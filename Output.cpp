@@ -1,12 +1,11 @@
-#include <hgversion.h>
 #include <Utils.h>
 #include <Vector5D.h>
 #include <Output.h>
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &vf_) 
-  : comm(comm_), iod(iod_), vf(vf_),
+Output::Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &vf_) : comm(comm_), 
+    iod(iod_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof))
 {
@@ -15,7 +14,7 @@ Output::Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &v
   char f1[256];
   sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
   pvdfile  = fopen(f1,"w");
-  print(pvdfile, "<?xml version=\"1.0\"?>\n";
+  print(pvdfile, "<?xml version=\"1.0\"?>\n");
   print(pvdfile, "<VTKFile type=\"Collection\" version=\"0.1\"\n");
   print(pvdfile, "byte_order=\"LittleEndian\">\n");
   print(pvdfile, "  <Collection>\n");
@@ -40,7 +39,7 @@ void Output::InitializeOutput(SpaceVariable2D &coordinates)
 
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, SpaceVariable &V)
+void Output::WriteSolutionSnapshot(double time, SpaceVariable2D &V)
 {
 
   // Define vtr file name
@@ -79,43 +78,37 @@ void Output::WriteSolutionSnapshot(double time, SpaceVariable &V)
   Vec5D**  v  = (Vec5D**) V.GetDataPointer();
 
   int i0, j0, imax, jmax;
-  v.GetCornerIndices(&i0, &j0, &imax, &jmax);
+  V.GetCornerIndices(&i0, &j0, &imax, &jmax);
 
-  for(int i=0; i<OutputData::SIZE; i++) {
-    if(iod.output.specified[i]) {
+  if(iod.output.density==OutputData::ON) {
+    double** s  = (double**) scalar.GetDataPointer();
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        s[j][i] = v[j][i][0];
+    scalar.RestoreDataPointerAndInsert();
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "density");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
+  }
 
-      if(i==OutputData::DENSITY) {
-        double** s  = (double**) scalar.GetDataPointer();
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++)
-            s[j][i] = v[j][i][0];
-        scalar.RestoreDataPointerAndInsert();
-        PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "density");
-        VecView(scalar.GetRefToGlobalVec(), viewer);
-      }
+  if(iod.output.velocity==OutputData::ON) {
+    Vec3D** v3  = (Vec3D**) vector3.GetDataPointer();
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        for(int k=0; k<3; k++)
+          v3[j][i][k] = v[j][i][1+k];
+    vector3.RestoreDataPointerAndInsert();
+    PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "velocity");
+    VecView(vector3.GetRefToGlobalVec(), viewer);
+  }
 
-      else if (i==OutputData::VELOCITY) {
-        Vec3D** v3  = (Vec3D**) vector3.GetDataPointer();
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++)
-            for(int k=0; k<3; k++)
-              s[j][i][k] = v[j][i][1+k];
-        vector3.RestoreDataPointerAndInsert();
-        PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "velocity");
-        VecView(vector3.GetRefToGlobalVec(), viewer);
-      }
-
-      if(i==OutputData::PRESSURE) {
-        double** s  = (double**) scalar.GetDataPointer();
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++)
-            s[j][i] = v[j][i][4];
-        scalar.RestoreDataPointerAndInsert();
-        PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "pressure");
-        VecView(scalar.GetRefToGlobalVec(), viewer);
-      }
-
-    }
+  if(iod.output.pressure==OutputData::ON) {
+    double** s  = (double**) scalar.GetDataPointer();
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        s[j][i] = v[j][i][4];
+    scalar.RestoreDataPointerAndInsert();
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "pressure");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
   }
 
   // Add a line to the pvd file to record the new solutio snapshot

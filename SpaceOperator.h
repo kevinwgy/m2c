@@ -29,13 +29,16 @@ public:
   void SetInitialCondition(SpaceVariable2D &V);
   void applyBoundaryConditions(SpaceVariable2D &V);
     
-  void ComputeAdvectionFluxes(&U, &F);
+  void SetBoundaryConditions(SpaceVariable2D &U);
+  void ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &F);
+
+  void Destroy();
 
 private:
   void SetupMesh();
   void SetupNodalCoordinatesUniformRectangularDomain();
-  void PopulateGhostNodalCoordinates();
-}
+  void PopulateGhostBoundaryNodalCoordinates();
+};
 
 
 #endif

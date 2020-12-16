@@ -15,7 +15,7 @@ class Output
   SpaceVariable2D scalar;   
   SpaceVariable2D vector3;
 
-  static int iFrame;
+  int iFrame;
 
   FILE* pvdfile;
 
@@ -24,9 +24,9 @@ public:
   ~Output();
 
   void InitializeOutput(SpaceVariable2D &coordinates); //attach mesh
-  void WriteSolutionSnapshot(double time, SpaceVariable &V);
+  void WriteSolutionSnapshot(double time, SpaceVariable2D &V);
   void FinalizeOutput();
 
-}
+};
 
 #endif

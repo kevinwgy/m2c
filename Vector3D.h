@@ -49,7 +49,7 @@ struct Vec3D {
 
   double operator*(const Vec3D &) const;
 
-  operator double*() { return v; }
+  operator double*() { return v; } //convert Vec3D to double*
 
   double &operator[](int i) { return v[i]; }
   double operator[](int i) const { return v[i]; }
@@ -316,7 +316,7 @@ public:
   PointIn3D() {}
   PointIn3D(int i, Vec3D &xin) {id = i; x = xin;}
   double val(int i) const {return x[i];}
-  double width(int i) const {return 0.0;}
+//  double width(int i) const {return 0.0;}
   int pid() const {return id;}
 };
 

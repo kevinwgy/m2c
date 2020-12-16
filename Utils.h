@@ -1,66 +1,28 @@
-#ifndef _UTILS_H_
-#define _UTILS_H_
+#pragma once
 
-#include <time.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <petscsys.h>
+#include <string>
+
+using std::string;
+
 
 //--------------------------------------------------
 // MPI Rank 0 will print to stdout
-void print(const char format[],...)
-{
-  va_list Argp;
-  va_start(Argp, format);
-  PetscPrintf(PETSC_COMM_WORLD, format, Argp);
-}
-
+void print(const char format[],...);
 //--------------------------------------------------
 // MPI Rank i will print to stdout
-void print(int i, const char format[],...)
-{
-  int rank;
-  MPI_Comm_rank(PETSC_COMM_WORLD,&rank);
-
-  va_list Argp;
-  va_start(Argp, format);
-
-  if(rank==i)
-    PetscPrintf(PETSC_COMM_SELF, format, Argp);
-}
-
-//--------------------------------------------------
-// All MPI processes will print to the screen
-void Print(const char format[],...)
-{
-  va_list Argp;
-  va_start(Argp, format);
-  PetscSynchronizedPrintf(PETSC_COMM_WORLD, format, Argp); 
-  PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
-}
-
+void print(int i, const char format[],...);
 //--------------------------------------------------
 // MPI Rank 0 will print to a file
-void print(FILE* fd, const char format[],...)
-{
-  va_list Argp;
-  va_start(Argp, format);
-  PetscFPrintf(PETSC_COMM_WORLD, fd, format, Argp);
-}
-
+void print(FILE* fd, const char format[],...);
+//--------------------------------------------------
+// Check for NAN
+template <class T>
+inline int m2c_isnan(const T& t) {return (t != t);}
 //--------------------------------------------------
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
-const string getCurrentDateTime()
-{
-    time_t     now = time(0);
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&now);
-    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
-    // for more information about date/time format
-    strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
-
-    return buf;
-}
-#endif
-
+const string getCurrentDateTime();
+//--------------------------------------------------
+// Print logo and code version
+void printLogo();

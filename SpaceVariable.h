@@ -1,6 +1,6 @@
 #ifndef _SPACEVARIABLE_
 #define _SPACEVARIABLE_
-#include <petscmdma.h>
+#include <petscdmda.h>
 
 // -----------------------------------------------
 // This class stores all the DM's
@@ -22,7 +22,7 @@ public:
   DataManagers2D(MPI_Comm comm, int NX, int NY);
   ~DataManagers2D();
 
-  void CreateAllDataManagers(MPI_Comm comm, int NX, int NY);
+  int CreateAllDataManagers(MPI_Comm comm, int NX, int NY);
   void DestroyAllDataManagers(); //need to call this before "PetscFinalize()".
 
 };
@@ -31,11 +31,11 @@ public:
 // Defines a space variable
 // -----------------------------------------------
 class SpaceVariable2D {
-  MPI_Comm   comm; 
+  MPI_Comm&  comm; 
   DM*        dm;   
   Vec        globalVec;  //each process only stores a local portion, without ghost
   Vec        localVec; //local portion of globalVec (separate memory allocation), with ghost layer
-  void*      array; //user should only edit "array", which is a pointer to localVec. this class handles 
+  double**   array; //user should only edit "array", which is a pointer to localVec. this class handles 
                     //array <-> localVec <-> globalVec
   int        dof;
 
@@ -56,34 +56,38 @@ public:
   SpaceVariable2D(MPI_Comm &comm_, DM *dm_);
   ~SpaceVariable2D();
 
-  void *GetDataPointer(); 
-  void RestoreDataPointer(); 
-  void AssembleInsert();
-  void AssembleAdd();
+  double** GetDataPointer(); 
+  void RestoreDataPointerAndInsert();
+  void RestoreDataPointerAndAdd();
+  void RestoreDataPointerToLocalVector(); //caution: does not update globalVec
   void Destroy(); //should be called before PetscFinalize!
 
-  void GetCornerIndices(int *i0_, int *j0_, int *imax_=0, int *jmax_=0) {
+  void StoreMeshCoordinates(SpaceVariable2D &coordinates);
+  void WriteToVTRFile(const char *filename);
+
+  inline void GetCornerIndices(int *i0_, int *j0_, int *imax_=0, int *jmax_=0) {
     *i0_ = i0; *j0_ = j0; 
-    if(imax_) *imax_0 = imax; 
-    if(jmax_) *jmax_jmax;
+    if(imax_) *imax_ = imax; 
+    if(jmax_) *jmax_ = jmax;
   }
 
-  void GetSize(int *nx_, int *ny_) {*nx_ = nx;  *ny_ = ny;}
+  inline void GetSize(int *nx_, int *ny_) {*nx_ = nx;  *ny_ = ny;}
 
-  void GetGhostedCornerIndices(int *i0_, int *j0_, int *imax_=0, int *jmax_=0) {
+  inline void GetGhostedCornerIndices(int *i0_, int *j0_, int *imax_=0, int *jmax_=0) {
     *i0_ = ghost_i0; *j0_ = ghost_j0;
     if(imax_) *imax_ = ghost_imax;
     if(jmax_) *jmax_ = ghost_jmax;
   }
 
-  void GetGhostedSize(int *ghost_nx_, int *ghost_ny_) {*ghost_nx_ = ghost_nx; *ghost_ny_ = ghost_ny;}
+  inline void GetGhostedSize(int *ghost_nx_, int *ghost_ny_) {*ghost_nx_ = ghost_nx; *ghost_ny_ = ghost_ny;}
 
-  int  NumGhostLayers() {return ghost_width;}
-  int  NumDOF() {return dof;}
+  inline int  NumGhostLayers() {return ghost_width;}
+  inline int  NumDOF() {return dof;}
 
-  int  NumProcs(int *nProcX_, int *nProcY_) {*nProcX_ = nProcX; *nProcY_ = nProcY;}
-  int  GetGlobalSize(int *NX_, int *NY_) {*NX_ = NX; *NY_ = NY;}
+  inline void NumProcs(int *nProcX_, int *nProcY_) {*nProcX_ = nProcX; *nProcY_ = nProcY;}
+  inline void GetGlobalSize(int *NX_, int *NY_) {*NX_ = NX; *NY_ = NY;}
  
+  inline Vec& GetRefToGlobalVec() {return globalVec;}
 };
 
 #endif

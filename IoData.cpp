@@ -1,12 +1,17 @@
+#include <Utils.h>
 #include <IoData.h>
 #include <parser/Assigner.h>
+#include <parser/Dictionary.h>
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <cstring>
 #include <cmath>
 #include <unistd.h>
 //#include <dlfcn.h>
+using namespace std;
 
 //------------------------------------------------------------------------------
 
@@ -17,25 +22,31 @@ MeshData::MeshData()
   xmax = 1.0;
   y0 = 0.0;
   ymax = 1.0;
+  z0 = 0.0;
+  zmax = 1.0;
   Nx = 50;
   Ny = 50;
+  Nz = 50;
 }
 
 //------------------------------------------------------------------------------
 
 void MeshData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 10, father);
 
   new ClassToken<MeshData>(ca, "Type", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::type), 3,
-                               "TwoDimensional", 0, "Cylindrical", 1, "ThreeDimensional");
+                               "TwoDimensional", 0, "Cylindrical", 1, "ThreeDimensional", 2);
   new ClassDouble<MeshData>(ca, "X0", this, &MeshData::x0);
   new ClassDouble<MeshData>(ca, "Xmax", this, &MeshData::xmax);
   new ClassDouble<MeshData>(ca, "Y0", this, &MeshData::y0);
   new ClassDouble<MeshData>(ca, "Ymax", this, &MeshData::ymax);
-  new ClassInt<MeshData>(ca, "NumberOfElementsX", this, &MeshData::Nx);
-  new ClassInt<MeshData>(ca, "NumberOfElementsY", this, &MeshData::Ny);
+  new ClassDouble<MeshData>(ca, "Z0", this, &MeshData::z0);
+  new ClassDouble<MeshData>(ca, "Zmax", this, &MeshData::zmax);
+  new ClassInt<MeshData>(ca, "NumberOfCellsX", this, &MeshData::Nx);
+  new ClassInt<MeshData>(ca, "NumberOfCellsY", this, &MeshData::Ny);
+  new ClassInt<MeshData>(ca, "NumberOfCellsZ", this, &MeshData::Nz);
  } 
 
 //------------------------------------------------------------------------------
@@ -111,7 +122,9 @@ EquationsData::EquationsData()
 
 void EquationsData::setup(const char *name, ClassAssigner *father)
 {
-  fluidModelMap.setup("FluidModel", 0);
+  ClassAssigner *ca = new ClassAssigner(name, 2, father); //not used.
+
+  fluid1.setup("FluidModel1");
 }
 
 //------------------------------------------------------------------------------
@@ -205,7 +218,7 @@ void BoundarySchemeData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-SchemesData::SchemesData() : ls(0), tm(0)
+SchemesData::SchemesData() : ls(0), ns(1)
 {
 
 }
@@ -221,7 +234,6 @@ void SchemesData::setup(const char *name, ClassAssigner *father)
   ls.setup("LevelSet",ca);
   bc.setup("Boundaries", ca);
 
-  return ca;
 }
 
 //------------------------------------------------------------------------------
@@ -276,10 +288,302 @@ void TsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-void Input::readCmdLine(int argc, char** argv)
+BcsData::BcsData()
+{
+
+}
+
+//------------------------------------------------------------------------------
+
+void BcsData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+
+  farfield.setup("Farfield", ca);
+  wall.setup("Wall", ca);
+
+}
+
+//------------------------------------------------------------------------------
+
+BcsFreeStreamData::BcsFreeStreamData()
+{
+
+  density = -1.0;
+  velocity_x = 0.0;
+  velocity_y = 0.0;
+  velocity_z = 0.0;
+  pressure = -1.0;
+  temperature = -1.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+void BcsFreeStreamData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+
+  new ClassDouble<BcsFreeStreamData>(ca, "Density", this, &BcsFreeStreamData::density);
+  new ClassDouble<BcsFreeStreamData>(ca, "VelocityX", this, &BcsFreeStreamData::velocity_x);
+  new ClassDouble<BcsFreeStreamData>(ca, "VelocityY", this, &BcsFreeStreamData::velocity_y);
+  new ClassDouble<BcsFreeStreamData>(ca, "VelocityZ", this, &BcsFreeStreamData::velocity_z);
+  new ClassDouble<BcsFreeStreamData>(ca, "Pressure", this, &BcsFreeStreamData::pressure);
+  new ClassDouble<BcsFreeStreamData>(ca, "Temperature", this, &BcsFreeStreamData::temperature);
+
+}
+
+//------------------------------------------------------------------------------
+
+BcsWallData::BcsWallData()
+{
+
+  type = ADIABATIC;
+  temperature = -1.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+void BcsWallData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+
+  new ClassToken<BcsWallData>(ca, "Type", this,
+                              reinterpret_cast<int BcsWallData::*>(&BcsWallData::type), 2,
+                              "Isothermal", 0, "Adiabatic", 1);
+  new ClassDouble<BcsWallData>(ca, "Temperature", this, &BcsWallData::temperature);
+
+}
+
+//------------------------------------------------------------------------------
+
+IcData::IcData()
+{
+  user_specified_ic = "";
+  user_specified_ic2 = "";
+
+  type = NONE;
+
+  for(int i=0; i<SIZE; i++)
+    specified[i] = 0;
+}
+
+//------------------------------------------------------------------------------
+
+void IcData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+
+  new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
+  new ClassStr<IcData>(ca, "UserDataFile2", this, &IcData::user_specified_ic2);
+}
+
+//------------------------------------------------------------------------------
+
+void IcData::readUserSpecifiedIC()
+{
+  if(!strcmp(user_specified_ic, "")) //no user_specified_ic
+    return;
+
+  std::fstream input;
+  input.open(user_specified_ic, std::fstream::in);
+  if (!input.is_open()) {
+    print("ERROR: could not open user-specified initial condition file %s.\n", user_specified_ic);
+    exit(-1);
+  } else
+    print("Reading user-specified initial condition file: %s.\n", user_specified_ic);
+
+  std::string word, line;
+
+  // Read the first line of user-specified file
+  input.ignore(2,' '); //This line should start with ## (so the file can be plotted
+                       //directly using gnuplot). It must then specify the type of initial cond.
+
+  input >> word;
+  // just comparing the first 4 letters is sufficient
+  if(!(word.compare(0,4,"Planar",0,4) && 
+       word.compare(0,4,"PLANAR",0,4) && 
+       word.compare(0,4,"planar",0,4)))
+    type = PLANAR;
+  else if(!(word.compare(0,4,"Cylindrical",0,4) && 
+            word.compare(0,4,"CYLINDRICAL",0,4) && 
+            word.compare(0,4,"cylindrical",0,4)))
+    type = CYLINDRICAL;
+  else if(!(word.compare(0,4,"Spherical",0,4) && 
+            word.compare(0,4,"SPHERICAL",0,4) && 
+            word.compare(0,4,"spherical",0,4)))
+    type = SPHERICAL;
+  else {
+    print("ERROR: Unknown initial condition type %s.\n", word);
+    exit(-1);
+  }
+  input.ignore(256,'\n'); //done with line 1
+
+  // Read the second line of user-specified file
+  input.ignore(2,' '); //This line should start with ## 
+                       //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
+                       //of the "0" in this data file within the actual mesh
+  input >> x0[0] >> x0[1] >> x0[2];
+  input.ignore(256,'\n'); //done with line 2
+
+  // Read the next line, which should be provided only if type is "planar" or "cylindrical"
+  input.ignore(2,' '); //This line should start with ##
+                       //It must contain 3 real numbers corresponding to the direction of "+x"
+  input >> dir[0] >> dir[1] >> dir[2];
+  dir /= dir.norm();
+  input.ignore(256,'\n'); //done with this line
+
+  // Read the next line, which specifies the variable of each column
+  input.ignore(2,' '); //This line should start with ##
+                       //It must contain between 2 and SIZE words indicating the field
+  for(int i=0; i<SIZE; i++)
+    specified[i] = 0;
+  std::map<int,int> column2var; //maps the column number to "Vars" index 
+  getline(input, line);
+
+  std::istringstream iss(line);
+  int column = 0; 
+  for(;iss>>word;) {
+    // just check the first four letters
+    if(!(word.compare(0,4,"Coordinate",0,4) && 
+         word.compare(0,4,"COORDINATE",0,4) && 
+         word.compare(0,4,"coordinate",0,4))) {
+      column2var[column] = COORDINATE;
+      specified[COORDINATE] = 1;
+    } 
+    else if(!(word.compare(0,4,"Density",0,4) && 
+              word.compare(0,4,"DENSITY",0,4) && 
+              word.compare(0,4,"density",0,4))) {
+      column2var[column] = DENSITY;
+      specified[DENSITY] = 1;
+    } 
+    else if(!(word.compare(0,4,"Velocity",0,4) && 
+              word.compare(0,4,"VELOCITY",0,4) && 
+              word.compare(0,4,"velocity",0,4))) {
+      column2var[column] = VELOCITY;
+      specified[VELOCITY] = 1;
+    } 
+    else if(!(word.compare(0,4,"Pressure",0,4) && 
+              word.compare(0,4,"PRESSURE",0,4) && 
+              word.compare(0,4,"pressure",0,4))) {
+      column2var[column] = PRESSURE;
+      specified[PRESSURE] = 1;
+    } 
+    else if(!(word.compare(0,4,"LevelSet",0,4) && 
+              word.compare(0,4,"LEVELSET",0,4) && 
+              word.compare(0,4,"levelset",0,4))) {
+      column2var[column] = LEVELSET;
+      specified[LEVELSET] = 1;
+    } 
+    else if(!(word.compare(0,4,"MaterialID",0,4) && 
+              word.compare(0,4,"MATERIALID",0,4) && 
+              word.compare(0,4,"materialid",0,4))) {
+      column2var[column] = MATERIALID;
+      specified[MATERIALID] = 1;
+    } 
+    else if(!(word.compare(0,4,"Temperature",0,4) && 
+              word.compare(0,4,"TEMPERATURE",0,4) && 
+              word.compare(0,4,"temperature",0,4))) {
+      column2var[column] = TEMPERATURE;
+      specified[TEMPERATURE] = 1;
+    } else {
+      print("ERROR: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      exit(-1);
+    }
+    column++;
+  }
+  input.ignore(256,'\n'); //done with this line
+  if(column<2 || !specified[COORDINATE]) {
+    print("ERROR: Need additional data in the initial condition file.\n");
+    exit(-1);
+  }
+
+  // Now start reading the actual data (until end of file)
+  int MaxRows = 100000; //should be a lot more than enough
+  double data;
+  for(int r=0; r<MaxRows; r++) {
+    getline(input, line);
+    std::istringstream is(line);
+    for(int i=0; i<column; i++) {
+      is >> data; 
+      user_data[column2var[i]].push_back(data);
+    }
+    if(input.eof())
+      break;
+  }
+
+  input.close();
+  print("Successfully read user-specified initial condition.\n");
+}
+
+//------------------------------------------------------------------------------
+
+OutputData::OutputData()
+{
+  prefix = "";
+  solution_filename_base = "solution";
+
+  frequency = 0;
+  frequency_dt = -1.0;
+
+  density = OFF;
+  velocity = OFF;
+  pressure = OFF;
+  levelset = OFF;
+  materialid = OFF;
+  temperature = OFF;
+}
+
+//------------------------------------------------------------------------------
+
+void OutputData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 10, father);
+
+  new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
+  new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
+
+  new ClassInt<OutputData>(ca, "Frequency", this, &OutputData::frequency);
+  new ClassDouble<OutputData>(ca, "TimeInterval", this, &OutputData::frequency_dt);
+
+  new ClassToken<OutputData>(ca, "Density", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::density), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "Velocity", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::velocity), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "Pressure", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::pressure), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "LevelSet", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "MaterialID", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::materialid), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "Temperature", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
+                               "Off", 0, "On", 1);
+}
+
+//------------------------------------------------------------------------------
+
+IoData::IoData(int argc, char** argv)
+{
+  readCmdLine(argc, argv);
+  readCmdFile();
+}
+
+//------------------------------------------------------------------------------
+
+void IoData::readCmdLine(int argc, char** argv)
 {
   if(argc==1) {
-    fprintf(stderr,"ERROR: Input file not provided!\n");
+    print("ERROR: Input file not provided!\n");
     exit(-1);
   }
   cmdFileName = argv[1];
@@ -287,7 +591,7 @@ void Input::readCmdLine(int argc, char** argv)
 
 //------------------------------------------------------------------------------
 
-void Input::readCmdFile()
+void IoData::readCmdFile()
 {
   extern FILE *yyCmdfin;
   extern int yyCmdfparse();
@@ -297,26 +601,36 @@ void Input::readCmdFile()
   yyCmdfin = cmdFilePtr = fopen(cmdFileName, "r");
 
   if (!cmdFilePtr) {
-    fprintf(stderr,"*** Error: could not open \'%s\'\n", cmdFileName);
+    print("*** Error: could not open \'%s\'\n", cmdFileName);
     exit(-1);
   }
 
   int error = yyCmdfparse();
   if (error) {
-    fprintf(stderr,"*** Error: command file contained parsing errors\n");
+    print("*** Error: command file contained parsing errors\n");
     exit(error);
   }
   fclose(cmdFilePtr);
+
+  //READ ADDITIONAL FILES
+  if(strcmp(ic.user_specified_ic, ""))
+    ic.readUserSpecifiedIC(); 
 }
 
 //------------------------------------------------------------------------------
 
 void IoData::setupCmdFileVariables()
 {
-  domain.setup("Domain");
   eqs.setup("Equations");
+  ic.setup("InitialCondition");
+  bc.setup("BoundaryConditions");
+
+  mesh.setup("Mesh");
+
   schemes.setup("Space");
   ts.setup("Time");
+
+  output.setup("Output");
 }
 
 //------------------------------------------------------------------------------

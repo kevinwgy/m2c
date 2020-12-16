@@ -1,18 +1,23 @@
+#include <iostream>
+#include <Utils.h>
 #include <time.h>
-#include <stdarg.h>
+#include <mpi.h>
+#include <version.h>
 #include <stdio.h>
-#include <string>
-#include <petscsys.h>
-
-using std::string;
-
+using std::cout;
+using std::endl;
 //--------------------------------------------------
 // MPI Rank 0 will print to stdout
 void print(const char format[],...)
 {
-  va_list Argp;
-  va_start(Argp, format);
-  PetscPrintf(PETSC_COMM_WORLD, format, Argp);
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(!rank) {
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format, Argp);
+    va_end(Argp);
+  }
 }
 
 //--------------------------------------------------
@@ -20,32 +25,29 @@ void print(const char format[],...)
 void print(int i, const char format[],...)
 {
   int rank;
-  MPI_Comm_rank(PETSC_COMM_WORLD,&rank);
+  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
-  va_list Argp;
-  va_start(Argp, format);
-
-  if(rank==i)
-    PetscPrintf(PETSC_COMM_SELF, format, Argp);
-}
-
-//--------------------------------------------------
-// All MPI processes will print to the screen
-void Print(const char format[],...)
-{
-  va_list Argp;
-  va_start(Argp, format);
-  PetscSynchronizedPrintf(PETSC_COMM_WORLD, format, Argp); 
-  PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
+  if(rank == i) {
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format, Argp);
+    va_end(Argp);
+  }
 }
 
 //--------------------------------------------------
 // MPI Rank 0 will print to a file
 void print(FILE* fd, const char format[],...)
 {
-  va_list Argp;
-  va_start(Argp, format);
-  PetscFPrintf(PETSC_COMM_WORLD, fd, format, Argp);
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+
+  if(!rank) {
+    va_list Argp;
+    va_start(Argp, format);
+    vfprintf(fd, format, Argp);
+    va_end(Argp);
+  }
 }
 
 //--------------------------------------------------
@@ -62,3 +64,34 @@ const string getCurrentDateTime()
 
     return buf;
 }
+
+//--------------------------------------------------
+// Print logo 
+void printLogo()
+{
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(!rank) {
+    cout << endl;
+    cout << "                                     _..._     " << endl;
+    cout << "                     .-''-.       .-'_..._''.  " << endl;
+    cout << "  __  __   ___     .' .-.  )    .' .'      '.\\  " << endl;
+    cout << " |  |/  `.'   `.  / .'  / /    / .'            " << endl;
+    cout << " |   .-.  .-.   '(_/   / /    . '              " << endl;
+    cout << " |  |  |  |  |  |     / /     | |              " << endl;
+    cout << " |  |  |  |  |  |    / /      | |              " << endl;
+    cout << " |  |  |  |  |  |   . '       . '              " << endl;
+    cout << " |  |  |  |  |  |  / /    _.-')\\ '.          . " << endl;
+    cout << " |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/ " << endl;
+    cout << "                /  /.-'_.'        `-.______ /  " << endl;
+    cout << "               /    _.'                    `   " << endl;
+    cout << "              ( _.-'                           " << endl;
+    cout << endl;
+    cout << "Revision: " << GIT_REV << " | " << "Branch: " << GIT_BRANCH << " | " << "Tag: " << GIT_TAG << endl;
+    cout << "Simulation started at: " << getCurrentDateTime() << endl;
+    cout << endl;
+    cout.flush();
+  }
+}
+
+//--------------------------------------------------

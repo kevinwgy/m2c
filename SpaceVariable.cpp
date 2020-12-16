@@ -3,6 +3,14 @@
 //---------------------------------------------------------
 // DataManagers2D
 //---------------------------------------------------------
+// static member variables
+DM DataManagers2D::ghosted1_1dof; //ghosted"1" --> stencil width is 1
+DM DataManagers2D::ghosted1_2dof;
+DM DataManagers2D::ghosted1_3dof;
+DM DataManagers2D::ghosted1_4dof;
+DM DataManagers2D::ghosted1_5dof;
+
+//---------------------------------------------------------
 
 DataManagers2D::DataManagers2D()
 {
@@ -25,64 +33,76 @@ DataManagers2D::~DataManagers2D()
 
 //---------------------------------------------------------
 
-void DataManagers2D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY)
+int DataManagers2D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY)
 {
   int nProcX, nProcY; //All DM's should use the same domain partition
 
-  auto ierr = DMDACreate2D(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_STENCIL_BOX,
+  auto ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
                            NX, NY, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, NULL,
-                           &ghosted_1dof);
-  CHKERRXX(ierr);
+                           &ghosted1_1dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted1_1dof);
+  DMSetUp(ghosted1_1dof);
 
-  DMDAGetInfo(ghosted_1dof, NULL, NULL, NULL, NULL, &nProcX, &nProcY, NULL, NULL, NULL, NULL,
+  DMDAGetInfo(ghosted1_1dof, NULL, NULL, NULL, NULL, &nProcX, &nProcY, NULL, NULL, NULL, NULL,
               NULL, NULL, NULL); 
 
-  ierr = DMDACreate2D(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, PETSC_DECIDE, 2, 1, NULL, NULL,
-                      &ghosted_2dof);
-  CHKERRXX(ierr);
+  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
+                      NX, NY, nProcX, nProcY, 2, 1, NULL, NULL,
+                      &ghosted1_2dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted1_2dof);
+  DMSetUp(ghosted1_2dof);
 
-  ierr = DMDACreate2D(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, PETSC_DECIDE, 3, 1, NULL, NULL,
-                      &ghosted_3dof);
-  CHKERRXX(ierr);
+  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
+                      NX, NY, nProcX, nProcY, 3, 1, NULL, NULL,
+                      &ghosted1_3dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted1_3dof);
+  DMSetUp(ghosted1_3dof);
 
-  ierr = DMDACreate2D(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, PETSC_DECIDE, 4, 1, NULL, NULL,
-                      &ghosted_4dof);
-  CHKERRXX(ierr);
+  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
+                      NX, NY, nProcX, nProcY, 4, 1, NULL, NULL,
+                      &ghosted1_4dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted1_4dof);
+  DMSetUp(ghosted1_4dof);
 
-  ierr = DMDACreate2D(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, PETSC_DECIDE, 5, 1, NULL, NULL,
-                      &ghosted_5dof);
-  CHKERRXX(ierr);
+  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
+                      NX, NY, nProcX, nProcY, 5, 1, NULL, NULL,
+                      &ghosted1_5dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted1_5dof);
+  DMSetUp(ghosted1_5dof);
+
+  return 0;
 }
 
 //---------------------------------------------------------
 
-void DestroyAllDataManagers()
+void DataManagers2D::DestroyAllDataManagers()
 {
-  DMDestroy(&ghosted_1dof);
-  DMDestroy(&ghosted_2dof);
-  DMDestroy(&ghosted_3dof);
-  DMDestroy(&ghosted_4dof);
-  DMDestroy(&ghosted_5dof);
+  DMDestroy(&ghosted1_1dof);
+  DMDestroy(&ghosted1_2dof);
+  DMDestroy(&ghosted1_3dof);
+  DMDestroy(&ghosted1_4dof);
+  DMDestroy(&ghosted1_5dof);
 }
 
 //---------------------------------------------------------
 // SpaceVariable2D
 //---------------------------------------------------------
 
-SpaceVariable2D::SpaceVariable2D(DM *dm_) : comm(comm_), globalVec(), localVec()
+SpaceVariable2D::SpaceVariable2D(MPI_Comm &comm_, DM *dm_) : comm(comm_), globalVec(), localVec()
 {
   dm = dm_;
 
   auto ierr = DMCreateGlobalVector(*dm, &globalVec); 
-  CHKERRXX(ierr);
+  //CHKERRQ(ierr);
   VecSet(globalVec, 0.0);
 
   ierr = DMCreateLocalVector(*dm, &localVec);
-  CHKERRXX(ierr);
+  //CHKERRQ(ierr);
   VecSet(localVec, 0.0);
 
   array = NULL;
@@ -99,7 +119,7 @@ SpaceVariable2D::SpaceVariable2D(DM *dm_) : comm(comm_), globalVec(), localVec()
     ghosted = true;
   } else {
     PetscPrintf(comm, "ERROR: Unsupported ghost type.\n");
-    PETSCABORT(comm, 1); 
+    MPI_Abort(comm, 1); 
   }
 
   DMDAGetCorners(*dm, &i0, &j0, NULL, &nx, &ny, NULL);
@@ -116,42 +136,44 @@ SpaceVariable2D::SpaceVariable2D(DM *dm_) : comm(comm_), globalVec(), localVec()
 
 SpaceVariable2D::~SpaceVariable2D() 
 {
-
+  Destroy();
 }
 
 //---------------------------------------------------------
 
-void* SpaceVariable2D::GetDataPointer()
+double** SpaceVariable2D::GetDataPointer()
 {
   DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
   DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
-  auto ierr = DMDAVecGetArray(*dm, localVec, array);
-  CHKERRXX(ierr);
+  auto ierr = DMDAVecGetArray(*dm, localVec, &array);
+  //CHKERRQ(ierr);
   return array;
 }
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::RestoreDataPointer()
+void SpaceVariable2D::RestoreDataPointerAndInsert()
 {
-  auto ierr = DMDAVecRestoreArray(*dm, localVec, array);  
-  CHKERRXX(ierr);
+  RestoreDataPointerToLocalVector();
+  auto ierr = DMLocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
+  //CHKERRQ(ierr);
 }
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::AssembleInsert()
+void SpaceVariable2D::RestoreDataPointerAndAdd()
 {
-  auto ierr = DMDALocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
-  CHKERRXX(ierr);
+  RestoreDataPointerToLocalVector();
+  auto ierr = DMLocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
+  //CHKERRQ(ierr);
 }
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::AssembleAdd()
+void SpaceVariable2D::RestoreDataPointerToLocalVector()
 {
-  auto ierr = DMDALocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
-  CHKERRXX(ierr);
+  auto ierr = DMDAVecRestoreArray(*dm, localVec, &array);  
+  //CHKERRQ(ierr);
 }
 
 //---------------------------------------------------------
@@ -164,18 +186,22 @@ void SpaceVariable2D::Destroy()
 
 //---------------------------------------------------------
 
+void SpaceVariable2D::StoreMeshCoordinates(SpaceVariable2D &coordinates)
+{
+  auto ierr = DMSetCoordinateDim(*dm, 2/*2D*/);
+  //CHKERRQ(ierr);
+  ierr = DMSetCoordinates(*dm, coordinates.globalVec);
+  //CHKERRQ(ierr);
+}
 
+//---------------------------------------------------------
 
-
-
-
-
-
-
-
-
-
-
-
+void SpaceVariable2D::WriteToVTRFile(const char *filename)
+{
+  PetscViewer viewer;
+  PetscViewerVTKOpen(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer);
+  VecView(globalVec, viewer);
+  PetscViewerDestroy(&viewer);
+}
 
 

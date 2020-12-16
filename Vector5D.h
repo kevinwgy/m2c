@@ -14,7 +14,7 @@ struct Vec5D {
   Vec5D() {v[0] = v[1] = v[2] = v[3] = v[4] = 0.0; }
   Vec5D(double x[5]) { v[0] = x[0]; v[1] = x[1]; v[2] = x[2]; v[3] = x[3]; v[4] = x[4];}
   Vec5D(double x, double y, double z, double zz, double zzz) { v[0] = x; v[1] = y; v[2] = z; v[3] = zz; v[4] = zzz;}
-  Vec5D(const Vec5D &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; v[2] = v2.v[2]; v[3] = v2.v[3]; v[4] = v2.v[4]}
+  Vec5D(const Vec5D &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; v[2] = v2.v[2]; v[3] = v2.v[3]; v[4] = v2.v[4];}
   Vec5D(double x) { v[0] = v[1] = v[2] = v[3] = v[4] = x; }
   ~Vec5D() {}
 

@@ -1,6 +1,8 @@
 #include <SpaceOperator.h>
 #include <Vector2D.h>
 #include <Vector5D.h>
+using std::cout;
+using std::endl;
 
 //-----------------------------------------------------
 
@@ -10,7 +12,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &i
     coordinates(comm_, &(dm_all_.ghosted1_2dof)),
     delta_xy(comm_, &(dm_all_.ghosted1_2dof)),
     face_rt(comm_, &(dm_all_.ghosted1_2dof)),
-    volume(comm_, &(dm_all_.ghosted1_1dof)),
+    volume(comm_, &(dm_all_.ghosted1_1dof))
 {
   SetupMesh();
 }
@@ -18,6 +20,13 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &i
 //-----------------------------------------------------
 
 SpaceOperator::~SpaceOperator()
+{
+
+}
+
+//-----------------------------------------------------
+
+void SpaceOperator::Destroy()
 {
   coordinates.Destroy();
   delta_xy.Destroy();
@@ -36,10 +45,10 @@ void SpaceOperator::SetupMesh()
 
 
   // Compute mesh information
-  Vec2D** coords = coordinates.GetDataPointer(); 
-  Vec2D**  dxy   = delta_xy.GetDataPointer();
-  Vec2D**  frt   = face_rt.GetDataPointer();
-  double** vol   = volume.GetDataPointer();
+  Vec2D** coords = (Vec2D**)coordinates.GetDataPointer(); 
+  Vec2D**  dxy   = (Vec2D**)delta_xy.GetDataPointer();
+  Vec2D**  frt   = (Vec2D**)face_rt.GetDataPointer();
+  double** vol   = (double**)volume.GetDataPointer();
 
   int i0, j0, imax, jmax, ii0, jj0;
   coordinates.GetCornerIndices(&i0, &j0, &imax, &jmax);
@@ -103,7 +112,7 @@ void SpaceOperator::SetupNodalCoordinatesUniformRectangularDomain()
 
 //-----------------------------------------------------
 
-void SpaceOperator::PopulateGhostBoundaryNodalCoordinates();
+void SpaceOperator::PopulateGhostBoundaryNodalCoordinates()
 {
   Vec2D** v = (Vec2D**) coordinates.GetDataPointer();
 
@@ -167,9 +176,9 @@ void SpaceOperator::ConservativeToPrimitive(SpaceVariable2D &U, SpaceVariable2D 
 
   int i0, j0, imax, jmax;
   if(workOnGhost)
-    u.GetGhostedCornerIndices(&i0, &j0, &imax, &jmax);
+    U.GetGhostedCornerIndices(&i0, &j0, &imax, &jmax);
   else
-    u.GetCornerIndices(&i0, &j0, &imax, &jmax);
+    U.GetCornerIndices(&i0, &j0, &imax, &jmax);
 
   for(int j=j0; j<jmax; j++)
     for(int i=i0; i<imax; i++)
@@ -190,9 +199,9 @@ void SpaceOperator::PrimitiveToConservative(SpaceVariable2D &V, SpaceVariable2D 
 
   int i0, j0, imax, jmax;
   if(workOnGhost)
-    v.GetGhostedCornerIndices(&i0, &j0, &imax, &jmax);
+    V.GetGhostedCornerIndices(&i0, &j0, &imax, &jmax);
   else
-    v.GetCornerIndices(&i0, &j0, &imax, &jmax);
+    V.GetCornerIndices(&i0, &j0, &imax, &jmax);
 
   for(int j=j0; j<jmax; j++)
     for(int i=i0; i<imax; i++)
@@ -209,16 +218,16 @@ void SpaceOperator::SetInitialCondition(SpaceVariable2D &V) //apply IC within th
   Vec5D** v = (Vec5D**) V.GetDataPointer();
 
   int i0, j0, imax, jmax;
-  v.GetCornerIndices(&i0, &j0, &imax, &jmax);
+  V.GetCornerIndices(&i0, &j0, &imax, &jmax);
 
   // First, apply the farfield state
   for(int j=j0; j<jmax; j++)
     for(int i=i0; i<imax; i++) {
-      v[j][i][0] = iod.bc.inlet.density;
-      v[j][i][1] = iod.bc.inlet.velocity_x;
-      v[j][i][2] = iod.bc.inlet.velocity_y;
-      v[j][i][3] = iod.bc.inlet.velocity_z;
-      v[j][i][4] = iod.bc.inlet.pressure;
+      v[j][i][0] = iod.bc.farfield.density;
+      v[j][i][1] = iod.bc.farfield.velocity_x;
+      v[j][i][2] = iod.bc.farfield.velocity_y;
+      v[j][i][3] = iod.bc.farfield.velocity_z;
+      v[j][i][4] = iod.bc.farfield.pressure;
     }
 
   // Second, apply user-specified function
@@ -236,7 +245,7 @@ void SpaceOperator::SetBoundaryConditions(SpaceVariable2D &U)
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeAdvectionFluxes(&U, &F)
+void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &F)
 {
   //TODO
 }

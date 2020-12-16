@@ -3,7 +3,7 @@
 
 #include <VarFcnBase.h>
 #include <fstream>
-#include <utils/Aerof_math.h>
+#include <Utils.h>
 
 //--------------------------------------------------------------------------
 // This class is the VarFcn class for the Stiffened Gas EOS in Euler
@@ -53,7 +53,7 @@ public:
   ~VarFcnSGEuler() { delete [] pname; }
 
   virtual bool equal(VarFcnBase* oth) {
-    if (oth->type == VarFcnBase::STIFFENEDGAS || oth->type == VarFcnBase::PERFECTGAS) {
+    if (oth->type == VarFcnBase::STIFFENEDGAS) {
       VarFcnSGEuler* othsg = dynamic_cast<VarFcnSGEuler*>(oth);
       if (gam == othsg->gam && Pstiff == othsg->Pstiff)
         return true;
@@ -106,14 +106,14 @@ public:
     return error;
   }
   double computeTemperature(double *V) const {
-    if (aerof_isnan(1.0/V[0])) {
+    if (m2c_isnan(1.0/V[0])) {
       fprintf(stderr, "ERROR*** computeTemp\n");
       throw std::exception();
     }
     return invgam1 * (V[4]+Pstiff) / V[0];
   }
   void computeTemperatureGradient(double *V,double* Tg) const {
-    if (aerof_isnan(1.0/V[0])) {
+    if (m2c_isnan(1.0/V[0])) {
       fprintf(stderr, "ERROR*** computeTemp\n");
       throw std::exception();
     }
@@ -123,7 +123,7 @@ public:
   }
   void computeTemperatureHessian(double *V,double& Trr, double& Trp,
                                  double& Tpp) const {
-    if (aerof_isnan(1.0/V[0])) {
+    if (m2c_isnan(1.0/V[0])) {
       fprintf(stderr, "ERROR*** computeTemp\n");
       throw std::exception();
     }
@@ -229,14 +229,12 @@ public:
 inline
 VarFcnSGEuler::VarFcnSGEuler(FluidModelData &data) : VarFcnBase(data) {
 
-  if(data.fluid != FluidModelData::PERFECT_GAS && data.fluid != FluidModelData::STIFFENED_GAS){
+  if(data.fluid != FluidModelData::STIFFENED_GAS){
     fprintf(stderr, "*** Error: FluidModelData is not of type GAS\n");
     exit(1);
   }
 
-  if (data.gasModel.type == GasModelData::IDEAL)
-    type = PERFECTGAS;
-  else if(data.gasModel.type == GasModelData::STIFFENED)
+  if(data.gasModel.type == GasModelData::STIFFENED)
     type = STIFFENEDGAS;
   else
     fprintf(stdout, "*** Error: VarFcnSGEuler::type is undefined since data.gasModel.type = %d\n", data.gasModel.type);
