@@ -2,16 +2,17 @@
 #define _SPACEVARIABLE_
 #include <petscdmda.h>
 
-// -----------------------------------------------
-// This class stores all the DM's
-// -----------------------------------------------
+/*******************************************
+ * This class stores all the DM's
+ *******************************************
+*/
 class DataManagers2D {
 
 public:
-  // Note: To avoid ambiguities, ghosted means DM_BOUNDARY_GHOSTED. We do NOT use DM_BOUNDARY_MIRROR, 
-  //       _PERIODIC, _TWISTED, ... Also, we always use DMDA_STENCIL_BOX for "stencil type"
+  //! Note: To avoid ambiguities, ghosted means DM_BOUNDARY_GHOSTED. We do NOT use DM_BOUNDARY_MIRROR, 
+  //!       _PERIODIC, _TWISTED, ... Also, we always use DMDA_STENCIL_BOX for "stencil type"
   //
-  static DM ghosted1_1dof; //ghosted"1" --> stencil width is 1 
+  static DM ghosted1_1dof; //!< ghosted"1" --> stencil width is 1 
   static DM ghosted1_2dof;  
   static DM ghosted1_3dof;  
   static DM ghosted1_4dof;  
@@ -23,34 +24,35 @@ public:
   ~DataManagers2D();
 
   int CreateAllDataManagers(MPI_Comm comm, int NX, int NY);
-  void DestroyAllDataManagers(); //need to call this before "PetscFinalize()".
+  void DestroyAllDataManagers(); //!< need to call this before "PetscFinalize()".
 
 };
 
-// -----------------------------------------------
-// Defines a space variable
-// -----------------------------------------------
+/*******************************************
+ * Defines a space variable
+ *******************************************
+ */
 class SpaceVariable2D {
   MPI_Comm&  comm; 
   DM*        dm;   
-  Vec        globalVec;  //each process only stores a local portion, without ghost
-  Vec        localVec; //local portion of globalVec (separate memory allocation), with ghost layer
-  double**   array; //user should only edit "array", which is a pointer to localVec. this class handles 
-                    //array <-> localVec <-> globalVec
+  Vec        globalVec;  //!< each process only stores a local portion, without ghost
+  Vec        localVec; //!< local portion of globalVec (separate memory allocation), with ghost layer
+  double**   array; /**< user should only edit "array", which is a pointer to localVec. this class handles 
+                      *  array <-> localVec <-> globalVec */
   int        dof;
 
-  int        NX, NY; //global number of grid points in x and y directions
-  int        nProcX, nProcY; //number of processors in X and Y directions
+  int        NX, NY; //!< global number of grid points in x and y directions
+  int        nProcX, nProcY; //!< number of processors in X and Y directions
 
-  int        i0, j0; //lower-left corner of the actual subdomain
-  int        imax, jmax; //upper-right corner of the actual subdomain
-  int        nx, ny; //width of the actual subdomain in x and y directions
+  int        i0, j0; //!< lower-left corner of the actual subdomain
+  int        imax, jmax; //!< upper-right corner of the actual subdomain
+  int        nx, ny; //!< width of the actual subdomain in x and y directions
 
-  bool       ghosted; //whether da is ghosted.
-  int        ghost_width; //width of the ghost layer (usually 1)
-  int        ghost_i0, ghost_j0; //lower-left corner of the ghost layer
-  int        ghost_imax, ghost_jmax; //upper-right corner of the ghost layer
-  int        ghost_nx, ghost_ny; //width of the ghosted subdomain in x and y directions
+  bool       ghosted; //!< whether da is ghosted.
+  int        ghost_width; //!< width of the ghost layer (usually 1)
+  int        ghost_i0, ghost_j0; //!< lower-left corner of the ghost layer
+  int        ghost_imax, ghost_jmax; //!< upper-right corner of the ghost layer
+  int        ghost_nx, ghost_ny; //!< width of the ghosted subdomain in x and y directions
 
 public:
   SpaceVariable2D(MPI_Comm &comm_, DM *dm_);
@@ -59,8 +61,8 @@ public:
   double** GetDataPointer(); 
   void RestoreDataPointerAndInsert();
   void RestoreDataPointerAndAdd();
-  void RestoreDataPointerToLocalVector(); //caution: does not update globalVec
-  void Destroy(); //should be called before PetscFinalize!
+  void RestoreDataPointerToLocalVector(); //!< caution: does not update globalVec
+  void Destroy(); //!< should be called before PetscFinalize!
 
   void StoreMeshCoordinates(SpaceVariable2D &coordinates);
   void WriteToVTRFile(const char *filename);
@@ -88,6 +90,9 @@ public:
   inline void GetGlobalSize(int *NX_, int *NY_) {*NX_ = NX; *NY_ = NY;}
  
   inline Vec& GetRefToGlobalVec() {return globalVec;}
+
+  // operators
+  //TODO 
 };
 
 #endif

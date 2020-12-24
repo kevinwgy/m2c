@@ -27,13 +27,20 @@ MeshData::MeshData()
   Nx = 50;
   Ny = 50;
   Nz = 50;
+
+  bc_x0   = NONE;
+  bc_xmax = NONE;
+  bc_y0   = NONE;
+  bc_ymax = NONE;
+  bc_z0   = NONE;
+  bc_zmax = NONE;
 }
 
 //------------------------------------------------------------------------------
 
 void MeshData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 10, father);
+  ClassAssigner *ca = new ClassAssigner(name, 16, father);
 
   new ClassToken<MeshData>(ca, "Type", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::type), 3,
@@ -47,6 +54,25 @@ void MeshData::setup(const char *name, ClassAssigner *father)
   new ClassInt<MeshData>(ca, "NumberOfCellsX", this, &MeshData::Nx);
   new ClassInt<MeshData>(ca, "NumberOfCellsY", this, &MeshData::Ny);
   new ClassInt<MeshData>(ca, "NumberOfCellsZ", this, &MeshData::Nz);
+
+  new ClassToken<MeshData>(ca, "BoundaryConditionX0", this,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 5,
+                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+  new ClassToken<MeshData>(ca, "BoundaryConditionXmax", this,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 5,
+                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+  new ClassToken<MeshData>(ca, "BoundaryConditionY0", this,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 5,
+                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+  new ClassToken<MeshData>(ca, "BoundaryConditionYmax", this,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 5,
+                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+  new ClassToken<MeshData>(ca, "BoundaryConditionZ0", this,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 5,
+                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+  new ClassToken<MeshData>(ca, "BoundaryConditionZmax", this,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 5,
+                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
  } 
 
 //------------------------------------------------------------------------------
@@ -298,9 +324,10 @@ BcsData::BcsData()
 void BcsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
-  farfield.setup("Farfield", ca);
+  inlet.setup("Inlet", ca);
+  outlet.setup("Outlet", ca);
   wall.setup("Wall", ca);
 
 }

@@ -1,6 +1,8 @@
+#include <Utils.h>
 #include <SpaceOperator.h>
 #include <Vector2D.h>
 #include <Vector5D.h>
+#include <algorithm> //std::upper_bound
 using std::cout;
 using std::endl;
 
@@ -14,6 +16,10 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &i
     face_rt(comm_, &(dm_all_.ghosted1_2dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof))
 {
+  
+  coordinates.GetCornerIndices(&i0, &j0, &imax, &jmax);
+  coordinates.GetGhostedCornerIndices(&ii0, &jj0, &iimax, &jjmax);
+
   SetupMesh();
 }
 
@@ -38,34 +44,31 @@ void SpaceOperator::Destroy()
 
 void SpaceOperator::SetupMesh()
 {
-  // Setup nodal coordinates
+  //! Setup nodal coordinates
   if(true)
     SetupNodalCoordinatesUniformRectangularDomain();
-  // TODO: add more choices later
+  //! TODO: add more choices later
 
 
-  // Compute mesh information
+  //! Compute mesh information
   Vec2D** coords = (Vec2D**)coordinates.GetDataPointer(); 
   Vec2D**  dxy   = (Vec2D**)delta_xy.GetDataPointer();
   Vec2D**  frt   = (Vec2D**)face_rt.GetDataPointer();
   double** vol   = (double**)volume.GetDataPointer();
 
-  int i0, j0, imax, jmax, ii0, jj0;
-  coordinates.GetCornerIndices(&i0, &j0, &imax, &jmax);
-  coordinates.GetGhostedCornerIndices(&ii0, &jj0, NULL, NULL);
-
-  // Calculate dx and dy in the forward difference fashion. 
-  // Include ghost nodes outside the bottom and the left domain boundaries
+  //! Calculate dx and dy in the forward difference fashion. 
+  //! Include ghost nodes outside the bottom and the left domain boundaries
   for(int j=jj0; j<jmax; j++)
     for(int i=ii0; i<imax; i++) {
       dxy[j][i][0] = coords[j][i+1][0] - coords[j][i][0]; 
       dxy[j][i][1] = coords[j+1][i][1] - coords[j][i][1]; 
     }
 
-  // Calculate the area/length of right and top faces
-  // Calculate the volume/area of node-centered control volumes ("cells")
-  // Include ghost nodes outside the bottom and the left domain boundaries,
-  // but not the ghost node at the bottom-left corner.
+  /** Calculate the area/length of right and top faces
+   *  Calculate the volume/area of node-centered control volumes ("cells")
+   *  Include ghost nodes outside the bottom and the left domain boundaries,
+   *  but not the ghost node at the bottom-left corner.
+   */
   for(int j=jj0; j<jmax; j++)
     for(int i=ii0; i<imax; i++) {
       if(j!=-1)
@@ -76,7 +79,7 @@ void SpaceOperator::SetupMesh()
         vol[j][i]   /*area of cv*/ = frt[j][i][0]*frt[j][i][1];
     }
 
-  coordinates.RestoreDataPointerToLocalVector(); //no changes have been made
+  coordinates.RestoreDataPointerToLocalVector(); //!< no changes have been made
   delta_xy.RestoreDataPointerAndInsert();
   face_rt.RestoreDataPointerAndInsert();
   volume.RestoreDataPointerAndInsert();
@@ -86,27 +89,26 @@ void SpaceOperator::SetupMesh()
 
 void SpaceOperator::SetupNodalCoordinatesUniformRectangularDomain()
 {
-  int i0, j0, imax, jmax, NX, NY;
-  coordinates.GetCornerIndices(&i0, &j0, &imax, &jmax);
+  int NX, NY;
   coordinates.GetGlobalSize(&NX, &NY);
 
   double dx = (iod.mesh.xmax - iod.mesh.x0)/NX;
   double dy = (iod.mesh.ymax - iod.mesh.y0)/NY;
 
-  // get array to edit
+  //! get array to edit
   Vec2D** coords = (Vec2D**)coordinates.GetDataPointer();
 
-  // Fill the actual subdomain, w/o ghost layer
+  //! Fill the actual subdomain, w/o ghost layer
   for(int j=j0; j<jmax; j++)
     for(int i=i0; i<imax; i++) {
       coords[j][i][0] = iod.mesh.x0 + 0.5*dx + i*dx; 
       coords[j][i][1] = iod.mesh.y0 + 0.5*dy + j*dy; 
     } 
 
-  // restore array
+  //! restore array
   coordinates.RestoreDataPointerAndInsert(); //update localVec and globalVec;
 
-  // Populate the ghost boundary layer
+  //! Populate the ghost boundary layer
   PopulateGhostBoundaryNodalCoordinates();
 }
 
@@ -116,8 +118,7 @@ void SpaceOperator::PopulateGhostBoundaryNodalCoordinates()
 {
   Vec2D** v = (Vec2D**) coordinates.GetDataPointer();
 
-  int ii0, jj0, nnx, nny, NX, NY;
-  coordinates.GetGhostedCornerIndices(&ii0, &jj0, NULL, NULL);
+  int nnx, nny, NX, NY;
   coordinates.GetGhostedSize(&nnx, &nny);
   coordinates.GetGlobalSize(&NX, &NY);
 
@@ -166,22 +167,24 @@ void SpaceOperator::PopulateGhostBoundaryNodalCoordinates()
 }
 
 //-----------------------------------------------------
-// U and V should have 5 DOFs per node, like in 3D. This allows
-// us to re-use the same functions for 3D. Just set z-velocity/momentum
-// to 0.
+/** 
+ * U and V should have 5 DOFs per node, like in 3D. This allows
+ * us to re-use the same functions for 3D. Just set z-velocity/momentum
+ * to 0.
+ */
 void SpaceOperator::ConservativeToPrimitive(SpaceVariable2D &U, SpaceVariable2D &V, bool workOnGhost)
 {
   Vec5D** u = (Vec5D**) U.GetDataPointer();
   Vec5D** v = (Vec5D**) V.GetDataPointer();
 
-  int i0, j0, imax, jmax;
+  int myi0, myj0, myimax, myjmax;
   if(workOnGhost)
-    U.GetGhostedCornerIndices(&i0, &j0, &imax, &jmax);
+    U.GetGhostedCornerIndices(&myi0, &myj0, &myimax, &myjmax);
   else
-    U.GetCornerIndices(&i0, &j0, &imax, &jmax);
+    U.GetCornerIndices(&myi0, &myj0, &myimax, &myjmax);
 
-  for(int j=j0; j<jmax; j++)
-    for(int i=i0; i<imax; i++)
+  for(int j=myj0; j<myjmax; j++)
+    for(int i=myi0; i<myimax; i++)
       vf.conservativeToPrimitive((double*)u[j][i], (double*)v[j][i]); 
 
   U.RestoreDataPointerToLocalVector(); //no changes made
@@ -189,22 +192,23 @@ void SpaceOperator::ConservativeToPrimitive(SpaceVariable2D &U, SpaceVariable2D 
 }
 
 //-----------------------------------------------------
-// U and V should have 5 DOFs per node, like in 3D. This allows
-// us to re-use the same functions for 3D. Just set z-velocity/momentum
-// to 0.
+/** U and V should have 5 DOFs per node, like in 3D. This allows
+ *  us to re-use the same functions for 3D. Just set z-velocity/momentum
+ *  to 0.
+ */
 void SpaceOperator::PrimitiveToConservative(SpaceVariable2D &V, SpaceVariable2D &U, bool workOnGhost)
 {
   Vec5D** v = (Vec5D**) V.GetDataPointer();
   Vec5D** u = (Vec5D**) U.GetDataPointer();
 
-  int i0, j0, imax, jmax;
+  int myi0, myj0, myimax, myjmax;
   if(workOnGhost)
-    V.GetGhostedCornerIndices(&i0, &j0, &imax, &jmax);
+    U.GetGhostedCornerIndices(&myi0, &myj0, &myimax, &myjmax);
   else
-    V.GetCornerIndices(&i0, &j0, &imax, &jmax);
+    U.GetCornerIndices(&myi0, &myj0, &myimax, &myjmax);
 
-  for(int j=j0; j<jmax; j++)
-    for(int i=i0; i<imax; i++)
+  for(int j=myj0; j<myjmax; j++)
+    for(int i=myi0; i<myimax; i++)
       vf.primitiveToConservative((double*)v[j][i], (double*)u[j][i]); 
 
   V.RestoreDataPointerToLocalVector(); //no changes made
@@ -217,28 +221,246 @@ void SpaceOperator::SetInitialCondition(SpaceVariable2D &V) //apply IC within th
 {
   Vec5D** v = (Vec5D**) V.GetDataPointer();
 
-  int i0, j0, imax, jmax;
-  V.GetCornerIndices(&i0, &j0, &imax, &jmax);
-
-  // First, apply the farfield state
+  //! First, apply the inlet (i.e. farfield) state
   for(int j=j0; j<jmax; j++)
     for(int i=i0; i<imax; i++) {
-      v[j][i][0] = iod.bc.farfield.density;
-      v[j][i][1] = iod.bc.farfield.velocity_x;
-      v[j][i][2] = iod.bc.farfield.velocity_y;
-      v[j][i][3] = iod.bc.farfield.velocity_z;
-      v[j][i][4] = iod.bc.farfield.pressure;
+      v[j][i][0] = iod.bc.inlet.density;
+      v[j][i][1] = iod.bc.inlet.velocity_x;
+      v[j][i][2] = iod.bc.inlet.velocity_y;
+      v[j][i][3] = iod.bc.inlet.velocity_z;
+      v[j][i][4] = iod.bc.inlet.pressure;
     }
 
-  // Second, apply user-specified function
+  //! Second, apply user-specified function
+  if(iod.ic.type != IcData::NONE) {
 
+    //! Get coordinates
+    Vec2D** coords = (Vec2D**)coordinates.GetDataPointer();
+    Vec2D   x0(iod.ic.x0[0], iod.ic.x0[1]); //!< 3D -> 2D
+    Vec2D   dir(iod.ic.dir[0], iod.ic.dir[1]); //!< 3D -> 2D
+    dir /= dir.norm();
 
-  // Apply boundary condition to populate ghost nodes
+    if(iod.ic.type == IcData::PLANAR) {
+      print("Applying user-specified initial condition (with planar symmetry) ...\n");
+ 
+    double x;
+    int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
+
+    int k0, k1;    
+    double a0, a1;
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        x = (coords[j][i] - x0)*dir; //!< projection onto the 1D axis
+        if(x<0 || x>iod.ic.user_data[IcData::COORDINATE][n-1])
+          continue;
+ 
+        //! Find the first 1D coordinate greater than x
+        auto upper_it = std::upper_bound(iod.ic.user_data[IcData::COORDINATE].begin(),
+                                         iod.ic.user_data[IcData::COORDINATE].end(),
+                                         x); 
+        k1 = (int)(upper_it - iod.ic.user_data[IcData::COORDINATE].begin());
+
+        if(k1==0) // exactly the first node in 1D
+          k1 = 1;
+
+        k0 = k1 - 1;
+
+        //! calculate interpolation weights
+        a0 = (iod.ic.user_data[IcData::COORDINATE][k1] - x) /
+             (iod.ic.user_data[IcData::COORDINATE][k1] - iod.ic.user_data[IcData::COORDINATE][k0]);
+        a1 = 1.0 - a0;
+
+        //! specify i.c. on node (cell center)
+        v[j][i][0] = a0*iod.ic.user_data[IcData::DENSITY][k0] + a1*iod.ic.user_data[IcData::DENSITY][k1];
+        v[j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][k0] + a1*iod.ic.user_data[IcData::VELOCITY][k1])*dir[0];
+        v[j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][k0] + a1*iod.ic.user_data[IcData::VELOCITY][k1])*dir[1];
+        v[j][i][3] = 0.0; //To be updated for 3D
+        v[j][i][4] = a0*iod.ic.user_data[IcData::PRESSURE][k0] + a1*iod.ic.user_data[IcData::PRESSURE][k1];
+      }
+    } 
+    else if (iod.ic.type == IcData::CYLINDRICAL) {
+      print("ERROR: Cannot handle cylindrical i.c. at the moment.\n");
+      terminate();
+    } 
+    else if (iod.ic.type == IcData::SPHERICAL) {
+      print("ERROR: Cannot handle spherical i.c. at the moment.\n");
+      terminate();
+    }
+
+    coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
+  }
+
+  V.RestoreDataPointerAndInsert();
+
+  //! Apply boundary condition to populate ghost nodes
+  ApplyBoundaryConditions(V);   
+
+}
+
+//-----------------------------------------------------
+//! Apply boundary conditions by populating the ghost cells.
+void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
+{
+  Vec5D** v = (Vec5D**) V.GetDataPointer();
+
+  int NX, NY;
+  V.GetGlobalSize(&NX, &NY);
+
+  //! Left boundary
+  if(ii0==-1) { 
+    switch (iod.mesh.bc_x0) {
+      case MeshData::INLET :
+        for(int j=j0; j<jmax; j++) {
+          v[j][ii0][0] = iod.bc.inlet.density;
+          v[j][ii0][1] = iod.bc.inlet.velocity_x;
+          v[j][ii0][2] = iod.bc.inlet.velocity_y;
+          v[j][ii0][3] = iod.bc.inlet.velocity_z;
+          v[j][ii0][4] = iod.bc.inlet.pressure;
+        }
+        break;
+      case MeshData::OUTLET :
+        for(int j=j0; j<jmax; j++) {
+          v[j][ii0][0] = iod.bc.outlet.density;
+          v[j][ii0][1] = iod.bc.outlet.velocity_x;
+          v[j][ii0][2] = iod.bc.outlet.velocity_y;
+          v[j][ii0][3] = iod.bc.outlet.velocity_z;
+          v[j][ii0][4] = iod.bc.outlet.pressure;
+        }
+        break; 
+      case MeshData::WALL :
+      case MeshData::SYMMETRY :
+        for(int j=j0; j<jmax; j++) {
+          v[j][ii0][0] =      v[j][ii0+1][0];
+          v[j][ii0][1] = -1.0*v[j][ii0+1][1];
+          v[j][ii0][2] =      v[j][ii0+1][2];
+          v[j][ii0][3] =      v[j][ii0+1][3]; 
+          v[j][ii0][4] =      v[j][ii0+1][4];
+        }
+        break;
+      default :
+        print("ERROR: Boundary condition at x=x0 cannot be specified!\n");
+        terminate();
+    }
+  }
+
+  //! Right boundary
+  if(iimax==NX+1) { 
+    switch (iod.mesh.bc_xmax) {
+      case MeshData::INLET :
+        for(int j=j0; j<jmax; j++) {
+          v[j][iimax][0] = iod.bc.inlet.density;
+          v[j][iimax][1] = iod.bc.inlet.velocity_x;
+          v[j][iimax][2] = iod.bc.inlet.velocity_y;
+          v[j][iimax][3] = iod.bc.inlet.velocity_z;
+          v[j][iimax][4] = iod.bc.inlet.pressure;
+        }
+        break;
+      case MeshData::OUTLET :
+        for(int j=j0; j<jmax; j++) {
+          v[j][iimax][0] = iod.bc.outlet.density;
+          v[j][iimax][1] = iod.bc.outlet.velocity_x;
+          v[j][iimax][2] = iod.bc.outlet.velocity_y;
+          v[j][iimax][3] = iod.bc.outlet.velocity_z;
+          v[j][iimax][4] = iod.bc.outlet.pressure;
+        }
+        break; 
+      case MeshData::WALL :
+      case MeshData::SYMMETRY :
+        for(int j=j0; j<jmax; j++) {
+          v[j][iimax][0] =      v[j][iimax-1][0];
+          v[j][iimax][1] = -1.0*v[j][iimax-1][1];
+          v[j][iimax][2] =      v[j][iimax-1][2];
+          v[j][iimax][3] =      v[j][iimax-1][3]; 
+          v[j][iimax][4] =      v[j][iimax-1][4];
+        }
+        break;
+      default :
+        print("ERROR: Boundary condition at x=xmax cannot be specified!\n");
+        terminate();
+    }
+  }
+
+  //! Top boundary
+  if(jj0==-1) { 
+    switch (iod.mesh.bc_y0) {
+      case MeshData::INLET :
+        for(int i=i0; i<imax; i++) {
+          v[jj0][i][0] = iod.bc.inlet.density;
+          v[jj0][i][1] = iod.bc.inlet.velocity_x;
+          v[jj0][i][2] = iod.bc.inlet.velocity_y;
+          v[jj0][i][3] = iod.bc.inlet.velocity_z;
+          v[jj0][i][4] = iod.bc.inlet.pressure;
+        }
+        break;
+      case MeshData::OUTLET :
+        for(int i=i0; i<imax; i++) {
+          v[jj0][i][0] = iod.bc.outlet.density;
+          v[jj0][i][1] = iod.bc.outlet.velocity_x;
+          v[jj0][i][2] = iod.bc.outlet.velocity_y;
+          v[jj0][i][3] = iod.bc.outlet.velocity_z;
+          v[jj0][i][4] = iod.bc.outlet.pressure;
+        }
+        break; 
+      case MeshData::WALL :
+      case MeshData::SYMMETRY :
+        for(int i=i0; i<imax; i++) {
+          v[jj0][i][0] =      v[jj0+1][i][0];
+          v[jj0][i][1] =      v[jj0+1][i][1];
+          v[jj0][i][2] = -1.0*v[jj0+1][i][2];
+          v[jj0][i][3] =      v[jj0+1][i][3]; 
+          v[jj0][i][4] =      v[jj0+1][i][4];
+        }
+        break;
+      default :
+        print("ERROR: Boundary condition at y=y0 cannot be specified!\n");
+        terminate();
+    }
+  }
+
+  //! Bottom boundary
+  if(jjmax==NY+1) { 
+    switch (iod.mesh.bc_ymax) {
+      case MeshData::INLET :
+        for(int i=i0; i<imax; i++) {
+          v[jjmax][i][0] = iod.bc.inlet.density;
+          v[jjmax][i][1] = iod.bc.inlet.velocity_x;
+          v[jjmax][i][2] = iod.bc.inlet.velocity_y;
+          v[jjmax][i][3] = iod.bc.inlet.velocity_z;
+          v[jjmax][i][4] = iod.bc.inlet.pressure;
+        }
+        break;
+      case MeshData::OUTLET :
+        for(int i=i0; i<imax; i++) {
+          v[jjmax][i][0] = iod.bc.outlet.density;
+          v[jjmax][i][1] = iod.bc.outlet.velocity_x;
+          v[jjmax][i][2] = iod.bc.outlet.velocity_y;
+          v[jjmax][i][3] = iod.bc.outlet.velocity_z;
+          v[jjmax][i][4] = iod.bc.outlet.pressure;
+        }
+        break; 
+      case MeshData::WALL :
+      case MeshData::SYMMETRY :
+        for(int i=i0; i<imax; i++) {
+          v[jjmax][i][0] =      v[jjmax-1][i][0];
+          v[jjmax][i][1] =      v[jjmax-1][i][1];
+          v[jjmax][i][2] = -1.0*v[jjmax-1][i][2];
+          v[jjmax][i][3] =      v[jjmax-1][i][3]; 
+          v[jjmax][i][4] =      v[jjmax-1][i][4];
+        }
+        break;
+      default :
+        print("ERROR: Boundary condition at y=ymax cannot be specified!\n");
+        terminate();
+    }
+  }
+
+  V.RestoreDataPointerAndInsert();
 }
 
 //-----------------------------------------------------
 
-void SpaceOperator::SetBoundaryConditions(SpaceVariable2D &U)
+void SpaceOperator::ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &cfl)
 {
   //TODO
 }

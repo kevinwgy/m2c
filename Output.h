@@ -5,17 +5,23 @@
 #include <SpaceVariable.h>
 #include <stdio.h>
 
+/** This class is responsible (only) for writing solutions to files. It uses PETSc functionalities
+    to write VTK files. It is not designed for post-processing results --- we leave this job to
+    external software (e.g., Paraview). Keep it as simple as possible.
+*/
 class Output
 {
   MPI_Comm& comm;
   IoData& iod;
   VarFcnBase& vf;
 
-  //These variables will temporarily hold solutions before they are printed to file
+  /// These variables will temporarily hold solutions before they are printed to file
   SpaceVariable2D scalar;   
   SpaceVariable2D vector3;
 
-  int iFrame;
+  int iFrame; // frame id.
+
+  double last_snapshot_time; //!< latest time when solution snapshot is written to file
 
   FILE* pvdfile;
 
@@ -23,8 +29,14 @@ public:
   Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &vf_);
   ~Output();
 
-  void InitializeOutput(SpaceVariable2D &coordinates); //attach mesh
-  void WriteSolutionSnapshot(double time, SpaceVariable2D &V);
+  void InitializeOutput(SpaceVariable2D &coordinates); //!< attach mesh
+
+  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &V); //!< write solution to file
+
+  bool ToWriteSolutionSnapshot(double time, double dt, int time_step); /**< check whether to write solution 
+                                                                        * at this time & time-step */
+  inline double GetLastSnapshotTime() {return last_snapshot_time;}
+
   void FinalizeOutput();
 
 };

@@ -11,6 +11,10 @@ using std::map;
 using std::pair;
 using std::vector;
 
+/*********************************************************************
+ * class IoData reads and processes the input data provided by the user
+ *********************************************************************
+*/
 //------------------------------------------------------------------------------
 
 template<class DataType>
@@ -36,6 +40,9 @@ struct MeshData {
   enum Type {TWODIMENSIONAL = 0, CYLINDRICAL = 1, THREEDIMENSIONAL = 2} type;
   double x0, xmax, y0, ymax, z0, zmax;
   int Nx, Ny, Nz;
+
+  enum BcType {NONE = 0, INLET = 1, OUTLET = 2, WALL = 3, SYMMETRY = 4, SIZE = 5};
+  BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
 
   MeshData();
   ~MeshData() {} 
@@ -115,7 +122,7 @@ struct SchemeData {
 
   int allowsFlux;
 
-  // allowsFlux = 0 for levelset equation (the choice of flux for the levelset is hardcoded)
+  //! allowsFlux = 0 for levelset equation (the choice of flux for the levelset is hardcoded)
   SchemeData(int allowsFlux = 1);
   ~SchemeData() {}
 
@@ -158,7 +165,7 @@ struct SchemesData {
 
 struct ExplicitData {
 
-//time-integration scheme used
+//!time-integration scheme used
   enum Type {RUNGE_KUTTA_4 = 0, RUNGE_KUTTA_2 = 1, FORWARD_EULER = 2} type;
 
   ExplicitData();
@@ -221,7 +228,8 @@ struct BcsWallData {
 
 struct BcsData {
 
-  BcsFreeStreamData farfield;
+  BcsFreeStreamData inlet;
+  BcsFreeStreamData outlet;
   BcsWallData wall;
 
   BcsData();
@@ -235,21 +243,21 @@ struct BcsData {
 
 struct IcData {
 
-  // user-specified file
+  //! user-specified file
   const char *user_specified_ic;
 
   enum Type {NONE = 0, PLANAR = 1, CYLINDRICAL = 2, SPHERICAL = 3} type;
   Vec3D x0;
-  Vec3D dir; //relevant for PLANAR and CYLINDRICAL
+  Vec3D dir; //!< relevant for PLANAR and CYLINDRICAL
   enum Vars {COORDINATE = 0, DENSITY = 1, VELOCITY = 2, PRESSURE = 3,
              LEVELSET = 4, MATERIALID = 5, TEMPERATURE = 6, SIZE = 7};
 
-  int specified[SIZE];  //0~unspecified, 1~specified
+  int specified[SIZE];  //!< 0~unspecified, 1~specified
 
   vector<double> user_data[SIZE];
 
-  const char *user_specified_ic2; //for radial variation in the case of cylindrical
-  vector<double> user_data2[SIZE]; //for radial variation 
+  const char *user_specified_ic2; //!< for radial variation in the case of cylindrical
+  vector<double> user_data2[SIZE]; //!< for radial variation 
 
   IcData();
   ~IcData() {}
@@ -262,14 +270,14 @@ struct IcData {
 
 struct OutputData {
 
-  const char *prefix; //path
-  const char *solution_filename_base; //filename without path
+  const char *prefix; //!< path
+  const char *solution_filename_base; //!< filename without path
 
   enum Options {OFF = 0, ON = 1};
   Options density, velocity, pressure, levelset, materialid, temperature;
  
   int frequency;
-  double frequency_dt; //-1 by default. To activate it, set it to a positive number
+  double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
 
   OutputData();
   ~OutputData() {}
@@ -289,8 +297,8 @@ public:
   MeshData mesh;
 
   EquationsData eqs;
-  IcData ic;  //initial condition
-  BcsData bc;  //boundary condition
+  IcData ic;  //!< initial condition
+  BcsData bc;  //!< boundary condition
 
   SchemesData schemes;
   TsData ts;

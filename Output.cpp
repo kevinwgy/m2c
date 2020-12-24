@@ -11,6 +11,8 @@ Output::Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &v
 {
   iFrame = 0;
 
+  last_snapshot_time = -1.0;
+
   char f1[256];
   sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
   pvdfile  = fopen(f1,"w");
@@ -39,10 +41,28 @@ void Output::InitializeOutput(SpaceVariable2D &coordinates)
 
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, SpaceVariable2D &V)
+bool Output::ToWriteSolutionSnapshot(double time, double dt, int time_step)
 {
+  //! First check frequency_dt. If it is not specified, use frequency
+  if(iod.output.frequency_dt > 0) {
+    if(time - last_snapshot_time >= iod.output.frequency_dt - 0.01*dt/*a small tolerance*/)
+      return true;
+    else
+      return false;
+  } 
+  else { //!< use frequency
+    if((iod.output.frequency > 0) && (time_step % iod.output.frequency == 0))
+      return true;
+    else
+      return false;
+  } 
+}
 
-  // Define vtr file name
+//--------------------------------------------------------------------------
+
+void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &V)
+{
+  //! Define vtr file name
   char full_fname[256];
   char fname[256];
   if(iFrame<10) {
@@ -118,8 +138,10 @@ void Output::WriteSolutionSnapshot(double time, SpaceVariable2D &V)
   PetscViewerDestroy(&viewer);
   V.RestoreDataPointerToLocalVector(); //no changes made to V.
 
-  // increment iFrame
+  // bookkeeping
   iFrame++;
+  last_snapshot_time = time;
+   
 }
 
 //--------------------------------------------------------------------------

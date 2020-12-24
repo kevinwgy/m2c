@@ -143,8 +143,6 @@ SpaceVariable2D::~SpaceVariable2D()
 
 double** SpaceVariable2D::GetDataPointer()
 {
-  DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
-  DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
   auto ierr = DMDAVecGetArray(*dm, localVec, &array);
   //CHKERRQ(ierr);
   return array;
@@ -157,6 +155,10 @@ void SpaceVariable2D::RestoreDataPointerAndInsert()
   RestoreDataPointerToLocalVector();
   auto ierr = DMLocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
   //CHKERRQ(ierr);
+
+  // sync local to global
+  DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
+  DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
 }
 
 //---------------------------------------------------------
@@ -166,6 +168,10 @@ void SpaceVariable2D::RestoreDataPointerAndAdd()
   RestoreDataPointerToLocalVector();
   auto ierr = DMLocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
   //CHKERRQ(ierr);
+
+  // sync local to global
+  DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
+  DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
 }
 
 //---------------------------------------------------------
