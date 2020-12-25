@@ -12,7 +12,8 @@
 #include <SpaceVariable.h>
 #include <VarFcnSGEuler.h>
 #include <SpaceOperator.h>
-
+using std::cout;
+using std::endl;
 /*************************************
  * Main Function
  ************************************/
@@ -24,6 +25,11 @@ int main(int argc, char* argv[])
   PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
   MPI_Comm comm = PETSC_COMM_WORLD; //be default, this is MPI_COMM_WORLD
   printLogo();
+
+  print("\033[0;32m==========================================\n\033[0m");
+  print("\033[0;32m                 START \n\033[0m"); 
+  print("\033[0;32m==========================================\n\033[0m");
+  print("\n");
 
   //! Read user's input file
   IoData iod(argc, argv);
@@ -61,9 +67,9 @@ int main(int argc, char* argv[])
    * Main Loop 
    ************************************/
   print("\n");
-  print("----------------------------\n");
-  print("--       Main Loop        --\n");
-  print("----------------------------\n");
+  print("\033[0;32m----------------------------\n\033[0m");
+  print("\033[0;32m--       Main Loop        --\n\033[0m");
+  print("\033[0;32m----------------------------\n\033[0m");
   double t = 0.0; //!< simulation (i.e. physical) time
   double dt = 0.0;
   double cfl = 0.0;
@@ -83,8 +89,6 @@ int main(int argc, char* argv[])
     //integreter.integrate
     //TODO
 
-
-
     t += dt;
 
     if(out.ToWriteSolutionSnapshot(t, dt, time_step))
@@ -95,10 +99,11 @@ int main(int argc, char* argv[])
     out.WriteSolutionSnapshot(t, time_step, V);
 
   print("\n");
-  print("======================================\n");
-  print("   NORMAL TERMINATION (t = %f) \n", t); 
-  print("======================================\n");
+  print("\033[0;32m==========================================\n\033[0m");
+  print("\033[0;32m   NORMAL TERMINATION (t = %e) \n\033[0m", t); 
+  print("\033[0;32m==========================================\n\033[0m");
   print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+  print("\n");
 
   //! finalize 
   U.Destroy();

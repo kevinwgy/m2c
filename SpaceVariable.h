@@ -65,7 +65,7 @@ public:
   void Destroy(); //!< should be called before PetscFinalize!
 
   void StoreMeshCoordinates(SpaceVariable2D &coordinates);
-  void WriteToVTRFile(const char *filename);
+  void WriteToVTRFile(const char *filename); //!< write vector to file (w/o mesh info)
 
   inline void GetCornerIndices(int *i0_, int *j0_, int *imax_=0, int *jmax_=0) {
     *i0_ = i0; *j0_ = j0; 

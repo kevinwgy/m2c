@@ -15,11 +15,22 @@ Output::Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &v
 
   char f1[256];
   sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
+
   pvdfile  = fopen(f1,"w");
+  if(!pvdfile) {
+    print("ERROR: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
+    exit_mpi();
+  }
+
   print(pvdfile, "<?xml version=\"1.0\"?>\n");
   print(pvdfile, "<VTKFile type=\"Collection\" version=\"0.1\"\n");
   print(pvdfile, "byte_order=\"LittleEndian\">\n");
   print(pvdfile, "  <Collection>\n");
+
+  print(pvdfile, "  </Collection>\n");
+  print(pvdfile, "</VTKFile>\n");
+
+  fclose(pvdfile); pvdfile = NULL;
 }
 
 //--------------------------------------------------------------------------
@@ -27,8 +38,6 @@ Output::Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &v
 Output::~Output()
 {
   if(pvdfile) fclose(pvdfile);
-  scalar.Destroy();
-  vector3.Destroy();
 }
 
 //--------------------------------------------------------------------------
@@ -90,11 +99,15 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &
             iod.output.solution_filename_base, iFrame); 
   }
 
+  //Open file
+  PetscViewer viewer;
+  int code = PetscViewerVTKOpen(PETSC_COMM_WORLD, full_fname, FILE_MODE_WRITE, &viewer); 
+  if(code) {
+    print("ERROR: Cannot open file '%s' for output. (code: %d)\n", full_fname, code);
+    exit_mpi();
+  }
 
   // Write solution snapshot
-  PetscViewer viewer;
-  PetscViewerVTKOpen(PETSC_COMM_WORLD, full_fname, FILE_MODE_WRITE, &viewer); 
-
   Vec5D**  v  = (Vec5D**) V.GetDataPointer();
 
   int i0, j0, imax, jmax;
@@ -132,7 +145,18 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &
   }
 
   // Add a line to the pvd file to record the new solutio snapshot
+  char f1[256];
+  sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
+  pvdfile  = fopen(f1,"r+");
+  if(!pvdfile) {
+    print("ERROR: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
+    exit_mpi();
+  }
+  fseek(pvdfile, -27, SEEK_END); //!< overwrite the previous end of file script
   print(pvdfile, "  <DataSet timestep=\"%e\" file=\"%s\"/>\n", time, fname);
+  print(pvdfile, "  </Collection>\n");
+  print(pvdfile, "</VTKFile>\n");
+  fclose(pvdfile); pvdfile = NULL;
 
   // clean up
   PetscViewerDestroy(&viewer);
@@ -142,16 +166,15 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &
   iFrame++;
   last_snapshot_time = time;
    
+  print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
 }
 
 //--------------------------------------------------------------------------
 
 void Output::FinalizeOutput()
 {
-  print(pvdfile, "  </Collection>\n");
-  print(pvdfile, "</VTKFile>\n");
-
-  fclose(pvdfile); pvdfile = NULL;
+  scalar.Destroy();
+  vector3.Destroy(); 
 }
 
 //--------------------------------------------------------------------------

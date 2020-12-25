@@ -4,6 +4,7 @@
 #include <mpi.h>
 #include <version.h>
 #include <stdio.h>
+#include <cstring>
 using std::cout;
 using std::endl;
 //--------------------------------------------------
@@ -18,7 +19,33 @@ void print(const char format[],...)
     vprintf(format, Argp);
     va_end(Argp);
   }
+  MPI_Barrier(MPI_COMM_WORLD);
+  return;
 }
+
+//--------------------------------------------------
+// MPI Rank 0 will print to stdout in red color
+void print_error(const char format[],...)
+{
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  if(!rank) {
+
+    char format_colored[strlen(format)+40] = "";
+    strcat(format_colored, "\033[0;31m");
+    strcat(format_colored, format);
+    strcat(format_colored, "\033[0m");
+
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format_colored, Argp);
+    va_end(Argp);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  return;
+}
+
 
 //--------------------------------------------------
 // MPI Rank i will print to stdout
@@ -33,6 +60,9 @@ void print(int i, const char format[],...)
     vprintf(format, Argp);
     va_end(Argp);
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  return;
 }
 
 //--------------------------------------------------
@@ -48,6 +78,9 @@ void print(FILE* fd, const char format[],...)
     vfprintf(fd, format, Argp);
     va_end(Argp);
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  return;
 }
 
 //--------------------------------------------------
@@ -60,7 +93,12 @@ const string getCurrentDateTime()
     tstruct = *localtime(&now);
     // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
     // for more information about date/time format
-    strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+    strftime(buf, sizeof(buf), "%Y-%m-%d.%X ", &tstruct);
+    if(strlen(tzname[1]) != 0)
+      strcat(buf, tzname[1]); //daylight saving time
+    else
+      strcat(buf, tzname[0]); //standard time
+
 
     return buf;
 }
@@ -75,30 +113,32 @@ void printLogo()
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   if(!rank) {
     cout << endl;
-    cout << "                                     _..._     " << endl;
-    cout << "                     .-''-.       .-'_..._''.  " << endl;
-    cout << "  __  __   ___     .' .-.  )    .' .'      '.\\  " << endl;
-    cout << " |  |/  `.'   `.  / .'  / /    / .'            " << endl;
-    cout << " |   .-.  .-.   '(_/   / /    . '              " << endl;
-    cout << " |  |  |  |  |  |     / /     | |              " << endl;
-    cout << " |  |  |  |  |  |    / /      | |              " << endl;
-    cout << " |  |  |  |  |  |   . '       . '              " << endl;
-    cout << " |  |  |  |  |  |  / /    _.-')\\ '.          . " << endl;
-    cout << " |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/ " << endl;
-    cout << "                /  /.-'_.'        `-.______ /  " << endl;
-    cout << "               /    _.'                    `   " << endl;
-    cout << "              ( _.-'                           " << endl;
+    cout << "\033[0;32m                                      _..._     \033[0m" << endl;
+    cout << "\033[0;32m                      .-''-.       .-'_..._''.  \033[0m" << endl;
+    cout << "\033[0;32m   __  __   ___     .' .-.  )    .' .'      '.\\  \033[0m" << endl;
+    cout << "\033[0;32m  |  |/  `.'   `.  / .'  / /    / .'            \033[0m" << endl;
+    cout << "\033[0;32m  |   .-.  .-.   '(_/   / /    . '              \033[0m" << endl;
+    cout << "\033[0;32m  |  |  |  |  |  |     / /     | |              \033[0m" << endl;
+    cout << "\033[0;32m  |  |  |  |  |  |    / /      | |              \033[0m" << endl;
+    cout << "\033[0;32m  |  |  |  |  |  |   . '       . '              \033[0m" << endl;
+    cout << "\033[0;32m  |  |  |  |  |  |  / /    _.-')\\ '.          . \033[0m" << endl;
+    cout << "\033[0;32m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/ \033[0m" << endl;
+    cout << "\033[0;32m                 /  /.-'_.'        `-.______ /  \033[0m" << endl;
+    cout << "\033[0;32m                /    _.'                    `   \033[0m" << endl;
+    cout << "\033[0;32m               ( _.-'                           \033[0m" << endl;
     cout << endl;
     cout << "Revision: " << GIT_REV << " | " << "Branch: " << GIT_BRANCH << " | " << "Tag: " << GIT_TAG << endl;
     cout << "Simulation started at: " << getCurrentDateTime() << endl;
     cout << endl;
     cout.flush();
   }
+  MPI_Barrier(MPI_COMM_WORLD);
+  return;
 }
 
 //--------------------------------------------------
-// Terminate
-void terminate()
+// Terminate program properly
+void exit_mpi()
 {
   MPI_Finalize();
   exit(-1);

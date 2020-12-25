@@ -14,6 +14,9 @@ using std::string;
 //! MPI Rank 0 will print to stdout
 void print(const char format[],...);
 //--------------------------------------------------
+//! MPI Rank 0 will print to stdout in red color
+void print_error(const char format[],...);
+//--------------------------------------------------
 //! MPI Rank i will print to stdout
 void print(int i, const char format[],...);
 //--------------------------------------------------
@@ -31,4 +34,4 @@ const string getCurrentDateTime();
 void printLogo();
 //--------------------------------------------------
 //! Call MPI_Finalize and exit (with error)
-void terminate();
+void exit_mpi();

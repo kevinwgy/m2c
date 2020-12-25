@@ -71,11 +71,11 @@ void SpaceOperator::SetupMesh()
    */
   for(int j=jj0; j<jmax; j++)
     for(int i=ii0; i<imax; i++) {
-      if(j!=-1)
+      if(j!=jj0)
         frt[j][i][0]/*right face*/ = 0.5*(dxy[j-1][i][1] + dxy[j][i][1]);
-      if(i!=-1)
+      if(i!=ii0)
         frt[j][i][1]/*top face*/   = 0.5*(dxy[j][i-1][0] + dxy[j][i][0]); 
-      if(i!=-1 && j!=-1)
+      if(i!=ii0 && j!=jj0)
         vol[j][i]   /*area of cv*/ = frt[j][i][0]*frt[j][i][1];
     }
 
@@ -222,8 +222,8 @@ void SpaceOperator::SetInitialCondition(SpaceVariable2D &V) //apply IC within th
   Vec5D** v = (Vec5D**) V.GetDataPointer();
 
   //! First, apply the inlet (i.e. farfield) state
-  for(int j=j0; j<jmax; j++)
-    for(int i=i0; i<imax; i++) {
+  for(int j=jj0; j<jjmax; j++)
+    for(int i=ii0; i<iimax; i++) {
       v[j][i][0] = iod.bc.inlet.density;
       v[j][i][1] = iod.bc.inlet.velocity_x;
       v[j][i][2] = iod.bc.inlet.velocity_y;
@@ -241,51 +241,58 @@ void SpaceOperator::SetInitialCondition(SpaceVariable2D &V) //apply IC within th
     dir /= dir.norm();
 
     if(iod.ic.type == IcData::PLANAR) {
-      print("Applying user-specified initial condition (with planar symmetry) ...\n");
+      print("- Applying user-specified initial condition (with planar symmetry).\n");
  
-    double x;
-    int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
+      double x;
+      int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
 
-    int k0, k1;    
-    double a0, a1;
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
+      int k0, k1;    
+      double a0, a1;
+//      cout << "i0 = " << i0 << ", imax = " << imax << ", j0 = " << j0 << ", jmax = " << jmax << endl;
+//      cout << "ii0 = " << ii0 << ", iimax = " << iimax << ", jj0 = " << jj0 << ", jjmax = " << jjmax << endl;
+//      cout << "n = " << n << endl;
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
 
-        x = (coords[j][i] - x0)*dir; //!< projection onto the 1D axis
-        if(x<0 || x>iod.ic.user_data[IcData::COORDINATE][n-1])
-          continue;
+          x = (coords[j][i] - x0)*dir; //!< projection onto the 1D axis
+//          cout << "coords: " << coords[j][i][0] << ", " << coords[j][i][1] << "; x = " << x << endl;
+          if(x<0 || x>iod.ic.user_data[IcData::COORDINATE][n-1])
+            continue;
  
-        //! Find the first 1D coordinate greater than x
-        auto upper_it = std::upper_bound(iod.ic.user_data[IcData::COORDINATE].begin(),
-                                         iod.ic.user_data[IcData::COORDINATE].end(),
-                                         x); 
-        k1 = (int)(upper_it - iod.ic.user_data[IcData::COORDINATE].begin());
+          //! Find the first 1D coordinate greater than x
+          auto upper_it = std::upper_bound(iod.ic.user_data[IcData::COORDINATE].begin(),
+                                           iod.ic.user_data[IcData::COORDINATE].end(),
+                                           x); 
+          k1 = (int)(upper_it - iod.ic.user_data[IcData::COORDINATE].begin());
 
-        if(k1==0) // exactly the first node in 1D
-          k1 = 1;
+          if(k1==0) // exactly the first node in 1D
+            k1 = 1;
 
-        k0 = k1 - 1;
+          k0 = k1 - 1;
 
-        //! calculate interpolation weights
-        a0 = (iod.ic.user_data[IcData::COORDINATE][k1] - x) /
-             (iod.ic.user_data[IcData::COORDINATE][k1] - iod.ic.user_data[IcData::COORDINATE][k0]);
-        a1 = 1.0 - a0;
+          //! calculate interpolation weights
+          a0 = (iod.ic.user_data[IcData::COORDINATE][k1] - x) /
+               (iod.ic.user_data[IcData::COORDINATE][k1] - iod.ic.user_data[IcData::COORDINATE][k0]);
+          a1 = 1.0 - a0;
 
-        //! specify i.c. on node (cell center)
-        v[j][i][0] = a0*iod.ic.user_data[IcData::DENSITY][k0] + a1*iod.ic.user_data[IcData::DENSITY][k1];
-        v[j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][k0] + a1*iod.ic.user_data[IcData::VELOCITY][k1])*dir[0];
-        v[j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][k0] + a1*iod.ic.user_data[IcData::VELOCITY][k1])*dir[1];
-        v[j][i][3] = 0.0; //To be updated for 3D
-        v[j][i][4] = a0*iod.ic.user_data[IcData::PRESSURE][k0] + a1*iod.ic.user_data[IcData::PRESSURE][k1];
-      }
+//          cout << "k0 = " << k0 << ", k1 = " << k1 << ", a0 = " << a0 << ", a1 = " << a1 << endl;
+//          cout << "coord_k1:" << iod.ic.user_data[IcData::COORDINATE][k1] << ", coord_k0:" << iod.ic.user_data[IcData::COORDINATE][k0] << endl;
+
+          //! specify i.c. on node (cell center)
+          v[j][i][0] = a0*iod.ic.user_data[IcData::DENSITY][k0] + a1*iod.ic.user_data[IcData::DENSITY][k1];
+          v[j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][k0] + a1*iod.ic.user_data[IcData::VELOCITY][k1])*dir[0];
+          v[j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][k0] + a1*iod.ic.user_data[IcData::VELOCITY][k1])*dir[1];
+          v[j][i][3] = 0.0; //To be updated for 3D
+          v[j][i][4] = a0*iod.ic.user_data[IcData::PRESSURE][k0] + a1*iod.ic.user_data[IcData::PRESSURE][k1];
+        }
     } 
     else if (iod.ic.type == IcData::CYLINDRICAL) {
-      print("ERROR: Cannot handle cylindrical i.c. at the moment.\n");
-      terminate();
+      print_error("ERROR: Cannot handle cylindrical i.c. at the moment.\n");
+      exit_mpi();
     } 
     else if (iod.ic.type == IcData::SPHERICAL) {
-      print("ERROR: Cannot handle spherical i.c. at the moment.\n");
-      terminate();
+      print_error("ERROR: Cannot handle spherical i.c. at the moment.\n");
+      exit_mpi();
     }
 
     coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
@@ -306,6 +313,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
 
   int NX, NY;
   V.GetGlobalSize(&NX, &NY);
+//  cout << "NX = " << NX << ", NY = " << NY << endl;
 
   //! Left boundary
   if(ii0==-1) { 
@@ -339,8 +347,8 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
         }
         break;
       default :
-        print("ERROR: Boundary condition at x=x0 cannot be specified!\n");
-        terminate();
+        print_error("ERROR: Boundary condition at x=x0 cannot be specified!\n");
+        exit_mpi();
     }
   }
 
@@ -349,39 +357,39 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
     switch (iod.mesh.bc_xmax) {
       case MeshData::INLET :
         for(int j=j0; j<jmax; j++) {
-          v[j][iimax][0] = iod.bc.inlet.density;
-          v[j][iimax][1] = iod.bc.inlet.velocity_x;
-          v[j][iimax][2] = iod.bc.inlet.velocity_y;
-          v[j][iimax][3] = iod.bc.inlet.velocity_z;
-          v[j][iimax][4] = iod.bc.inlet.pressure;
+          v[j][iimax-1][0] = iod.bc.inlet.density;
+          v[j][iimax-1][1] = iod.bc.inlet.velocity_x;
+          v[j][iimax-1][2] = iod.bc.inlet.velocity_y;
+          v[j][iimax-1][3] = iod.bc.inlet.velocity_z;
+          v[j][iimax-1][4] = iod.bc.inlet.pressure;
         }
         break;
       case MeshData::OUTLET :
         for(int j=j0; j<jmax; j++) {
-          v[j][iimax][0] = iod.bc.outlet.density;
-          v[j][iimax][1] = iod.bc.outlet.velocity_x;
-          v[j][iimax][2] = iod.bc.outlet.velocity_y;
-          v[j][iimax][3] = iod.bc.outlet.velocity_z;
-          v[j][iimax][4] = iod.bc.outlet.pressure;
+          v[j][iimax-1][0] = iod.bc.outlet.density;
+          v[j][iimax-1][1] = iod.bc.outlet.velocity_x;
+          v[j][iimax-1][2] = iod.bc.outlet.velocity_y;
+          v[j][iimax-1][3] = iod.bc.outlet.velocity_z;
+          v[j][iimax-1][4] = iod.bc.outlet.pressure;
         }
         break; 
       case MeshData::WALL :
       case MeshData::SYMMETRY :
         for(int j=j0; j<jmax; j++) {
-          v[j][iimax][0] =      v[j][iimax-1][0];
-          v[j][iimax][1] = -1.0*v[j][iimax-1][1];
-          v[j][iimax][2] =      v[j][iimax-1][2];
-          v[j][iimax][3] =      v[j][iimax-1][3]; 
-          v[j][iimax][4] =      v[j][iimax-1][4];
+          v[j][iimax-1][0] =      v[j][iimax-2][0];
+          v[j][iimax-1][1] = -1.0*v[j][iimax-2][1];
+          v[j][iimax-1][2] =      v[j][iimax-2][2];
+          v[j][iimax-1][3] =      v[j][iimax-2][3]; 
+          v[j][iimax-1][4] =      v[j][iimax-2][4];
         }
         break;
       default :
-        print("ERROR: Boundary condition at x=xmax cannot be specified!\n");
-        terminate();
+        print_error("ERROR: Boundary condition at x=xmax cannot be specified!\n");
+        exit_mpi();
     }
   }
 
-  //! Top boundary
+  //! Bottom boundary
   if(jj0==-1) { 
     switch (iod.mesh.bc_y0) {
       case MeshData::INLET :
@@ -413,8 +421,8 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
         }
         break;
       default :
-        print("ERROR: Boundary condition at y=y0 cannot be specified!\n");
-        terminate();
+        print_error("ERROR: Boundary condition at y=y0 cannot be specified!\n");
+        exit_mpi();
     }
   }
 
@@ -423,35 +431,35 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
     switch (iod.mesh.bc_ymax) {
       case MeshData::INLET :
         for(int i=i0; i<imax; i++) {
-          v[jjmax][i][0] = iod.bc.inlet.density;
-          v[jjmax][i][1] = iod.bc.inlet.velocity_x;
-          v[jjmax][i][2] = iod.bc.inlet.velocity_y;
-          v[jjmax][i][3] = iod.bc.inlet.velocity_z;
-          v[jjmax][i][4] = iod.bc.inlet.pressure;
+          v[jjmax-1][i][0] = iod.bc.inlet.density;
+          v[jjmax-1][i][1] = iod.bc.inlet.velocity_x;
+          v[jjmax-1][i][2] = iod.bc.inlet.velocity_y;
+          v[jjmax-1][i][3] = iod.bc.inlet.velocity_z;
+          v[jjmax-1][i][4] = iod.bc.inlet.pressure;
         }
         break;
       case MeshData::OUTLET :
         for(int i=i0; i<imax; i++) {
-          v[jjmax][i][0] = iod.bc.outlet.density;
-          v[jjmax][i][1] = iod.bc.outlet.velocity_x;
-          v[jjmax][i][2] = iod.bc.outlet.velocity_y;
-          v[jjmax][i][3] = iod.bc.outlet.velocity_z;
-          v[jjmax][i][4] = iod.bc.outlet.pressure;
+          v[jjmax-1][i][0] = iod.bc.outlet.density;
+          v[jjmax-1][i][1] = iod.bc.outlet.velocity_x;
+          v[jjmax-1][i][2] = iod.bc.outlet.velocity_y;
+          v[jjmax-1][i][3] = iod.bc.outlet.velocity_z;
+          v[jjmax-1][i][4] = iod.bc.outlet.pressure;
         }
         break; 
       case MeshData::WALL :
       case MeshData::SYMMETRY :
         for(int i=i0; i<imax; i++) {
-          v[jjmax][i][0] =      v[jjmax-1][i][0];
-          v[jjmax][i][1] =      v[jjmax-1][i][1];
-          v[jjmax][i][2] = -1.0*v[jjmax-1][i][2];
-          v[jjmax][i][3] =      v[jjmax-1][i][3]; 
-          v[jjmax][i][4] =      v[jjmax-1][i][4];
+          v[jjmax-1][i][0] =      v[jjmax-2][i][0];
+          v[jjmax-1][i][1] =      v[jjmax-2][i][1];
+          v[jjmax-1][i][2] = -1.0*v[jjmax-2][i][2];
+          v[jjmax-1][i][3] =      v[jjmax-2][i][3]; 
+          v[jjmax-1][i][4] =      v[jjmax-2][i][4];
         }
         break;
       default :
-        print("ERROR: Boundary condition at y=ymax cannot be specified!\n");
-        terminate();
+        print_error("ERROR: Boundary condition at y=ymax cannot be specified!\n");
+        exit_mpi();
     }
   }
 
@@ -462,7 +470,12 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
 
 void SpaceOperator::ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &cfl)
 {
-  //TODO
+  if(iod.ts.timestep > 0)
+    dt = iod.ts.timestep;
+  else {
+    print_error("ERROR: Unable to calculate time step size.\n");
+    exit_mpi();
+  }
 }
 
 //-----------------------------------------------------

@@ -419,10 +419,10 @@ void IcData::readUserSpecifiedIC()
   std::fstream input;
   input.open(user_specified_ic, std::fstream::in);
   if (!input.is_open()) {
-    print("ERROR: could not open user-specified initial condition file %s.\n", user_specified_ic);
-    exit(-1);
+    print_error("ERROR: could not open user-specified initial condition file %s.\n", user_specified_ic);
+    exit_mpi();
   } else
-    print("Reading user-specified initial condition file: %s.\n", user_specified_ic);
+    print("- Reading user-specified initial condition file: %s.\n", user_specified_ic);
 
   std::string word, line;
 
@@ -445,8 +445,8 @@ void IcData::readUserSpecifiedIC()
             word.compare(0,4,"spherical",0,4)))
     type = SPHERICAL;
   else {
-    print("ERROR: Unknown initial condition type %s.\n", word);
-    exit(-1);
+    print_error("ERROR: Unknown initial condition type %s.\n", word);
+    exit_mpi();
   }
   input.ignore(256,'\n'); //done with line 1
 
@@ -518,15 +518,15 @@ void IcData::readUserSpecifiedIC()
       column2var[column] = TEMPERATURE;
       specified[TEMPERATURE] = 1;
     } else {
-      print("ERROR: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
-      exit(-1);
+      print_error("ERROR: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      exit_mpi();
     }
     column++;
   }
-  input.ignore(256,'\n'); //done with this line
+
   if(column<2 || !specified[COORDINATE]) {
-    print("ERROR: Need additional data in the initial condition file.\n");
-    exit(-1);
+    print_error("ERROR: Need additional data in the initial condition file.\n");
+    exit_mpi();
   }
 
   // Now start reading the actual data (until end of file)
@@ -537,6 +537,9 @@ void IcData::readUserSpecifiedIC()
     std::istringstream is(line);
     for(int i=0; i<column; i++) {
       is >> data; 
+      if(is.fail())
+        break;
+      //cout << "row " << r << ", column " << i << ": " << data << endl;
       user_data[column2var[i]].push_back(data);
     }
     if(input.eof())
@@ -544,7 +547,7 @@ void IcData::readUserSpecifiedIC()
   }
 
   input.close();
-  print("Successfully read user-specified initial condition.\n");
+  //print("Read user-specified initial condition.\n");
 }
 
 //------------------------------------------------------------------------------
@@ -610,8 +613,8 @@ IoData::IoData(int argc, char** argv)
 void IoData::readCmdLine(int argc, char** argv)
 {
   if(argc==1) {
-    print("ERROR: Input file not provided!\n");
-    exit(-1);
+    print_error("ERROR: Input file not provided!\n");
+    exit_mpi();
   }
   cmdFileName = argv[1];
 }
@@ -628,13 +631,13 @@ void IoData::readCmdFile()
   yyCmdfin = cmdFilePtr = fopen(cmdFileName, "r");
 
   if (!cmdFilePtr) {
-    print("*** Error: could not open \'%s\'\n", cmdFileName);
-    exit(-1);
+    print_error("*** Error: could not open \'%s\'\n", cmdFileName);
+    exit_mpi();
   }
 
   int error = yyCmdfparse();
   if (error) {
-    print("*** Error: command file contained parsing errors\n");
+    print_error("*** Error: command file contained parsing errors\n");
     exit(error);
   }
   fclose(cmdFilePtr);
