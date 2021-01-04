@@ -166,7 +166,8 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &
   iFrame++;
   last_snapshot_time = time;
    
-  print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
+  //print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
+  print("- Wrote solution at %e to %s.\n", time, fname);
 }
 
 //--------------------------------------------------------------------------

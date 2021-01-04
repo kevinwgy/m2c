@@ -26,9 +26,9 @@ int main(int argc, char* argv[])
   MPI_Comm comm = PETSC_COMM_WORLD; //be default, this is MPI_COMM_WORLD
   printLogo();
 
-  print("\033[0;32m==========================================\n\033[0m");
-  print("\033[0;32m                 START \n\033[0m"); 
-  print("\033[0;32m==========================================\n\033[0m");
+  print("\033[0;32m==========================================\033[0m\n");
+  print("\033[0;32m                 START                    \033[0m\n"); 
+  print("\033[0;32m==========================================\033[0m\n");
   print("\n");
 
   //! Read user's input file
@@ -67,9 +67,9 @@ int main(int argc, char* argv[])
    * Main Loop 
    ************************************/
   print("\n");
-  print("\033[0;32m----------------------------\n\033[0m");
-  print("\033[0;32m--       Main Loop        --\n\033[0m");
-  print("\033[0;32m----------------------------\n\033[0m");
+  print("----------------------------\n");
+  print("--       Main Loop        --\n");
+  print("----------------------------\n");
   double t = 0.0; //!< simulation (i.e. physical) time
   double dt = 0.0;
   double cfl = 0.0;
@@ -99,9 +99,9 @@ int main(int argc, char* argv[])
     out.WriteSolutionSnapshot(t, time_step, V);
 
   print("\n");
-  print("\033[0;32m==========================================\n\033[0m");
-  print("\033[0;32m   NORMAL TERMINATION (t = %e) \n\033[0m", t); 
-  print("\033[0;32m==========================================\n\033[0m");
+  print("\033[0;32m==========================================\033[0m\n");
+  print("\033[0;32m   NORMAL TERMINATION (t = %e)  \033[0m\n", t); 
+  print("\033[0;32m==========================================\033[0m\n");
   print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
   print("\n");
 
