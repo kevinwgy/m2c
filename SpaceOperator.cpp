@@ -13,7 +13,6 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &i
   : comm(comm_), dm_all(dm_all_), iod(iod_), vf(vf_), 
     coordinates(comm_, &(dm_all_.ghosted1_2dof)),
     delta_xy(comm_, &(dm_all_.ghosted1_2dof)),
-    face_rt(comm_, &(dm_all_.ghosted1_2dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof))
 {
   
@@ -36,7 +35,6 @@ void SpaceOperator::Destroy()
 {
   coordinates.Destroy();
   delta_xy.Destroy();
-  face_rt.Destroy();
   volume.Destroy();
 }
 
@@ -44,50 +42,33 @@ void SpaceOperator::Destroy()
 
 void SpaceOperator::SetupMesh()
 {
-  //! Setup nodal coordinates
+  //! Setup coordinates of cell centers and dx, dy
   if(true)
-    SetupNodalCoordinatesUniformRectangularDomain();
+    SetupMeshUniformRectangularDomain();
   //! TODO: add more choices later
 
 
   //! Compute mesh information
-  Vec2D** coords = (Vec2D**)coordinates.GetDataPointer(); 
   Vec2D**  dxy   = (Vec2D**)delta_xy.GetDataPointer();
-  Vec2D**  frt   = (Vec2D**)face_rt.GetDataPointer();
   double** vol   = (double**)volume.GetDataPointer();
 
-  //! Calculate dx and dy in the forward difference fashion. 
-  //! Include ghost nodes outside the bottom and the left domain boundaries
-  for(int j=jj0; j<jmax; j++)
-    for(int i=ii0; i<imax; i++) {
-      dxy[j][i][0] = coords[j][i+1][0] - coords[j][i][0]; 
-      dxy[j][i][1] = coords[j+1][i][1] - coords[j][i][1]; 
-    }
 
-  /** Calculate the area/length of right and top faces
-   *  Calculate the volume/area of node-centered control volumes ("cells")
-   *  Include ghost nodes outside the bottom and the left domain boundaries,
-   *  but not the ghost node at the bottom-left corner.
+  /** Calculate the volume/area of node-centered control volumes ("cells")
+   *  Include ghost cells. 
    */
-  for(int j=jj0; j<jmax; j++)
-    for(int i=ii0; i<imax; i++) {
-      if(j!=jj0)
-        frt[j][i][0]/*right face*/ = 0.5*(dxy[j-1][i][1] + dxy[j][i][1]);
-      if(i!=ii0)
-        frt[j][i][1]/*top face*/   = 0.5*(dxy[j][i-1][0] + dxy[j][i][0]); 
-      if(i!=ii0 && j!=jj0)
-        vol[j][i]   /*area of cv*/ = frt[j][i][0]*frt[j][i][1];
+  for(int j=jj0; j<jjmax; j++)
+    for(int i=ii0; i<iimax; i++) {
+      vol[j][i] /*area of cv*/ = dxy[j][i][0]*dxy[j][i][1];
     }
 
   coordinates.RestoreDataPointerToLocalVector(); //!< no changes have been made
   delta_xy.RestoreDataPointerAndInsert();
-  face_rt.RestoreDataPointerAndInsert();
   volume.RestoreDataPointerAndInsert();
 }
 
 //-----------------------------------------------------
 
-void SpaceOperator::SetupNodalCoordinatesUniformRectangularDomain()
+void SpaceOperator::SetupMeshUniformRectangularDomain()
 {
   int NX, NY;
   coordinates.GetGlobalSize(&NX, &NY);
@@ -97,26 +78,31 @@ void SpaceOperator::SetupNodalCoordinatesUniformRectangularDomain()
 
   //! get array to edit
   Vec2D** coords = (Vec2D**)coordinates.GetDataPointer();
+  Vec2D** dxy    = (Vec2D**)delta_xy.GetDataPointer();
 
-  //! Fill the actual subdomain, w/o ghost layer
+  //! Fill the actual subdomain, w/o ghost cells 
   for(int j=j0; j<jmax; j++)
     for(int i=i0; i<imax; i++) {
       coords[j][i][0] = iod.mesh.x0 + 0.5*dx + i*dx; 
       coords[j][i][1] = iod.mesh.y0 + 0.5*dy + j*dy; 
+      dxy[j][i][0] = dx;
+      dxy[j][i][1] = dy;
     } 
 
   //! restore array
   coordinates.RestoreDataPointerAndInsert(); //update localVec and globalVec;
+  delta_xy.RestoreDataPointerAndInsert(); //update localVec and globalVec;
 
-  //! Populate the ghost boundary layer
-  PopulateGhostBoundaryNodalCoordinates();
+  //! Populate the ghost cells (coordinates, dx, dy)
+  PopulateGhostBoundaryCoordinates();
 }
 
 //-----------------------------------------------------
-
-void SpaceOperator::PopulateGhostBoundaryNodalCoordinates()
+/** Populate the coordinates, dx, and dy of ghost cells */
+void SpaceOperator::PopulateGhostBoundaryCoordinates()
 {
-  Vec2D** v = (Vec2D**) coordinates.GetDataPointer();
+  Vec2D** v   = (Vec2D**) coordinates.GetDataPointer();
+  Vec2D** dxy = (Vec2D**) delta_xy.GetDataPointer();
 
   int nnx, nny, NX, NY;
   coordinates.GetGhostedSize(&nnx, &nny);
@@ -126,44 +112,76 @@ void SpaceOperator::PopulateGhostBoundaryNodalCoordinates()
     for(int j=jj0; j<jj0+nny; j++) {
       v[j][ii0][0] = 2.0*iod.mesh.x0 - v[j][ii0+1][0];
       v[j][ii0][1] = v[j][ii0+1][1];
+
+      dxy[j][ii0][0] = dxy[j][ii0+1][0];
+      dxy[j][ii0][1] = dxy[j][ii0+1][1];
     }
   }
+
   if(ii0+nnx == NX+1) {//Right
     for(int j=jj0; j<jj0+nny; j++) {
       v[j][ii0+nnx-1][0] = 2.0*iod.mesh.xmax - v[j][ii0+nnx-2][0];
       v[j][ii0+nnx-1][1] = v[j][ii0+nnx-2][1];
+
+      dxy[j][ii0+nnx-1][0] = dxy[j][ii0+nnx-2][0];
+      dxy[j][ii0+nnx-1][1] = dxy[j][ii0+nnx-2][1];
     }
   }
+
   if(jj0 == -1) {//Bottom
     for(int i=ii0; i<ii0+nnx; i++) {
       v[jj0][i][0] = v[jj0+1][i][0];
       v[jj0][i][1] = 2.0*iod.mesh.y0 - v[jj0+1][i][1];
+
+      dxy[jj0][i][0] = dxy[jj0+1][i][0];
+      dxy[jj0][i][1] = dxy[jj0+1][i][1];
     }
   }
+
   if(jj0+nny == NY+1) {//Top
     for(int i=ii0; i<ii0+nnx; i++) {
       v[jj0+nny-1][i][0] = v[jj0+nny-2][i][0];
       v[jj0+nny-1][i][1] = 2.0*iod.mesh.ymax - v[jj0+nny-2][i][1];
+
+      dxy[jj0+nny-1][i][0] = dxy[jj0+nny-2][i][0];
+      dxy[jj0+nny-1][i][1] = dxy[jj0+nny-2][i][1];
     }
   }
+
   if(ii0 == -1 && jj0 == -1) {//Bottom-Left Corner
     v[jj0][ii0][0] = v[jj0+1][ii0][0];
     v[jj0][ii0][1] = v[jj0][ii0+1][1];
+
+    dxy[jj0][ii0][0] = dxy[jj0+1][ii0][0];
+    dxy[jj0][ii0][1] = dxy[jj0][ii0+1][1];
   }
+
   if(ii0 == -1 && jj0+nny == NY+1) {//Top-Left Corner
     v[jj0+nny-1][ii0][0] = v[jj0+nny-2][ii0][0];
     v[jj0+nny-1][ii0][1] = v[jj0+nny-1][ii0+1][1];
+
+    dxy[jj0+nny-1][ii0][0] = dxy[jj0+nny-2][ii0][0];
+    dxy[jj0+nny-1][ii0][1] = dxy[jj0+nny-1][ii0+1][1];
   }
+
   if(ii0+nnx == NX+1 && jj0 == -1) {//Bottom-Right Corner
     v[jj0][ii0+nnx-1][0] = v[jj0+1][ii0+nnx-1][0];
     v[jj0][ii0+nnx-1][1] = v[jj0][ii0+nnx-2][1];
+
+    dxy[jj0][ii0+nnx-1][0] = dxy[jj0+1][ii0+nnx-1][0];
+    dxy[jj0][ii0+nnx-1][1] = dxy[jj0][ii0+nnx-2][1];
   }
+
   if(ii0+nnx == NX+1 && jj0+nny == NY+1) {//Top-Right Corner
     v[jj0+nny-1][ii0+nnx-1][0] = v[jj0+nny-2][ii0+nnx-1][0];
     v[jj0+nny-1][ii0+nnx-1][1] = v[jj0+nny-1][ii0+nnx-2][1];
+
+    dxy[jj0+nny-1][ii0+nnx-1][0] = dxy[jj0+nny-2][ii0+nnx-1][0];
+    dxy[jj0+nny-1][ii0+nnx-1][1] = dxy[jj0+nny-1][ii0+nnx-2][1];
   }
 
   coordinates.RestoreDataPointerAndInsert();
+  delta_xy.RestoreDataPointerAndInsert();
 }
 
 //-----------------------------------------------------

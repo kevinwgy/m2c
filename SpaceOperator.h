@@ -19,7 +19,6 @@ class SpaceOperator
   //! Mesh info
   SpaceVariable2D coordinates;
   SpaceVariable2D delta_xy;
-  SpaceVariable2D face_rt; //!< right and top faces
   SpaceVariable2D volume; //!< volume of node-centered control volumes (area in 2D)
   
   int i0, j0, imax, jmax; //!< corners of the real subdomain
@@ -46,8 +45,8 @@ public:
 
 private:
   void SetupMesh();
-  void SetupNodalCoordinatesUniformRectangularDomain();
-  void PopulateGhostBoundaryNodalCoordinates();
+  void SetupMeshUniformRectangularDomain();
+  void PopulateGhostBoundaryCoordinates();
 };
 
 
