@@ -49,12 +49,6 @@ int main(int argc, char* argv[])
 
   SpaceVariable2D F(comm, &(dms.ghosted1_5dof)); //!< advection fluxes
 
-  //! Allocate memory for reconstructed cons. s.v. at l,r,t,b faces of each cell
-  SpaceVariable2D Ul(comm, &(dms.ghosted1_5dof)); 
-  SpaceVariable2D Ur(comm, &(dms.ghosted1_5dof));
-  SpaceVariable2D Ut(comm, &(dms.ghosted1_5dof));
-  SpaceVariable2D Ub(comm, &(dms.ghosted1_5dof));
-
   //! Impose initial condition
   spo.SetInitialCondition(V);
   spo.PrimitiveToConservative(V,U);
@@ -84,8 +78,7 @@ int main(int argc, char* argv[])
     print("Time step %d: t = %e, dt = %e, cfl = %e.\n", time_step, t, dt, cfl);
 
     spo.ComputeTimeStepSize(V, dt, cfl); 
-    //spo.ReconstructConservativeStateVariables(U, Ul, Ur, Ut, Ub);
-    //spo.ComputeConvectionFluxes(Ul, Ur, Ut, Ub, F);
+    spo.ComputeAdvectionFluxes(U, V, F); //pass in both the conservative and the primitive s.v.
     //integreter.integrate
     //TODO
 
@@ -107,10 +100,6 @@ int main(int argc, char* argv[])
 
   //! finalize 
   U.Destroy();
-  Ul.Destroy();
-  Ur.Destroy();
-  Ut.Destroy();
-  Ub.Destroy();
   V.Destroy();
   F.Destroy();
 

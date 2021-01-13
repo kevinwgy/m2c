@@ -59,8 +59,15 @@ public:
   ~SpaceVariable2D();
 
   double** GetDataPointer(); 
+
+  /** The following two functions involve MPI communications
+   *  Note that only the data in the real domain gets "communicated" (i.e. inserted or added)
+   *  Data in the ghost boundary (i.e. outside the physical domain) do not participate 
+   *  in any communications
+   */
   void RestoreDataPointerAndInsert();
   void RestoreDataPointerAndAdd();
+
   void RestoreDataPointerToLocalVector(); //!< caution: does not update globalVec
   void Destroy(); //!< should be called before PetscFinalize!
 

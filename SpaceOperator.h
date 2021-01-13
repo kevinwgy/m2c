@@ -4,9 +4,10 @@
 #include <IoData.h>
 #include <VarFcnBase.h>
 #include <SpaceVariable.h>
+#include <Reconstructor.h>
 
 /*******************************************
- * class SpaceOperator is drives computations
+ * class SpaceOperator drives computations
  * that require domain/mesh information
  ******************************************/
 class SpaceOperator
@@ -24,6 +25,12 @@ class SpaceOperator
   int i0, j0, imax, jmax; //!< corners of the real subdomain
   int ii0, jj0, iimax, jjmax; //!< corners of the ghosted subdomain
 
+  //! Class for spatial reconstruction
+  Reconstructor rec;
+
+  //! Reconstructed conservative state variables at cell boundaries
+  SpaceVariable2D Ul, Ur, Ub, Ut;
+
 public:
   SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &iod_,
                 VarFcnBase &vf_);
@@ -37,7 +44,7 @@ public:
   void ApplyBoundaryConditions(SpaceVariable2D &V);
 
   void ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &cfl);
-  void ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &F);
+  void ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &V, SpaceVariable2D &F);
 
   SpaceVariable2D& GetMeshCoordinates() {return coordinates;}
 

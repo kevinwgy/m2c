@@ -13,13 +13,21 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &i
   : comm(comm_), dm_all(dm_all_), iod(iod_), vf(vf_), 
     coordinates(comm_, &(dm_all_.ghosted1_2dof)),
     delta_xy(comm_, &(dm_all_.ghosted1_2dof)),
-    volume(comm_, &(dm_all_.ghosted1_1dof))
+    volume(comm_, &(dm_all_.ghosted1_1dof)),
+    rec(comm_, dm_all_, iod_, coordinates, delta_xy),
+    Ul(comm_, &(dm_all_.ghosted1_5dof)),
+    Ur(comm_, &(dm_all_.ghosted1_5dof)),
+    Ub(comm_, &(dm_all_.ghosted1_5dof)),
+    Ut(comm_, &(dm_all_.ghosted1_5dof))
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &imax, &jmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &iimax, &jjmax);
 
   SetupMesh();
+
+  rec.Setup();
+  
 }
 
 //-----------------------------------------------------
@@ -33,9 +41,14 @@ SpaceOperator::~SpaceOperator()
 
 void SpaceOperator::Destroy()
 {
+  rec.Destroy();
   coordinates.Destroy();
   delta_xy.Destroy();
   volume.Destroy();
+  Ul.Destroy();
+  Ur.Destroy();
+  Ub.Destroy();
+  Ut.Destroy();
 }
 
 //-----------------------------------------------------
@@ -498,8 +511,9 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &F)
+void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &V, SpaceVariable2D &F)
 {
+  rec.Reconstruct(U, Ul, Ur, Ub, Ut);
   //TODO
 }
 

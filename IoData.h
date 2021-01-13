@@ -102,23 +102,14 @@ struct EquationsData {
 
 struct SchemeData {
 
-  enum Flux {ROE = 0, VANLEER = 1, HLLE = 2, HLLC = 3} flux;
+  enum Flux {ROE = 0, HLLE = 2, HLLC = 3, KURGANOV_TADMOR = 4} flux;
 
   enum Reconstruction {CONSTANT = 0, LINEAR = 1} reconstruction;
 
-  enum Limiter {NONE = 0, VANALBADA = 1, BARTH = 2, VENKAT = 3, P_SENSOR = 4,
-                EXTENDEDVANALBADA = 5} limiter;
-  enum Dissipation {SECOND_ORDER = 0, SIXTH_ORDER = 1} dissipation;
+  enum Limiter {NONE = 0, GENERALIZED_MINMOD = 1, VANALBADA = 2, MODIFIED_VANALBADA = 3} limiter; 
 
-  double beta;
-  double gamma;
-  double xiu;
-  double xic;
-  double eps;
-
-  double xirho;
-  double xip;
-  double vel_fac;
+  double generalized_minmod_coeff;
+  
 
   int allowsFlux;
 

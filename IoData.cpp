@@ -160,19 +160,9 @@ SchemeData::SchemeData(int af) : allowsFlux(af)
 
   flux = ROE;
   reconstruction = LINEAR;
-  limiter = NONE;
-  dissipation = SECOND_ORDER;
+  limiter = GENERALIZED_MINMOD;
 
-  beta = 1.0/3.0;
-  gamma = 1.0;
-  xiu  = -2.0/15.0;
-  xic = -1.0/30.0;
-  eps = 0.1;
-
-  xirho = 1.0;
-  xip = 1.0;
-
-  vel_fac = sqrt(5.0);
+  generalized_minmod_coeff = 2.0; //The MC Limiter
 }
 
 //------------------------------------------------------------------------------
@@ -182,15 +172,15 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 
   ClassAssigner* ca;
   if (allowsFlux)
-    ca = new ClassAssigner(name, 12, father);
+    ca = new ClassAssigner(name, 4, father);
   else
-    ca = new ClassAssigner(name, 11, father);
+    ca = new ClassAssigner(name, 3, father);
 
   if (allowsFlux) {
     new ClassToken<SchemeData>
       (ca, "Flux", this,
        reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 4,
-       "Roe", 0, "VanLeer", 1, "HLLE", 2, "HLLC", 3);
+       "Roe", 0, "HLLE", 1, "HLLC", 2, "KurganovTadmor", 3);
   }
 
   new ClassToken<SchemeData>
@@ -200,24 +190,11 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<SchemeData>
     (ca, "Limiter", this,
-     reinterpret_cast<int SchemeData::*>(&SchemeData::limiter), 6,
-     "None", 0, "VanAlbada", 1, "Barth", 2, "Venkatakrishnan", 3, "PressureSensor", 4,
-     "ExtendedVanAlbada",5);
+     reinterpret_cast<int SchemeData::*>(&SchemeData::limiter), 4,
+     "None", 0, "GeneralizedMinMod", 1, "VanAlbada", 2, "ModifiedVanAlbada", 3);
 
-  new ClassToken<SchemeData>
-    (ca, "Dissipation", this,
-     reinterpret_cast<int SchemeData::*>(&SchemeData::dissipation), 2,
-     "SecondOrder", 0, "SixthOrder", 1);
-
-  new ClassDouble<SchemeData>(ca, "Beta", this, &SchemeData::beta);
-  new ClassDouble<SchemeData>(ca, "Gamma", this, &SchemeData::gamma);
-  new ClassDouble<SchemeData>(ca, "XiU", this, &SchemeData::xiu);
-  new ClassDouble<SchemeData>(ca, "XiC", this, &SchemeData::xic);
-  new ClassDouble<SchemeData>(ca, "Eps", this, &SchemeData::eps);
-
-  new ClassDouble<SchemeData>(ca, "XiRho", this, &SchemeData::xirho);
-  new ClassDouble<SchemeData>(ca, "XiP", this, &SchemeData::xip);
-  new ClassDouble<SchemeData>(ca, "VelFac", this, &SchemeData::vel_fac);
+  new ClassDouble<SchemeData>(ca, "GeneralizedMinModCoefficient", this, 
+    &SchemeData::generalized_minmod_coeff);
 
 }
 
