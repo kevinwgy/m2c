@@ -216,7 +216,7 @@ void SpaceOperator::ConservativeToPrimitive(SpaceVariable2D &U, SpaceVariable2D 
 
   for(int j=myj0; j<myjmax; j++)
     for(int i=myi0; i<myimax; i++)
-      vf.conservativeToPrimitive((double*)u[j][i], (double*)v[j][i]); 
+      vf.ConservativeToPrimitive((double*)u[j][i], (double*)v[j][i]); 
 
   U.RestoreDataPointerToLocalVector(); //no changes made
   V.RestoreDataPointerAndInsert();
@@ -240,7 +240,7 @@ void SpaceOperator::PrimitiveToConservative(SpaceVariable2D &V, SpaceVariable2D 
 
   for(int j=myj0; j<myjmax; j++)
     for(int i=myi0; i<myimax; i++)
-      vf.primitiveToConservative((double*)v[j][i], (double*)u[j][i]); 
+      vf.PrimitiveToConservative((double*)v[j][i], (double*)u[j][i]); 
 
   V.RestoreDataPointerToLocalVector(); //no changes made
   U.RestoreDataPointerAndInsert();
@@ -513,8 +513,10 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &V, SpaceVariable2D &F)
 {
+  //Reconstruction w/ slope limiters
   rec.Reconstruct(U, Ul, Ur, Ub, Ut);
-  //TODO
+
+   
 }
 
 //-----------------------------------------------------
