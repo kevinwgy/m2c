@@ -1,9 +1,3 @@
-/**********************************************************************************
- * Copyright © Kevn Wang, 2020
- * (1) Redistribution and use in source and binary forms, with or without modification,
- *     are permitted, provided that this copyright notice is retained.
- * (2) Use at your own risk.
- **********************************************************************************/
 #include <time.h>
 #include <petscdmda.h> //PETSc
 #include <Utils.h>
