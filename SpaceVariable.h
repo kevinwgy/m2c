@@ -98,8 +98,10 @@ public:
  
   inline Vec& GetRefToGlobalVec() {return globalVec;}
 
-  // operators
-  //TODO 
+  //! operators
+  void AXPlusB(double a, double b, bool workOnGhost = false); //self = a*self + b;
+  void AXPlusBY(double a, double b, SpaceVariable2D &y, bool workOnGhost = false); //self = a*self + b*vector_y
+  
 };
 
 #endif

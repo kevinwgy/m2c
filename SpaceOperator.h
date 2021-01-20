@@ -3,6 +3,7 @@
 #include <petscdmda.h>
 #include <IoData.h>
 #include <VarFcnBase.h>
+#include <FluxFcnBase.h>
 #include <SpaceVariable.h>
 #include <Reconstructor.h>
 
@@ -16,6 +17,7 @@ class SpaceOperator
   DataManagers2D& dm_all;
   IoData&         iod;
   VarFcnBase&     vf; 
+  FluxFcnBase&    ff;
 
   //! Mesh info
   SpaceVariable2D coordinates;
@@ -28,23 +30,27 @@ class SpaceOperator
   //! Class for spatial reconstruction
   Reconstructor rec;
 
-  //! Reconstructed conservative state variables at cell boundaries
-  SpaceVariable2D Ul, Ur, Ub, Ut;
+  //! Reconstructed primitive state variables at cell boundaries
+  SpaceVariable2D Vl, Vr, Vb, Vt;
 
 public:
   SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &iod_,
-                VarFcnBase &vf_);
+                VarFcnBase &vf_, FluxFcnBase &ff_); 
   ~SpaceOperator();
 
-  void ConservativeToPrimitive(SpaceVariable2D &U, SpaceVariable2D &V, bool workOnGhost = true);
-  void PrimitiveToConservative(SpaceVariable2D &V, SpaceVariable2D &U, bool workonGhost = true);
+  void ConservativeToPrimitive(SpaceVariable2D &U, SpaceVariable2D &V, bool workOnGhost = false);
+  void PrimitiveToConservative(SpaceVariable2D &V, SpaceVariable2D &U, bool workOnGhost = false);
+  int  ClipDensityAndPressure(SpaceVariable2D &V, bool workOnGhost = false, bool checkState = true);
 
   void SetInitialCondition(SpaceVariable2D &V);
     
   void ApplyBoundaryConditions(SpaceVariable2D &V);
 
   void ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &cfl);
-  void ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &V, SpaceVariable2D &F);
+
+  //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
+  void ComputeResidual(SpaceVariable2D &V, SpaceVariable2D &R);
+  void ComputeAdvectionFluxes(SpaceVariable2D &V, SpaceVariable2D &F);
 
   SpaceVariable2D& GetMeshCoordinates() {return coordinates;}
 

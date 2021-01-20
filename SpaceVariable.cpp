@@ -1,4 +1,5 @@
 #include <SpaceVariable.h>
+#include <Utils.h>
 
 //---------------------------------------------------------
 // DataManagers2D
@@ -210,4 +211,53 @@ void SpaceVariable2D::WriteToVTRFile(const char *filename)
   PetscViewerDestroy(&viewer);
 }
 
+//---------------------------------------------------------
+
+void SpaceVariable2D::AXPlusB(double a, double b, bool workOnGhost)
+{
+  double** v = GetDataPointer();
+  int myi0, myj0, myimax, myjmax;
+
+  if(workOnGhost)
+    GetGhostedCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+  else
+    GetCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+
+  for(int j=myj0; j<myjmax; j++)
+    for(int i=myi0; i<myimax; i++)
+      for(int p=0; p<dof; p++)
+        v[j][i*dof+p] = a*v[j][i*dof+p] + b;
+
+  RestoreDataPointerAndInsert();
+}
+
+//---------------------------------------------------------
+
+void SpaceVariable2D::AXPlusBY(double a, double b, SpaceVariable2D &y, bool workOnGhost)
+{
+  if(dof != y.NumDOF()) {
+    print_error("Error: Vector operation failed due to inconsistent sizes (%d vs. %d)\n", dof, y.NumDOF());
+    exit_mpi();
+  }
+
+  double** v  = GetDataPointer();
+  double** v2 = y.GetDataPointer();
+
+  int myi0, myj0, myimax, myjmax;
+
+  if(workOnGhost)
+    GetGhostedCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+  else
+    GetCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+
+  for(int j=myj0; j<myjmax; j++)
+    for(int i=myi0; i<myimax; i++)
+      for(int p=0; p<dof; p++)
+        v[j][i*dof+p] = a*v[j][i*dof+p] + b*v2[j][i*dof+p];
+
+  RestoreDataPointerAndInsert();
+  y.RestoreDataPointerToLocalVector(); //no changes
+}
+
+//---------------------------------------------------------
 

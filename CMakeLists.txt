@@ -66,6 +66,7 @@ SpaceVariable.cpp
 Output.cpp
 Reconstructor.cpp
 SpaceOperator.cpp
+TimeIntegrator.cpp
 Utils.cpp)
 
 # link to libraries

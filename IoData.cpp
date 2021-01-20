@@ -115,8 +115,8 @@ FluidModelData::FluidModelData()
 {
 
   fluid = STIFFENED_GAS;
-  rhomin = -1.e9; // note: if these defaults are changed then doVerification()
-  pmin = -1.e9;   //       in VarFcnBase.h must also be changed.
+  rhomin = -DBL_MAX; // By default, no clipping
+  pmin = -DBL_MAX;   // By default, no clipping
 
 }
 
@@ -243,7 +243,7 @@ void SchemesData::setup(const char *name, ClassAssigner *father)
 
 ExplicitData::ExplicitData()
 {
-  type = RUNGE_KUTTA_4;
+  type = RUNGE_KUTTA_2;
 }
 
 //------------------------------------------------------------------------------
@@ -256,7 +256,7 @@ void ExplicitData::setup(const char *name, ClassAssigner *father)
   new ClassToken<ExplicitData>
     (ca, "Type", this,
      reinterpret_cast<int ExplicitData::*>(&ExplicitData::type), 3,
-     "RungeKutta4", 0, "RungeKutta2", 1, "ForwardEuler", 2);
+     "ForwardEuler", 0, "RungeKutta2", 1, "RungeKutta3", 2);
 
 }
 
@@ -268,7 +268,8 @@ TsData::TsData()
   type = EXPLICIT;
   maxIts = 100;
   timestep = -1.0;
-  maxTime = 1.e99;
+  cfl = 0.5;
+  maxTime = 1e6;
 
 }
 
@@ -277,13 +278,14 @@ TsData::TsData()
 void TsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
 
   new ClassToken<TsData>(ca, "Type", this,
                          reinterpret_cast<int TsData::*>(&TsData::type), 2,
                          "Explicit", 0, "Implicit", 1);
   new ClassInt<TsData>(ca, "MaxIts", this, &TsData::maxIts);
   new ClassDouble<TsData>(ca, "TimeStep", this, &TsData::timestep);
+  new ClassDouble<TsData>(ca, "CFL", this, &TsData::cfl);
   new ClassDouble<TsData>(ca, "MaxTime", this, &TsData::maxTime);
 
   expl.setup("Explicit", ca);
@@ -543,13 +545,15 @@ OutputData::OutputData()
   levelset = OFF;
   materialid = OFF;
   temperature = OFF;
+
+  verbose = OFF;
 }
 
 //------------------------------------------------------------------------------
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 10, father);
+  ClassAssigner *ca = new ClassAssigner(name, 11, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -573,6 +577,10 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                reinterpret_cast<int OutputData::*>(&OutputData::materialid), 2,
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "Temperature", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
+                               "Off", 0, "On", 1);
+
+  new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
                                "Off", 0, "On", 1);
 }

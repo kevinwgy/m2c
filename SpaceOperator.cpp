@@ -5,20 +5,22 @@
 #include <algorithm> //std::upper_bound
 using std::cout;
 using std::endl;
+using std::max;
+using std::min;
 
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &iod_,
-                             VarFcnBase &vf_) 
-  : comm(comm_), dm_all(dm_all_), iod(iod_), vf(vf_), 
+                             VarFcnBase &vf_, FluxFcnBase &ff_) 
+  : comm(comm_), dm_all(dm_all_), iod(iod_), vf(vf_), ff(ff_),
     coordinates(comm_, &(dm_all_.ghosted1_2dof)),
     delta_xy(comm_, &(dm_all_.ghosted1_2dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)),
     rec(comm_, dm_all_, iod_, coordinates, delta_xy),
-    Ul(comm_, &(dm_all_.ghosted1_5dof)),
-    Ur(comm_, &(dm_all_.ghosted1_5dof)),
-    Ub(comm_, &(dm_all_.ghosted1_5dof)),
-    Ut(comm_, &(dm_all_.ghosted1_5dof))
+    Vl(comm_, &(dm_all_.ghosted1_5dof)),
+    Vr(comm_, &(dm_all_.ghosted1_5dof)),
+    Vb(comm_, &(dm_all_.ghosted1_5dof)),
+    Vt(comm_, &(dm_all_.ghosted1_5dof))
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &imax, &jmax);
@@ -45,10 +47,10 @@ void SpaceOperator::Destroy()
   coordinates.Destroy();
   delta_xy.Destroy();
   volume.Destroy();
-  Ul.Destroy();
-  Ur.Destroy();
-  Ub.Destroy();
-  Ut.Destroy();
+  Vl.Destroy();
+  Vr.Destroy();
+  Vb.Destroy();
+  Vt.Destroy();
 }
 
 //-----------------------------------------------------
@@ -499,25 +501,236 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
 
 //-----------------------------------------------------
 
+void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable2D &V,
+                        double *Vmin, double *Vmax, double &cmin, double &cmax,
+                        double &Machmax, double &char_speed_max,
+                        double &dx_over_char_speed_min)
+{
+  Vec5D** v = (Vec5D**) V.GetDataPointer();
+  Vec2D** dxy = (Vec2D**)delta_xy.GetDataPointer();
+
+  for(int i=0; i<5; i++) {
+    Vmin[i] = DBL_MAX; //max. double precision number
+    Vmax[i] = -DBL_MAX;
+  }
+  cmin = DBL_MAX;
+  cmax = Machmax = char_speed_max = -DBL_MAX;
+  dx_over_char_speed_min = DBL_MAX;
+
+  // Loop through the real domain (excluding the ghost layer)
+  double c, mach, lam_f, lam_g, lam_h;
+  for(int j=j0; j<jmax; j++) {
+    for(int i=i0; i<imax; i++) {
+
+      for(int p=0; p<5; p++) {
+        Vmin[p] = min(Vmin[p], v[j][i][p]);
+        Vmax[p] = max(Vmax[p], v[j][i][p]);
+      } 
+
+      c = vf.ComputeSoundSpeed(v[j][i][0]/*rho*/, vf.GetInternalEnergyPerUnitMass(v[j][i][0],v[j][i][4])/*e*/);
+      cmin = min(cmin, c);
+      cmax = max(cmax, c);
+      mach = vf.ComputeMachNumber(v[j][i]); 
+      Machmax = max(Machmax, mach); 
+
+      ff.EvaluateMaxEigenvalues(v[j][i], lam_f, lam_g, lam_h);
+      char_speed_max = max(max(max(char_speed_max, lam_f), lam_g), lam_h);
+
+      dx_over_char_speed_min = min(dx_over_char_speed_min, min(dxy[j][i][0]/lam_f, dxy[j][i][1]/lam_g)); //TODO:update for 3D
+    }
+  }
+
+  MPI_Allreduce(Vmin, Vmin, 5, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(Vmax, Vmax, 5, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(&cmin, &cmin, 1, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(&cmax, &cmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(&Machmax, &Machmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(&char_speed_max, &char_speed_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(&dx_over_char_speed_min, &dx_over_char_speed_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  V.Destroy();
+  delta_xy.Destroy();
+}
+
+//-----------------------------------------------------
+
 void SpaceOperator::ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &cfl)
 {
-  if(iod.ts.timestep > 0)
+  double Vmin[5], Vmax[5], cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min; 
+  FindExtremeValuesOfFlowVariables(V, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
+
+  if(iod.output.verbose == Output::ON)
+    print("Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
+          Vmax[0], Vmax[4], cmax, Machmax, char_speed_max);
+
+  if(iod.ts.timestep > 0) {
     dt = iod.ts.timestep;
-  else {
-    print_error("ERROR: Unable to calculate time step size.\n");
-    exit_mpi();
+    cfl = dt/dx_over_char_speed_min;
+  } else {//apply the CFL number
+    cfl = iod.ts.cfl;      
+    dt = cfl*dx_over_char_speed_min;
   }
+
 }
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable2D &U, SpaceVariable2D &V, SpaceVariable2D &F)
+void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable2D &V, SpaceVariable2D &F)
 {
-  //Reconstruction w/ slope limiters
-  rec.Reconstruct(U, Ul, Ur, Ub, Ut);
+  //------------------------------------
+  // Reconstruction w/ slope limiters.
+  //------------------------------------
+  rec.Reconstruct(V, Vl, Vr, Vb, Vt);
 
-   
+  Vec5D** v  = (Vec5D**) V.GetDataPointer();
+  Vec5D** vl = (Vec5D**) Vl.GetDataPointer();
+  Vec5D** vr = (Vec5D**) Vr.GetDataPointer();
+  Vec5D** vb = (Vec5D**) Vb.GetDataPointer();
+  Vec5D** vt = (Vec5D**) Vt.GetDataPointer();
+  Vec5D** f  = (Vec5D**) F.GetDataPointer();
+
+  //------------------------------------
+  // Clip pressure and density for the reconstructed state
+  // Verify hyperbolicity (i.e. c^2 > 0).
+  //------------------------------------
+  int nClipped = 0;
+  bool error = false;
+  for(int j=jj0; j<jjmax; j++) {
+    for(int i=ii0; i<iimax; i++) {
+      nClipped += (int)vf.ClipDensityAndPressure(vl[j][i]);
+      nClipped += (int)vf.ClipDensityAndPressure(vr[j][i]);
+      nClipped += (int)vf.ClipDensityAndPressure(vb[j][i]);
+      nClipped += (int)vf.ClipDensityAndPressure(vt[j][i]);
+         
+      error = vf.CheckState(vl[j][i]) || vf.CheckState(vr[j][i]) || 
+              vf.CheckState(vb[j][i]) || vf.CheckState(vt[j][i]);
+
+      if(error) {
+        print_error("ERROR: Reconstructed state at (%d,%d) violates hyperbolicity.\n", i,j);
+        exit_mpi();
+      } 
+    }
+  }
+  MPI_Allreduce(&nClipped, &nClipped, 1, MPI_INT, MPI_SUM, comm);
+  if(nClipped)
+    print("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
+  
+  //------------------------------------
+  // Compute fluxes
+  //------------------------------------
+  int nDOF = 5;
+  Vec5D localflux;
+  Vec2D** dxy = (Vec2D**)delta_xy.GetDataPointer();
+
+  // Initialize F to 0
+  for(int j=jj0; j<jjmax; j++) 
+    for(int i=ii0; i<iimax; i++)
+        f[j][i] = 0.0; //setting f[j][i][0] = ... = f[j][i][4] = 0.0;
+
+  // Loop through the domain interior, and the right and top ghost layers. For each cell, calculate the
+  // numerical flux across the left and lower cell boundaries/interfaces
+  for(int j=j0; j<jjmax; j++) {
+    for(int i=i0; i<iimax; i++) {
+
+      //calculate flux function F_{i-1/2,j,k}
+      ff.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[j][i-1]/*Vm*/, vl[j][i]/*Vp*/, localflux);
+      localflux *= dxy[j][i][1];
+      f[j][i-1] += localflux;
+      f[j][i]   -= localflux;  // the scheme is conservative 
+
+      //calculate flux function G_{i,j-1/2,k}
+      ff.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[j-1][i]/*Vm*/, vb[j][i]/*Vp*/, localflux);
+      localflux *= dxy[j][i][0];
+      f[j-1][i] += localflux;
+      f[j][i]   -= localflux;  // the scheme is conservative 
+      
+    }
+  }
+        
+  //------------------------------------
+  // Restore Spatial Variables
+  //------------------------------------
+  delta_xy.RestoreDataPointerToLocalVector(); //no changes
+  V.RestoreDataPointerToLocalVector(); 
+  Vl.RestoreDataPointerToLocalVector(); 
+  Vr.RestoreDataPointerToLocalVector(); 
+  Vb.RestoreDataPointerToLocalVector(); 
+  Vt.RestoreDataPointerToLocalVector(); 
+
+  F.RestoreDataPointerToLocalVector(); //NOTE: although F has been updated, there is no need of 
+                                       //      cross-subdomain communications. So, no need to 
+                                       //      update the global vec.
 }
 
 //-----------------------------------------------------
+
+void SpaceOperator::ComputeResidual(SpaceVariable2D &V, SpaceVariable2D &R)
+{
+  ComputeAdvectionFluxes(V,R);
+
+  // -------------------------------------------------
+  // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
+  // -------------------------------------------------
+  Vec5D**    r = (Vec5D**) R.GetDataPointer();
+  double** vol = (double**)volume.GetDataPointer();
+
+  for(int j=j0; j<jmax; j++) 
+    for(int i=i0; i<imax; i++)
+      r[j][i] /= -vol[j][i];
+
+  // restore spatial variables
+  R.RestoreDataPointerToLocalVector(); //NOTE: although R has been updated, there is no need of 
+                                       //      cross-subdomain communications. So, no need to 
+                                       //      update the global vec.
+  volume.RestoreDataPointerToLocalVector();
+}
+
+
+//-----------------------------------------------------
+
+int SpaceOperator::ClipDensityAndPressure(SpaceVariable2D &V, bool workOnGhost, bool checkState)
+{
+
+  Vec5D** v = (Vec5D**) V.GetDataPointer();
+
+  int myi0, myj0, myimax, myjmax;
+  if(workOnGhost)
+    V.GetGhostedCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+  else
+    V.GetCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+
+  int nClipped = 0;
+  for(int j=myj0; j<myjmax; j++) {
+    for(int i=myi0; i<myimax; i++) {
+      nClipped += (int)vf.ClipDensityAndPressure(v[j][i]);
+
+      if(checkState) {
+        if(vf.CheckState(v[j][i])) {
+          print_error("ERROR: State variables at (%d,%d) violate hyperbolicity.\n", i,j);
+          exit_mpi();
+        }
+      }
+    }
+  }
+
+  MPI_Allreduce(&nClipped, &nClipped, 1, MPI_INT, MPI_SUM, comm);
+  if(nClipped)
+    print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
+
+  V.RestoreDataPointerAndInsert();
+
+  return nClipped;
+}  
+
+//-----------------------------------------------------
+
+
+
+
+
+
+
+
+
+
 

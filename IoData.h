@@ -157,7 +157,7 @@ struct SchemesData {
 struct ExplicitData {
 
 //!time-integration scheme used
-  enum Type {RUNGE_KUTTA_4 = 0, RUNGE_KUTTA_2 = 1, FORWARD_EULER = 2} type;
+  enum Type {FORWARD_EULER = 0, RUNGE_KUTTA_2 = 1, RUNGE_KUTTA_3 = 2} type;
 
   ExplicitData();
   ~ExplicitData() {}
@@ -173,6 +173,7 @@ struct TsData {
   enum Type {EXPLICIT = 0, IMPLICIT = 1} type;
   int maxIts;
   double timestep;
+  double cfl;
   double maxTime;
   ExplicitData expl;
 
@@ -266,7 +267,8 @@ struct OutputData {
 
   enum Options {OFF = 0, ON = 1};
   Options density, velocity, pressure, levelset, materialid, temperature;
- 
+  Options verbose;
+
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
 

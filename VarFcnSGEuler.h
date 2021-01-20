@@ -11,14 +11,6 @@
  * All arguments must be pertinent to only a single grid node or a single
  * state.
  *
- * lay-out of the base class is:
- *  - 1 -  Transformation Operators
- *  - 2 -  General Functions
- *  - 3 -  Equations of State Parameters
- *  - 4 -  EOS related functions
- *
- *--------------------------------------------------------------------------
- *
  * EOS: Pressure = (gam - 1)*Density*e - gam*Pc
  * where
  *   e  : internal energy per unit mass.
@@ -40,7 +32,7 @@ private:
   double invgam1; //!< 1/(gamma-1)
 
 public:
-  VarFcnSGEuler(FluidModelData &data);
+  VarFcnSGEuler(FluidModelData &data, bool verbose_ = true);
   ~VarFcnSGEuler() {}
 
   //! ----- EOS-Specific Functions -----
@@ -53,7 +45,8 @@ public:
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + Pstiff < 0 (Not p + gamma*Pstiff). 
   inline bool CheckState(double *V) const{
     if(V[0] <= 0.0 || V[4]+Pstiff <= 0.0){
-      fprintf(stdout, "Warning:  found negative density (%e) or negative pressure (p = %e, Pstiff = %e).\n", V[0], V[4], Pstiff);
+      if(verbose)
+        fprintf(stdout, "Warning:  found negative density (%e) or negative pressure (p = %e, Pstiff = %e).\n", V[0], V[4], Pstiff);
       return true;
     }
     return false;
@@ -64,7 +57,7 @@ public:
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 inline
-VarFcnSGEuler::VarFcnSGEuler(FluidModelData &data) : VarFcnBase(data) {
+VarFcnSGEuler::VarFcnSGEuler(FluidModelData &data, bool verbose_) : VarFcnBase(data,verbose_) {
 
   if(data.fluid != FluidModelData::STIFFENED_GAS){
     fprintf(stderr, "*** Error: FluidModelData is not of type GAS\n");

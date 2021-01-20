@@ -11,6 +11,7 @@
 #include <Output.h>
 #include <SpaceVariable.h>
 #include <VarFcnSGEuler.h>
+#include <FluxFcnGenRoe.h>
 #include <SpaceOperator.h>
 using std::cout;
 using std::endl;
@@ -38,24 +39,55 @@ int main(int argc, char* argv[])
   DataManagers2D dms(comm, iod.mesh.Nx, iod.mesh.Ny);
 
   //! Initialize VarFcn (EOS, etc.)
-  VarFcnSGEuler vf(iod.eqs.fluid1);
+  VarFcnBase *vf = NULL;
+  if(iod.eqs.fluid1.fluid == FluidModelData::STIFFENED_GAS)
+    vf = new VarFcnSGEuler(iod.eqs.fluid1, iod.output.verbose);
+  else {
+    print_error("Error: Unable to initialize variable functions (VarFcn) for the specified fluid model.\n");
+    exit_mpi();
+  }
+
+  //! Initialize FluxFcn
+  FluxFcnBase *ff = NULL;
+  if(iod.schemes.ns.flux == SchemeData::ROE)
+    ff = new FluxFcnGenRoe(*vf, iod);
+  else {
+    print_error("Error: Unable to initialize flux calculator (FluxFcn) for the specified numerical method.\n");
+    exit_mpi();
+  }
 
   //! Initialize space operator
-  SpaceOperator spo(comm, dms, iod, vf);
+  SpaceOperator spo(comm, dms, iod, *vf, *ff);
 
-  //! Initialize State Variable and fluxes 
-  SpaceVariable2D U(comm, &(dms.ghosted1_5dof)); //!< conservative state variables
+  //! Initialize State Variables
   SpaceVariable2D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
-
-  SpaceVariable2D F(comm, &(dms.ghosted1_5dof)); //!< advection fluxes
 
   //! Impose initial condition
   spo.SetInitialCondition(V);
-  spo.PrimitiveToConservative(V,U);
 
   //! Initialize output
-  Output out(comm, dms, iod, vf);
+  Output out(comm, dms, iod, *vf);
   out.InitializeOutput(spo.GetMeshCoordinates());
+
+  //! Initialize time integrator
+  TimeIntegratorBase *integrator = NULL;
+  if(iod.ts.type == TsData::EXPLICIT) {
+    if(iod.ts.expl.type == FORWARD_EULER)
+      integrator = new TimeIntegratorFE(comm, iod, dms, spo);
+    else if(iod.ts.expl.type == RUNGE_KUTTA_2)
+      integrator = new TimeIntegratorRK2(comm, iod, dms, spo);
+    else if(iod.ts.expl.type == RUNGE_KUTTA_3)
+      integrator = new TimeIntegratorRK3(comm, iod, dms, spo);
+    else {
+      print_error("Error: Unable to initialize time integrator for the specified (explicit) method.\n");
+      exit_mpi();
+    }
+  } else {
+    print_error("Error: Unable to initialize time integrator for the specified method.\n");
+    exit_mpi();
+  }
+
+
 
   /*************************************
    * Main Loop 
@@ -68,24 +100,37 @@ int main(int argc, char* argv[])
   double dt = 0.0;
   double cfl = 0.0;
   int time_step = 0;
-
   //! write initial condition to file
   out.WriteSolutionSnapshot(t, time_step, V);
 
   while(t<iod.ts.maxTime && time_step<iod.ts.maxIts) {
 
     time_step++;
+
+    // Apply boundary conditions by filling the ghost layer (outside the physical domain) of V
+    spo.ApplyBoundaryConditions(V);
+
+    // Compute time step size
+    spo.ComputeTimeStepSize(V, dt, cfl); 
+
+    if(t+dt >= iod.ts.maxTime) { //update dt at the LAST time step so it terminates at maxTime
+      cfl *= (iod.ts.maxTime - t)/dt;
+      dt = iod.ts.maxTime - t;
+    }
     print("Time step %d: t = %e, dt = %e, cfl = %e.\n", time_step, t, dt, cfl);
 
-    spo.ComputeTimeStepSize(V, dt, cfl); 
-    spo.ComputeAdvectionFluxes(U, V, F); //pass in both the conservative and the primitive s.v.
-    //integreter.integrate
-    //TODO
+    //----------------------------------------------------
+    // Move forward by one time-step: Update V
+    //----------------------------------------------------
+    integrator.AdvanceOneTimeStep(V,dt); 
+    spo.ClipDensityAndPressure(V);
+    //----------------------------------------------------
 
     t += dt;
 
     if(out.ToWriteSolutionSnapshot(t, dt, time_step))
       out.WriteSolutionSnapshot(t, time_step, V);
+
   }
 
   if(t > out.GetLastSnapshotTime()+0.1*dt) //!< write final solution to file (if it has not been written)
@@ -99,14 +144,18 @@ int main(int argc, char* argv[])
   print("\n");
 
   //! finalize 
-  U.Destroy();
+  //! In general, "Destroy" should be called for classes that store Petsc DMDA data (which need to be "destroyed").
   V.Destroy();
-  F.Destroy();
 
   out.FinalizeOutput();
+  integrator.Destroy();
   spo.Destroy();
   dms.DestroyAllDataManagers();
   PetscFinalize();
+
+  delete integrator;
+  delete ff;
+  delete vf;
 
   return 0;
 }
