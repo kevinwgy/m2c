@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cfloat>
 #include <cmath>
 #include <unistd.h>
 //#include <dlfcn.h>

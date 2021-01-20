@@ -2,6 +2,7 @@
 #define _FLUX_FCN_GEN_ROE_H_
 
 #include <FluxFcnBase.h>
+#include <Vector5D.h>
 #include <math.h>
 using std::fabs;
 /****************************************************************************************
@@ -64,7 +65,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   // 1. Compute the intermediate state variables (with "hat")
   double rho_hat, u_hat, v_hat, w_hat, H_hat, c_hat;
   
-  rho_hat = sqrt(Vm[0]*Vp[0];
+  rho_hat = sqrt(Vm[0]*Vp[0]);
 
   double sqrt_rhom = sqrt(Vm[0]);
   double sqrt_rhop = sqrt(Vp[0]);
@@ -87,7 +88,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   double diffvelo;
   if     (dir==0) diffvelo = du; //x --> du;
   else if(dir==1) diffvelo = dv; //y --> dv;
-  else   (dir==2) diffvelo = dw; //z --> dw;
+  else            diffvelo = dw; //z --> dw;
 
   double diff = diffvelo/(sqrt_rhom+sqrt_rhop); 
   double p_over_rho_hat = Average(sqrt_rhom, Vm[4]/Vm[0], sqrt_rhop, Vp[4]/Vp[0])
@@ -104,12 +105,13 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
 
   double dpdrho_roeavg = Average(sqrt_rhom, vf->GetDpdrho(Vm[0],Vm[4]), 
                                  sqrt_rhop, vf->GetDpdrho(Vp[0],Vp[4]));
+  double Gamma_roeavg = Average(sqrt_rhom, vf->GetBigGamma(Vm[0],Vm[4]), 
+                                sqrt_rhop, vf->GetBigGamma(Vp[0],Vp[4]));
+
   double dpdrho_hat_numerator_term1 = (w_e + eps)*dpdrho_roeavg;
   double dpdrho_hat_numerator_term2 = (dp - Gamma_roeavg*rho_hat*de)*drho/(rho_hat*rho_hat); //avoid dividing by drho (possibly 0)
   double dpdrho_hat = (dpdrho_hat_numerator_term1 + dpdrho_hat_numerator_term2)/denominator;
 
-  double Gamma_roeavg = Average(sqrt_rhom, vf->GetBigGamma(Vm[0],Vm[4]), 
-                                sqrt_rhop, vf->GetBigGamma(Vp[0],Vp[4]));
   double Gamma_hat_numerator_term1 = (w_rho + eps)*Gamma_roeavg; 
   double Gamma_hat_numerator_term2 = (dp - dpdrho_roeavg*drho)*de/(rho_hat*e_hat*e_hat); //avoid dividing by de (possibly 0)
   double Gamma_hat = (Gamma_hat_numerator_term1 + Gamma_hat_numerator_term2)/denominator;
@@ -165,8 +167,9 @@ inline
 void FluxFcnGenRoe::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double *Vp, double *flux)
 {
   // Compute lambda, alpha, and R
-  double lam[5], a[5];
-  Vec5D r[5];
+  int nDOF = 5;
+  double lam[nDOF], a[nDOF];
+  Vec5D r[nDOF];
   ComputeLambdaAlphaR(dir/*0~x,1~y,2~z*/, Vm, Vp, 
                       lam[0], lam[1], lam[2], lam[3], lam[4], a[0], a[1], a[2], a[3], a[4], 
                       r[0], r[1], r[2], r[3], r[4]);
@@ -187,7 +190,7 @@ void FluxFcnGenRoe::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, dou
 
   for(int i=0; i<5; i++) {
     flux[i] = 0.5*(fm[i]+fp[i]);
-    for(int p=0; p<5; p++)
+    for(int p=0; p<nDOF; p++)
       flux[i] -= 0.5*fabs(lam[p])*a[p]*r[p][i];
   }
 }

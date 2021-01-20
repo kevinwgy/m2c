@@ -46,6 +46,10 @@ public:
     
   void ApplyBoundaryConditions(SpaceVariable2D &V);
 
+  void FindExtremeValuesOfFlowVariables(SpaceVariable2D &V, double *Vmin, double *Vmax, double &cmin, 
+                                        double &cmax, double &Machmax, double &char_speed_max,
+                                        double &dx_over_char_speed_min);
+
   void ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &cfl);
 
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)

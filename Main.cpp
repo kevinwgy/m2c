@@ -13,6 +13,7 @@
 #include <VarFcnSGEuler.h>
 #include <FluxFcnGenRoe.h>
 #include <SpaceOperator.h>
+#include <TimeIntegrator.h>
 using std::cout;
 using std::endl;
 /*************************************
@@ -50,7 +51,7 @@ int main(int argc, char* argv[])
   //! Initialize FluxFcn
   FluxFcnBase *ff = NULL;
   if(iod.schemes.ns.flux == SchemeData::ROE)
-    ff = new FluxFcnGenRoe(*vf, iod);
+    ff = new FluxFcnGenRoe(vf, iod);
   else {
     print_error("Error: Unable to initialize flux calculator (FluxFcn) for the specified numerical method.\n");
     exit_mpi();
@@ -72,11 +73,11 @@ int main(int argc, char* argv[])
   //! Initialize time integrator
   TimeIntegratorBase *integrator = NULL;
   if(iod.ts.type == TsData::EXPLICIT) {
-    if(iod.ts.expl.type == FORWARD_EULER)
+    if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
       integrator = new TimeIntegratorFE(comm, iod, dms, spo);
-    else if(iod.ts.expl.type == RUNGE_KUTTA_2)
+    else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
       integrator = new TimeIntegratorRK2(comm, iod, dms, spo);
-    else if(iod.ts.expl.type == RUNGE_KUTTA_3)
+    else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
       integrator = new TimeIntegratorRK3(comm, iod, dms, spo);
     else {
       print_error("Error: Unable to initialize time integrator for the specified (explicit) method.\n");
@@ -122,7 +123,7 @@ int main(int argc, char* argv[])
     //----------------------------------------------------
     // Move forward by one time-step: Update V
     //----------------------------------------------------
-    integrator.AdvanceOneTimeStep(V,dt); 
+    integrator->AdvanceOneTimeStep(V,dt); 
     spo.ClipDensityAndPressure(V);
     //----------------------------------------------------
 
@@ -148,7 +149,7 @@ int main(int argc, char* argv[])
   V.Destroy();
 
   out.FinalizeOutput();
-  integrator.Destroy();
+  integrator->Destroy();
   spo.Destroy();
   dms.DestroyAllDataManagers();
   PetscFinalize();

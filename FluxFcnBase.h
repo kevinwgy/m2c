@@ -11,7 +11,7 @@ protected:
   VarFcnBase *vf;
 
 public:
-  FluxFcnBase(IoData VarFcnBase *varFcn);
+  FluxFcnBase(VarFcnBase *varFcn);
   virtual ~FluxFcnBase() { vf = 0; }
 
   inline void EvaluateFluxFunction_F(double *V, double *F);
@@ -42,7 +42,7 @@ public:
                                          double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                          double *r1 = 0, double *r2 = 0, double *r3 = 0, double *r4 = 0, double *r5 = 0);
 
-  inline void EvaluateMaxEigenvalues(double *V, double &lam_f_max, &lam_g_max, &lam_h_max);
+  inline void EvaluateMaxEigenvalues(double *V, double &lam_f_max, double &lam_g_max, double &lam_h_max);
 
   /** The following function(s) depend on the numerical method for flux calculation.
     * Should be defined in derived classes. */
@@ -93,16 +93,16 @@ void FluxFcnBase::EvaluateFluxFunction_G(double *V, double *G)
 //------------------------------------------------------------------------------
 
 inline
-void FluxFcnBase::EvaluateFluxFunction_H(double *V, double *H)
+void FluxFcnBase::EvaluateFluxFunction_H(double *V, double *HH)
 {
   double H = vf->ComputeTotalEnthalpyPerUnitMass(V); 
   double rhow = V[0]*V[3];
 
-  H[0] = rhow; //rho*w
-  H[1] = rhow*V[1]; //rho*w*u
-  H[2] = rhow*V[2]; //rho*w*v
-  H[3] = rhow*V[3] + V[4]; //rho*w*w + p
-  H[4] = rhow*H; //rho*H*w
+  HH[0] = rhow; //rho*w
+  HH[1] = rhow*V[1]; //rho*w*u
+  HH[2] = rhow*V[2]; //rho*w*v
+  HH[3] = rhow*V[3] + V[4]; //rho*w*w + p
+  HH[4] = rhow*H; //rho*H*w
 }
 
 //------------------------------------------------------------------------------
@@ -243,7 +243,7 @@ void FluxFcnBase::EvaluateEigensOfJacobian_H(double u, double v, double w, doubl
 //------------------------------------------------------------------------------
 
 inline 
-void FluxFcnBase::EvaluateMaxEigenvalues(double *V, double &lam_f_max, &lam_g_max, &lam_h_max)
+void FluxFcnBase::EvaluateMaxEigenvalues(double *V, double &lam_f_max, double &lam_g_max, double &lam_h_max)
 {
   double e = vf->GetInternalEnergyPerUnitMass(V[0],V[4]);
   double c = vf->ComputeSoundSpeed(V[0], e);

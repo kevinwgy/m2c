@@ -3,6 +3,7 @@
 #include <Vector2D.h>
 #include <Vector5D.h>
 #include <algorithm> //std::upper_bound
+#include <cfloat> //DBL_MAX
 using std::cout;
 using std::endl;
 using std::max;
@@ -559,8 +560,8 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &
   double Vmin[5], Vmax[5], cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min; 
   FindExtremeValuesOfFlowVariables(V, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
 
-  if(iod.output.verbose == Output::ON)
-    print("Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
+  if(iod.output.verbose == OutputData::ON)
+    print("  - Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
           Vmax[0], Vmax[4], cmax, Machmax, char_speed_max);
 
   if(iod.ts.timestep > 0) {

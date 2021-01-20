@@ -47,28 +47,28 @@ public:
   //! get pressure from density (rho) and internal energy per unit mass (e)
   virtual double GetPressure(double rho, double e) const{
     print_error("*** Error:  GetPressure Function not defined\n");
-    exit_mpi(); }
+    exit_mpi(); return 0.0;}
 
   //! get e (internal energy per unit mass) from density (rho) and pressure (p)
   virtual double GetInternalEnergyPerUnitMass(double rho, double p) const{
     print_error("*** Error:  GetInternalEnergyPerUnitMass Function not defined\n");
-    exit_mpi(); }
+    exit_mpi(); return 0.0;}
 
   //! get rho (density) from p (pressure) and p (internal energy per unit mass)
   virtual double GetDensity(double p, double e) const{
     print_error("*** Error:  GetDensity Function not defined\n");
-    exit_mpi(); }
+    exit_mpi(); return 0.0;}
 
   //! dpdrho = \frac{\partial p(\rho,e)}{\partial \rho}
   virtual double GetDpdrho(double rho, double e) const{
     print_error("*** Error:  GetDpdrho Function not defined\n");
-    exit_mpi(); }
+    exit_mpi(); return 0.0;}
 
   //! BigGamma = 1/rho*(\frac{\partial p(\rho,e)}{\partial e})
   //  It is called "BigGamma" to distinguish it from the small "gamma" in perfect and stiffened EOS.
   virtual double GetBigGamma(double rho, double e) const{
     print_error("*** Error:  GetBigGamma Function not defined\n");
-    exit_mpi(); }
+    exit_mpi(); return 0.0;}
 
   //checks that the Euler equations are still hyperbolic
   virtual bool CheckState(double *V) const{

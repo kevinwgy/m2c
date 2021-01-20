@@ -8,6 +8,7 @@
  *******************************************************************/
 class TimeIntegratorBase
 {
+protected:
   MPI_Comm&       comm;
   IoData&         iod;
   SpaceOperator&  spo;
@@ -16,7 +17,7 @@ public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, SpaceOperator& spo_) : 
       comm(comm_), iod(iod_), spo(spo_) {/*nothing else to be done*/}
 
-  ~TimeIntegratorBase() {}
+  virtual ~TimeIntegratorBase() {}
 
   // Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable2D &V, double dt) {
@@ -35,7 +36,7 @@ public:
 class TimeIntegratorFE : public TimeIntegratorBase
 {
   //! conservative state variable at time n
-  Spacevariable2D Un;
+  SpaceVariable2D Un;
   //! "residual", i.e. the right-hand-side of the ODE
   SpaceVariable2D Rn;  
 
@@ -58,9 +59,9 @@ public:
 class TimeIntegratorRK2 : public TimeIntegratorBase
 {
   //! conservative state variable at time n
-  Spacevariable2D Un;
+  SpaceVariable2D Un;
   //! intermediate state
-  Spacevariable2D U1;
+  SpaceVariable2D U1;
   SpaceVariable2D V1;
   //! "residual", i.e. the right-hand-side of the ODE
   SpaceVariable2D R;  
@@ -85,9 +86,9 @@ public:
 class TimeIntegratorRK3 : public TimeIntegratorBase
 {
   //! conservative state variable at time n
-  Spacevariable2D Un;
+  SpaceVariable2D Un;
   //! intermediate state
-  Spacevariable2D U1;
+  SpaceVariable2D U1;
   SpaceVariable2D V1;
   //! "residual", i.e. the right-hand-side of the ODE
   SpaceVariable2D R;  
