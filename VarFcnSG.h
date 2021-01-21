@@ -1,5 +1,5 @@
-#ifndef _VAR_FCN_SGEULER_H
-#define _VAR_FCN_SGEULER_H
+#ifndef _VAR_FCN_SG_H
+#define _VAR_FCN_SG_H
 
 #include <VarFcnBase.h>
 #include <fstream>
@@ -22,7 +22,7 @@
  *   For a stiffened gas, choosing epsilon = cv * T would lead to a non-constant cp...
  *
  ********************************************************************************/
-class VarFcnSGEuler : public VarFcnBase {
+class VarFcnSG : public VarFcnBase {
 
 private:
   double gam;
@@ -32,8 +32,8 @@ private:
   double invgam1; //!< 1/(gamma-1)
 
 public:
-  VarFcnSGEuler(FluidModelData &data, bool verbose_ = true);
-  ~VarFcnSGEuler() {}
+  VarFcnSG(MaterialModelData &data, bool verbose_ = true);
+  ~VarFcnSG() {}
 
   //! ----- EOS-Specific Functions -----
   inline double GetPressure(double rho, double e) const {return gam1*rho*e - gam*Pstiff;}
@@ -57,17 +57,14 @@ public:
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 inline
-VarFcnSGEuler::VarFcnSGEuler(FluidModelData &data, bool verbose_) : VarFcnBase(data,verbose_) {
+VarFcnSG::VarFcnSG(MaterialModelData &data, bool verbose_) : VarFcnBase(data,verbose_) {
 
-  if(data.fluid != FluidModelData::STIFFENED_GAS){
-    fprintf(stderr, "*** Error: FluidModelData is not of type GAS\n");
+  if(data.eos != MaterialModelData::STIFFENED_GAS){
+    fprintf(stderr, "*** Error: MaterialModelData is not of type GAS\n");
     exit(1);
   }
 
-  if(data.gasModel.type == GasModelData::STIFFENED)
-    type = STIFFENEDGAS;
-  else
-    fprintf(stdout, "*** Error: VarFcnSGEuler::type is undefined since data.gasModel.type = %d\n", data.gasModel.type);
+  type = STIFFENED_GAS;
 
   gam = data.gasModel.specificHeatRatio;
   gam1 = gam -1.0;

@@ -30,13 +30,13 @@ class VarFcnBase {
 
 public:
   
-  enum Type{ STIFFENEDGAS = 0, MIEGRUNEISEN = 1} type;
+  enum Type{ STIFFENED_GAS = 0, MIE_GRUNEISEN = 1} type;
 
   double rhomin,pmin;
 
   bool verbose;
 
-  VarFcnBase(FluidModelData &data, bool verbose_) {
+  VarFcnBase(MaterialModelData &data, bool verbose_) {
     rhomin = data.rhomin;
     pmin = data.pmin;
     verbose = verbose_;

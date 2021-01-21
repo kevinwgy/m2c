@@ -54,8 +54,6 @@ struct MeshData {
 
 struct GasModelData {
 
-  enum Type {IDEAL = 0, STIFFENED = 1} type;
-
   double specificHeatRatio;
   double idealGasConstant;
   double pressureConstant;
@@ -70,16 +68,34 @@ struct GasModelData {
 
 //------------------------------------------------------------------------------
 
-struct FluidModelData {
+struct MieGruneisenModelData {
 
-  enum Fluid { STIFFENED_GAS = 0} fluid;
+  double rho0;
+  double cv; 
+  double C0;
+  double s;
+  double Gamma0;
+
+  MieGruneisenModelData();
+  ~MieGruneisenModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct MaterialModelData {
+
+  enum EOS {STIFFENED_GAS = 0, MIE_GRUNEISEN = 1} eos;
   double rhomin;
   double pmin;
 
   GasModelData gasModel;
+  MieGruneisenModelData mgModel;
 
-  FluidModelData();
-  ~FluidModelData() {}
+  MaterialModelData();
+  ~MaterialModelData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 
@@ -90,7 +106,7 @@ struct FluidModelData {
 struct EquationsData {
 
   int numPhase;
-  FluidModelData fluid1;
+  MaterialModelData material1;
 
   EquationsData();
   ~EquationsData() {}

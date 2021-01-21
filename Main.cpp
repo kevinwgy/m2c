@@ -4,7 +4,8 @@
 #include <IoData.h>
 #include <Output.h>
 #include <SpaceVariable.h>
-#include <VarFcnSGEuler.h>
+#include <VarFcnSG.h>
+#include <VarFcnMG.h>
 #include <FluxFcnGenRoe.h>
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
@@ -35,10 +36,12 @@ int main(int argc, char* argv[])
 
   //! Initialize VarFcn (EOS, etc.)
   VarFcnBase *vf = NULL;
-  if(iod.eqs.fluid1.fluid == FluidModelData::STIFFENED_GAS)
-    vf = new VarFcnSGEuler(iod.eqs.fluid1, iod.output.verbose);
+  if(iod.eqs.material1.eos == MaterialModelData::STIFFENED_GAS)
+    vf = new VarFcnSG(iod.eqs.material1, iod.output.verbose);
+  else if(iod.eqs.material1.eos == MaterialModelData::MIE_GRUNEISEN)
+    vf = new VarFcnMG(iod.eqs.material1, iod.output.verbose);
   else {
-    print_error("Error: Unable to initialize variable functions (VarFcn) for the specified fluid model.\n");
+    print_error("Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
     exit_mpi();
   }
 

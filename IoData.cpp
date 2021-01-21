@@ -81,7 +81,6 @@ void MeshData::setup(const char *name, ClassAssigner *father)
 GasModelData::GasModelData()
 {
 
-  type = IDEAL;
   specificHeatRatio = 1.4;
   idealGasConstant = 287.1;
   specificHeatPressure = -1.0;
@@ -94,11 +93,8 @@ GasModelData::GasModelData()
 void GasModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
-  new ClassToken<GasModelData>(ca, "Type", this,
-                               reinterpret_cast<int GasModelData::*>(&GasModelData::type), 2,
-                               "Ideal", 0, "Stiffened", 1);
   new ClassDouble<GasModelData>(ca, "SpecificHeatRatio", this,
                                 &GasModelData::specificHeatRatio);
   new ClassDouble<GasModelData>(ca, "IdealGasConstant", this,
@@ -112,10 +108,43 @@ void GasModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-FluidModelData::FluidModelData()
+MieGruneisenModelData::MieGruneisenModelData() 
+{
+  //default values are for copper
+  rho0 = 8.96e-3;       // unit: g/mm3
+  cv = 3.90e8;          // unit: mm2/(s2.K)
+  C0 = 3.933e6;         // unit: mm/s
+  s = 1.5;              // non-dimensional
+  Gamma0 = 1.99;        // non-dimensional
+
+}
+
+//------------------------------------------------------------------------------
+
+void MieGruneisenModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  fluid = STIFFENED_GAS;
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+
+  new ClassDouble<MieGruneisenModelData>(ca, "ReferenceDensity", this, 
+                                         &MieGruneisenModelData::rho0);
+  new ClassDouble<MieGruneisenModelData>(ca, "SpecificHeatAtConstantVolume", this, 
+                                         &MieGruneisenModelData::cv);
+  new ClassDouble<MieGruneisenModelData>(ca, "BulkSpeedOfSound", this, 
+                                         &MieGruneisenModelData::C0);
+  new ClassDouble<MieGruneisenModelData>(ca, "HugoniotSlope", this, 
+                                         &MieGruneisenModelData::s);
+  new ClassDouble<MieGruneisenModelData>(ca, "Gamma0", this, 
+                                         &MieGruneisenModelData::Gamma0);
+
+}
+
+//------------------------------------------------------------------------------
+
+MaterialModelData::MaterialModelData()
+{
+
+  eos = STIFFENED_GAS;
   rhomin = -DBL_MAX; // By default, no clipping
   pmin = -DBL_MAX;   // By default, no clipping
 
@@ -123,18 +152,20 @@ FluidModelData::FluidModelData()
 
 //------------------------------------------------------------------------------
 
-void FluidModelData::setup(const char *name, ClassAssigner *father)
+void MaterialModelData::setup(const char *name, ClassAssigner *father)
 {
 
   ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
-  new ClassToken<FluidModelData>(ca, "Fluid", this,
-                                 reinterpret_cast<int FluidModelData::*>(&FluidModelData::fluid), 1,
-                                 "StiffenedGas", FluidModelData::STIFFENED_GAS);
-  new ClassDouble<FluidModelData>(ca, "DensityCutOff", this, &FluidModelData::rhomin);
-  new ClassDouble<FluidModelData>(ca, "PressureCutOff", this, &FluidModelData::pmin);
+  new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
+                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 2,
+                                 "StiffenedGas", MaterialModelData::STIFFENED_GAS, 
+                                 "MieGruneisen", MaterialModelData::MIE_GRUNEISEN);
+  new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
+  new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
 
   gasModel.setup("GasModel", ca);
+  mgModel.setup("MieGruneisenModel", ca);
 
 };
 
@@ -151,7 +182,7 @@ void EquationsData::setup(const char *name, ClassAssigner *father)
 {
   ClassAssigner *ca = new ClassAssigner(name, 2, father); //not used.
 
-  fluid1.setup("FluidModel1");
+  material1.setup("MaterialModel1");
 }
 
 //------------------------------------------------------------------------------
