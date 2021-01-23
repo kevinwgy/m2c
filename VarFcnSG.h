@@ -66,10 +66,10 @@ VarFcnSG::VarFcnSG(MaterialModelData &data, bool verbose_) : VarFcnBase(data,ver
 
   type = STIFFENED_GAS;
 
-  gam = data.gasModel.specificHeatRatio;
+  gam = data.sgModel.specificHeatRatio;
   gam1 = gam -1.0;
   invgam1 = 1.0/gam1;
-  Pstiff = data.gasModel.pressureConstant;
+  Pstiff = data.sgModel.pressureConstant;
 
 }
 

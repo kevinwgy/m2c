@@ -52,15 +52,15 @@ struct MeshData {
 
 //------------------------------------------------------------------------------
 
-struct GasModelData {
+struct StiffenedGasModelData {
 
   double specificHeatRatio;
   double idealGasConstant;
   double pressureConstant;
   double specificHeatPressure;
 
-  GasModelData();
-  ~GasModelData() {}
+  StiffenedGasModelData();
+  ~StiffenedGasModelData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 
@@ -91,7 +91,7 @@ struct MaterialModelData {
   double rhomin;
   double pmin;
 
-  GasModelData gasModel;
+  StiffenedGasModelData sgModel;
   MieGruneisenModelData mgModel;
 
   MaterialModelData();

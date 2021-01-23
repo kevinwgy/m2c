@@ -78,7 +78,7 @@ void MeshData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-GasModelData::GasModelData()
+StiffenedGasModelData::StiffenedGasModelData()
 {
 
   specificHeatRatio = 1.4;
@@ -90,19 +90,19 @@ GasModelData::GasModelData()
 
 //------------------------------------------------------------------------------
 
-void GasModelData::setup(const char *name, ClassAssigner *father)
+void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 {
 
   ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
-  new ClassDouble<GasModelData>(ca, "SpecificHeatRatio", this,
-                                &GasModelData::specificHeatRatio);
-  new ClassDouble<GasModelData>(ca, "IdealGasConstant", this,
-                                &GasModelData::idealGasConstant);
-  new ClassDouble<GasModelData>(ca, "SpecificHeatAtConstantPressure", this,
-                                &GasModelData::specificHeatPressure);
-  new ClassDouble<GasModelData>(ca, "PressureConstant", this,
-                                &GasModelData::pressureConstant);
+  new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatRatio", this,
+                                &StiffenedGasModelData::specificHeatRatio);
+  new ClassDouble<StiffenedGasModelData>(ca, "IdealGasConstant", this,
+                                &StiffenedGasModelData::idealGasConstant);
+  new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatAtConstantPressure", this,
+                                &StiffenedGasModelData::specificHeatPressure);
+  new ClassDouble<StiffenedGasModelData>(ca, "PressureConstant", this,
+                                &StiffenedGasModelData::pressureConstant);
 
 }
 
@@ -164,7 +164,7 @@ void MaterialModelData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
   new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
 
-  gasModel.setup("GasModel", ca);
+  sgModel.setup("GasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
 
 };
