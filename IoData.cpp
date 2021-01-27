@@ -155,7 +155,7 @@ MaterialModelData::MaterialModelData()
 void MaterialModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 2,
@@ -164,7 +164,7 @@ void MaterialModelData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
   new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
 
-  sgModel.setup("GasModel", ca);
+  sgModel.setup("StiffenedGasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
 
 };
@@ -180,7 +180,7 @@ EquationsData::EquationsData()
 
 void EquationsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father); //not used.
+  ClassAssigner *ca = new ClassAssigner(name, 1, father); 
 
   material1.setup("MaterialModel1");
 }

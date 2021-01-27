@@ -77,7 +77,6 @@ void SpaceOperator::SetupMesh()
       vol[j][i] /*area of cv*/ = dxy[j][i][0]*dxy[j][i][1];
     }
 
-  coordinates.RestoreDataPointerToLocalVector(); //!< no changes have been made
   delta_xy.RestoreDataPointerAndInsert();
   volume.RestoreDataPointerAndInsert();
 }
