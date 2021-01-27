@@ -137,7 +137,7 @@ void Reconstructor::Reconstruct(SpaceVariable2D &U, SpaceVariable2D &Ul, SpaceVa
     for(int i=ii0; i<iimax; i++) {
 
       if(i==ii0 || i==iimax-1 || j==jj0 || j==jjmax-1) {// ghost layer
-        if(i == -1 || i==NX-1 || j==-1 || j==NY-1) { //!< outside the physical domain
+        if(i == -1 || i==NX || j==-1 || j==NY) { //!< outside the physical domain
           for(int dof=0; dof<nDOF; dof++) {
             ul[j][i][dof] = u[j][i][dof];
             ur[j][i][dof] = u[j][i][dof];
@@ -147,7 +147,7 @@ void Reconstructor::Reconstruct(SpaceVariable2D &U, SpaceVariable2D &Ul, SpaceVa
         } else { //!< inside the physical domain (overlapped with another subdomain)
           /*do nothing*/
         }
-        goto label;
+        continue;
       }
 
       // In the real part of the subdomain 
@@ -199,20 +199,20 @@ void Reconstructor::Reconstruct(SpaceVariable2D &U, SpaceVariable2D &Ul, SpaceVa
         ut[j][i][dof] = u[j][i][dof] + sigma[1];
 
         //! For first-layer cells, switch back to constant reconstruction in the normal dir.
-        if(i==0 || i==NX-2) {
+        if(i==0 || i==NX-1) {
           ul[j][i][dof] = u[j][i][dof];
           ur[j][i][dof] = u[j][i][dof];
         }
-        if(j==0 || j==NY-2) {
+        if(j==0 || j==NY-1) {
           ub[j][i][dof] = u[j][i][dof] - sigma[1];
           ut[j][i][dof] = u[j][i][dof] + sigma[1];
         }
 
       }
+
     }
   }
 
-label:
   //! Restore vectors
   CoeffA.RestoreDataPointerToLocalVector(); //!< no changes to vector
   CoeffB.RestoreDataPointerToLocalVector(); //!< no changes to vector

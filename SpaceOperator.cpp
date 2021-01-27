@@ -320,11 +320,11 @@ void SpaceOperator::SetInitialCondition(SpaceVariable2D &V) //apply IC within th
         }
     } 
     else if (iod.ic.type == IcData::CYLINDRICAL) {
-      print_error("ERROR: Cannot handle cylindrical i.c. at the moment.\n");
+      print_error("Error: Cannot handle cylindrical i.c. at the moment.\n");
       exit_mpi();
     } 
     else if (iod.ic.type == IcData::SPHERICAL) {
-      print_error("ERROR: Cannot handle spherical i.c. at the moment.\n");
+      print_error("Error: Cannot handle spherical i.c. at the moment.\n");
       exit_mpi();
     }
 
@@ -380,7 +380,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
         }
         break;
       default :
-        print_error("ERROR: Boundary condition at x=x0 cannot be specified!\n");
+        print_error("Error: Boundary condition at x=x0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -417,7 +417,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
         }
         break;
       default :
-        print_error("ERROR: Boundary condition at x=xmax cannot be specified!\n");
+        print_error("Error: Boundary condition at x=xmax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -454,7 +454,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
         }
         break;
       default :
-        print_error("ERROR: Boundary condition at y=y0 cannot be specified!\n");
+        print_error("Error: Boundary condition at y=y0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -491,7 +491,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable2D &V)
         }
         break;
       default :
-        print_error("ERROR: Boundary condition at y=ymax cannot be specified!\n");
+        print_error("Error: Boundary condition at y=ymax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -548,8 +548,8 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable2D &V,
   MPI_Allreduce(&char_speed_max, &char_speed_max, 1, MPI_DOUBLE, MPI_MAX, comm);
   MPI_Allreduce(&dx_over_char_speed_min, &dx_over_char_speed_min, 1, MPI_DOUBLE, MPI_MIN, comm);
 
-  V.Destroy();
-  delta_xy.Destroy();
+  V.RestoreDataPointerToLocalVector(); 
+  delta_xy.RestoreDataPointerToLocalVector(); 
 }
 
 //-----------------------------------------------------
@@ -606,7 +606,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable2D &V, SpaceVariable2D &
               vf.CheckState(vb[j][i]) || vf.CheckState(vt[j][i]);
 
       if(error) {
-        print_error("ERROR: Reconstructed state at (%d,%d) violates hyperbolicity.\n", i,j);
+        print_error("Error: Reconstructed state at (%d,%d) violates hyperbolicity.\n", i,j);
         exit_mpi();
       } 
     }
@@ -706,7 +706,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable2D &V, bool workOnGhost, 
 
       if(checkState) {
         if(vf.CheckState(v[j][i])) {
-          print_error("ERROR: State variables at (%d,%d) violate hyperbolicity.\n", i,j);
+          print_error("Error: State variables at (%d,%d) violate hyperbolicity.\n", i,j);
           exit_mpi();
         }
       }

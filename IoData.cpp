@@ -613,7 +613,7 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
+                               reinterpret_cast<int OutputData::*>(&OutputData::verbose), 2,
                                "Off", 0, "On", 1);
 }
 

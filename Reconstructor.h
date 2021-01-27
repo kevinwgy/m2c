@@ -60,7 +60,8 @@ private:
   inline double ModifiedVanAlbada(double A, double B, int k, double theta) {
     if(theta <= 0) return 0.0;
     else {
-      double theta_power_k = pow(theta,k);                                                                                                return B*(theta_power_k + theta)/(theta_power_k + A);
+      double theta_power_k = pow(theta,k);
+      return B*(theta_power_k + theta)/(theta_power_k + A);
     }
   }
   
