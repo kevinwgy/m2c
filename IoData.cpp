@@ -9,6 +9,7 @@
 #include <sstream>
 #include <cstring>
 #include <cfloat>
+#include <climits>
 #include <cmath>
 #include <unistd.h>
 //#include <dlfcn.h>
@@ -212,7 +213,7 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
     new ClassToken<SchemeData>
       (ca, "Flux", this,
        reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 4,
-       "Roe", 0, "HLLE", 1, "HLLC", 2, "KurganovTadmor", 3);
+       "Roe", 0, "LocalLaxFriedrichs", 1, "HLLE", 2, "HLLC", 3, "KurganovTadmor", 4);
   }
 
   new ClassToken<SchemeData>
@@ -298,7 +299,7 @@ TsData::TsData()
 {
 
   type = EXPLICIT;
-  maxIts = 100;
+  maxIts = INT_MAX;
   timestep = -1.0;
   cfl = 0.5;
   maxTime = 1e6;
@@ -310,7 +311,7 @@ TsData::TsData()
 void TsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassToken<TsData>(ca, "Type", this,
                          reinterpret_cast<int TsData::*>(&TsData::type), 2,

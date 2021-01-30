@@ -7,6 +7,7 @@
 #include <VarFcnSG.h>
 #include <VarFcnMG.h>
 #include <FluxFcnGenRoe.h>
+#include <FluxFcnLLF.h>
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
 using std::cout;
@@ -49,6 +50,8 @@ int main(int argc, char* argv[])
   FluxFcnBase *ff = NULL;
   if(iod.schemes.ns.flux == SchemeData::ROE)
     ff = new FluxFcnGenRoe(vf, iod);
+  else if(iod.schemes.ns.flux == SchemeData::LOCAL_LAX_FRIEDRICHS)
+    ff = new FluxFcnLLF(vf, iod);
   else {
     print_error("Error: Unable to initialize flux calculator (FluxFcn) for the specified numerical method.\n");
     exit_mpi();

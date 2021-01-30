@@ -19,7 +19,7 @@ private:
 public:
 
   FluxFcnGenRoe(VarFcnBase *varFcn, IoData &iod) : FluxFcnBase(varFcn) {
-    del = 1e-6; eps = 1e-10;} //!< Hard-coded for the moment. If needed, these can be user inputs (IoData)
+    del = 1e-1; eps = 1e-10;} //!< Hard-coded for the moment. If needed, these can be user inputs (IoData)
     
   ~FluxFcnGenRoe() {}
 

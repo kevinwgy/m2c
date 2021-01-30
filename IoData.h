@@ -118,7 +118,7 @@ struct EquationsData {
 
 struct SchemeData {
 
-  enum Flux {ROE = 0, HLLE = 2, HLLC = 3, KURGANOV_TADMOR = 4} flux;
+  enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, HLLE = 2, HLLC = 3, KURGANOV_TADMOR = 4} flux;
 
   enum Reconstruction {CONSTANT = 0, LINEAR = 1} reconstruction;
 
