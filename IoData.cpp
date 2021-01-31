@@ -19,7 +19,7 @@ using namespace std;
 
 MeshData::MeshData()
 {
-  type = CYLINDRICAL;
+  type = THREEDIMENSIONAL;
   x0 = 0.0;
   xmax = 1.0;
   y0 = 0.0;
@@ -45,8 +45,8 @@ void MeshData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 16, father);
 
   new ClassToken<MeshData>(ca, "Type", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::type), 3,
-                               "TwoDimensional", 0, "Cylindrical", 1, "ThreeDimensional", 2);
+                               reinterpret_cast<int MeshData::*>(&MeshData::type), 2,
+                               "ThreeDimensional", 0, "Cylindrical", 1);
   new ClassDouble<MeshData>(ca, "X0", this, &MeshData::x0);
   new ClassDouble<MeshData>(ca, "Xmax", this, &MeshData::xmax);
   new ClassDouble<MeshData>(ca, "Y0", this, &MeshData::y0);

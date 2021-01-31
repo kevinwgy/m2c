@@ -37,7 +37,7 @@ public:
 
 struct MeshData {
 
-  enum Type {TWODIMENSIONAL = 0, CYLINDRICAL = 1, THREEDIMENSIONAL = 2} type;
+  enum Type {THREEDIMENSIONAL = 0, CYLINDRICAL = 1} type;
   double x0, xmax, y0, ymax, z0, zmax;
   int Nx, Ny, Nz;
 

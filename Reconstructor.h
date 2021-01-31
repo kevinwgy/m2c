@@ -14,31 +14,31 @@ class Reconstructor
   IoData&   iod;
 
   //! Mesh info
-  SpaceVariable2D &delta_xy;
+  SpaceVariable3D &delta_xyz;
   
   /** Internal variables
    *  CoeffA, CoeffB, and CoeffK are only defined within the real domain
    */
-  SpaceVariable2D CoeffA;  //!< constant coefficient for non-uniform meshes, dim=2 for 2D 
-  SpaceVariable2D CoeffB;  //!< constant coefficient for non-uniform meshes, dim=2 for 2D 
-  SpaceVariable2D CoeffK;  //!< the integer k in Zeng's 2016 paper for Van Albada (stored as real numbers)
+  SpaceVariable3D CoeffA;  //!< constant coefficient for non-uniform meshes, dim=3 for 3D 
+  SpaceVariable3D CoeffB;  //!< constant coefficient for non-uniform meshes, dim=3 for 3D 
+  SpaceVariable3D CoeffK;  //!< the integer k in Zeng's 2016 paper for Van Albada (stored as real numbers)
 
 
 public:
-  Reconstructor(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &iod_, 
-                SpaceVariable2D &coordinates_, SpaceVariable2D &delta_xy_);
+  Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, 
+                SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_);
 
   ~Reconstructor();
 
   void Setup(); //!< compute AB and K
 
-  /** Linear reconstruction in 2D (TODO: Needs to be updated for 3D).
+  /** Linear reconstruction in 3D 
     * Although the input argument is denoted by U, this function can be applied to
     * any other form (e.g., primitive state variables, characteristic varaibles, etc.*/
-  void Reconstruct(SpaceVariable2D &U, SpaceVariable2D &Ul, SpaceVariable2D &Ur, 
-           SpaceVariable2D &Ub, SpaceVariable2D &Ut);
+  void Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVariable3D &Ur, 
+           SpaceVariable3D &Ub, SpaceVariable3D &Ut, SpaceVariable3D &Uk, SpaceVariable3D &Uf);
 
-  void Destroy(); //!< destroy the SpaceVariable2D variables
+  void Destroy(); //!< destroy the SpaceVariable3D variables
 
 private:
 

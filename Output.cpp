@@ -4,7 +4,7 @@
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers2D &dms, IoData &iod_, VarFcnBase &vf_) : comm(comm_), 
+Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, VarFcnBase &vf_) : comm(comm_), 
     iod(iod_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof))
@@ -42,7 +42,7 @@ Output::~Output()
 
 //--------------------------------------------------------------------------
 
-void Output::InitializeOutput(SpaceVariable2D &coordinates)
+void Output::InitializeOutput(SpaceVariable3D &coordinates)
 {
   scalar.StoreMeshCoordinates(coordinates);
   vector3.StoreMeshCoordinates(coordinates);
@@ -69,7 +69,7 @@ bool Output::ToWriteSolutionSnapshot(double time, double dt, int time_step)
 
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &V)
+void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V)
 {
   //! Define vtr file name
   char full_fname[256];
@@ -108,37 +108,40 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable2D &
   }
 
   // Write solution snapshot
-  Vec5D**  v  = (Vec5D**) V.GetDataPointer();
+  Vec5D***  v  = (Vec5D***) V.GetDataPointer();
 
-  int i0, j0, imax, jmax;
-  V.GetCornerIndices(&i0, &j0, &imax, &jmax);
+  int i0, j0, k0, imax, jmax, kmax;
+  V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
 
   if(iod.output.density==OutputData::ON) {
-    double** s  = (double**) scalar.GetDataPointer();
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++)
-        s[j][i] = v[j][i][0];
+    double*** s  = (double***) scalar.GetDataPointer();
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++)
+          s[k][j][i] = v[k][j][i][0];
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "density");
     VecView(scalar.GetRefToGlobalVec(), viewer);
   }
 
   if(iod.output.velocity==OutputData::ON) {
-    Vec3D** v3  = (Vec3D**) vector3.GetDataPointer();
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++)
-        for(int k=0; k<3; k++)
-          v3[j][i][k] = v[j][i][1+k];
+    Vec3D*** v3  = (Vec3D***) vector3.GetDataPointer();
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++)
+          for(int p=0; p<3; p++)
+            v3[k][j][i][p] = v[k][j][i][1+p];
     vector3.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "velocity");
     VecView(vector3.GetRefToGlobalVec(), viewer);
   }
 
   if(iod.output.pressure==OutputData::ON) {
-    double** s  = (double**) scalar.GetDataPointer();
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++)
-        s[j][i] = v[j][i][4];
+    double*** s  = (double***) scalar.GetDataPointer();
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++)
+          s[k][j][i] = v[k][j][i][4];
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "pressure");
     VecView(scalar.GetRefToGlobalVec(), viewer);

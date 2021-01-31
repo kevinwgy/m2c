@@ -14,49 +14,49 @@
 class SpaceOperator
 {
   MPI_Comm&       comm;
-  DataManagers2D& dm_all;
+  DataManagers3D& dm_all;
   IoData&         iod;
-  VarFcnBase&     vf; 
-  FluxFcnBase&    ff;
+  VarFcnBase&     varFcn; 
+  FluxFcnBase&    fluxFcn;
 
   //! Mesh info
-  SpaceVariable2D coordinates;
-  SpaceVariable2D delta_xy;
-  SpaceVariable2D volume; //!< volume of node-centered control volumes (area in 2D)
+  SpaceVariable3D coordinates;
+  SpaceVariable3D delta_xyz;
+  SpaceVariable3D volume; //!< volume of node-centered control volumes
   
-  int i0, j0, imax, jmax; //!< corners of the real subdomain
-  int ii0, jj0, iimax, jjmax; //!< corners of the ghosted subdomain
+  int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
+  int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
   //! Class for spatial reconstruction
   Reconstructor rec;
 
   //! Reconstructed primitive state variables at cell boundaries
-  SpaceVariable2D Vl, Vr, Vb, Vt;
+  SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;
 
 public:
-  SpaceOperator(MPI_Comm &comm_, DataManagers2D &dm_all_, IoData &iod_,
-                VarFcnBase &vf_, FluxFcnBase &ff_); 
+  SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
+                VarFcnBase &varFcn_, FluxFcnBase &fluxFcn_); 
   ~SpaceOperator();
 
-  void ConservativeToPrimitive(SpaceVariable2D &U, SpaceVariable2D &V, bool workOnGhost = false);
-  void PrimitiveToConservative(SpaceVariable2D &V, SpaceVariable2D &U, bool workOnGhost = false);
-  int  ClipDensityAndPressure(SpaceVariable2D &V, bool workOnGhost = false, bool checkState = true);
+  void ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &V, bool workOnGhost = false);
+  void PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &U, bool workOnGhost = false);
+  int  ClipDensityAndPressure(SpaceVariable3D &V, bool workOnGhost = false, bool checkState = true);
 
-  void SetInitialCondition(SpaceVariable2D &V);
+  void SetInitialCondition(SpaceVariable3D &V);
     
-  void ApplyBoundaryConditions(SpaceVariable2D &V);
+  void ApplyBoundaryConditions(SpaceVariable3D &V);
 
-  void FindExtremeValuesOfFlowVariables(SpaceVariable2D &V, double *Vmin, double *Vmax, double &cmin, 
+  void FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, double *Vmin, double *Vmax, double &cmin, 
                                         double &cmax, double &Machmax, double &char_speed_max,
                                         double &dx_over_char_speed_min);
 
-  void ComputeTimeStepSize(SpaceVariable2D &V, double &dt, double &cfl);
+  void ComputeTimeStepSize(SpaceVariable3D &V, double &dt, double &cfl);
 
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
-  void ComputeResidual(SpaceVariable2D &V, SpaceVariable2D &R);
-  void ComputeAdvectionFluxes(SpaceVariable2D &V, SpaceVariable2D &F);
+  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &R);
+  void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &F);
 
-  SpaceVariable2D& GetMeshCoordinates() {return coordinates;}
+  SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
 
   void Destroy();
 

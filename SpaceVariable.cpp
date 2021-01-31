@@ -2,75 +2,83 @@
 #include <Utils.h>
 
 //---------------------------------------------------------
-// DataManagers2D
+// DataManagers3D
 //---------------------------------------------------------
 // static member variables
-DM DataManagers2D::ghosted1_1dof; //ghosted"1" --> stencil width is 1
-DM DataManagers2D::ghosted1_2dof;
-DM DataManagers2D::ghosted1_3dof;
-DM DataManagers2D::ghosted1_4dof;
-DM DataManagers2D::ghosted1_5dof;
+DM DataManagers3D::ghosted1_1dof; //ghosted"1" --> stencil width is 1
+DM DataManagers3D::ghosted1_2dof;
+DM DataManagers3D::ghosted1_3dof;
+DM DataManagers3D::ghosted1_5dof;
 
 //---------------------------------------------------------
 
-DataManagers2D::DataManagers2D()
+DataManagers3D::DataManagers3D()
 {
 
 }
 
 //---------------------------------------------------------
 
-DataManagers2D::DataManagers2D(MPI_Comm comm, int NX, int NY)
+DataManagers3D::DataManagers3D(MPI_Comm comm, int NX, int NY, int NZ)
 {
-  CreateAllDataManagers(comm, NX, NY);
+  CreateAllDataManagers(comm, NX, NY, NZ);
 }
 
 //---------------------------------------------------------
 
-DataManagers2D::~DataManagers2D()
+DataManagers3D::~DataManagers3D()
 {
  //DMDestroy needs to be called before PetscFinalize()!
 }
 
 //---------------------------------------------------------
 
-int DataManagers2D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY)
+int DataManagers3D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY, int NZ)
 {
-  int nProcX, nProcY; //All DM's should use the same domain partition
+  int nProcX, nProcY, nProcZ; //All DM's should use the same domain partition
 
-  auto ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
-                           NX, NY, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, NULL,
+  auto ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                           DMDA_STENCIL_BOX,
+                           NX, NY, NZ,
+                           PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                           1/*dof*/, 1/*stencil width*/, 
+                           NULL, NULL, NULL,
                            &ghosted1_1dof);
   CHKERRQ(ierr);
   DMSetFromOptions(ghosted1_1dof);
   DMSetUp(ghosted1_1dof);
 
-  DMDAGetInfo(ghosted1_1dof, NULL, NULL, NULL, NULL, &nProcX, &nProcY, NULL, NULL, NULL, NULL,
+  DMDAGetInfo(ghosted1_1dof, NULL, NULL, NULL, NULL, &nProcX, &nProcY, &nProcZ, NULL, NULL, NULL,
               NULL, NULL, NULL); 
 
-  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, 2, 1, NULL, NULL,
+  ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                      DMDA_STENCIL_BOX,
+                      NX, NY, NZ,
+                      PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                      2/*dof*/, 1/*stencil width*/, 
+                      NULL, NULL, NULL,
                       &ghosted1_2dof);
   CHKERRQ(ierr);
   DMSetFromOptions(ghosted1_2dof);
   DMSetUp(ghosted1_2dof);
 
-  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, 3, 1, NULL, NULL,
+  ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                      DMDA_STENCIL_BOX,
+                      NX, NY, NZ,
+                      PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                      3/*dof*/, 1/*stencil width*/, 
+                      NULL, NULL, NULL,
                       &ghosted1_3dof);
   CHKERRQ(ierr);
   DMSetFromOptions(ghosted1_3dof);
   DMSetUp(ghosted1_3dof);
 
-  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, 4, 1, NULL, NULL,
-                      &ghosted1_4dof);
-  CHKERRQ(ierr);
-  DMSetFromOptions(ghosted1_4dof);
-  DMSetUp(ghosted1_4dof);
-
-  ierr = DMDACreate2d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DMDA_STENCIL_BOX,
-                      NX, NY, nProcX, nProcY, 5, 1, NULL, NULL,
+  ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                      DMDA_STENCIL_BOX,
+                      NX, NY, NZ,
+                      PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                      5/*dof*/, 1/*stencil width*/, 
+                      NULL, NULL, NULL,
                       &ghosted1_5dof);
   CHKERRQ(ierr);
   DMSetFromOptions(ghosted1_5dof);
@@ -81,20 +89,19 @@ int DataManagers2D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY)
 
 //---------------------------------------------------------
 
-void DataManagers2D::DestroyAllDataManagers()
+void DataManagers3D::DestroyAllDataManagers()
 {
   DMDestroy(&ghosted1_1dof);
   DMDestroy(&ghosted1_2dof);
   DMDestroy(&ghosted1_3dof);
-  DMDestroy(&ghosted1_4dof);
   DMDestroy(&ghosted1_5dof);
 }
 
 //---------------------------------------------------------
-// SpaceVariable2D
+// SpaceVariable3D
 //---------------------------------------------------------
 
-SpaceVariable2D::SpaceVariable2D(MPI_Comm &comm_, DM *dm_) : comm(comm_), globalVec(), localVec()
+SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : comm(comm_), globalVec(), localVec()
 {
   dm = dm_;
 
@@ -108,41 +115,43 @@ SpaceVariable2D::SpaceVariable2D(MPI_Comm &comm_, DM *dm_) : comm(comm_), global
 
   array = NULL;
 
-  DMBoundaryType bx, by;
+  DMBoundaryType bx, by, bz;
 
-  DMDAGetInfo(*dm, NULL, &NX, &NY, NULL, &nProcX, &nProcY, NULL, &dof, &ghost_width, 
-              &bx, &by, NULL, NULL);
+  DMDAGetInfo(*dm, NULL, &NX, &NY, &NZ, &nProcX, &nProcY, &nProcZ, &dof, &ghost_width, 
+              &bx, &by, &bz, NULL);
   
-  if(bx==DM_BOUNDARY_NONE && by==DM_BOUNDARY_NONE) {
+  if(bx==DM_BOUNDARY_NONE && by==DM_BOUNDARY_NONE && bz==DM_BOUNDARY_NONE) {
     ghosted = false;
     ghost_width = 0;
-  } else if(bx==DM_BOUNDARY_GHOSTED && by==DM_BOUNDARY_GHOSTED) {
+  } else if(bx==DM_BOUNDARY_GHOSTED && by==DM_BOUNDARY_GHOSTED && bz==DM_BOUNDARY_GHOSTED) {
     ghosted = true;
   } else {
     PetscPrintf(comm, "ERROR: Unsupported ghost type.\n");
     MPI_Abort(comm, 1); 
   }
 
-  DMDAGetCorners(*dm, &i0, &j0, NULL, &nx, &ny, NULL);
+  DMDAGetCorners(*dm, &i0, &j0, &k0, &nx, &ny, &nz);
   imax = i0 + nx;
   jmax = j0 + ny;
+  kmax = k0 + nz;
 
-  DMDAGetGhostCorners(*dm, &ghost_i0, &ghost_j0, NULL, &ghost_nx, &ghost_ny, NULL);
+  DMDAGetGhostCorners(*dm, &ghost_i0, &ghost_j0, &ghost_k0, &ghost_nx, &ghost_ny, &ghost_nz);
   ghost_imax = ghost_i0 + ghost_nx;
   ghost_jmax = ghost_j0 + ghost_ny;
+  ghost_kmax = ghost_k0 + ghost_nz;
 
 }
 
 //---------------------------------------------------------
 
-SpaceVariable2D::~SpaceVariable2D() 
+SpaceVariable3D::~SpaceVariable3D() 
 {
   Destroy();
 }
 
 //---------------------------------------------------------
 
-double** SpaceVariable2D::GetDataPointer()
+double*** SpaceVariable3D::GetDataPointer()
 {
   auto ierr = DMDAVecGetArray(*dm, localVec, &array);
   //CHKERRQ(ierr);
@@ -151,7 +160,7 @@ double** SpaceVariable2D::GetDataPointer()
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::RestoreDataPointerAndInsert()
+void SpaceVariable3D::RestoreDataPointerAndInsert()
 {
   RestoreDataPointerToLocalVector();
   auto ierr = DMLocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
@@ -164,7 +173,7 @@ void SpaceVariable2D::RestoreDataPointerAndInsert()
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::RestoreDataPointerAndAdd()
+void SpaceVariable3D::RestoreDataPointerAndAdd()
 {
   RestoreDataPointerToLocalVector();
   auto ierr = DMLocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
@@ -177,7 +186,7 @@ void SpaceVariable2D::RestoreDataPointerAndAdd()
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::RestoreDataPointerToLocalVector()
+void SpaceVariable3D::RestoreDataPointerToLocalVector()
 {
   auto ierr = DMDAVecRestoreArray(*dm, localVec, &array);  
   //CHKERRQ(ierr);
@@ -185,7 +194,7 @@ void SpaceVariable2D::RestoreDataPointerToLocalVector()
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::Destroy()
+void SpaceVariable3D::Destroy()
 {
   VecDestroy(&globalVec);
   VecDestroy(&localVec);
@@ -193,9 +202,9 @@ void SpaceVariable2D::Destroy()
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::StoreMeshCoordinates(SpaceVariable2D &coordinates)
+void SpaceVariable3D::StoreMeshCoordinates(SpaceVariable3D &coordinates)
 {
-  auto ierr = DMSetCoordinateDim(*dm, 2/*2D*/);
+  auto ierr = DMSetCoordinateDim(*dm, 3/*3D*/);
   //CHKERRQ(ierr);
   ierr = DMSetCoordinates(*dm, coordinates.globalVec);
   //CHKERRQ(ierr);
@@ -203,7 +212,7 @@ void SpaceVariable2D::StoreMeshCoordinates(SpaceVariable2D &coordinates)
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::WriteToVTRFile(const char *filename)
+void SpaceVariable3D::WriteToVTRFile(const char *filename)
 {
   PetscViewer viewer;
   PetscViewerVTKOpen(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer);
@@ -213,47 +222,49 @@ void SpaceVariable2D::WriteToVTRFile(const char *filename)
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::AXPlusB(double a, double b, bool workOnGhost)
+void SpaceVariable3D::AXPlusB(double a, double b, bool workOnGhost)
 {
-  double** v = GetDataPointer();
-  int myi0, myj0, myimax, myjmax;
+  double*** v = GetDataPointer();
+  int myi0, myj0, myk0, myimax, myjmax, mykmax;
 
   if(workOnGhost)
-    GetGhostedCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+    GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
   else
-    GetCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+    GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
 
-  for(int j=myj0; j<myjmax; j++)
-    for(int i=myi0; i<myimax; i++)
-      for(int p=0; p<dof; p++)
-        v[j][i*dof+p] = a*v[j][i*dof+p] + b;
+  for(int k=myk0; k<mykmax; k++)
+    for(int j=myj0; j<myjmax; j++)
+      for(int i=myi0; i<myimax; i++)
+        for(int p=0; p<dof; p++)
+          v[k][j][i*dof+p] = a*v[k][j][i*dof+p] + b;
 
   RestoreDataPointerAndInsert();
 }
 
 //---------------------------------------------------------
 
-void SpaceVariable2D::AXPlusBY(double a, double b, SpaceVariable2D &y, bool workOnGhost)
+void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost)
 {
   if(dof != y.NumDOF()) {
     print_error("Error: Vector operation failed due to inconsistent sizes (%d vs. %d)\n", dof, y.NumDOF());
     exit_mpi();
   }
 
-  double** v  = GetDataPointer();
-  double** v2 = y.GetDataPointer();
+  double*** v  = GetDataPointer();
+  double*** v2 = y.GetDataPointer();
 
-  int myi0, myj0, myimax, myjmax;
+  int myi0, myj0, myk0, myimax, myjmax, mykmax;
 
   if(workOnGhost)
-    GetGhostedCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+    GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
   else
-    GetCornerIndices(&myi0, &myj0, &myimax, &myjmax);
+    GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
 
-  for(int j=myj0; j<myjmax; j++)
-    for(int i=myi0; i<myimax; i++)
-      for(int p=0; p<dof; p++)
-        v[j][i*dof+p] = a*v[j][i*dof+p] + b*v2[j][i*dof+p];
+  for(int k=myk0; k<mykmax; k++)
+    for(int j=myj0; j<myjmax; j++)
+      for(int i=myi0; i<myimax; i++)
+        for(int p=0; p<dof; p++)
+          v[k][j][i*dof+p] = a*v[k][j][i*dof+p] + b*v2[k][j][i*dof+p];
 
   RestoreDataPointerAndInsert();
   y.RestoreDataPointerToLocalVector(); //no changes

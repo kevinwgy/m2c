@@ -4,7 +4,7 @@ using std::endl;
 
 //----------------------------------------------------------------------------
 
-void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable2D &V, double dt)
+void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, double dt)
 { 
   spo.ComputeResidual(V, Rn); // compute Rn
 
@@ -18,7 +18,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable2D &V, double dt)
 
 //----------------------------------------------------------------------------
 
-void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable2D &V, double dt)
+void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, double dt)
 {
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
   spo.ComputeResidual(V, R); // compute R = R(V(n))
@@ -45,7 +45,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable2D &V, double dt)
 
 //----------------------------------------------------------------------------
 
-void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable2D &V, double dt)
+void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, double dt)
 {
 
   // Forward Euler step: U1 = U(n) + dt*R(V(n))

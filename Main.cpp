@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
   IoData iod(argc, argv);
 
   //! Setup PETSc data array (da) structure for nodal variables
-  DataManagers2D dms(comm, iod.mesh.Nx, iod.mesh.Ny);
+  DataManagers3D dms(comm, iod.mesh.Nx, iod.mesh.Ny, iod.mesh.Nz);
 
   //! Initialize VarFcn (EOS, etc.)
   VarFcnBase *vf = NULL;
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
   SpaceOperator spo(comm, dms, iod, *vf, *ff);
 
   //! Initialize State Variables
-  SpaceVariable2D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
+  SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
 
   //! Impose initial condition
   spo.SetInitialCondition(V);
