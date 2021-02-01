@@ -154,6 +154,8 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
               ur[k][j][i][dof] = u[k][j][i][dof];
               ub[k][j][i][dof] = u[k][j][i][dof];
               ut[k][j][i][dof] = u[k][j][i][dof];
+              uk[k][j][i][dof] = u[k][j][i][dof];
+              uf[k][j][i][dof] = u[k][j][i][dof];
             }
           } else { //!< inside the physical domain (overlapped with another subdomain)
             /*do nothing*/

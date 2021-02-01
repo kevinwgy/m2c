@@ -185,8 +185,16 @@ void FluxFcnGenRoe::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, dou
 
   //Roe's flux
   double fm[5], fp[5];
-  EvaluateFluxFunction_F(Vm,fm);
-  EvaluateFluxFunction_F(Vp,fp);
+  if(dir==0) {
+    EvaluateFluxFunction_F(Vm,fm);
+    EvaluateFluxFunction_F(Vp,fp);
+  } else if(dir==1) {
+    EvaluateFluxFunction_G(Vm,fm);
+    EvaluateFluxFunction_G(Vp,fp);
+  } else { //dir = 2
+    EvaluateFluxFunction_H(Vm,fm);
+    EvaluateFluxFunction_H(Vp,fp);
+  }
 
   for(int i=0; i<5; i++) {
     flux[i] = 0.5*(fm[i]+fp[i]);

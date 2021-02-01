@@ -80,6 +80,7 @@ void SpaceOperator::SetupMesh()
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
         vol[k][j][i] /*volume of cv*/ = dxyz[k][j][i][0]*dxyz[k][j][i][1]*dxyz[k][j][i][2];
+//        fprintf(stderr,"(%d,%d,%d), dx = %e, dy = %e, dz = %e, vol = %e.\n", i,j,k, dxyz[k][j][i][0], dxyz[k][j][i][1], dxyz[k][j][i][2], vol[k][j][i]);
       }
 
   delta_xyz.RestoreDataPointerAndInsert();
@@ -137,16 +138,16 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
   double dxyz0[3], dxyz1[3];
   for(int p=0; p<3; p++) {
     v0[p]    = v[k0][j0][i0][p] - dxyz[k0][j0][i0][p];
-    v1[p]    = v[kmax][jmax][imax][p] + dxyz[kmax][jmax][imax][p];
+    v1[p]    = v[kmax-1][jmax-1][imax-1][p] + dxyz[kmax-1][jmax-1][imax-1][p];
     dxyz0[p] = dxyz[k0][j0][i0][p];
-    dxyz1[p] = dxyz[kmax][jmax][imax][p];
+    dxyz1[p] = dxyz[kmax-1][jmax-1][imax-1][p];
   }
 
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
 
-        if(k!=-1 && k!=NZ+1 && j!=-1 && j!=NY+1 && i!=-1 && i!=NX+1)
+        if(k!=-1 && k!=NZ && j!=-1 && j!=NY && i!=-1 && i!=NX)
           continue; //not in the ghost layer of the physical domain
 
         Vec3D& X  = v[k][j][i];
@@ -160,7 +161,7 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
           xdone = true;
         }
 
-        if(i==NX+1) {
+        if(i==NX) {
           X[0]  = v1[0];
           dX[0] = dxyz1[0];
           xdone = true;
@@ -172,7 +173,7 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
           ydone = true;
         }
 
-        if(j==NY+1) {
+        if(j==NY) {
           X[1]  = v1[1];
           dX[1] = dxyz1[1];
           ydone = true;
@@ -184,7 +185,7 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
           zdone = true;
         }
 
-        if(k==NZ+1) {
+        if(k==NZ) {
           X[2]  = v1[2];
           dX[2] = dxyz1[2];
           zdone = true;
@@ -705,6 +706,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   for(int k=kk0; k<kkmax; k++) {
     for(int j=jj0; j<jjmax; j++) {
       for(int i=ii0; i<iimax; i++) {
+
         nClipped += (int)varFcn.ClipDensityAndPressure(vl[k][j][i]);
         nClipped += (int)varFcn.ClipDensityAndPressure(vr[k][j][i]);
         nClipped += (int)varFcn.ClipDensityAndPressure(vb[k][j][i]);
@@ -718,6 +720,13 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
         if(error) {
           print_error("Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity.\n", i,j,k);
+          fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+          fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
+          fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
+          fprintf(stderr, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
+          fprintf(stderr, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
+          fprintf(stderr, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
+          fprintf(stderr, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
           exit_mpi();
         } 
       }
@@ -747,23 +756,31 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
       for(int i=i0; i<iimax; i++) {
 
         //calculate flux function F_{i-1/2,j,k}
-        fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, localflux);
-        localflux *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
-        f[k][j][i-1] += localflux;
-        f[k][j][i]   -= localflux;  // the scheme is conservative 
+        if(k!=kkmax-1 && j!=jjmax-1) {
+          fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, localflux);
+          localflux *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
+          f[k][j][i-1] += localflux;
+          f[k][j][i]   -= localflux;  // the scheme is conservative 
+        }
 
         //calculate flux function G_{i,j-1/2,k}
-        fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, localflux);
-        localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
-        f[k][j-1][i] += localflux;
-        f[k][j][i]   -= localflux;  // the scheme is conservative 
+        if(k!=kkmax-1 && i!=iimax-1) {
+          fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, localflux);
+          localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
+          f[k][j-1][i] += localflux;
+          f[k][j][i]   -= localflux;  // the scheme is conservative 
+        }
 
         //calculate flux function H_{i,j,k-1/2}
-        fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, localflux);
-        localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
-        f[k-1][j][i] += localflux;
-        f[k][j][i]   -= localflux;  // the scheme is conservative 
-      
+        if(j!=jjmax-1 && i!=iimax-1) {
+          fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, localflux);
+          localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
+          f[k-1][j][i] += localflux;
+          f[k][j][i]   -= localflux;  // the scheme is conservative 
+//          fprintf(stderr,"(%d,%d,%d) Vm = [%e %e %e %e %e]. \n", i,j,k, vf[k-1][j][i][0], vf[k-1][j][i][1], vf[k-1][j][i][2], vf[k-1][j][i][3], vf[k-1][j][i][4]);
+//          fprintf(stderr,"(%d,%d,%d) Vp = [%e %e %e %e %e]. \n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
+          //fprintf(stderr,"(%d,%d,%d) H = [%e %e %e %e %e]. area = %e.\n", i,j,k, localflux[0], localflux[1], localflux[2], localflux[3], localflux[4], dxyz[k][j][i][0]*dxyz[k][j][i][1]);
+        }
       }
     }
   }
@@ -832,6 +849,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, bool workOnGhost, 
         if(checkState) {
           if(varFcn.CheckState(v[k][j][i])) {
             print_error("Error: State variables at (%d,%d,%d) violate hyperbolicity.\n", i,j,k);
+            fprintf(stderr,"v[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
             exit_mpi();
           }
         }
