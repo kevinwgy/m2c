@@ -195,6 +195,7 @@ SchemeData::SchemeData(int af) : allowsFlux(af)
   reconstruction = LINEAR;
   limiter = GENERALIZED_MINMOD;
 
+  delta = 0.2; //the coefficient in Harten's entropy fix.
   generalized_minmod_coeff = 2.0; //The MC Limiter
 }
 
@@ -205,7 +206,7 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 
   ClassAssigner* ca;
   if (allowsFlux)
-    ca = new ClassAssigner(name, 4, father);
+    ca = new ClassAssigner(name, 5, father);
   else
     ca = new ClassAssigner(name, 3, father);
 
@@ -214,6 +215,7 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
       (ca, "Flux", this,
        reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 4,
        "Roe", 0, "LocalLaxFriedrichs", 1, "HLLE", 2, "HLLC", 3, "KurganovTadmor", 4);
+    new ClassDouble<SchemeData>(ca, "EntropyFixCoefficient", this, &SchemeData::delta);
   }
 
   new ClassToken<SchemeData>

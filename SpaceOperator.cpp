@@ -707,6 +707,15 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     for(int j=jj0; j<jjmax; j++) {
       for(int i=ii0; i<iimax; i++) {
 
+        if(k==2 && j==2 && i>=98 && i<=101) {
+
+        fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+        fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
+        fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
+ 
+
+        }
+
         nClipped += (int)varFcn.ClipDensityAndPressure(vl[k][j][i]);
         nClipped += (int)varFcn.ClipDensityAndPressure(vr[k][j][i]);
         nClipped += (int)varFcn.ClipDensityAndPressure(vb[k][j][i]);

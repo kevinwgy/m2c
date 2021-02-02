@@ -54,6 +54,8 @@ void Reconstructor::Setup()
         K[k][j][i][0] = CalculateSlopeLimiterCoefficientK(A[k][j][i][0],B[k][j][i][0]);    
         K[k][j][i][1] = CalculateSlopeLimiterCoefficientK(A[k][j][i][1],B[k][j][i][1]);    
         K[k][j][i][2] = CalculateSlopeLimiterCoefficientK(A[k][j][i][2],B[k][j][i][2]);    
+
+        //fprintf(stderr,"(%d,%d,%d): A = %e %e %e, B = %e %e %e, k = %e %e %e\n", i,j,k, A[k][j][i][0], A[k][j][i][1], A[k][j][i][2], B[k][j][i][0], B[k][j][i][1], B[k][j][i][2], K[k][j][i][0], K[k][j][i][1], K[k][j][i][2]);
       }
     }
   }
@@ -209,6 +211,8 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
             }
           }
   
+          if(j==2 && k==2 && dof==0) 
+            fprintf(stderr,"phi(%d,%d,%d) = %e %e %e, theta = %e %e %e\n",i,j,k, phi[0], phi[1], phi[2], theta[0], theta[1], theta[2]);
           //! calculate the slope sigma (times half cell width) within cell (i,j)
           sigma[0] = 0.5*phi[0]*(u[k][j][i+1][dof]-u[k][j][i][dof]);
           sigma[1] = 0.5*phi[1]*(u[k][j+1][i][dof]-u[k][j][i][dof]);

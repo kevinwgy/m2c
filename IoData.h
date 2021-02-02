@@ -126,6 +126,7 @@ struct SchemeData {
 
   double generalized_minmod_coeff;
   
+  double delta; //! The coeffient in Harten's entropy fix.
 
   int allowsFlux;
 
