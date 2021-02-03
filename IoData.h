@@ -122,7 +122,7 @@ struct SchemeData {
 
   enum Reconstruction {CONSTANT = 0, LINEAR = 1} reconstruction;
 
-  enum Limiter {NONE = 0, GENERALIZED_MINMOD = 1, VANALBADA = 2, MODIFIED_VANALBADA = 3} limiter; 
+  enum Limiter {NONE = 0, GENERALIZED_MINMOD = 1, VANALBADA = 2} limiter; 
 
   double generalized_minmod_coeff;
   

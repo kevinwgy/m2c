@@ -1,5 +1,4 @@
 #pragma once
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <string>
@@ -31,7 +30,7 @@ inline int m2c_isnan(const T& t) {return (t != t);}
 const string getCurrentDateTime();
 //--------------------------------------------------
 //! Print logo and code version
-void printLogo();
+void printHeader(int argc, char* argv[]);
 //--------------------------------------------------
 //! Call MPI_Finalize and exit (with error)
 void exit_mpi();

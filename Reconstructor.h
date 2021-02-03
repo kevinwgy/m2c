@@ -48,23 +48,24 @@ private:
   /** slope limiter functions
    * (frequently called; need to be as fast as possible)
    */
-  inline double GeneralizedMinMod(double A, double B, double alpha, double theta) {
-    return max(0.0, min(alpha*theta, min(B/(A+1.0)*(theta+1.0), alpha) ) );
+  inline double GeneralizedMinMod(double A, double B, double alpha, double dq0, double dq1) {
+    if(dq0<0.0 && dq1<0.0) 
+      return max(alpha*dq0, max(B/(A+1.0)*(dq0+dq1), alpha*dq1));
+    else if(dq0>0.0 && dq1>0.0) 
+      return min(alpha*dq0, min(B/(A+1.0)*(dq0+dq1), alpha*dq1));
+    else
+      return 0.0;
   }
 
-  inline double VanAlbada(double A, double B, int k, double theta) {
-    double theta_power_k = pow(theta,k);
-    return B*(theta_power_k + theta)/(theta_power_k + A);
+  inline double VanAlbada(double A, double B, int k, double dq0, double dq1) {
+    if(dq0*dq1<=0) return 0.0;
+    if(fabs(dq0*dq1)<1e-16) return 0.0;
+    double dq0_power_k = pow(dq0,k);
+    double dq1_power_k = pow(dq1,k);
+    double denom = dq0_power_k + A*dq1_power_k;
+    return B*(dq1*dq0_power_k + dq0*dq1_power_k)/(dq0_power_k + A*dq1_power_k);
   }
 
-  inline double ModifiedVanAlbada(double A, double B, int k, double theta) {
-    if(theta <= 0) return 0.0;
-    else {
-      double theta_power_k = pow(theta,k);
-      return B*(theta_power_k + theta)/(theta_power_k + A);
-    }
-  }
-  
 };
 
 #endif

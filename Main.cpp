@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
   //! Initialize PETSc and MPI 
   PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
   MPI_Comm comm = PETSC_COMM_WORLD; //be default, this is MPI_COMM_WORLD
-  printLogo();
+  printHeader(argc, argv);
 
   print("\033[0;32m==========================================\033[0m\n");
   print("\033[0;32m                 START                    \033[0m\n"); 
@@ -118,6 +118,7 @@ int main(int argc, char* argv[])
       cfl *= (iod.ts.maxTime - t)/dt;
       dt = iod.ts.maxTime - t;
     }
+    
     print("Time step %d: t = %e, dt = %e, cfl = %e.\n", time_step, t, dt, cfl);
 
     //----------------------------------------------------

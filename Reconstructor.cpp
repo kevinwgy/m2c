@@ -70,9 +70,7 @@ void Reconstructor::Setup()
 
 int Reconstructor::CalculateSlopeLimiterCoefficientK(double A, double B)
 {
-  if(iod.schemes.ns.limiter == SchemeData::VANALBADA || 
-     iod.schemes.ns.limiter == SchemeData::MODIFIED_VANALBADA) {
-
+  if(iod.schemes.ns.limiter == SchemeData::VANALBADA){
     int k;
     double rhs;
     for(k=2; k<1000; k++) {
@@ -137,9 +135,8 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
    *    - Within the internal ghost layer (i.e. shared with some other subdomains): do not compute
    *    - Otherwise: Normal computation based on user input.
    ***************************************************************/
-  double phi[3]; //!< slope limiter
   double sigma[3]; //!< slope
-  double theta[3]; //!< input of slope limiter function
+  double dq0[3], dq1[3];
 
   double a[3], b[3];
   double alpha = iod.schemes.ns.generalized_minmod_coeff; //!< only needed for gen. minmod
@@ -168,63 +165,56 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
         //! In the real part of the subdomain 
         for(int dof=0; dof<nDOF; dof++) {
 
-          //! get constant coefficients
-          a[0] = A[k][j][i][0];
-          a[1] = A[k][j][i][1];
-          a[2] = A[k][j][i][2];
-          b[0] = B[k][j][i][0];
-          b[1] = B[k][j][i][1];
-          b[2] = B[k][j][i][2];
-          kk[0] = round(K[k][j][i][0]);
-          kk[1] = round(K[k][j][i][1]);
-          kk[2] = round(K[k][j][i][2]);
-
-          //! calculate theta: input argument of slope limiter function
-          theta[0] = (u[k][j][i][dof] - u[k][j][i-1][dof]) / (u[k][j][i+1][dof] - u[k][j][i][dof]);
-          theta[1] = (u[k][j][i][dof] - u[k][j-1][i][dof]) / (u[k][j+1][i][dof] - u[k][j][i][dof]);
-          theta[2] = (u[k][j][i][dof] - u[k-1][j][i][dof]) / (u[k+1][j][i][dof] - u[k][j][i][dof]);
-
           //! calculate slope limiter phi within cell (i,j) 
-          phi[0] = phi[1] = phi[2] = 0.0; //!< zero slope
+          sigma[0] = sigma[1] = sigma[2] = 0.0;
+
           if(iod.schemes.ns.reconstruction == SchemeData::LINEAR) {
+
+            //! get constant coefficients
+            a[0] = A[k][j][i][0];
+            a[1] = A[k][j][i][1];
+            a[2] = A[k][j][i][2];
+            b[0] = B[k][j][i][0];
+            b[1] = B[k][j][i][1];
+            b[2] = B[k][j][i][2];
+
+            //! calculate theta: input argument of slope limiter function
+            dq0[0] = (u[k][j][i][dof]   - u[k][j][i-1][dof]);
+            dq1[0] = (u[k][j][i+1][dof] - u[k][j][i][dof]);
+            dq0[1] = (u[k][j][i][dof]   - u[k][j-1][i][dof]);
+            dq1[1] = (u[k][j+1][i][dof] - u[k][j][i][dof]);
+            dq0[2] = (u[k][j][i][dof]   - u[k-1][j][i][dof]);
+            dq1[2] = (u[k+1][j][i][dof] - u[k][j][i][dof]);
+
             switch (iod.schemes.ns.limiter) {
               case SchemeData::GENERALIZED_MINMOD :
-                phi[0] = GeneralizedMinMod(a[0], b[0], alpha, theta[0]);
-                phi[1] = GeneralizedMinMod(a[1], b[1], alpha, theta[1]);
-                phi[2] = GeneralizedMinMod(a[2], b[2], alpha, theta[2]);
+                sigma[0] = GeneralizedMinMod(a[0], b[0], alpha, dq0[0], dq1[0]);
+                sigma[1] = GeneralizedMinMod(a[1], b[1], alpha, dq0[1], dq1[1]);
+                sigma[2] = GeneralizedMinMod(a[2], b[2], alpha, dq0[2], dq1[2]);
                 break;
               case SchemeData::VANALBADA :
-                phi[0] = VanAlbada(a[0], b[0], kk[0], theta[0]);
-                phi[1] = VanAlbada(a[1], b[1], kk[1], theta[1]);
-                phi[2] = VanAlbada(a[2], b[2], kk[2], theta[2]);
-                break;
-              case SchemeData::MODIFIED_VANALBADA :
-                phi[0] = ModifiedVanAlbada(a[0], b[0], kk[0], theta[0]);
-                phi[1] = ModifiedVanAlbada(a[1], b[1], kk[1], theta[1]);
-                phi[2] = ModifiedVanAlbada(a[2], b[2], kk[2], theta[2]);
+                kk[0] = round(K[k][j][i][0]);
+                kk[1] = round(K[k][j][i][1]);
+                kk[2] = round(K[k][j][i][2]);
+                sigma[0] = VanAlbada(a[0], b[0], kk[0], dq0[0], dq1[0]);
+                sigma[1] = VanAlbada(a[1], b[1], kk[1], dq0[1], dq1[1]);
+                sigma[2] = VanAlbada(a[2], b[2], kk[2], dq0[2], dq1[2]);
                 break;
               case SchemeData::NONE :
-                phi[0] = 1.0;
-                phi[1] = 1.0;
-                phi[2] = 1.0;
+                sigma[0] = 0.5*(dq0[0]+dq1[0]);
+                sigma[1] = 0.5*(dq0[1]+dq1[1]);
+                sigma[2] = 0.5*(dq0[2]+dq1[2]);
                 break;
             }
           }
   
-          if(j==2 && k==2 && dof==0) 
-            fprintf(stderr,"phi(%d,%d,%d) = %e %e %e, theta = %e %e %e\n",i,j,k, phi[0], phi[1], phi[2], theta[0], theta[1], theta[2]);
-          //! calculate the slope sigma (times half cell width) within cell (i,j)
-          sigma[0] = 0.5*phi[0]*(u[k][j][i+1][dof]-u[k][j][i][dof]);
-          sigma[1] = 0.5*phi[1]*(u[k][j+1][i][dof]-u[k][j][i][dof]);
-          sigma[2] = 0.5*phi[2]*(u[k+1][j][i][dof]-u[k][j][i][dof]);
-
           //! calculate face values
-          ul[k][j][i][dof] = u[k][j][i][dof] - sigma[0];
-          ur[k][j][i][dof] = u[k][j][i][dof] + sigma[0];
-          ub[k][j][i][dof] = u[k][j][i][dof] - sigma[1];
-          ut[k][j][i][dof] = u[k][j][i][dof] + sigma[1];
-          uk[k][j][i][dof] = u[k][j][i][dof] - sigma[2];
-          uf[k][j][i][dof] = u[k][j][i][dof] + sigma[2];
+          ul[k][j][i][dof] = u[k][j][i][dof] - 0.5*sigma[0];
+          ur[k][j][i][dof] = u[k][j][i][dof] + 0.5*sigma[0];
+          ub[k][j][i][dof] = u[k][j][i][dof] - 0.5*sigma[1];
+          ut[k][j][i][dof] = u[k][j][i][dof] + 0.5*sigma[1];
+          uk[k][j][i][dof] = u[k][j][i][dof] - 0.5*sigma[2];
+          uf[k][j][i][dof] = u[k][j][i][dof] + 0.5*sigma[2];
 
           //! For first-layer cells, switch back to constant reconstruction in the normal dir.
           if(i==0 || i==NX-1) {

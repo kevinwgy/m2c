@@ -225,8 +225,8 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<SchemeData>
     (ca, "Limiter", this,
-     reinterpret_cast<int SchemeData::*>(&SchemeData::limiter), 4,
-     "None", 0, "GeneralizedMinMod", 1, "VanAlbada", 2, "ModifiedVanAlbada", 3);
+     reinterpret_cast<int SchemeData::*>(&SchemeData::limiter), 3,
+     "None", 0, "GeneralizedMinMod", 1, "VanAlbada", 2);
 
   new ClassDouble<SchemeData>(ca, "GeneralizedMinModCoefficient", this, 
     &SchemeData::generalized_minmod_coeff);

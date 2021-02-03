@@ -630,7 +630,9 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V,
           Vmax[p] = max(Vmax[p], v[k][j][i][p]);
         } 
 
-        c = varFcn.ComputeSoundSpeed(v[k][j][i][0]/*rho*/, varFcn.GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
+        c = varFcn.ComputeSoundSpeed(v[k][j][i][0]/*rho*/, 
+                       varFcn.GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
+
         cmin = min(cmin, c);
         cmax = max(cmax, c);
         mach = varFcn.ComputeMachNumber(v[k][j][i]); 
@@ -646,13 +648,13 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V,
     }
   }
 
-  MPI_Allreduce(Vmin, Vmin, 5, MPI_DOUBLE, MPI_MIN, comm);
-  MPI_Allreduce(Vmax, Vmax, 5, MPI_DOUBLE, MPI_MAX, comm);
-  MPI_Allreduce(&cmin, &cmin, 1, MPI_DOUBLE, MPI_MIN, comm);
-  MPI_Allreduce(&cmax, &cmax, 1, MPI_DOUBLE, MPI_MAX, comm);
-  MPI_Allreduce(&Machmax, &Machmax, 1, MPI_DOUBLE, MPI_MAX, comm);
-  MPI_Allreduce(&char_speed_max, &char_speed_max, 1, MPI_DOUBLE, MPI_MAX, comm);
-  MPI_Allreduce(&dx_over_char_speed_min, &dx_over_char_speed_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, Vmin, 5, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, Vmax, 5, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &cmin, 1, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &cmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &Machmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &char_speed_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &dx_over_char_speed_min, 1, MPI_DOUBLE, MPI_MIN, comm);
 
   V.RestoreDataPointerToLocalVector(); 
   delta_xyz.RestoreDataPointerToLocalVector(); 
@@ -703,18 +705,18 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   int nClipped = 0;
   bool error = false;
+  int corner;
   for(int k=kk0; k<kkmax; k++) {
     for(int j=jj0; j<jjmax; j++) {
       for(int i=ii0; i<iimax; i++) {
 
-        if(k==2 && j==2 && i>=98 && i<=101) {
+        corner = 0;
+        if(k==kk0 || k==kkmax-1) corner++;
+        if(j==jj0 || j==jjmax-1) corner++;
+        if(i==ii0 || i==iimax-1) corner++;
+        if(corner>=2) //not needed
+          continue;
 
-        fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
-        fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
-        fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
- 
-
-        }
 
         nClipped += (int)varFcn.ClipDensityAndPressure(vl[k][j][i]);
         nClipped += (int)varFcn.ClipDensityAndPressure(vr[k][j][i]);
@@ -741,7 +743,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
       }
     }
   }
-  MPI_Allreduce(&nClipped, &nClipped, 1, MPI_INT, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
   if(nClipped)
     print("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
   
@@ -770,6 +772,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           localflux *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
           f[k][j][i-1] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
+
+//          if(j==2 && k==2 && i>198 && i<203) {
+//            fprintf(stderr,"(%d,%d,%d) Vm = [%e %e %e %e %e]. \n", i,j,k, vr[k][j][i-1][0], vr[k][j][i-1][1], vr[k][j][i-1][2], vr[k][j][i-1][3], vr[k][j][i-1][4]);
+//            fprintf(stderr,"(%d,%d,%d) Vp = [%e %e %e %e %e]. \n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
+//            fprintf(stderr,"(%d,%d,%d) F = [%e %e %e %e %e]. area = %e.\n", i,j,k, localflux[0], localflux[1], localflux[2], localflux[3], localflux[4], dxyz[k][j][i][1]*dxyz[k][j][i][2]);
+//          }
         }
 
         //calculate flux function G_{i,j-1/2,k}
@@ -786,9 +794,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
           f[k-1][j][i] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
-//          fprintf(stderr,"(%d,%d,%d) Vm = [%e %e %e %e %e]. \n", i,j,k, vf[k-1][j][i][0], vf[k-1][j][i][1], vf[k-1][j][i][2], vf[k-1][j][i][3], vf[k-1][j][i][4]);
-//          fprintf(stderr,"(%d,%d,%d) Vp = [%e %e %e %e %e]. \n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
-          //fprintf(stderr,"(%d,%d,%d) H = [%e %e %e %e %e]. area = %e.\n", i,j,k, localflux[0], localflux[1], localflux[2], localflux[3], localflux[4], dxyz[k][j][i][0]*dxyz[k][j][i][1]);
+//          if(i==2 && j==2 && k>198 && k<203) {
+//            fprintf(stderr,"(%d,%d,%d) Vm = [%e %e %e %e %e]. \n", i,j,k, vf[k-1][j][i][0], vf[k-1][j][i][1], vf[k-1][j][i][2], vf[k-1][j][i][3], vf[k-1][j][i][4]);
+//            fprintf(stderr,"(%d,%d,%d) Vp = [%e %e %e %e %e]. \n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
+//            fprintf(stderr,"(%d,%d,%d) H = [%e %e %e %e %e]. area = %e.\n", i,j,k, localflux[0], localflux[1], localflux[2], localflux[3], localflux[4], dxyz[k][j][i][0]*dxyz[k][j][i][1]);
+//          }
         }
       }
     }
@@ -866,7 +876,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, bool workOnGhost, 
     }
   }
 
-  MPI_Allreduce(&nClipped, &nClipped, 1, MPI_INT, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
   if(nClipped)
     print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
 

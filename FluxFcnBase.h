@@ -232,11 +232,11 @@ void FluxFcnBase::EvaluateEigensOfJacobian_H(double u, double v, double w, doubl
     return;
 
   //eigenvectores
-  r1[0] = 1;        r2[0] = 0;  r3[0] = 0;  r3[0] = 1;                        r5[0] = 1;
-  r1[1] = u;        r2[1] = 1;  r3[1] = 0;  r3[1] = u;                        r5[1] = u;
-  r1[2] = v;        r2[2] = 0;  r3[2] = 1;  r3[2] = v;                        r5[2] = v;
-  r1[3] = w - c;    r2[3] = 0;  r3[3] = 0;  r3[3] = w;                        r5[3] = w + c;
-  r1[4] = H - w*c;  r2[4] = u;  r3[4] = v;  r3[4] = e+0.5*vel2-dpdrho/Gamma;  r5[4] = H + w*c;
+  r1[0] = 1;        r2[0] = 0;  r3[0] = 0;  r4[0] = 1;                        r5[0] = 1;
+  r1[1] = u;        r2[1] = 1;  r3[1] = 0;  r4[1] = u;                        r5[1] = u;
+  r1[2] = v;        r2[2] = 0;  r3[2] = 1;  r4[2] = v;                        r5[2] = v;
+  r1[3] = w - c;    r2[3] = 0;  r3[3] = 0;  r4[3] = w;                        r5[3] = w + c;
+  r1[4] = H - w*c;  r2[4] = u;  r3[4] = v;  r4[4] = e+0.5*vel2-dpdrho/Gamma;  r5[4] = H + w*c;
 
 }
 
