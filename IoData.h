@@ -265,14 +265,17 @@ struct IcData {
 
   vector<double> user_data[SIZE];
 
-  const char *user_specified_ic2; //!< for radial variation in the case of cylindrical
   vector<double> user_data2[SIZE]; //!< for radial variation 
 
   IcData();
   ~IcData() {}
 
   void setup(const char *, ClassAssigner * = 0);
+
   void readUserSpecifiedIC();
+  void readUserSpecifiedIC_Planar(std::fstream &input);
+  void readUserSpecifiedIC_Cylindrical(std::fstream &input);
+  void readUserSpecifiedIC_Spherical(std::fstream &input);
 };
 
 //------------------------------------------------------------------------------

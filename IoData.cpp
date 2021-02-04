@@ -405,7 +405,6 @@ void BcsWallData::setup(const char *name, ClassAssigner *father)
 IcData::IcData()
 {
   user_specified_ic = "";
-  user_specified_ic2 = "";
 
   type = NONE;
 
@@ -417,10 +416,9 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
-  new ClassStr<IcData>(ca, "UserDataFile2", this, &IcData::user_specified_ic2);
 }
 
 //------------------------------------------------------------------------------
@@ -433,7 +431,7 @@ void IcData::readUserSpecifiedIC()
   std::fstream input;
   input.open(user_specified_ic, std::fstream::in);
   if (!input.is_open()) {
-    print_error("ERROR: could not open user-specified initial condition file %s.\n", user_specified_ic);
+    print_error("Error: could not open user-specified initial condition file %s.\n", user_specified_ic);
     exit_mpi();
   } else
     print("- Reading user-specified initial condition file: %s.\n", user_specified_ic);
@@ -448,21 +446,40 @@ void IcData::readUserSpecifiedIC()
   // just comparing the first 4 letters is sufficient
   if(!(word.compare(0,4,"Planar",0,4) && 
        word.compare(0,4,"PLANAR",0,4) && 
-       word.compare(0,4,"planar",0,4)))
+       word.compare(0,4,"planar",0,4))) {
     type = PLANAR;
+    input.ignore(256,'\n'); //done with line 1
+    readUserSpecifiedIC_Planar(input);
+  } 
   else if(!(word.compare(0,4,"Cylindrical",0,4) && 
             word.compare(0,4,"CYLINDRICAL",0,4) && 
-            word.compare(0,4,"cylindrical",0,4)))
+            word.compare(0,4,"cylindrical",0,4))) {
     type = CYLINDRICAL;
+    input.ignore(256,'\n'); //done with line 1
+    readUserSpecifiedIC_Cylindrical(input);
+  } 
   else if(!(word.compare(0,4,"Spherical",0,4) && 
             word.compare(0,4,"SPHERICAL",0,4) && 
-            word.compare(0,4,"spherical",0,4)))
+            word.compare(0,4,"spherical",0,4))) {
     type = SPHERICAL;
+    input.ignore(256,'\n'); //done with line 1
+    readUserSpecifiedIC_Spherical(input);
+  } 
   else {
-    print_error("ERROR: Unknown initial condition type %s.\n", word);
+    print_error("Error: Unknown initial condition type %s.\n", word);
     exit_mpi();
   }
-  input.ignore(256,'\n'); //done with line 1
+
+  input.close();
+  //print("Read user-specified initial condition.\n");
+}
+
+//------------------------------------------------------------------------------
+
+// Read planar initial condition from file
+void IcData::readUserSpecifiedIC_Planar(std::fstream &input)
+{
+  std::string word, line;
 
   // Read the second line of user-specified file
   input.ignore(2,' '); //This line should start with ## 
@@ -471,9 +488,9 @@ void IcData::readUserSpecifiedIC()
   input >> x0[0] >> x0[1] >> x0[2];
   input.ignore(256,'\n'); //done with line 2
 
-  // Read the next line, which should be provided only if type is "planar" or "cylindrical"
+  // Read the next line
   input.ignore(2,' '); //This line should start with ##
-                       //It must contain 3 real numbers corresponding to the direction of "+x"
+                       //It must contain 3 real numbers corresponding to the direction of "+x" in the 1D data
   input >> dir[0] >> dir[1] >> dir[2];
   dir /= dir.norm();
   input.ignore(256,'\n'); //done with this line
@@ -532,14 +549,14 @@ void IcData::readUserSpecifiedIC()
       column2var[column] = TEMPERATURE;
       specified[TEMPERATURE] = 1;
     } else {
-      print_error("ERROR: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      print_error("Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
       exit_mpi();
     }
     column++;
   }
 
   if(column<2 || !specified[COORDINATE]) {
-    print_error("ERROR: Need additional data in the initial condition file.\n");
+    print_error("Error: Need additional data in the initial condition file.\n");
     exit_mpi();
   }
 
@@ -560,10 +577,256 @@ void IcData::readUserSpecifiedIC()
       break;
   }
 
-  input.close();
-  //print("Read user-specified initial condition.\n");
 }
 
+//------------------------------------------------------------------------------
+
+// Read cylindrical initial condition from file
+void IcData::readUserSpecifiedIC_Cylindrical(std::fstream &input)
+{
+  std::string word, line;
+
+  // Read the second line of user-specified file
+  input.ignore(2,' '); //This line should start with ## 
+                       //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
+                       //of the "0" in this data file within the actual mesh
+  input >> x0[0] >> x0[1] >> x0[2];
+  input.ignore(256,'\n'); //done with line 2
+
+  // Read the next line
+  input.ignore(2,' '); //This line should start with ##
+                       //It must contain 3 real numbers corresponding to the positive direction of axis of symmetry
+  input >> dir[0] >> dir[1] >> dir[2];
+  dir /= dir.norm();
+  input.ignore(256,'\n'); //done with this line
+
+  // Read the next line, which specifies the variable of each column
+  input.ignore(2,' '); //This line should start with ##
+                       //It must contain between 2 and SIZE words indicating the field
+  for(int i=0; i<SIZE; i++)
+    specified[i] = 0;
+  std::map<int,int> column2var; //maps the column number to "Vars" index 
+  getline(input, line);
+
+  std::istringstream iss(line);
+  int column = 0; 
+  for(;iss>>word;) {
+    // just check the first four letters
+    if(!(word.compare(0,4,"Coordinate",0,4) && 
+         word.compare(0,4,"COORDINATE",0,4) && 
+         word.compare(0,4,"coordinate",0,4))) {
+      column2var[column] = COORDINATE;
+      specified[COORDINATE] = 1;
+    } 
+    else if(!(word.compare(0,4,"Density",0,4) && 
+              word.compare(0,4,"DENSITY",0,4) && 
+              word.compare(0,4,"density",0,4))) {
+      column2var[column] = DENSITY;
+      specified[DENSITY] = 1;
+    } 
+    else if(!(word.compare(0,4,"Velocity",0,4) && 
+              word.compare(0,4,"VELOCITY",0,4) && 
+              word.compare(0,4,"velocity",0,4))) {
+      column2var[column] = VELOCITY;
+      specified[VELOCITY] = 1;
+    } 
+    else if(!(word.compare(0,4,"Pressure",0,4) && 
+              word.compare(0,4,"PRESSURE",0,4) && 
+              word.compare(0,4,"pressure",0,4))) {
+      column2var[column] = PRESSURE;
+      specified[PRESSURE] = 1;
+    } 
+    else if(!(word.compare(0,4,"LevelSet",0,4) && 
+              word.compare(0,4,"LEVELSET",0,4) && 
+              word.compare(0,4,"levelset",0,4))) {
+      column2var[column] = LEVELSET;
+      specified[LEVELSET] = 1;
+    } 
+    else if(!(word.compare(0,4,"MaterialID",0,4) && 
+              word.compare(0,4,"MATERIALID",0,4) && 
+              word.compare(0,4,"materialid",0,4))) {
+      column2var[column] = MATERIALID;
+      specified[MATERIALID] = 1;
+    } 
+    else if(!(word.compare(0,4,"Temperature",0,4) && 
+              word.compare(0,4,"TEMPERATURE",0,4) && 
+              word.compare(0,4,"temperature",0,4))) {
+      column2var[column] = TEMPERATURE;
+      specified[TEMPERATURE] = 1;
+    } else {
+      print_error("Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      exit_mpi();
+    }
+    column++;
+  }
+
+  if(column<2 || !specified[COORDINATE]) {
+    print_error("Error: Need additional data in the initial condition file.\n");
+    exit_mpi();
+  }
+
+
+  // Read the next line: should start with ##, then say "AXIAL"
+  input.ignore(2,' '); 
+  input >> word;
+  if(word.compare(0,4,"Axial",0,4) && 
+     word.compare(0,4,"AXIAL",0,4) && 
+     word.compare(0,4,"axial",0,4)) {
+    print_error("Error: Expect keyword 'Axial' in user-specified initical condition.\n");
+    exit_mpi();
+  } 
+  input.ignore(256,'\n'); //done with this line
+
+
+  // Now start reading the data in the axial direction
+  int MaxRows = 100000; //should be a lot more than enough
+  double data;
+  bool found_radial = false;
+  for(int r=0; r<MaxRows; r++) {
+
+    getline(input, line);
+
+    // check if we got the line that says "## Radial"
+    std::istringstream check(line);
+    check >> word; check >> word;
+    if(!(word.compare(0,4,"Radial",0,4) && 
+         word.compare(0,4,"RADIAL",0,4) && 
+         word.compare(0,4,"radial",0,4))) {
+      found_radial = true;
+      break; 
+    }
+
+    std::istringstream is(line);
+    for(int i=0; i<column; i++) {
+      is >> data; 
+      if(is.fail())
+        break;
+      //cout << "row " << r << ", column " << i << ": " << data << endl;
+      user_data[column2var[i]].push_back(data);
+    }
+
+    if(input.eof())
+      break;
+  }
+
+  if(found_radial) { //read radial variation
+    for(int r=0; r<MaxRows; r++) {
+      getline(input, line);
+
+      std::istringstream is(line);
+      for(int i=0; i<column; i++) {
+        is >> data; 
+        if(is.fail())
+          break;
+        //cout << "row " << r << ", column " << i << ": " << data << endl;
+        user_data2[column2var[i]].push_back(data);
+      }
+
+      if(input.eof())
+        break;
+    }
+  }
+
+}
+
+//------------------------------------------------------------------------------
+
+// Read spherical initial condition from file
+// Note: This is almost identical to reading planar data, except the variable "dir" does not need be read
+void IcData::readUserSpecifiedIC_Spherical(std::fstream &input)
+{
+  std::string word, line;
+
+  // Read the second line of user-specified file
+  input.ignore(2,' '); //This line should start with ## 
+                       //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
+                       //of the "0" in this data file within the actual mesh
+  input >> x0[0] >> x0[1] >> x0[2];
+  input.ignore(256,'\n'); //done with line 2
+
+  // Read the next line, which specifies the variable of each column
+  input.ignore(2,' '); //This line should start with ##
+                       //It must contain between 2 and SIZE words indicating the field
+  for(int i=0; i<SIZE; i++)
+    specified[i] = 0;
+  std::map<int,int> column2var; //maps the column number to "Vars" index 
+  getline(input, line);
+
+  std::istringstream iss(line);
+  int column = 0; 
+  for(;iss>>word;) {
+    // just check the first four letters
+    if(!(word.compare(0,4,"Coordinate",0,4) && 
+         word.compare(0,4,"COORDINATE",0,4) && 
+         word.compare(0,4,"coordinate",0,4))) {
+      column2var[column] = COORDINATE;
+      specified[COORDINATE] = 1;
+    } 
+    else if(!(word.compare(0,4,"Density",0,4) && 
+              word.compare(0,4,"DENSITY",0,4) && 
+              word.compare(0,4,"density",0,4))) {
+      column2var[column] = DENSITY;
+      specified[DENSITY] = 1;
+    } 
+    else if(!(word.compare(0,4,"Velocity",0,4) && 
+              word.compare(0,4,"VELOCITY",0,4) && 
+              word.compare(0,4,"velocity",0,4))) {
+      column2var[column] = VELOCITY;
+      specified[VELOCITY] = 1;
+    } 
+    else if(!(word.compare(0,4,"Pressure",0,4) && 
+              word.compare(0,4,"PRESSURE",0,4) && 
+              word.compare(0,4,"pressure",0,4))) {
+      column2var[column] = PRESSURE;
+      specified[PRESSURE] = 1;
+    } 
+    else if(!(word.compare(0,4,"LevelSet",0,4) && 
+              word.compare(0,4,"LEVELSET",0,4) && 
+              word.compare(0,4,"levelset",0,4))) {
+      column2var[column] = LEVELSET;
+      specified[LEVELSET] = 1;
+    } 
+    else if(!(word.compare(0,4,"MaterialID",0,4) && 
+              word.compare(0,4,"MATERIALID",0,4) && 
+              word.compare(0,4,"materialid",0,4))) {
+      column2var[column] = MATERIALID;
+      specified[MATERIALID] = 1;
+    } 
+    else if(!(word.compare(0,4,"Temperature",0,4) && 
+              word.compare(0,4,"TEMPERATURE",0,4) && 
+              word.compare(0,4,"temperature",0,4))) {
+      column2var[column] = TEMPERATURE;
+      specified[TEMPERATURE] = 1;
+    } else {
+      print_error("Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      exit_mpi();
+    }
+    column++;
+  }
+
+  if(column<2 || !specified[COORDINATE]) {
+    print_error("Error: Need additional data in the initial condition file.\n");
+    exit_mpi();
+  }
+
+  // Now start reading the actual data (until end of file)
+  int MaxRows = 100000; //should be a lot more than enough
+  double data;
+  for(int r=0; r<MaxRows; r++) {
+    getline(input, line);
+    std::istringstream is(line);
+    for(int i=0; i<column; i++) {
+      is >> data; 
+      if(is.fail())
+        break;
+      //cout << "row " << r << ", column " << i << ": " << data << endl;
+      user_data[column2var[i]].push_back(data);
+    }
+    if(input.eof())
+      break;
+  }
+
+}
 //------------------------------------------------------------------------------
 
 OutputData::OutputData()
@@ -633,7 +896,7 @@ IoData::IoData(int argc, char** argv)
 void IoData::readCmdLine(int argc, char** argv)
 {
   if(argc==1) {
-    print_error("ERROR: Input file not provided!\n");
+    print_error("Error: Input file not provided!\n");
     exit_mpi();
   }
   cmdFileName = argv[1];

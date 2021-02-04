@@ -279,20 +279,26 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
     //! Get coordinates
     Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
     Vec3D    x0(iod.ic.x0[0], iod.ic.x0[1], iod.ic.x0[2]); 
-    Vec3D    dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
-    dir /= dir.norm();
 
-    if(iod.ic.type == IcData::PLANAR) {
-      print("- Applying user-specified initial condition (with planar symmetry).\n");
+    if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
+
+      if(iod.ic.type == IcData::PLANAR)
+        print("- Applying user-specified initial condition (planar).\n");
+      else
+        print("- Applying user-specified initial condition (with cylindrical symmetry).\n");
  
+      Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
+      dir /= dir.norm();
+
       double x;
-      int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
+      int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user (in the axial dir)
+
+      double r;
+      int nrad = iod.ic.user_data2[IcData::COORDINATE].size(); //!< number of data points in the radial dir.
 
       int t0, t1;    
       double a0, a1;
-//      cout << "i0 = " << i0 << ", imax = " << imax << ", j0 = " << j0 << ", jmax = " << jmax << endl;
-//      cout << "ii0 = " << ii0 << ", iimax = " << iimax << ", jj0 = " << jj0 << ", jjmax = " << jjmax << endl;
-//      cout << "n = " << n << endl;
+
       for(int k=k0; k<kmax; k++)
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
@@ -318,8 +324,84 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
                  (iod.ic.user_data[IcData::COORDINATE][t1] - iod.ic.user_data[IcData::COORDINATE][t0]);
             a1 = 1.0 - a0;
 
-//            cout << "t0 = " << t0 << ", t1 = " << t1 << ", a0 = " << a0 << ", a1 = " << a1 << endl;
-//            cout << "coord_t1:" << iod.ic.user_data[IcData::COORDINATE][t1] << ", coord_t0:" << iod.ic.user_data[IcData::COORDINATE][t0] << endl;
+            //! specify i.c. on node (cell center)
+            v[k][j][i][0] =  a0*iod.ic.user_data[IcData::DENSITY][t0]  + a1*iod.ic.user_data[IcData::DENSITY][t1];
+            v[k][j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[0];
+            v[k][j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[1];
+            v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
+            v[k][j][i][4] =  a0*iod.ic.user_data[IcData::PRESSURE][t0] + a1*iod.ic.user_data[IcData::PRESSURE][t1];
+
+
+            //! apply radial variation (if provided by user)
+            if(nrad>0) { 
+              r = (coords[k][j][i] - x0 - x*dir).norm();
+              if(r>iod.ic.user_data2[IcData::COORDINATE][nrad-1])
+                continue;
+ 
+              //! Find the first radial coordinate greater than r
+              auto upper_it = std::upper_bound(iod.ic.user_data2[IcData::COORDINATE].begin(),
+                                               iod.ic.user_data2[IcData::COORDINATE].end(),
+                                               r); 
+              t1 = (int)(upper_it - iod.ic.user_data2[IcData::COORDINATE].begin());
+
+              if(t1==0) // exactly the first node
+                t1 = 1;
+
+              t0 = t1 - 1;
+
+              //! calculate interpolation weights
+              a0 = (iod.ic.user_data2[IcData::COORDINATE][t1] - r) /
+                   (iod.ic.user_data2[IcData::COORDINATE][t1] - iod.ic.user_data2[IcData::COORDINATE][t0]);
+              a1 = 1.0 - a0;
+
+              v[k][j][i][0] *= a0*iod.ic.user_data2[IcData::DENSITY][t0] + a1*iod.ic.user_data2[IcData::DENSITY][t1];
+              for(int p=1; p<=3; p++)
+                v[k][j][i][p] *= a0*iod.ic.user_data2[IcData::VELOCITY][t0] + a1*iod.ic.user_data2[IcData::VELOCITY][t1];
+              v[k][j][i][4] *= a0*iod.ic.user_data2[IcData::PRESSURE][t0] + a1*iod.ic.user_data2[IcData::PRESSURE][t1];
+
+            }
+          }
+
+    } 
+
+    else if (iod.ic.type == IcData::SPHERICAL) {
+
+      print("- Applying user-specified initial condition (with spherical symmetry).\n");
+ 
+      double x;
+      int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
+      Vec3D dir;
+
+      int t0, t1;    
+      double a0, a1;
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+
+            dir = coords[k][j][i] - x0;
+            x = dir.norm();
+            dir /= x;
+   
+//            cout << "coords: " << coords[j][i][0] << ", " << coords[j][i][1] << "; x = " << x << endl;
+            if(x>iod.ic.user_data[IcData::COORDINATE][n-1])
+              continue;
+ 
+            //! Find the first 1D coordinate greater than x
+            auto upper_it = std::upper_bound(iod.ic.user_data[IcData::COORDINATE].begin(),
+                                             iod.ic.user_data[IcData::COORDINATE].end(),
+                                             x); 
+            t1 = (int)(upper_it - iod.ic.user_data[IcData::COORDINATE].begin());
+
+            if(t1==0) // exactly the first node in 1D
+              t1 = 1;
+
+            t0 = t1 - 1;
+
+            //! calculate interpolation weights
+            a0 = (iod.ic.user_data[IcData::COORDINATE][t1] - x) /
+                 (iod.ic.user_data[IcData::COORDINATE][t1] - iod.ic.user_data[IcData::COORDINATE][t0]);
+            a1 = 1.0 - a0;
 
             //! specify i.c. on node (cell center)
             v[k][j][i][0] =  a0*iod.ic.user_data[IcData::DENSITY][t0]  + a1*iod.ic.user_data[IcData::DENSITY][t1];
@@ -328,14 +410,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
             v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
             v[k][j][i][4] =  a0*iod.ic.user_data[IcData::PRESSURE][t0] + a1*iod.ic.user_data[IcData::PRESSURE][t1];
           }
-    } 
-    else if (iod.ic.type == IcData::CYLINDRICAL) {
-      print_error("Error: Cannot handle cylindrical i.c. at the moment.\n");
-      exit_mpi();
-    } 
-    else if (iod.ic.type == IcData::SPHERICAL) {
-      print_error("Error: Cannot handle spherical i.c. at the moment.\n");
-      exit_mpi();
+
     }
 
     coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
