@@ -109,7 +109,8 @@ const string getCurrentDateTime()
 // Print logo 
 void printHeader(int argc, char *argv[])
 {
-  int rank;
+  int size, rank;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   if(!rank) {
     cout << endl;
@@ -129,6 +130,7 @@ void printHeader(int argc, char *argv[])
     cout << endl;
     cout << "Revision: " << GIT_REV << " | " << "Branch: " << GIT_BRANCH << " | " << "Tag: " << GIT_TAG << endl;
     cout << "Simulation started at: " << getCurrentDateTime() << endl;
+    cout << "Using " << size << " processor cores." << endl;
     cout << "Command:";
     for(int i=0; i<argc; i++)
       cout << " " << argv[i];

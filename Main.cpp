@@ -119,7 +119,8 @@ int main(int argc, char* argv[])
       dt = iod.ts.maxTime - t;
     }
     
-    print("Time step %d: t = %e, dt = %e, cfl = %e.\n", time_step, t, dt, cfl);
+    print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, 
+          ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
     //----------------------------------------------------
     // Move forward by one time-step: Update V

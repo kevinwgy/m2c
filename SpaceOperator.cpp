@@ -290,10 +290,10 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
       Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
       dir /= dir.norm();
 
-      double x;
+      double x = 0.0;
       int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user (in the axial dir)
 
-      double r;
+      double r = 0.0;
       int nrad = iod.ic.user_data2[IcData::COORDINATE].size(); //!< number of data points in the radial dir.
 
       int t0, t1;    
@@ -307,6 +307,12 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
 //            cout << "coords: " << coords[j][i][0] << ", " << coords[j][i][1] << "; x = " << x << endl;
             if(x<0 || x>iod.ic.user_data[IcData::COORDINATE][n-1])
               continue;
+
+            if(nrad>0) {
+              r = (coords[k][j][i] - x0 - x*dir).norm();
+              if(r>iod.ic.user_data2[IcData::COORDINATE][nrad-1])
+                continue;
+            }
  
             //! Find the first 1D coordinate greater than x
             auto upper_it = std::upper_bound(iod.ic.user_data[IcData::COORDINATE].begin(),
@@ -334,9 +340,6 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
 
             //! apply radial variation (if provided by user)
             if(nrad>0) { 
-              r = (coords[k][j][i] - x0 - x*dir).norm();
-              if(r>iod.ic.user_data2[IcData::COORDINATE][nrad-1])
-                continue;
  
               //! Find the first radial coordinate greater than r
               auto upper_it = std::upper_bound(iod.ic.user_data2[IcData::COORDINATE].begin(),

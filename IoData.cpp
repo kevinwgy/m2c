@@ -672,7 +672,7 @@ void IcData::readUserSpecifiedIC_Cylindrical(std::fstream &input)
   if(word.compare(0,4,"Axial",0,4) && 
      word.compare(0,4,"AXIAL",0,4) && 
      word.compare(0,4,"axial",0,4)) {
-    print_error("Error: Expect keyword 'Axial' in user-specified initical condition.\n");
+    print_error("Error: Expect keyword 'Axial' in user-specified initial condition.\n");
     exit_mpi();
   } 
   input.ignore(256,'\n'); //done with this line
