@@ -2,6 +2,9 @@
 #define _TIME_INTEGRATOR_H_
 
 #include <SpaceOperator.h>
+#include <LevelSetOperator.h>
+#include <vector>
+using std::vector;
 
 /********************************************************************
  * Numerical time-integrator: The base class
@@ -12,15 +15,18 @@ protected:
   MPI_Comm&       comm;
   IoData&         iod;
   SpaceOperator&  spo;
+  vector<LevelSetOperator*>& lso;
+  
 
 public:
-  TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, SpaceOperator& spo_) : 
-      comm(comm_), iod(iod_), spo(spo_) {/*nothing else to be done*/}
+  TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, SpaceOperator& spo_, 
+                     vector<LevelSetOperator*>& lso_) : 
+      comm(comm_), iod(iod_), spo(spo_), lso(lso_) { }
 
   virtual ~TimeIntegratorBase() {}
 
   // Integrate the ODE system for one time-step. Implemented in derived classes
-  virtual void AdvanceOneTimeStep(SpaceVariable3D &V, double dt) {
+  virtual void AdvanceOneTimeStep(SpaceVariable3D &V, vector<SpaceVariable3D*> &Phi, double dt) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
 
@@ -37,24 +43,24 @@ class TimeIntegratorFE : public TimeIntegratorBase
 {
   //! conservative state variable at time n
   SpaceVariable3D Un;
+
   //! "residual", i.e. the right-hand-side of the ODE
   SpaceVariable3D Rn;  
+  vector<SpaceVariable3D*> Rn_ls;
 
 public:
-  TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_) :
-    TimeIntegratorBase(comm_, iod_, spo_), 
-    Un(comm_, &(dms_.ghosted1_5dof)), Rn(comm_, &(dms_.ghosted1_5dof)) {/*nothing else to be done*/}
-
+  TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
+                   vector<LevelSetOperator*>& lso_);
   ~TimeIntegratorFE() {}
 
-  void AdvanceOneTimeStep(SpaceVariable3D &V, double dt);
+  void AdvanceOneTimeStep(SpaceVariable3D &V, vector<SpaceVariable3D*>& Phi, double dt);
 
-  void Destroy() {Un.Destroy(); Rn.Destroy();}
+  void Destroy();
 
 };
 
 /********************************************************************
- * Numerical time-integrator: 2nd-order Runge-Kutta (Huen's method, TVD)
+ * Numerical time-integrator: 2nd-order Runge-Kutta (Heun's method, TVD)
  *******************************************************************/
 class TimeIntegratorRK2 : public TimeIntegratorBase
 {
@@ -66,17 +72,18 @@ class TimeIntegratorRK2 : public TimeIntegratorBase
   //! "residual", i.e. the right-hand-side of the ODE
   SpaceVariable3D R;  
 
-public:
-  TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_) :
-    TimeIntegratorBase(comm_, iod_, spo_), 
-    Un(comm_, &(dms_.ghosted1_5dof)), U1(comm_, &(dms_.ghosted1_5dof)), 
-    V1(comm_, &(dms_.ghosted1_5dof)), R(comm_, &(dms_.ghosted1_5dof)) {/*nothing else to be done*/}
+  //! level set variables
+  vector<SpaceVariable3D*> Phi1; 
+  vector<SpaceVariable3D*> Rls; 
 
+public:
+  TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
+                    vector<LevelSetOperator*>& lso_);
   ~TimeIntegratorRK2() {}
 
-  void AdvanceOneTimeStep(SpaceVariable3D &V, double dt);
+  void AdvanceOneTimeStep(SpaceVariable3D &V, vector<SpaceVariable3D*>& Phi, double dt);
 
-  void Destroy() {Un.Destroy(); U1.Destroy(); V1.Destroy(); R.Destroy();}
+  void Destroy(); 
 
 };
 
@@ -93,17 +100,18 @@ class TimeIntegratorRK3 : public TimeIntegratorBase
   //! "residual", i.e. the right-hand-side of the ODE
   SpaceVariable3D R;  
 
-public:
-  TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_) :
-    TimeIntegratorBase(comm_, iod_, spo_), 
-    Un(comm_, &(dms_.ghosted1_5dof)), U1(comm_, &(dms_.ghosted1_5dof)), 
-    V1(comm_, &(dms_.ghosted1_5dof)), R(comm_, &(dms_.ghosted1_5dof)) {/*nothing else to be done*/}
+  //!level set variables
+  vector<SpaceVariable3D*> Phi1;
+  vector<SpaceVariable3D*> Rls;
 
+public:
+  TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
+                    vector<LevelSetOperator*>& lso_);
   ~TimeIntegratorRK3() {}
 
-  void AdvanceOneTimeStep(SpaceVariable3D &V, double dt);
+  void AdvanceOneTimeStep(SpaceVariable3D &V, vector<SpaceVariable3D*>& Phi, double dt);
 
-  void Destroy() {Un.Destroy(); U1.Destroy(); V1.Destroy(); R.Destroy();}
+  void Destroy();
 
 };
 

@@ -17,7 +17,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)),
-    rec(comm_, dm_all_, iod_, coordinates, delta_xyz),
+    rec(comm_, dm_all_, iod_.schemes.ns.rec, coordinates, delta_xyz),
     Vl(comm_, &(dm_all_.ghosted1_5dof)),
     Vr(comm_, &(dm_all_.ghosted1_5dof)),
     Vb(comm_, &(dm_all_.ghosted1_5dof)),
@@ -556,7 +556,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
     }
   }
 
-  //! Bottom boundary
+  //! Top boundary
   if(jjmax==NY+1) { 
     switch (iod.mesh.bc_ymax) {
       case MeshData::INLET :
@@ -828,7 +828,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Compute fluxes
   //------------------------------------
-  int nDOF = 5;
   Vec5D localflux;
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 

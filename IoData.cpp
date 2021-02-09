@@ -15,6 +15,178 @@
 //#include <dlfcn.h>
 using namespace std;
 
+RootClassAssigner *nullAssigner = new RootClassAssigner;
+
+//------------------------------------------------------------------------------
+
+StateVariable::StateVariable()
+{
+
+  materialid  = 0;
+  density     = -1.0;
+  velocity_x  = 0.0;
+  velocity_y  = 0.0;
+  velocity_z  = 0.0;
+  pressure    = -1.0;
+  temperature = -1.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+void StateVariable::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+
+  new ClassInt<StateVariable>(ca, "MaterialID", this, &StateVariable::materialid);
+  new ClassDouble<StateVariable>(ca, "Density", this, &StateVariable::density);
+  new ClassDouble<StateVariable>(ca, "VelocityX", this, &StateVariable::velocity_x);
+  new ClassDouble<StateVariable>(ca, "VelocityY", this, &StateVariable::velocity_y);
+  new ClassDouble<StateVariable>(ca, "VelocityZ", this, &StateVariable::velocity_z);
+  new ClassDouble<StateVariable>(ca, "Pressure", this, &StateVariable::pressure);
+  new ClassDouble<StateVariable>(ca, "Temperature", this, &StateVariable::temperature);
+
+}
+
+//------------------------------------------------------------------------------
+
+PointData::PointData()
+{
+  x  = 0.0;
+  y  = 0.0;
+  z  = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *PointData::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 4, nullAssigner);
+
+  new ClassDouble<PointData>
+    (ca, "X", this, &PointData::x);
+  new ClassDouble<PointData>
+    (ca, "Y", this, &PointData::y);
+  new ClassDouble<PointData>
+    (ca, "Z", this, &PointData::z);
+
+  initialConditions.setup("InitialState", ca);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+
+PlaneData::PlaneData()
+{
+
+  cen_x  = 0.0;
+  cen_y  = 0.0;
+  cen_z  = 0.0;
+  nx     = 0.0;
+  ny     = 0.0;
+  nz     = 0.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *PlaneData::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
+
+  new ClassDouble<PlaneData> (ca, "Point_x", this, &PlaneData::cen_x);
+  new ClassDouble<PlaneData> (ca, "Point_y", this, &PlaneData::cen_y);
+  new ClassDouble<PlaneData> (ca, "Point_z", this, &PlaneData::cen_z);
+  new ClassDouble<PlaneData> (ca, "Normal_x", this, &PlaneData::nx);
+  new ClassDouble<PlaneData> (ca, "Normal_y", this, &PlaneData::ny);
+  new ClassDouble<PlaneData> (ca, "Normal_z", this, &PlaneData::nz);
+
+  initialConditions.setup("InitialState", ca);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+SphereData::SphereData()
+{
+  
+  cen_x  = 0.0;
+  cen_y  = 0.0;
+  cen_z  = 0.0;
+  radius = -1.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *SphereData::getAssigner()
+{
+  
+  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
+  
+  new ClassDouble<SphereData> (ca, "Center_x", this, &SphereData::cen_x);
+  new ClassDouble<SphereData> (ca, "Center_y", this, &SphereData::cen_y);
+  new ClassDouble<SphereData> (ca, "Center_z", this, &SphereData::cen_z);
+  new ClassDouble<SphereData> (ca, "Radius", this, &SphereData::radius);
+  
+  initialConditions.setup("InitialState", ca);
+  
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+CylinderData::CylinderData() {
+
+  cen_x  = 0.0;
+  cen_y  = 0.0;
+  cen_z  = 0.0;
+  nx     = 0.0;
+  ny     = 0.0;
+  nz     = 1.0;
+
+  r = 0.5;
+  L = 1.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *CylinderData::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+
+  new ClassDouble<CylinderData> (ca, "Point_x", this, &CylinderData::cen_x);
+  new ClassDouble<CylinderData> (ca, "Point_y", this, &CylinderData::cen_y);
+  new ClassDouble<CylinderData> (ca, "Point_z", this, &CylinderData::cen_z);
+  new ClassDouble<CylinderData> (ca, "Normal_x", this, &CylinderData::nx);
+  new ClassDouble<CylinderData> (ca, "Normal_y", this, &CylinderData::ny);
+  new ClassDouble<CylinderData> (ca, "Normal_z", this, &CylinderData::nz);
+  new ClassDouble<CylinderData> (ca, "Radius", this, &CylinderData::r);
+  new ClassDouble<CylinderData> (ca, "Length", this, &CylinderData::L);
+
+  initialConditions.setup("InitialState", ca);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+void MultiInitialConditionsData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  pointMap.setup("Point", ca);
+  planeMap.setup("Plane", ca);
+  sphereMap.setup("Sphere", ca);
+  cylinderMap.setup("Cylinder", ca);
+}
+
 //------------------------------------------------------------------------------
 
 MeshData::MeshData()
@@ -188,15 +360,39 @@ void EquationsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-SchemeData::SchemeData(int af) : allowsFlux(af)
+ReconstructionData::ReconstructionData() 
 {
-
-  flux = ROE;
   reconstruction = LINEAR;
   limiter = GENERALIZED_MINMOD;
-
-  delta = 0.2; //the coefficient in Harten's entropy fix.
   generalized_minmod_coeff = 2.0; //The MC Limiter
+}
+
+//------------------------------------------------------------------------------
+
+void ReconstructionData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 3, father); 
+
+  new ClassToken<ReconstructionData>
+    (ca, "Reconstruction", this,
+     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::reconstruction), 2,
+     "Constant", 0, "Linear", 1);
+
+  new ClassToken<ReconstructionData>
+    (ca, "Limiter", this,
+     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::limiter), 3,
+     "None", 0, "GeneralizedMinMod", 1, "VanAlbada", 2);
+
+  new ClassDouble<ReconstructionData>(ca, "GeneralizedMinModCoefficient", this, 
+    &ReconstructionData::generalized_minmod_coeff);
+}
+
+//------------------------------------------------------------------------------
+
+SchemeData::SchemeData() 
+{
+  flux = ROE;
+  delta = 0.2; //the coefficient in Harten's entropy fix.
 }
 
 //------------------------------------------------------------------------------
@@ -205,31 +401,16 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 {
 
   ClassAssigner* ca;
-  if (allowsFlux)
-    ca = new ClassAssigner(name, 5, father);
-  else
-    ca = new ClassAssigner(name, 3, father);
-
-  if (allowsFlux) {
-    new ClassToken<SchemeData>
-      (ca, "Flux", this,
-       reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 4,
-       "Roe", 0, "LocalLaxFriedrichs", 1, "HLLE", 2, "HLLC", 3, "KurganovTadmor", 4);
-    new ClassDouble<SchemeData>(ca, "EntropyFixCoefficient", this, &SchemeData::delta);
-  }
+  ca = new ClassAssigner(name, 3, father);
 
   new ClassToken<SchemeData>
-    (ca, "Reconstruction", this,
-     reinterpret_cast<int SchemeData::*>(&SchemeData::reconstruction), 2,
-     "Constant", 0, "Linear", 1);
+    (ca, "Flux", this,
+     reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 4,
+     "Roe", 0, "LocalLaxFriedrichs", 1, "HLLE", 2, "HLLC", 3, "KurganovTadmor", 4);
 
-  new ClassToken<SchemeData>
-    (ca, "Limiter", this,
-     reinterpret_cast<int SchemeData::*>(&SchemeData::limiter), 3,
-     "None", 0, "GeneralizedMinMod", 1, "VanAlbada", 2);
+  new ClassDouble<SchemeData>(ca, "EntropyFixCoefficient", this, &SchemeData::delta);
 
-  new ClassDouble<SchemeData>(ca, "GeneralizedMinModCoefficient", this, 
-    &SchemeData::generalized_minmod_coeff);
+  rec.setup("Reconstruction", ca);
 
 }
 
@@ -256,7 +437,49 @@ void BoundarySchemeData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-SchemesData::SchemesData() : ls(0), ns(1)
+LevelSetSchemeData::LevelSetSchemeData() 
+{
+  materialid = -1;
+
+  flux = ROE;
+
+  delta = 0.2; //the coefficient in Harten's entropy fix.
+
+  reinitialization_freq = -1;
+}
+
+//------------------------------------------------------------------------------
+
+void LevelSetSchemeData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner* ca;
+  ca = new ClassAssigner(name, 5, father);
+
+  new ClassInt<LevelSetSchemeData>(ca, "MaterialID", this, 
+    &LevelSetSchemeData::materialid);
+
+  new ClassToken<LevelSetSchemeData>
+    (ca, "Flux", this,
+     reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::flux), 2,
+     "Roe", 0, "LocalLaxFriedrichs", 1);
+
+  new ClassDouble<LevelSetSchemeData>(ca, "EntropyFixCoefficient", this, &LevelSetSchemeData::delta);
+
+  new ClassInt<LevelSetSchemeData>(ca, "ReinitializationFrequency", this, 
+    &LevelSetSchemeData::reinitialization_freq);
+
+  rec.setup("Reconstruction", ca);
+
+}
+
+//------------------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------------------
+
+SchemesData::SchemesData() 
 {
 
 }
@@ -266,12 +489,17 @@ SchemesData::SchemesData() : ls(0), ns(1)
 void SchemesData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 2+MAXLS, father);
 
   ns.setup("NavierStokes", ca);
-  ls.setup("LevelSet",ca);
+
   bc.setup("Boundaries", ca);
 
+  char tmp[12];
+  for (int i=0; i<MAXLS; i++) {
+    sprintf(tmp, "LevelSet%d", i+1);  //"LevelSet1", "LevelSet2", ...
+    ls[i].setup(tmp, ca);
+  }
 }
 
 //------------------------------------------------------------------------------
@@ -343,36 +571,6 @@ void BcsData::setup(const char *name, ClassAssigner *father)
   inlet.setup("Inlet", ca);
   outlet.setup("Outlet", ca);
   wall.setup("Wall", ca);
-
-}
-
-//------------------------------------------------------------------------------
-
-BcsFreeStreamData::BcsFreeStreamData()
-{
-
-  density = -1.0;
-  velocity_x = 0.0;
-  velocity_y = 0.0;
-  velocity_z = 0.0;
-  pressure = -1.0;
-  temperature = -1.0;
-
-}
-
-//------------------------------------------------------------------------------
-
-void BcsFreeStreamData::setup(const char *name, ClassAssigner *father)
-{
-
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
-
-  new ClassDouble<BcsFreeStreamData>(ca, "Density", this, &BcsFreeStreamData::density);
-  new ClassDouble<BcsFreeStreamData>(ca, "VelocityX", this, &BcsFreeStreamData::velocity_x);
-  new ClassDouble<BcsFreeStreamData>(ca, "VelocityY", this, &BcsFreeStreamData::velocity_y);
-  new ClassDouble<BcsFreeStreamData>(ca, "VelocityZ", this, &BcsFreeStreamData::velocity_z);
-  new ClassDouble<BcsFreeStreamData>(ca, "Pressure", this, &BcsFreeStreamData::pressure);
-  new ClassDouble<BcsFreeStreamData>(ca, "Temperature", this, &BcsFreeStreamData::temperature);
 
 }
 
@@ -840,9 +1038,11 @@ OutputData::OutputData()
   density = OFF;
   velocity = OFF;
   pressure = OFF;
-  levelset = OFF;
   materialid = OFF;
   temperature = OFF;
+
+  for(int i=0; i<MAXLS; i++)
+    levelset[i] = OFF;
 
   verbose = OFF;
 }
@@ -851,7 +1051,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 11, father);
+  ClassAssigner *ca = new ClassAssigner(name, 10+MAXLS, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -868,15 +1068,21 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   new ClassToken<OutputData>(ca, "Pressure", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::pressure), 2,
                                "Off", 0, "On", 1);
-  new ClassToken<OutputData>(ca, "LevelSet", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset), 2,
-                               "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "MaterialID", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::materialid), 2,
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "Temperature", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
                                "Off", 0, "On", 1);
+
+  char tmp[12];
+  for (int i=0; i<MAXLS; i++) {
+    sprintf(tmp, "LevelSet%d", i+1);  //"LevelSet1", "LevelSet2", ...
+    new ClassToken<OutputData>(ca, tmp, this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset[i]), 2,
+                               "Off", 0, "On", 1);
+  }
+
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::verbose), 2,

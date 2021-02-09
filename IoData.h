@@ -21,16 +21,101 @@ template<class DataType>
 class ObjectMap {
 
 public:
-
   map<int, DataType *> dataMap;
-  void setup(const char *name, ClassAssigner *);
-  ~ObjectMap()
-    {
-      for(typename map<int, DataType *>::iterator it=dataMap.begin();it!=dataMap.end();++it)
-      {
-        delete it->second;
-      }
-    }
+
+  void setup(const char *name, ClassAssigner *p) {
+    SysMapObj<DataType> *smo = new SysMapObj<DataType>(name, &dataMap);
+    if (p) p->addSmb(name, smo);
+    else addSysSymbol(name, smo);
+  }
+
+  ~ObjectMap() {
+    for(typename map<int, DataType *>::iterator it=dataMap.begin();it!=dataMap.end();++it)
+      delete it->second;
+  }
+};
+
+//------------------------------------------------------------------------------
+
+struct StateVariable {
+
+  int    materialid;
+  double density;
+  double velocity_x;
+  double velocity_y;
+  double velocity_z;
+  double pressure;
+  double temperature;
+
+  StateVariable();
+  ~StateVariable() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct PointData {
+
+  double x,y,z;
+  StateVariable initialConditions;
+
+  PointData();
+  ~PointData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct PlaneData {
+
+  double cen_x, cen_y, cen_z, nx, ny, nz;
+  StateVariable initialConditions;
+
+  PlaneData();
+  ~PlaneData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct SphereData {
+
+  double cen_x, cen_y, cen_z, radius;
+  StateVariable initialConditions;
+
+  SphereData();
+  ~SphereData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct CylinderData {
+
+  double cen_x, cen_y, cen_z, nx, ny, nz, r, L;
+  StateVariable initialConditions;
+
+  CylinderData();
+  ~CylinderData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct MultiInitialConditionsData {
+
+  ObjectMap<PointData>    pointMap;
+  ObjectMap<PlaneData>    planeMap;
+  ObjectMap<SphereData>   sphereMap;
+  ObjectMap<CylinderData> cylinderMap;
+
+  void setup(const char *, ClassAssigner * = 0);
 };
 
 //------------------------------------------------------------------------------
@@ -116,22 +201,30 @@ struct EquationsData {
 
 //------------------------------------------------------------------------------
 
+struct ReconstructionData {
+
+  enum Reconstruction {CONSTANT = 0, LINEAR = 1} reconstruction;
+  enum Limiter {NONE = 0, GENERALIZED_MINMOD = 1, VANALBADA = 2} limiter; 
+  double generalized_minmod_coeff;
+
+  ReconstructionData();
+  ~ReconstructionData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct SchemeData {
 
   enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, HLLE = 2, HLLC = 3, KURGANOV_TADMOR = 4} flux;
-
-  enum Reconstruction {CONSTANT = 0, LINEAR = 1} reconstruction;
-
-  enum Limiter {NONE = 0, GENERALIZED_MINMOD = 1, VANALBADA = 2} limiter; 
-
-  double generalized_minmod_coeff;
-  
+ 
   double delta; //! The coeffient in Harten's entropy fix.
 
-  int allowsFlux;
+  ReconstructionData rec;
 
-  //! allowsFlux = 0 for levelset equation (the choice of flux for the levelset is hardcoded)
-  SchemeData(int allowsFlux = 1);
+  SchemeData();
   ~SchemeData() {}
 
   void setup(const char *, ClassAssigner * = 0);
@@ -156,11 +249,35 @@ struct BoundarySchemeData {
 
 //------------------------------------------------------------------------------
 
+struct LevelSetSchemeData {
+
+  int materialid; //! The material in the phi<0 region ("inside")
+
+  enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1} flux;
+
+  ReconstructionData rec;
+  
+  double delta; //! The coeffient in Harten's entropy fix.
+
+  int reinitialization_freq; 
+
+  LevelSetSchemeData();
+  ~LevelSetSchemeData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct SchemesData {
 
   SchemeData ns;
-  SchemeData ls;
+
   BoundarySchemeData bc;
+
+  const static int MAXLS = 99;
+  LevelSetSchemeData ls[MAXLS];
 
   SchemesData();
   ~SchemesData() {}
@@ -203,24 +320,6 @@ struct TsData {
 
 //------------------------------------------------------------------------------
 
-struct BcsFreeStreamData {
-
-  double density;
-  double velocity_x;
-  double velocity_y;
-  double velocity_z;
-  double pressure;
-  double temperature;
-
-  BcsFreeStreamData();
-  ~BcsFreeStreamData() {}
-
-  void setup(const char *, ClassAssigner * = 0);
-
-};
-
-//------------------------------------------------------------------------------
-
 struct BcsWallData {
 
   enum Type {ISOTHERMAL = 0, ADIABATIC = 1} type;
@@ -237,8 +336,8 @@ struct BcsWallData {
 
 struct BcsData {
 
-  BcsFreeStreamData inlet;
-  BcsFreeStreamData outlet;
+  StateVariable inlet;
+  StateVariable outlet;
   BcsWallData wall;
 
   BcsData();
@@ -251,6 +350,9 @@ struct BcsData {
 //------------------------------------------------------------------------------
 
 struct IcData {
+
+  //! initial condition specified using simple geometric entities (e.g., point, plane,)
+  MultiInitialConditionsData multiInitialConditions;
 
   //! user-specified file
   const char *user_specified_ic;
@@ -286,8 +388,12 @@ struct OutputData {
   const char *solution_filename_base; //!< filename without path
 
   enum Options {OFF = 0, ON = 1};
-  Options density, velocity, pressure, levelset, materialid, temperature;
+  Options density, velocity, pressure, materialid, temperature;
   Options verbose;
+
+  const static int MAXLS = 99;
+  Options levelset[MAXLS];
+
 
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number

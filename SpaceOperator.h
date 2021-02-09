@@ -1,6 +1,5 @@
 #ifndef _SPACEOPERATOR_H_
 #define _SPACEOPERATOR_H_
-#include <petscdmda.h>
 #include <IoData.h>
 #include <VarFcnBase.h>
 #include <FluxFcnBase.h>
@@ -57,6 +56,8 @@ public:
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &F);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
+  SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}
+  SpaceVariable3D& GetMeshCellVolumes() {return volume;}
 
   void Destroy();
 

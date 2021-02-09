@@ -69,7 +69,8 @@ bool Output::ToWriteSolutionSnapshot(double time, double dt, int time_step)
 
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V)
+void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V,
+                                   std::vector<SpaceVariable3D*> &Phi)
 {
   //! Define vtr file name
   char full_fname[256];
@@ -145,6 +146,18 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "pressure");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+  }
+
+  int ls_counter = 0;
+  for(int i=0; i<SchemesData::MAXLS; i++) {
+    if(iod.schemes.ls[i].materialid<1) 
+      continue; //inactive
+    if(iod.output.levelset[i]==OutputData::ON) {
+      char word[12];
+      sprintf(word, "levelset%d", i+1);
+      PetscObjectSetName((PetscObject)(Phi[ls_counter]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
+      VecView(Phi[ls_counter++]->GetRefToGlobalVec(), viewer);
+    }
   }
 
   // Add a line to the pvd file to record the new solutio snapshot

@@ -4,6 +4,7 @@
 #include <VarFcnBase.h>
 #include <SpaceVariable.h>
 #include <stdio.h>
+#include <vector>
 
 /** This class is responsible (only) for writing solutions to files. It uses PETSc functionalities
     to write VTK files. It is not designed for post-processing results --- we leave this job to
@@ -31,7 +32,8 @@ public:
 
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh
 
-  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V); //!< write solution to file
+  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
+                             std::vector<SpaceVariable3D*> &Phi); //!< write solution to file
 
   bool ToWriteSolutionSnapshot(double time, double dt, int time_step); /**< check whether to write solution 
                                                                         * at this time & time-step */
