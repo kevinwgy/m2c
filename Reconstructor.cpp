@@ -358,7 +358,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
           um[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] - 0.5*sigma;
           up[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] + 0.5*sigma;
 
-          if(slope) slope[k][j][i*nDOF+dof] = sigma/delta_xyz[k][j][i][dir];
+          if(slope) slope[k][j][i*nDOF+dof] = sigma/dxyz[k][j][i][dir];
 
           //! For first-layer cells, switch back to constant reconstruction in the normal dir.
           if(dir==0 && (i==0 || i==NX-1)) {

@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
     int matid = iod.schemes.ls[i].materialid;
     if(matid<=0)
       continue; //levelsets are for tracking subdomains w/ materialid>0
-    if(ls_tracker.find(matid)) {
+    if(ls_tracker.find(matid) != ls_tracker.end()) {
       print_error("Error: Cannot initialize multiple level sets for the same material (id=%d).\n", matid);
       exit_mpi();
     }

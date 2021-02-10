@@ -393,7 +393,7 @@ struct OutputData {
 
   const static int MAXLS = 99;
   Options levelset[MAXLS];
-
+  Options levelsetdummy;
 
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number

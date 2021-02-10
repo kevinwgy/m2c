@@ -39,7 +39,7 @@ public:
   void Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVariable3D &Ur, 
            SpaceVariable3D &Ub, SpaceVariable3D &Ut, SpaceVariable3D &Uk, SpaceVariable3D &Uf);
 
-  void ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U, SpaceVariable3D &Um, SpaceVariable3D &Up
+  void ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U, SpaceVariable3D &Um, SpaceVariable3D &Up,
                        SpaceVariable3D *Slope = NULL);
 
   void Destroy(); //!< destroy the SpaceVariable3D variables

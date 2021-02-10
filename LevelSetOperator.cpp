@@ -1,7 +1,9 @@
 #include <cfloat> //DBL_MAX
 #include <Utils.h>
 #include <LevelSetOperator.h>
+#include <SpaceOperator.h>
 #include <Vector3D.h>
+#include <Vector5D.h>
 #include <map>
 
 using std::min;
@@ -13,7 +15,7 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
   : comm(comm_), dm_all(dm_all_), iod(iod_), iod_ls(iod_ls_),
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
-    volume(spo.GetMeshCellVolumes())
+    volume(spo.GetMeshCellVolumes()),
     rec(comm_, dm_all_, iod_ls_.rec, coordinates, delta_xyz),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
     ul(comm_, &(dm_all_.ghosted1_1dof)),
@@ -179,7 +181,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
   double*** phi = (double***) Phi.GetDataPointer();
 
   int NX, NY, NZ;
-  V.GetGlobalSize(&NX, &NY, &NZ);
+  Phi.GetGlobalSize(&NX, &NY, &NZ);
 
   //! Left boundary
   if(ii0==-1) { 
@@ -308,8 +310,8 @@ void LevelSetOperator::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi)
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
-        s[k][j][i] = V[k][j][i][1]; //x-velocity
-  scalar.RestoreDataPointerToLocalVector; //no need to communicate w/ neighbors
+        s[k][j][i] = v[k][j][i][1]; //x-velocity
+  scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
   rec.ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx);
 
   // Reconstruction: y-velocity
@@ -317,8 +319,8 @@ void LevelSetOperator::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi)
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
-        s[k][j][i] = V[k][j][i][2]; //y-velocity
-  scalar.RestoreDataPointerToLocalVector; //no need to communicate w/ neighbors
+        s[k][j][i] = v[k][j][i][2]; //y-velocity
+  scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
   rec.ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy);
 
   // Reconstruction: z-velocity
@@ -326,8 +328,8 @@ void LevelSetOperator::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi)
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
-        s[k][j][i] = V[k][j][i][3]; //z-velocity
-  scalar.RestoreDataPointerToLocalVector; //no need to communicate w/ neighbors
+        s[k][j][i] = v[k][j][i][3]; //z-velocity
+  scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
   rec.ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz);
 
   // Reconstruction: Phi
@@ -372,7 +374,7 @@ void LevelSetOperator::ComputeAdvectionFlux(SpaceVariable3D &R)
 
         //calculate F_{i-1/2,jk}
         if(k!=kkmax-1 && j!=jjmax-1) {
-          localflux = ComputeLocalAdvectionFlux(Phir[k][j][i-1], Phil[k][j][i], 
+          localflux = ComputeLocalAdvectionFlux(phir[k][j][i-1], phil[k][j][i], 
                                                 urdata[k][j][i-1], uldata[k][j][i]) / dxyz[k][j][i][0];
           res[k][j][i-1] -= localflux;
           res[k][j][i]   += localflux;
@@ -380,7 +382,7 @@ void LevelSetOperator::ComputeAdvectionFlux(SpaceVariable3D &R)
 
         //calculate G_{i,j-1/2,k}
         if(k!=kkmax-1 && i!=iimax-1) {
-          localflux = ComputeLocalAdvectionFlux(Phit[k][j-1][i], Phib[k][j][i], 
+          localflux = ComputeLocalAdvectionFlux(phit[k][j-1][i], phib[k][j][i], 
                                                 vtdata[k][j-1][i], vbdata[k][j][i]) / dxyz[k][j][i][1];
           res[k][j-1][i] -= localflux;
           res[k][j][i]   += localflux;
@@ -388,7 +390,7 @@ void LevelSetOperator::ComputeAdvectionFlux(SpaceVariable3D &R)
 
         //calculate H_{ij,k-1/2}
         if(j!=jjmax-1 && i!=iimax-1) {
-          localflux = ComputeLocalAdvectionFlux(Phif[k-1][j][i], Phik[k][j][i], 
+          localflux = ComputeLocalAdvectionFlux(phif[k-1][j][i], phik[k][j][i], 
                                                 wfdata[k-1][j][i], wkdata[k][j][i]) / dxyz[k][j][i][2];
           res[k-1][j][i] -= localflux;
           res[k][j][i]   += localflux;
@@ -422,14 +424,15 @@ void LevelSetOperator::ComputeAdvectionFlux(SpaceVariable3D &R)
 double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, double um, double up)
 {
   double flux = 0.5*(phim*um + phip*up);
+  double lam, tol;
 
   switch (iod_ls.flux) {
-    case LevelSetSchemeData::LOCAL_LAX_FRIEDRICHS
+    case LevelSetSchemeData::LOCAL_LAX_FRIEDRICHS :
       flux -= 0.5*max(fabs(um),fabs(up))*(phip-phim);
       break;
-    case LevelSetSchemeData::ROE
-      double lam = abs(0.5*(um+up));
-      double tol   = max(fabs(um), fabs(up))*iod_ls.delta;
+    case LevelSetSchemeData::ROE :
+      lam = abs(0.5*(um+up));
+      tol   = max(fabs(um), fabs(up))*iod_ls.delta;
       if(lam<tol) lam = (lam*lam + tol*tol)/(2*tol);
       flux -= 0.5*lam*(phip-phim);
       break;
@@ -437,6 +440,7 @@ double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, dou
       print_error("Error: Level set flux function not recognized (code = %d).\n", iod_ls.flux);
       exit_mpi();      
   }
+  return flux;
 }
 
 //-----------------------------------------------------

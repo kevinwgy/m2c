@@ -66,6 +66,7 @@ SpaceVariable.cpp
 Output.cpp
 Reconstructor.cpp
 SpaceOperator.cpp
+LevelSetOperator.cpp
 TimeIntegrator.cpp
 Utils.cpp)
 

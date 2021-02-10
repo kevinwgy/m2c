@@ -1040,6 +1040,7 @@ OutputData::OutputData()
   pressure = OFF;
   materialid = OFF;
   temperature = OFF;
+  levelsetdummy = OFF;
 
   for(int i=0; i<MAXLS; i++)
     levelset[i] = OFF;
@@ -1079,8 +1080,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   for (int i=0; i<MAXLS; i++) {
     sprintf(tmp, "LevelSet%d", i+1);  //"LevelSet1", "LevelSet2", ...
     new ClassToken<OutputData>(ca, tmp, this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset[i]), 2,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelsetdummy), 2,
                                "Off", 0, "On", 1);
+    levelset[i] = levelsetdummy;
   }
 
 

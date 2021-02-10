@@ -6,11 +6,11 @@ using std::endl;
 // FORWARD EULER
 //----------------------------------------------------------------------------
 
-void TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
-                           SpaceOperator& spo_, vector<LevelSetOperator*>& lso_)
-                     : TimeIntegratorBase(comm_, iod_, spo_, lso_),
-                       Un(comm_, &(dms_.ghosted1_5dof)), 
-                       Rn(comm_, &(dms_.ghosted1_5dof))
+TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
+                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_)
+                : TimeIntegratorBase(comm_, iod_, spo_, lso_),
+                  Un(comm_, &(dms_.ghosted1_5dof)), 
+                  Rn(comm_, &(dms_.ghosted1_5dof))
 {
   for(int i=0; i<lso.size(); i++) {
     Rn_ls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
@@ -73,7 +73,7 @@ void TimeIntegratorRK2::Destroy()
   Un.Destroy(); 
   U1.Destroy(); 
   V1.Destroy(); 
-  R.Destroy();}
+  R.Destroy();
 
   for(int i=0; i<Rls.size(); i++) {
     Phi1[i]->Destroy(); delete Phi1[i];
