@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
   //! Setup PETSc data array (da) structure for nodal variables
   DataManagers3D dms(comm, iod.mesh.Nx, iod.mesh.Ny, iod.mesh.Nz);
 
-  //! Initialize VarFcn (EOS, etc.)
+  //! Initialize VarFcn (EOS, etc.) TODO: each material should have a vf!
   VarFcnBase *vf = NULL;
   if(iod.eqs.material1.eos == MaterialModelData::STIFFENED_GAS)
     vf = new VarFcnSG(iod.eqs.material1, iod.output.verbose);
@@ -64,9 +64,10 @@ int main(int argc, char* argv[])
 
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
+  SpaceVariable3D ID(comm, &(dms.ghosted1_1dof)); //!< material id
 
   //! Impose initial condition
-  spo.SetInitialCondition(V);
+  spo.SetInitialCondition(V, ID);
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -175,6 +176,7 @@ int main(int argc, char* argv[])
   //! finalize 
   //! In general, "Destroy" should be called for classes that store Petsc DMDA data (which need to be "destroyed").
   V.Destroy();
+  ID.Destroy();
 
 
   //! Detroy the levelsets

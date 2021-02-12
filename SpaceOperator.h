@@ -41,7 +41,7 @@ public:
   void PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &U, bool workOnGhost = false);
   int  ClipDensityAndPressure(SpaceVariable3D &V, bool workOnGhost = false, bool checkState = true);
 
-  void SetInitialCondition(SpaceVariable3D &V);
+  void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID);
     
   void ApplyBoundaryConditions(SpaceVariable3D &V);
 

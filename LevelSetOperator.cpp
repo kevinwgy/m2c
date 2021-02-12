@@ -88,7 +88,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
       for(int i=ii0; i<iimax; i++)
         phi[k][j][i] = DBL_MAX;
 
-  //initialize phi based on plane, cylinder, and sphere.
+  //initialize phi based on plane, cylinder-cones, and sphere.
   MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
 
   // planes
@@ -107,11 +107,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
         for(int i=i0; i<imax; i++) {
           dist = (coords[k][j][i]-x0)*dir;
           if(fabs(dist)<fabs(phi[k][j][i]))
-            phi[k][j][i] = dist;
+            phi[k][j][i] = -dist; //phi is negative inside the material subdomain, positive outside
         }
   }
 
-  // cylinders 
+  // cylinder-cone
   for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
 
     if(it->second->initialConditions.materialid != materialid)

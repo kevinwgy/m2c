@@ -258,11 +258,15 @@ void SpaceOperator::PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D 
 
 //-----------------------------------------------------
 
-void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within the real domain
+//apply IC within the real domain
+void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID) 
 {
-  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
-  //! First, apply the inlet (i.e. farfield) state
+  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
+
+  //! 1. apply the inlet (i.e. farfield) state
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
@@ -271,13 +275,91 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
         v[k][j][i][2] = iod.bc.inlet.velocity_y;
         v[k][j][i][3] = iod.bc.inlet.velocity_z;
         v[k][j][i][4] = iod.bc.inlet.pressure;
+        id[k][j][i]   = iod.bc.inlet.materialid;
       }
 
-  //! Second, apply user-specified function
+  //! 2. apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
+  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
+
+  // planes
+  for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+    double dist;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = (coords[k][j][i]-x0)*dir;
+          if(dist>0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+  // cylinder-cone
+  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder radius
+    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
+    double Hmax = R/tan_alpha;
+    double H = min(it->second->cone_height, Hmax); //cone's height
+
+    double x, r;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+H-x)*tan_alpha) ) {//inside
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  // spheres
+  for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
+          if (dist<0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  //! 3. apply user-specified function
   if(iod.ic.type != IcData::NONE) {
 
     //! Get coordinates
-    Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
     Vec3D    x0(iod.ic.x0[0], iod.ic.x0[1], iod.ic.x0[2]); 
 
     if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
@@ -331,12 +413,23 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
             a1 = 1.0 - a0;
 
             //! specify i.c. on node (cell center)
-            v[k][j][i][0] =  a0*iod.ic.user_data[IcData::DENSITY][t0]  + a1*iod.ic.user_data[IcData::DENSITY][t1];
-            v[k][j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[0];
-            v[k][j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[1];
-            v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
-            v[k][j][i][4] =  a0*iod.ic.user_data[IcData::PRESSURE][t0] + a1*iod.ic.user_data[IcData::PRESSURE][t1];
-
+            if(iod.ic.specified[IcData::DENSITY])
+              v[k][j][i][0] = a0*iod.ic.user_data[IcData::DENSITY][t0]  
+                            + a1*iod.ic.user_data[IcData::DENSITY][t1];
+            if(iod.ic.specified[IcData::VELOCITY]) {
+              v[k][j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] 
+                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[0];
+              v[k][j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][t0]
+                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[1];
+              v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] 
+                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
+            }
+            if(iod.ic.specified[IcData::PRESSURE]) 
+              v[k][j][i][4] = a0*iod.ic.user_data[IcData::PRESSURE][t0]
+                            + a1*iod.ic.user_data[IcData::PRESSURE][t1];
+            if(iod.ic.specified[IcData::MATERIALID])
+              id[k][j][i]   = std::round(a0*iod.ic.user_data[IcData::MATERIALID][t0] 
+                                       + a1*iod.ic.user_data[IcData::MATERIALID][t1]);
 
             //! apply radial variation (if provided by user)
             if(nrad>0) { 
@@ -357,11 +450,16 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
                    (iod.ic.user_data2[IcData::COORDINATE][t1] - iod.ic.user_data2[IcData::COORDINATE][t0]);
               a1 = 1.0 - a0;
 
-              v[k][j][i][0] *= a0*iod.ic.user_data2[IcData::DENSITY][t0] + a1*iod.ic.user_data2[IcData::DENSITY][t1];
-              for(int p=1; p<=3; p++)
-                v[k][j][i][p] *= a0*iod.ic.user_data2[IcData::VELOCITY][t0] + a1*iod.ic.user_data2[IcData::VELOCITY][t1];
-              v[k][j][i][4] *= a0*iod.ic.user_data2[IcData::PRESSURE][t0] + a1*iod.ic.user_data2[IcData::PRESSURE][t1];
-
+              if(iod.ic.specified[IcData::DENSITY])
+                v[k][j][i][0] *= a0*iod.ic.user_data2[IcData::DENSITY][t0] 
+                               + a1*iod.ic.user_data2[IcData::DENSITY][t1];
+              if(iod.ic.specified[IcData::VELOCITY])
+                for(int p=1; p<=3; p++)
+                  v[k][j][i][p] *= a0*iod.ic.user_data2[IcData::VELOCITY][t0] 
+                                 + a1*iod.ic.user_data2[IcData::VELOCITY][t1];
+              if(iod.ic.specified[IcData::PRESSURE])
+                v[k][j][i][4] *= a0*iod.ic.user_data2[IcData::PRESSURE][t0]
+                               + a1*iod.ic.user_data2[IcData::PRESSURE][t1];
             }
           }
 
@@ -407,21 +505,33 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V) //apply IC within th
             a1 = 1.0 - a0;
 
             //! specify i.c. on node (cell center)
-            v[k][j][i][0] =  a0*iod.ic.user_data[IcData::DENSITY][t0]  + a1*iod.ic.user_data[IcData::DENSITY][t1];
-            v[k][j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[0];
-            v[k][j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[1];
-            v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] + a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
-            v[k][j][i][4] =  a0*iod.ic.user_data[IcData::PRESSURE][t0] + a1*iod.ic.user_data[IcData::PRESSURE][t1];
+            if(iod.ic.specified[IcData::DENSITY])
+              v[k][j][i][0] = a0*iod.ic.user_data[IcData::DENSITY][t0]
+                            + a1*iod.ic.user_data[IcData::DENSITY][t1];
+            if(iod.ic.specified[IcData::VELOCITY]) {
+              v[k][j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][t0]
+                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[0];
+              v[k][j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] 
+                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[1];
+              v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0]
+                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
+            }
+            if(iod.ic.specified[IcData::PRESSURE])
+              v[k][j][i][4] = a0*iod.ic.user_data[IcData::PRESSURE][t0]
+                            + a1*iod.ic.user_data[IcData::PRESSURE][t1];
+            if(iod.ic.specified[IcData::MATERIALID])
+              id[k][j][i]   = std::round(a0*iod.ic.user_data[IcData::MATERIALID][t0] 
+                                       + a1*iod.ic.user_data[IcData::MATERIALID][t1]);
           }
 
     }
-
-    coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
   }
 
   V.RestoreDataPointerAndInsert();
+  ID.RestoreDataPointerAndInsert();
+  coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
 
-  //! Apply boundary condition to populate ghost nodes
+  //! Apply boundary condition to populate ghost nodes (no need to do this for ID)
   ApplyBoundaryConditions(V);   
 
 }
