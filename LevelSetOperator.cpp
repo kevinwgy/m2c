@@ -2,8 +2,8 @@
 #include <Utils.h>
 #include <LevelSetOperator.h>
 #include <SpaceOperator.h>
-#include <Vector3D.h>
 #include <Vector5D.h>
+#include <GeoTools.h>
 #include <map>
 
 using std::min;
@@ -122,45 +122,45 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     dir /= dir.norm();
 
     double L = it->second->L; //cylinder height
-    double r = it->second->r; //cylinder radius
-    double pi = acos(-1);
-    double alpha = it->second->opening_angle_degrees/180.0*pi;  //cone's opening angle
-    double tan_alpha = tan(alpha);
-    double hmax = r/tan_alpha;
-    double h = min(it->second->cone_height, hmax); //cone's height
+    double R = it->second->r; //cylinder radius
+    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
+    double Hmax = R/tan_alpha;
+    double H = min(it->second->cone_height, Hmax); //cone's height
  
-    double dist, R;
+    // define the geometry
+    vector<pair<Vec3D, Vec3D> > lineSegments; //boundary of the cylinder-cone
+    Vec3D p0(0.0, 0.0, 0.0); //x0
+    Vec3D p1(0.0, R, 0.0);
+    Vec3D p2(L, R, 0.0);
+    Vec3D p3(L+H, (Hmax-H)*tan_alpha, 0.0);
+    Vec3D p4(L+H, 0.0, 0.0); 
+    lineSegments.push_back(std::make_pair(p0,p1));
+    lineSegments.push_back(std::make_pair(p1,p2));
+    lineSegments.push_back(std::make_pair(p2,p3));
+    lineSegments.push_back(std::make_pair(p3,p4)); //may be a degenerate edge (point) but fine
+
+    double x, r, toto, dist = DBL_MAX;
+    Vec3D xp;
 
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++) {
     
-          dist = (coords[k][j][i]-x0)*dir;
-          R = (coords[k][j][i] - x0 - dist*dir).norm();
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          xp = Vec3D(x,r,0.0);
 
-          if(dist>0 && (  (dist<L   && R<r) 
-                        ||(dist<L+h && R<(L+hmax-dist)*tan_alpha) ) {//inside the cylinder & cone
+          //calculate unsigned distance from node to the boundary of the cylinder-cone
+          for(int l=0; l<lineSegments.size(); l++)
+            dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
+                                 lineSegments[l].first, lineSegments[l].second, toto));
 
-          //I AM HERE
-
-
-
-
-            dist = min(min(it->second->L - dist, dist), it->second->r - R); 
-            if(dist<fabs(phi[k][j][i]))
-              phi[k][j][i] = -dist; //<0 inside the cylinder
-          } 
-          else { //outside the cylinder
-            if(R<it->second->r)
-              dist = min(fabs(dist), fabs(dist - it->second->L));
-            else if(dist>0 && dist<it->second->L) // on the side
-              dist = R - it->second->r;
-            else {//the closest point is a "corner"
-              dist = min(fabs(dist), fabs(dist - it->second->L)); //distance to top or bottom, whichever closer
-              dist = sqrt((R-it->second->r)*(R-it->second->r) + (dist*dist));
-            }
-            if(dist<fabs(phi[k][j][i]))
-              phi[k][j][i] = dist; //>0 outside the cylinder
+          //figure out the sign, and update phi
+          if(dist<fabs(phi[k][j][i])) {
+            if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+H-x)*tan_alpha) ) //inside
+              phi[k][j][i] = -dist;
+            else 
+              phi[k][j][i] = dist; 
           }
         }
   }

@@ -287,7 +287,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
    *    - Otherwise: Normal computation based on user input.
    ***************************************************************/
   double sigma; //!< slope
-  double dq0, dq1;
+  double dq0 = 0.0, dq1 = 0.0;
 
   double a, b;
   double alpha = iod_rec.generalized_minmod_coeff; //!< only needed for gen. minmod
@@ -335,6 +335,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
               case 2:
                 dq0 = (u[k][j][i*nDOF+dof]     - u[k-1][j][i*nDOF+dof]);
                 dq1 = (u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof]);
+                break;
               default:
                 print_error("Error: dir(%d) not recognized.\n", dir);
                 exit_mpi();

@@ -15,6 +15,8 @@ namespace GeoTools {
  *   Outputs:
  *     alpha -- affine coordinate (i.e. xA + alpha*AB = projection point)
  *     return value -- distance from the point to the line
+ *   Note: If the "edge" is actually a point (i.e. xA = xB), alpha and 
+ *         the distance will both be inf.
  */
 inline double ProjectPointToLine(Vec3D& x0, Vec3D& xA, Vec3D& xB, double &alpha)
 {
@@ -35,6 +37,8 @@ inline double ProjectPointToLine(Vec3D& x0, Vec3D& xA, Vec3D& xB, double &alpha)
  *   Outputs:
  *     alpha -- affine coordinate of the closest point (between 0 and 1)
  *     return value -- shortest distance from x0 to the line segment AB
+ *   Note: This function can handle the degenerate case of a point (i.e.
+ *         xA = xB)
  */
 inline double GetShortestDistanceFromPointToLineSegment(Vec3D& x0, Vec3D& xA, Vec3D& xB,
                                                         double &alpha)
@@ -56,7 +60,7 @@ inline double GetShortestDistanceFromPointToLineSegment(Vec3D& x0, Vec3D& xA, Ve
  *     xA, xB, xC -- coords of the three vertices of the triangle
  *                    (the order matters!)
  *   Outputs:
- *     normal -- unit normal dir (xB-xA)^(xC-xA)
+ *     dir -- unit normal dir (xB-xA)^(xC-xA)
  *     return value -- area of the triangle
  */
 inline double GetNormalAndAreaOfTriangle(Vec3D& xA, Vec3D& xB, Vec3D& xC, 
@@ -64,7 +68,7 @@ inline double GetNormalAndAreaOfTriangle(Vec3D& xA, Vec3D& xB, Vec3D& xC,
 {
   Vec3D ABC = (xB-xA)^(xC-xA); //cross product
   double area= ABC.norm();
-  Vec3D dir = 1.0/areaABC*ABC;
+  dir = 1.0/area*ABC;
   return area;
 }                                  
 
@@ -84,20 +88,20 @@ inline double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC,
                                      double& xi1, double& xi2,
                                      double* area = NULL, Vec3D* dir = NULL)
 {
-  double dist, arePBC, areaPCA;
+  double dist, areaPBC, areaPCA;
   Vec3D xp;
 
   if(area && dir) {
 
     //calculate the projection.
-    dist = (x0-xA)*dir;
-    xp = x0 - dist*dir;
+    dist = (x0-xA)*(*dir);
+    xp = x0 - dist*(*dir);
 
     //calculate barycentric coords.
-    areaPBC = (((xB-xp)^(xC-xp))*dir);
-    areaPCA = (((xC-xp)^(xA-xp))*dir);
-    xi1 = areaPBC/area;
-    xi2 = areaPCA/area;
+    areaPBC = (((xB-xp)^(xC-xp))*(*dir));
+    areaPCA = (((xC-xp)^(xA-xp))*(*dir));
+    xi1 = areaPBC/(*area);
+    xi2 = areaPCA/(*area);
 
   } else {
 
