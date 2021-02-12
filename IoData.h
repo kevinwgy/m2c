@@ -95,13 +95,17 @@ struct SphereData {
 
 //------------------------------------------------------------------------------
 
-struct CylinderData {
+struct CylinderConeData {
 
+  //! info about the cylinder
   double cen_x, cen_y, cen_z, nx, ny, nz, r, L;
+  //! info about the cone (connected to the top of the cylinder)
+  double opening_angle_degrees, cone_height;
+ 
   StateVariable initialConditions;
 
-  CylinderData();
-  ~CylinderData() {}
+  CylinderConeData();
+  ~CylinderConeData() {}
   Assigner *getAssigner();
 
 };
@@ -113,7 +117,7 @@ struct MultiInitialConditionsData {
   ObjectMap<PointData>    pointMap;
   ObjectMap<PlaneData>    planeMap;
   ObjectMap<SphereData>   sphereMap;
-  ObjectMap<CylinderData> cylinderMap;
+  ObjectMap<CylinderConeData> cylinderconeMap;
 
   void setup(const char *, ClassAssigner * = 0);
 };

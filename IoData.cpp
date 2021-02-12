@@ -142,7 +142,7 @@ Assigner *SphereData::getAssigner()
 
 //------------------------------------------------------------------------------
 
-CylinderData::CylinderData() {
+CylinderConeData::CylinderConeData() {
 
   cen_x  = 0.0;
   cen_y  = 0.0;
@@ -158,18 +158,21 @@ CylinderData::CylinderData() {
 
 //------------------------------------------------------------------------------
 
-Assigner *CylinderData::getAssigner()
+Assigner *CylinderConeData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
 
-  new ClassDouble<CylinderData> (ca, "Point_x", this, &CylinderData::cen_x);
-  new ClassDouble<CylinderData> (ca, "Point_y", this, &CylinderData::cen_y);
-  new ClassDouble<CylinderData> (ca, "Point_z", this, &CylinderData::cen_z);
-  new ClassDouble<CylinderData> (ca, "Normal_x", this, &CylinderData::nx);
-  new ClassDouble<CylinderData> (ca, "Normal_y", this, &CylinderData::ny);
-  new ClassDouble<CylinderData> (ca, "Normal_z", this, &CylinderData::nz);
-  new ClassDouble<CylinderData> (ca, "Radius", this, &CylinderData::r);
-  new ClassDouble<CylinderData> (ca, "Length", this, &CylinderData::L);
+  new ClassDouble<CylinderConeData> (ca, "Axis_x", this, &CylinderConeData::nx);
+  new ClassDouble<CylinderConeData> (ca, "Axis_y", this, &CylinderConeData::ny);
+  new ClassDouble<CylinderConeData> (ca, "Axis_z", this, &CylinderConeData::nz);
+  new ClassDouble<CylinderConeData> (ca, "BaseCenter_x", this, &CylinderConeData::cen_x);
+  new ClassDouble<CylinderConeData> (ca, "BaseCenter_y", this, &CylinderConeData::cen_y);
+  new ClassDouble<CylinderConeData> (ca, "BaseCenter_z", this, &CylinderConeData::cen_z);
+  new ClassDouble<CylinderConeData> (ca, "CylinderRadius", this, &CylinderConeData::r);
+  new ClassDouble<CylinderConeData> (ca, "CylinderHeight", this, &CylinderConeData::L);
+
+  new ClassDouble<CylinderConeData> (ca, "ConeOpeningAngleInDegrees", this, &CylinderConeData::opening_angle_degrees);
+  new ClassDouble<CylinderConeData> (ca, "ConeHeight", this, &CylinderConeData::cone_height);
 
   initialConditions.setup("InitialState", ca);
 
@@ -184,7 +187,7 @@ void MultiInitialConditionsData::setup(const char *name, ClassAssigner *father)
   pointMap.setup("Point", ca);
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);
-  cylinderMap.setup("Cylinder", ca);
+  cylinderconeMap.setup("CylinderAndCone", ca);
 }
 
 //------------------------------------------------------------------------------

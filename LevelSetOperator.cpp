@@ -112,7 +112,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
   }
 
   // cylinders 
-  for(auto it=ic.cylinderMap.dataMap.begin(); it!=ic.cylinderMap.dataMap.end(); it++) {
+  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
 
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
@@ -120,6 +120,15 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double r = it->second->r; //cylinder radius
+    double pi = acos(-1);
+    double alpha = it->second->opening_angle_degrees/180.0*pi;  //cone's opening angle
+    double tan_alpha = tan(alpha);
+    double hmax = r/tan_alpha;
+    double h = min(it->second->cone_height, hmax); //cone's height
+ 
     double dist, R;
 
     for(int k=k0; k<kmax; k++)
@@ -129,7 +138,14 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
           dist = (coords[k][j][i]-x0)*dir;
           R = (coords[k][j][i] - x0 - dist*dir).norm();
 
-          if(dist>0 && dist<it->second->L && R<it->second->r) {//inside the cylinder
+          if(dist>0 && (  (dist<L   && R<r) 
+                        ||(dist<L+h && R<(L+hmax-dist)*tan_alpha) ) {//inside the cylinder & cone
+
+          //I AM HERE
+
+
+
+
             dist = min(min(it->second->L - dist, dist), it->second->r - R); 
             if(dist<fabs(phi[k][j][i]))
               phi[k][j][i] = -dist; //<0 inside the cylinder
