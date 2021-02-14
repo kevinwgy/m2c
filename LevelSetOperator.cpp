@@ -139,7 +139,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     lineSegments.push_back(std::make_pair(p2,p3));
     lineSegments.push_back(std::make_pair(p3,p4)); //may be a degenerate edge (point) but fine
 
-    double x, r, toto, dist = DBL_MAX;
+    double x, r, toto, dist;
     Vec3D xp;
 
     for(int k=k0; k<kmax; k++)
@@ -151,17 +151,19 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
           xp = Vec3D(x,r,0.0);
 
           //calculate unsigned distance from node to the boundary of the cylinder-cone
+          dist = DBL_MAX;
           for(int l=0; l<lineSegments.size(); l++)
             dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
                                  lineSegments[l].first, lineSegments[l].second, toto));
 
           //figure out the sign, and update phi
           if(dist<fabs(phi[k][j][i])) {
-            if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+H-x)*tan_alpha) ) //inside
+            if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) //inside
               phi[k][j][i] = -dist;
             else 
               phi[k][j][i] = dist; 
           }
+          
         }
   }
 

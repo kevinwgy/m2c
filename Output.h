@@ -32,7 +32,7 @@ public:
 
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh
 
-  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
+  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
                              std::vector<SpaceVariable3D*> &Phi); //!< write solution to file
 
   bool ToWriteSolutionSnapshot(double time, double dt, int time_step); /**< check whether to write solution 

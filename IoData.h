@@ -207,7 +207,7 @@ struct EquationsData {
 
 struct ReconstructionData {
 
-  enum Reconstruction {CONSTANT = 0, LINEAR = 1} reconstruction;
+  enum Reconstruction {CONSTANT = 0, LINEAR = 1} type;
   enum Limiter {NONE = 0, GENERALIZED_MINMOD = 1, VANALBADA = 2} limiter; 
   double generalized_minmod_coeff;
 
@@ -280,7 +280,7 @@ struct SchemesData {
 
   BoundarySchemeData bc;
 
-  const static int MAXLS = 99;
+  const static int MAXLS = 5;
   LevelSetSchemeData ls[MAXLS];
 
   SchemesData();
@@ -395,9 +395,14 @@ struct OutputData {
   Options density, velocity, pressure, materialid, temperature;
   Options verbose;
 
-  const static int MAXLS = 99;
+  const static int MAXLS = 5;
   Options levelset[MAXLS];
-  Options levelsetdummy;
+
+  Options levelset1;
+  Options levelset2;
+  Options levelset3;
+  Options levelset4;
+  Options levelset5;
 
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number

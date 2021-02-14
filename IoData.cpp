@@ -151,9 +151,11 @@ CylinderConeData::CylinderConeData() {
   ny     = 0.0;
   nz     = 1.0;
 
-  r = 0.5;
-  L = 1.0;
+  r = 1.0;
+  L = 0.0;
 
+  cone_height = 0.0;
+  opening_angle_degrees = 45.0;
 }
 
 //------------------------------------------------------------------------------
@@ -365,7 +367,7 @@ void EquationsData::setup(const char *name, ClassAssigner *father)
 
 ReconstructionData::ReconstructionData() 
 {
-  reconstruction = LINEAR;
+  type = LINEAR;
   limiter = GENERALIZED_MINMOD;
   generalized_minmod_coeff = 2.0; //The MC Limiter
 }
@@ -377,8 +379,8 @@ void ReconstructionData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 3, father); 
 
   new ClassToken<ReconstructionData>
-    (ca, "Reconstruction", this,
-     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::reconstruction), 2,
+    (ca, "Type", this,
+     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::type), 2,
      "Constant", 0, "Linear", 1);
 
   new ClassToken<ReconstructionData>
@@ -617,9 +619,11 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
+
+  multiInitialConditions.setup("GeometricEntities");
 }
 
 //------------------------------------------------------------------------------
@@ -1043,7 +1047,11 @@ OutputData::OutputData()
   pressure = OFF;
   materialid = OFF;
   temperature = OFF;
-  levelsetdummy = OFF;
+  levelset1 = OFF;
+  levelset2 = OFF;
+  levelset3 = OFF;
+  levelset4 = OFF;
+  levelset5 = OFF;
 
   for(int i=0; i<MAXLS; i++)
     levelset[i] = OFF;
@@ -1079,14 +1087,21 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
                                "Off", 0, "On", 1);
 
-  char tmp[12];
-  for (int i=0; i<MAXLS; i++) {
-    sprintf(tmp, "LevelSet%d", i+1);  //"LevelSet1", "LevelSet2", ...
-    new ClassToken<OutputData>(ca, tmp, this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelsetdummy), 2,
+  new ClassToken<OutputData>(ca, "LevelSet1", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset1), 2,
                                "Off", 0, "On", 1);
-    levelset[i] = levelsetdummy;
-  }
+  new ClassToken<OutputData>(ca, "LevelSet2", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset2), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "LevelSet3", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset3), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "LevelSet4", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset4), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "LevelSet5", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset5), 2,
+                               "Off", 0, "On", 1);
 
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
@@ -1139,6 +1154,13 @@ void IoData::readCmdFile()
   //READ ADDITIONAL FILES
   if(strcmp(ic.user_specified_ic, ""))
     ic.readUserSpecifiedIC(); 
+
+  //FIX Levelset output (TODO: need a better way...)
+  output.levelset[0] = output.levelset1;
+  output.levelset[1] = output.levelset2;
+  output.levelset[2] = output.levelset3;
+  output.levelset[3] = output.levelset4;
+  output.levelset[4] = output.levelset5;
 }
 
 //------------------------------------------------------------------------------

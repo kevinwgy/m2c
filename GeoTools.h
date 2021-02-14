@@ -16,7 +16,7 @@ namespace GeoTools {
  *     alpha -- affine coordinate (i.e. xA + alpha*AB = projection point)
  *     return value -- distance from the point to the line
  *   Note: If the "edge" is actually a point (i.e. xA = xB), alpha and 
- *         the distance will both be inf.
+ *         the distance will both be nan.
  */
 inline double ProjectPointToLine(Vec3D& x0, Vec3D& xA, Vec3D& xB, double &alpha)
 {
@@ -47,7 +47,7 @@ inline double GetShortestDistanceFromPointToLineSegment(Vec3D& x0, Vec3D& xA, Ve
   if(alpha>1.0) {
     dist = (x0-xB).norm();
     alpha = 1.0; 
-  } else if (alpha<0.0) {
+  } else if (alpha<0.0 || isnan(alpha)/*xA=xB*/) {
     dist = (x0-xA).norm();
     alpha = 0.0;
   }

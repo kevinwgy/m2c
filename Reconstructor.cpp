@@ -167,7 +167,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
           //! calculate slope limiter phi within cell (i,j) 
           sigma[0] = sigma[1] = sigma[2] = 0.0;
 
-          if(iod_rec.reconstruction == ReconstructionData::LINEAR) {
+          if(iod_rec.type == ReconstructionData::LINEAR) {
 
             //! get constant coefficients
             a[0] = A[k][j][i][0];
@@ -316,7 +316,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
           //! calculate slope limiter phi within cell (i,j) 
           sigma = 0.0;
 
-          if(iod_rec.reconstruction == ReconstructionData::LINEAR) {
+          if(iod_rec.type == ReconstructionData::LINEAR) {
 
             //! get constant coefficients
             a = A[k][j][i][dir];

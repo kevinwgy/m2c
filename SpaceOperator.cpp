@@ -278,85 +278,9 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
         id[k][j][i]   = iod.bc.inlet.materialid;
       }
 
-  //! 2. apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
-  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
-
-  // planes
-  for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
-
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-    double dist;
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0)*dir;
-          if(dist>0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-  // cylinder-cone
-  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
-
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-
-    double L = it->second->L; //cylinder height
-    double R = it->second->r; //cylinder radius
-    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
-    double Hmax = R/tan_alpha;
-    double H = min(it->second->cone_height, Hmax); //cone's height
-
-    double x, r;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          x = (coords[k][j][i]-x0)*dir;
-          r = (coords[k][j][i] - x0 - x*dir).norm();
-          if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+H-x)*tan_alpha) ) {//inside
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
 
 
-  // spheres
-  for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
-
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    double dist;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
-          if (dist<0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  //! 3. apply user-specified function
+  //! 2. apply user-specified function
   if(iod.ic.type != IcData::NONE) {
 
     //! Get coordinates
@@ -365,9 +289,9 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
     if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
 
       if(iod.ic.type == IcData::PLANAR)
-        print("- Applying user-specified initial condition (planar).\n");
+        print("- Applying file-based initial condition (planar).\n");
       else
-        print("- Applying user-specified initial condition (with cylindrical symmetry).\n");
+        print("- Applying file-based initial condition (with cylindrical symmetry).\n");
  
       Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
       dir /= dir.norm();
@@ -467,7 +391,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
 
     else if (iod.ic.type == IcData::SPHERICAL) {
 
-      print("- Applying user-specified initial condition (with spherical symmetry).\n");
+      print("- Applying file-based initial condition (with spherical symmetry).\n");
  
       double x;
       int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
@@ -526,6 +450,93 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
 
     }
   }
+
+
+
+  //! 3. apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
+  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
+
+  // planes
+  for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
+
+    print("- Applying initial condition on one side of a plane (material id: %d).\n", 
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+    double dist;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = (coords[k][j][i]-x0)*dir;
+          if(dist>0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+  // cylinder-cone
+  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
+
+    print("- Applying initial condition within a cylinder-cone (material id: %d).\n",
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder radius
+    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
+    double Hmax = R/tan_alpha;
+    double H = min(it->second->cone_height, Hmax); //cone's height
+
+    double x, r;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) {//inside
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  // spheres
+  for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
+
+    print("- Applying initial condition within a sphere (material id: %d).\n",
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
+          if (dist<0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
 
   V.RestoreDataPointerAndInsert();
   ID.RestoreDataPointerAndInsert();

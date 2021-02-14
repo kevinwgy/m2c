@@ -69,8 +69,8 @@ bool Output::ToWriteSolutionSnapshot(double time, double dt, int time_step)
 
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V,
-                                   std::vector<SpaceVariable3D*> &Phi)
+void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
+                                   SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi)
 {
   //! Define vtr file name
   char full_fname[256];
@@ -146,6 +146,11 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "pressure");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+  }
+
+  if(iod.output.materialid==OutputData::ON) {
+    PetscObjectSetName((PetscObject)(ID.GetRefToGlobalVec()), "materialid"); //adding the name directly to ID.
+    VecView(ID.GetRefToGlobalVec(), viewer);
   }
 
   int ls_counter = 0;
