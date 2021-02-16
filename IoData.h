@@ -6,6 +6,7 @@
 #include "parser/Assigner.h"
 #include "parser/Dictionary.h"
 #include <Vector3D.h>
+#include <Utils.h>
 
 using std::map;
 using std::pair;
@@ -176,6 +177,7 @@ struct MieGruneisenModelData {
 
 struct MaterialModelData {
 
+  int id;
   enum EOS {STIFFENED_GAS = 0, MIE_GRUNEISEN = 1} eos;
   double rhomin;
   double pmin;
@@ -185,8 +187,7 @@ struct MaterialModelData {
 
   MaterialModelData();
   ~MaterialModelData() {}
-
-  void setup(const char *, ClassAssigner * = 0);
+  Assigner *getAssigner();
 
 };
 
@@ -194,8 +195,7 @@ struct MaterialModelData {
 
 struct EquationsData {
 
-  int numPhase;
-  MaterialModelData material1;
+  ObjectMap<MaterialModelData> materials;
 
   EquationsData();
   ~EquationsData() {}
@@ -267,8 +267,7 @@ struct LevelSetSchemeData {
 
   LevelSetSchemeData();
   ~LevelSetSchemeData() {}
-
-  void setup(const char *, ClassAssigner * = 0);
+  Assigner *getAssigner();
 
 };
 
@@ -280,8 +279,7 @@ struct SchemesData {
 
   BoundarySchemeData bc;
 
-  const static int MAXLS = 5;
-  LevelSetSchemeData ls[MAXLS];
+  ObjectMap<LevelSetSchemeData> ls;
 
   SchemesData();
   ~SchemesData() {}
@@ -398,11 +396,11 @@ struct OutputData {
   const static int MAXLS = 5;
   Options levelset[MAXLS];
 
+  Options levelset0;
   Options levelset1;
   Options levelset2;
   Options levelset3;
   Options levelset4;
-  Options levelset5;
 
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number

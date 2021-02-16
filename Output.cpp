@@ -153,15 +153,16 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     VecView(ID.GetRefToGlobalVec(), viewer);
   }
 
-  int ls_counter = 0;
-  for(int i=0; i<SchemesData::MAXLS; i++) {
-    if(iod.schemes.ls[i].materialid<1) 
-      continue; //inactive
-    if(iod.output.levelset[i]==OutputData::ON) {
+  for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
+    if(it->first >= OutputData::MAXLS) {
+      print_error("Error: Not able to output level set %d (id must be less than %d).\n", it->first, OutputData::MAXLS);
+      exit_mpi();
+    }
+    if(iod.output.levelset[it->first]==OutputData::ON) {
       char word[12];
-      sprintf(word, "levelset%d", i+1);
-      PetscObjectSetName((PetscObject)(Phi[ls_counter]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
-      VecView(Phi[ls_counter++]->GetRefToGlobalVec(), viewer);
+      sprintf(word, "levelset%d", it->first);
+      PetscObjectSetName((PetscObject)(Phi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
+      VecView(Phi[it->first]->GetRefToGlobalVec(), viewer);
     }
   }
 

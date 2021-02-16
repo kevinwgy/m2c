@@ -330,10 +330,10 @@ MaterialModelData::MaterialModelData()
 
 //------------------------------------------------------------------------------
 
-void MaterialModelData::setup(const char *name, ClassAssigner *father)
+Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 2,
@@ -345,13 +345,14 @@ void MaterialModelData::setup(const char *name, ClassAssigner *father)
   sgModel.setup("StiffenedGasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
 
+  return ca;
 };
 
 //------------------------------------------------------------------------------
 
 EquationsData::EquationsData()
 {
-  numPhase = 1;
+
 }
 
 //------------------------------------------------------------------------------
@@ -360,7 +361,7 @@ void EquationsData::setup(const char *name, ClassAssigner *father)
 {
   ClassAssigner *ca = new ClassAssigner(name, 1, father); 
 
-  material1.setup("MaterialModel1");
+  materials.setup("Material", ca);
 }
 
 //------------------------------------------------------------------------------
@@ -455,11 +456,10 @@ LevelSetSchemeData::LevelSetSchemeData()
 
 //------------------------------------------------------------------------------
 
-void LevelSetSchemeData::setup(const char *name, ClassAssigner *father)
+Assigner *LevelSetSchemeData::getAssigner()
 {
 
-  ClassAssigner* ca;
-  ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
 
   new ClassInt<LevelSetSchemeData>(ca, "MaterialID", this, 
     &LevelSetSchemeData::materialid);
@@ -476,6 +476,7 @@ void LevelSetSchemeData::setup(const char *name, ClassAssigner *father)
 
   rec.setup("Reconstruction", ca);
 
+  return ca;
 }
 
 //------------------------------------------------------------------------------
@@ -494,17 +495,13 @@ SchemesData::SchemesData()
 void SchemesData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 2+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
   ns.setup("NavierStokes", ca);
 
   bc.setup("Boundaries", ca);
 
-  char tmp[12];
-  for (int i=0; i<MAXLS; i++) {
-    sprintf(tmp, "LevelSet%d", i+1);  //"LevelSet1", "LevelSet2", ...
-    ls[i].setup(tmp, ca);
-  }
+  ls.setup("LevelSet", ca);
 }
 
 //------------------------------------------------------------------------------
@@ -1047,11 +1044,11 @@ OutputData::OutputData()
   pressure = OFF;
   materialid = OFF;
   temperature = OFF;
+  levelset0 = OFF;
   levelset1 = OFF;
   levelset2 = OFF;
   levelset3 = OFF;
   levelset4 = OFF;
-  levelset5 = OFF;
 
   for(int i=0; i<MAXLS; i++)
     levelset[i] = OFF;
@@ -1087,6 +1084,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
                                "Off", 0, "On", 1);
 
+  new ClassToken<OutputData>(ca, "LevelSet0", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::levelset0), 2,
+                               "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LevelSet1", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::levelset1), 2,
                                "Off", 0, "On", 1);
@@ -1098,9 +1098,6 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LevelSet4", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::levelset4), 2,
-                               "Off", 0, "On", 1);
-  new ClassToken<OutputData>(ca, "LevelSet5", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset5), 2,
                                "Off", 0, "On", 1);
 
 
@@ -1156,11 +1153,11 @@ void IoData::readCmdFile()
     ic.readUserSpecifiedIC(); 
 
   //FIX Levelset output (TODO: need a better way...)
-  output.levelset[0] = output.levelset1;
-  output.levelset[1] = output.levelset2;
-  output.levelset[2] = output.levelset3;
-  output.levelset[3] = output.levelset4;
-  output.levelset[4] = output.levelset5;
+  output.levelset[0] = output.levelset0;
+  output.levelset[1] = output.levelset1;
+  output.levelset[2] = output.levelset2;
+  output.levelset[3] = output.levelset3;
+  output.levelset[4] = output.levelset4;
 }
 
 //------------------------------------------------------------------------------

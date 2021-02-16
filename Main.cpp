@@ -39,16 +39,22 @@ int main(int argc, char* argv[])
 
   //! Initialize VarFcn (EOS, etc.) TODO: each material should have a vf!
   VarFcnBase *vf = NULL;
-  if(iod.eqs.material1.eos == MaterialModelData::STIFFENED_GAS)
-    vf = new VarFcnSG(iod.eqs.material1, iod.output.verbose);
-  else if(iod.eqs.material1.eos == MaterialModelData::MIE_GRUNEISEN)
-    vf = new VarFcnMG(iod.eqs.material1, iod.output.verbose);
-  else {
-    print_error("Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
+  if(iod.eqs.materials.dataMap.size() != 1) {
+    print_error("Error: Found %d materials in the input file. Code is currently limited to 1 material.\n");
     exit_mpi();
   }
+  for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
+    if(it->second->eos == MaterialModelData::STIFFENED_GAS)
+      vf = new VarFcnSG(*it->second, iod.output.verbose);
+    else if(it->second->eos == MaterialModelData::MIE_GRUNEISEN)
+      vf = new VarFcnMG(*it->second, iod.output.verbose);
+    else {
+      print_error("Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
+      exit_mpi();
+    }
+  }
 
-  //! Initialize FluxFcn
+  //! Initialize FluxFcn for the advector flux of the N-S equations
   FluxFcnBase *ff = NULL;
   if(iod.schemes.ns.flux == SchemeData::ROE)
     ff = new FluxFcnGenRoe(vf, iod);
@@ -73,16 +79,18 @@ int main(int argc, char* argv[])
   std::vector<LevelSetOperator*> lso;
   std::vector<SpaceVariable3D*>  Phi;
   std::set<int> ls_tracker;
-  for(int i=0; i<SchemesData::MAXLS; i++) {
-    int matid = iod.schemes.ls[i].materialid;
-    if(matid<=0)
-      continue; //levelsets are for tracking subdomains w/ materialid>0
+  for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
+    int matid = it->second->materialid;
+    if(matid<=0) {
+      print_error("Error: Cannot initialize a level set for tracking material %d. (id must be >0)\n", matid);
+      exit_mpi();
+    }
     if(ls_tracker.find(matid) != ls_tracker.end()) {
       print_error("Error: Cannot initialize multiple level sets for the same material (id=%d).\n", matid);
       exit_mpi();
     }
     ls_tracker.insert(matid);    
-    lso.push_back(new LevelSetOperator(comm, dms, iod, iod.schemes.ls[i], spo));
+    lso.push_back(new LevelSetOperator(comm, dms, iod, *it->second, spo));
     Phi.push_back(new SpaceVariable3D(comm, &(dms.ghosted1_1dof)));
 
     lso.back()->SetInitialCondition(*Phi.back());
@@ -112,7 +120,6 @@ int main(int argc, char* argv[])
     print_error("Error: Unable to initialize time integrator for the specified method.\n");
     exit_mpi();
   }
-
 
 
   /*************************************
