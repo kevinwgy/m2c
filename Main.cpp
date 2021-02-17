@@ -8,6 +8,7 @@
 #include <VarFcnMG.h>
 #include <FluxFcnGenRoe.h>
 #include <FluxFcnLLF.h>
+#include <FluxFcnHLLC.h>
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
 #include <set>
@@ -59,7 +60,9 @@ int main(int argc, char* argv[])
   if(iod.schemes.ns.flux == SchemeData::ROE)
     ff = new FluxFcnGenRoe(vf, iod);
   else if(iod.schemes.ns.flux == SchemeData::LOCAL_LAX_FRIEDRICHS)
-    ff = new FluxFcnLLF(vf, iod);
+    ff = new FluxFcnGenRoe(vf, iod);
+  else if(iod.schemes.ns.flux == SchemeData::HLLC)
+    ff = new FluxFcnHLLC(vf, iod);
   else {
     print_error("Error: Unable to initialize flux calculator (FluxFcn) for the specified numerical method.\n");
     exit_mpi();

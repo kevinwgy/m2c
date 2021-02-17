@@ -2,7 +2,6 @@
 #define _FLUX_FCN_LLF_H_
 
 #include <FluxFcnBase.h>
-#include <Vector5D.h>
 #include <math.h>
 using std::fabs;
 using std::max;

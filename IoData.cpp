@@ -411,8 +411,8 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<SchemeData>
     (ca, "Flux", this,
-     reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 4,
-     "Roe", 0, "LocalLaxFriedrichs", 1, "HLLE", 2, "HLLC", 3, "KurganovTadmor", 4);
+     reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 3,
+     "Roe", 0, "LocalLaxFriedrichs", 1, "HLLC", 2);
 
   new ClassDouble<SchemeData>(ca, "EntropyFixCoefficient", this, &SchemeData::delta);
 
