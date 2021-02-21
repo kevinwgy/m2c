@@ -2,51 +2,56 @@
 #define _FLUX_FCN_BASE_H_
 
 #include <VarFcnBase.h>
+#include <vector>
 
-//----------------------------------------------------------------------------------------
+/*****************************************************************************************
+ * Base class for calculating fluxes within the interiors of all the material subdomains, 
+ * Fluxes across material interfaces are handled ELSEWHERE.
+ *****************************************************************************************/
 
 class FluxFcnBase {
 
 protected:
-  VarFcnBase *vf;
+  std::vector<VarFcnBase*> &vf;
 
 public:
-  FluxFcnBase(VarFcnBase *varFcn);
-  virtual ~FluxFcnBase() { vf = 0; }
+  FluxFcnBase(std::vector<VarFcnBase*> &varFcn) : vf(varFcn) { }
+  virtual ~FluxFcnBase() { }
 
-  inline void EvaluateFluxFunction_F(double *V, double *F);
-  inline void EvaluateFluxFunction_G(double *V, double *G);
-  inline void EvaluateFluxFunction_H(double *V, double *H);
+  inline void EvaluateFluxFunction_F(double *V, int id, double *F);
+  inline void EvaluateFluxFunction_G(double *V, int id, double *G);
+  inline void EvaluateFluxFunction_H(double *V, int id, double *H);
 
   /** Evaluate eigenvalues and eigenvectors of the Jacobian matrices, using V and the EOS. */
-  inline void EvaluateEigensOfJacobian_F(double *V, //input state
+  inline void EvaluateEigensOfJacobian_F(double *V, int id, //input state
                                          double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                          double *r1 = 0, double *r2 = 0, double *r3 = 0, double *r4 = 0, double *r5 = 0);
-  inline void EvaluateEigensOfJacobian_G(double *V, //input state
+  inline void EvaluateEigensOfJacobian_G(double *V, int id, //input state
                                          double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                          double *r1 = 0, double *r2 = 0, double *r3 = 0, double *r4 = 0, double *r5 = 0);
-  inline void EvaluateEigensOfJacobian_H(double *V, //input state
+  inline void EvaluateEigensOfJacobian_H(double *V, int id, //input state
                                          double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                          double *r1 = 0, double *r2 = 0, double *r3 = 0, double *r4 = 0, double *r5 = 0);
   
   /** Evaluate eigenvalues and eigenvectors of the Jacobian matrices, with all the variables specified explicitly.
     * The input variables can, but do not have to, satisfy the EOS. This is useful for evaluating some numerical flux functions which
     * simplify borrows the form of the Jacobian matrix */
-  inline void EvaluateEigensOfJacobian_F(double u, double v, double w, double e, double c, double H, double Gamma, double dpdrho,
+  inline void EvaluateEigensOfJacobian_F(double u, double v, double w, double e, double c, double H, double Gamma, double dpdrho, 
                                          double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                          double *r1 = 0, double *r2 = 0, double *r3 = 0, double *r4 = 0, double *r5 = 0);
-  inline void EvaluateEigensOfJacobian_G(double u, double v, double w, double e, double c, double H, double Gamma, double dpdrho,
+  inline void EvaluateEigensOfJacobian_G(double u, double v, double w, double e, double c, double H, double Gamma, double dpdrho, 
                                          double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                          double *r1 = 0, double *r2 = 0, double *r3 = 0, double *r4 = 0, double *r5 = 0);
-  inline void EvaluateEigensOfJacobian_H(double u, double v, double w, double e, double c, double H, double Gamma, double dpdrho,
+  inline void EvaluateEigensOfJacobian_H(double u, double v, double w, double e, double c, double H, double Gamma, double dpdrho, 
                                          double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                          double *r1 = 0, double *r2 = 0, double *r3 = 0, double *r4 = 0, double *r5 = 0);
 
-  inline void EvaluateMaxEigenvalues(double *V, double &lam_f_max, double &lam_g_max, double &lam_h_max);
+  inline void EvaluateMaxEigenvalues(double *V, int id, double &lam_f_max, double &lam_g_max, double &lam_h_max);
 
   /** The following function(s) depend on the numerical method for flux calculation.
     * Should be defined in derived classes. */
-  virtual void ComputeNumericalFluxAtCellInterface(int dir/*0~x,1~y,2~z*/,double *Vminus/*left*/, double *Vplus/*right*/, double *F) {
+  virtual void ComputeNumericalFluxAtCellInterface(int dir/*0~x,1~y,2~z*/,double *Vminus/*left*/, double *Vplus/*right*/, int id, 
+                                                   double *F) {
     print_error("*** Error: ComputeNumericalFluxAtCellInterface function not defined.\n"); 
     exit_mpi();}
 
@@ -54,18 +59,10 @@ public:
 
 //----------------------------------------------------------------------------------------
 
-inline
-FluxFcnBase::FluxFcnBase(VarFcnBase *varFcn) : vf(varFcn)
-{
-  
-}
-
-//------------------------------------------------------------------------------
-
 inline 
-void FluxFcnBase::EvaluateFluxFunction_F(double *V, double *F)
+void FluxFcnBase::EvaluateFluxFunction_F(double *V, int id, double *F)
 {
-  double H = vf->ComputeTotalEnthalpyPerUnitMass(V); //H = 1/rho*(E+p) = e + 1/2||u||^2 + p/rho
+  double H = vf[id]->ComputeTotalEnthalpyPerUnitMass(V); //H = 1/rho*(E+p) = e + 1/2||u||^2 + p/rho
   double rhou = V[0]*V[1];
 
   F[0] = rhou; //rho*u 
@@ -78,9 +75,9 @@ void FluxFcnBase::EvaluateFluxFunction_F(double *V, double *F)
 //------------------------------------------------------------------------------
 
 inline 
-void FluxFcnBase::EvaluateFluxFunction_G(double *V, double *G)
+void FluxFcnBase::EvaluateFluxFunction_G(double *V, int id, double *G)
 {
-  double H = vf->ComputeTotalEnthalpyPerUnitMass(V); 
+  double H = vf[id]->ComputeTotalEnthalpyPerUnitMass(V); 
   double rhov = V[0]*V[2];
 
   G[0] = rhov; //rho*v
@@ -93,9 +90,9 @@ void FluxFcnBase::EvaluateFluxFunction_G(double *V, double *G)
 //------------------------------------------------------------------------------
 
 inline
-void FluxFcnBase::EvaluateFluxFunction_H(double *V, double *HH)
+void FluxFcnBase::EvaluateFluxFunction_H(double *V, int id, double *HH)
 {
-  double H = vf->ComputeTotalEnthalpyPerUnitMass(V); 
+  double H = vf[id]->ComputeTotalEnthalpyPerUnitMass(V); 
   double rhow = V[0]*V[3];
 
   HH[0] = rhow; //rho*w
@@ -108,18 +105,18 @@ void FluxFcnBase::EvaluateFluxFunction_H(double *V, double *HH)
 //------------------------------------------------------------------------------
 
 inline 
-void FluxFcnBase::EvaluateEigensOfJacobian_F(double *V, 
+void FluxFcnBase::EvaluateEigensOfJacobian_F(double *V, int id,
                                 double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                 double *r1, double *r2, double *r3, double *r4, double *r5)
 {
   double u = V[1];
   double v = V[2];
   double w = V[3];
-  double e = vf->GetInternalEnergyPerUnitMass(V[0],V[4]);
-  double c = vf->ComputeSoundSpeed(V[0], e);
-  double H = vf->ComputeTotalEnthalpyPerUnitMass(V); 
-  double Gamma = vf->GetBigGamma(V[0], e);
-  double dpdrho = vf->GetDpdrho(V[0], e);
+  double e = vf[id]->GetInternalEnergyPerUnitMass(V[0],V[4]);
+  double c = vf[id]->ComputeSoundSpeed(V[0], e);
+  double H = vf[id]->ComputeTotalEnthalpyPerUnitMass(V); 
+  double Gamma = vf[id]->GetBigGamma(V[0], e);
+  double dpdrho = vf[id]->GetDpdrho(V[0], e);
 
   EvaluateEigensOfJacobian_F(u,v,w,e,c,H,Gamma,dpdrho,lam1,lam2,lam3,lam4,lam5,r1,r2,r3,r4,r5);
 }
@@ -153,18 +150,18 @@ void FluxFcnBase::EvaluateEigensOfJacobian_F(double u, double v, double w, doubl
 //------------------------------------------------------------------------------
 
 inline
-void FluxFcnBase::EvaluateEigensOfJacobian_G(double *V, 
+void FluxFcnBase::EvaluateEigensOfJacobian_G(double *V, int id,
                       double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                       double *r1, double *r2, double *r3, double *r4, double *r5)
 {
   double u = V[1];
   double v = V[2];
   double w = V[3];
-  double e = vf->GetInternalEnergyPerUnitMass(V[0],V[4]);
-  double c = vf->ComputeSoundSpeed(V[0], e);
-  double H = vf->ComputeTotalEnthalpyPerUnitMass(V); 
-  double Gamma = vf->GetBigGamma(V[0], e);
-  double dpdrho = vf->GetDpdrho(V[0], e);
+  double e = vf[id]->GetInternalEnergyPerUnitMass(V[0],V[4]);
+  double c = vf[id]->ComputeSoundSpeed(V[0], e);
+  double H = vf[id]->ComputeTotalEnthalpyPerUnitMass(V); 
+  double Gamma = vf[id]->GetBigGamma(V[0], e);
+  double dpdrho = vf[id]->GetDpdrho(V[0], e);
 
   EvaluateEigensOfJacobian_G(u,v,w,e,c,H,Gamma,dpdrho,lam1,lam2,lam3,lam4,lam5,r1,r2,r3,r4,r5);
 }
@@ -198,18 +195,18 @@ void FluxFcnBase::EvaluateEigensOfJacobian_G(double u, double v, double w, doubl
 //------------------------------------------------------------------------------
 
 inline
-void FluxFcnBase::EvaluateEigensOfJacobian_H(double *V, 
+void FluxFcnBase::EvaluateEigensOfJacobian_H(double *V, int id,
                       double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                       double *r1, double *r2, double *r3, double *r4, double *r5)
 {
   double u = V[1];
   double v = V[2];
   double w = V[3];
-  double e = vf->GetInternalEnergyPerUnitMass(V[0],V[4]);
-  double c = vf->ComputeSoundSpeed(V[0], e);
-  double H = vf->ComputeTotalEnthalpyPerUnitMass(V); 
-  double Gamma = vf->GetBigGamma(V[0], e);
-  double dpdrho = vf->GetDpdrho(V[0], e);
+  double e = vf[id]->GetInternalEnergyPerUnitMass(V[0],V[4]);
+  double c = vf[id]->ComputeSoundSpeed(V[0], e);
+  double H = vf[id]->ComputeTotalEnthalpyPerUnitMass(V); 
+  double Gamma = vf[id]->GetBigGamma(V[0], e);
+  double dpdrho = vf[id]->GetDpdrho(V[0], e);
 
   EvaluateEigensOfJacobian_H(u,v,w,e,c,H,Gamma,dpdrho,lam1,lam2,lam3,lam4,lam5,r1,r2,r3,r4,r5);
 }
@@ -243,10 +240,10 @@ void FluxFcnBase::EvaluateEigensOfJacobian_H(double u, double v, double w, doubl
 //------------------------------------------------------------------------------
 
 inline 
-void FluxFcnBase::EvaluateMaxEigenvalues(double *V, double &lam_f_max, double &lam_g_max, double &lam_h_max)
+void FluxFcnBase::EvaluateMaxEigenvalues(double *V, int id, double &lam_f_max, double &lam_g_max, double &lam_h_max)
 {
-  double e = vf->GetInternalEnergyPerUnitMass(V[0],V[4]);
-  double c = vf->ComputeSoundSpeed(V[0], e);
+  double e = vf[id]->GetInternalEnergyPerUnitMass(V[0],V[4]);
+  double c = vf[id]->ComputeSoundSpeed(V[0], e);
 
   lam_f_max = std::fabs(V[1]) + c;
   lam_g_max = std::fabs(V[2]) + c;

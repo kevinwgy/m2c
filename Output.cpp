@@ -4,7 +4,7 @@
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, VarFcnBase &vf_) : comm(comm_), 
+Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_) : comm(comm_), 
     iod(iod_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof))

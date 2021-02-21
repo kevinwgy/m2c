@@ -12,7 +12,7 @@ using std::max;
 
 LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo)
-  : comm(comm_), dm_all(dm_all_), iod(iod_), iod_ls(iod_ls_),
+  : comm(comm_), iod(iod_), iod_ls(iod_ls_),
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),

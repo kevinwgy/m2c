@@ -16,22 +16,23 @@ private:
 
 public:
 
-  FluxFcnHLLC(VarFcnBase *varFcn, IoData &iod) : FluxFcnBase(varFcn) 
+  FluxFcnHLLC(std::vector<VarFcnBase*> &varFcn, IoData &iod) : FluxFcnBase(varFcn) 
     {eps = 1e-10;} //!< Hard-coded for the moment. If needed, can be made a user input (IoData)
     
   ~FluxFcnHLLC() {}
 
   inline void ComputeNumericalFluxAtCellInterface(int dir /*0~x, 1~y, 2~z*/, double *Vm/*minus*/, 
-                                                  double *Vp/*plus*/, double *flux/*F,G,or H*/);
+                                                  double *Vp/*plus*/, int id, double *flux/*F,G,or H*/);
 
 private:
   //! Internal functions
   inline double Average(double w1, double f1, double w2, double f2);
 
-  inline void ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp,
-                                                   double &Sm, double &Sp);
+  inline void ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, int id,
+                                                  double &Sm, double &Sp);
 
-  inline void ComputeFstar(int dir /*0~x, 1~y, 2~z*/, double *V, double S, double Sstar, double *Fstar);
+  inline void ComputeFstar(int dir /*0~x, 1~y, 2~z*/, double *V, double S, double Sstar, int id, 
+                           double *Fstar);
 };
 
 //----------------------------------------------------------------------------------------
@@ -49,7 +50,7 @@ double FluxFcnHLLC::Average(double w1, double f1, double w2, double f2)
 //----------------------------------------------------------------------------------------
 
 inline 
-void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp,
+void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, int id,
                                                        double &Sm, double &Sp)
 {
   //Based on Hu et al., 2009 and Toro's book Chapter 10. Also see Kevin's notes
@@ -62,8 +63,8 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   double sqrt_rhom = sqrt(Vm[0]);
   double sqrt_rhop = sqrt(Vp[0]);
 
-  double Hm = vf->ComputeTotalEnthalpyPerUnitMass(Vm);
-  double Hp = vf->ComputeTotalEnthalpyPerUnitMass(Vp);
+  double Hm = vf[id]->ComputeTotalEnthalpyPerUnitMass(Vm);
+  double Hp = vf[id]->ComputeTotalEnthalpyPerUnitMass(Vp);
   H_hat = Average(sqrt_rhom, Hm, sqrt_rhop, Hp);
 
   // now calculate c_hat step by step
@@ -82,8 +83,8 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   double p_over_rho_hat = Average(sqrt_rhom, Vm[4]/Vm[0], sqrt_rhop, Vp[4]/Vp[0])
                         + 0.5*diff*diff;
 
-  double em   = vf->GetInternalEnergyPerUnitMass(Vm[0],Vm[4]);
-  double ep   = vf->GetInternalEnergyPerUnitMass(Vp[0],Vp[4]);
+  double em   = vf[id]->GetInternalEnergyPerUnitMass(Vm[0],Vm[4]);
+  double ep   = vf[id]->GetInternalEnergyPerUnitMass(Vp[0],Vp[4]);
   double de   = ep - em;
   double e_hat = Average(sqrt_rhom, em, sqrt_rhop, ep);
 
@@ -91,10 +92,10 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   double w_e   = de*de/(e_hat*e_hat);
   double denominator =  w_rho + w_e + eps;
 
-  double dpdrho_roeavg = Average(sqrt_rhom, vf->GetDpdrho(Vm[0],Vm[4]), 
-                                 sqrt_rhop, vf->GetDpdrho(Vp[0],Vp[4]));
-  double Gamma_roeavg = Average(sqrt_rhom, vf->GetBigGamma(Vm[0],Vm[4]), 
-                                sqrt_rhop, vf->GetBigGamma(Vp[0],Vp[4]));
+  double dpdrho_roeavg = Average(sqrt_rhom, vf[id]->GetDpdrho(Vm[0],Vm[4]), 
+                                 sqrt_rhop, vf[id]->GetDpdrho(Vp[0],Vp[4]));
+  double Gamma_roeavg = Average(sqrt_rhom, vf[id]->GetBigGamma(Vm[0],Vm[4]), 
+                                sqrt_rhop, vf[id]->GetBigGamma(Vp[0],Vp[4]));
 
   double dpdrho_hat_numerator_term1 = (w_e + eps)*dpdrho_roeavg;
   double dpdrho_hat_numerator_term2 = (dp - Gamma_roeavg*rho_hat*de)*drho/(rho_hat*rho_hat); //avoid dividing by drho (possibly 0)
@@ -112,8 +113,8 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   } else
     c_hat = sqrt(c_hat_square);
     
-  double cm = vf->ComputeSoundSpeed(Vm[0], em);
-  double cp = vf->ComputeSoundSpeed(Vp[0], ep);
+  double cm = vf[id]->ComputeSoundSpeed(Vm[0], em);
+  double cp = vf[id]->ComputeSoundSpeed(Vp[0], ep);
 
   // 2. Calculate Sm and Sp, the minimum and maximum wave speeds.
   switch (dir) {
@@ -141,7 +142,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
 //----------------------------------------------------------------------------------------
 
 inline 
-void FluxFcnHLLC::ComputeFstar(int dir /*0~x, 1~y, 2~z*/, double *V, double S, double Sstar, 
+void FluxFcnHLLC::ComputeFstar(int dir /*0~x, 1~y, 2~z*/, double *V, double S, double Sstar, int id,
                                double *Fstar)
 {
   int nDOF = 5;
@@ -149,7 +150,7 @@ void FluxFcnHLLC::ComputeFstar(int dir /*0~x, 1~y, 2~z*/, double *V, double S, d
   double rhostar = V[0]*(S - velo)/(S - Sstar);
 
   double U[nDOF];
-  vf->PrimitiveToConservative(V, U);
+  vf[id]->PrimitiveToConservative(V, U);
 
   // compute Ustar
   double Ustar[nDOF];
@@ -165,11 +166,11 @@ void FluxFcnHLLC::ComputeFstar(int dir /*0~x, 1~y, 2~z*/, double *V, double S, d
   // compute Fstar
   switch (dir) {
     case 0 :
-      EvaluateFluxFunction_F(V,Fstar); break;
+      EvaluateFluxFunction_F(V,id,Fstar); break;
     case 1 :
-      EvaluateFluxFunction_G(V,Fstar); break;
+      EvaluateFluxFunction_G(V,id,Fstar); break;
     case 2 :
-      EvaluateFluxFunction_H(V,Fstar); break;
+      EvaluateFluxFunction_H(V,id,Fstar); break;
   }
 
   for(int i=0; i<nDOF; i++)
@@ -179,30 +180,31 @@ void FluxFcnHLLC::ComputeFstar(int dir /*0~x, 1~y, 2~z*/, double *V, double S, d
 //----------------------------------------------------------------------------------------
 
 inline
-void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double *Vp, double *flux)
+void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double *Vp, int id,
+                                                      double *flux)
 {
   // estimates of min and max wave speeds
   double Sm = 0.0, Sp = 0.0;
-  ComputeMinMaxWaveSpeedsByRoeAverage(dir, Vm, Vp, Sm, Sp);
+  ComputeMinMaxWaveSpeedsByRoeAverage(dir, Vm, Vp, id, Sm, Sp);
 
   // calculate the HLLC flux function
   if (0.0 <= Sm) {
     switch (dir) {
       case 0:
-        EvaluateFluxFunction_F(Vm, flux); break;
+        EvaluateFluxFunction_F(Vm, id, flux); break;
       case 1:
-        EvaluateFluxFunction_G(Vm, flux); break;
+        EvaluateFluxFunction_G(Vm, id, flux); break;
       case 2:
-        EvaluateFluxFunction_H(Vm, flux); break;
+        EvaluateFluxFunction_H(Vm, id, flux); break;
     }
   } else if (0.0 >= Sp) {
     switch (dir) {
       case 0:
-        EvaluateFluxFunction_F(Vp, flux); break;
+        EvaluateFluxFunction_F(Vp, id, flux); break;
       case 1:
-        EvaluateFluxFunction_G(Vp, flux); break;
+        EvaluateFluxFunction_G(Vp, id, flux); break;
       case 2:
-        EvaluateFluxFunction_H(Vp, flux); break;
+        EvaluateFluxFunction_H(Vp, id, flux); break;
     }
   } else {
     // now we need to find the "star" states
@@ -212,9 +214,9 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
                   / (Vm[0]*(Sm - velo_m) - Vp[0]*(Sp - velo_p));
 
     if (Sstar >= 0.0)
-      ComputeFstar(dir, Vm, Sm, Sstar, flux);
+      ComputeFstar(dir, Vm, Sm, Sstar, id, flux);
     else if (Sstar <= 0.0)
-      ComputeFstar(dir, Vp, Sp, Sstar, flux);
+      ComputeFstar(dir, Vp, Sp, Sstar, id, flux);
     else {
       fprintf(stderr,"Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface.\n");
       exit_mpi();

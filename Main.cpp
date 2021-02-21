@@ -12,7 +12,6 @@
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
 #include <set>
-#include <vector>
 using std::cout;
 using std::endl;
 /*************************************
@@ -39,16 +38,21 @@ int main(int argc, char* argv[])
   DataManagers3D dms(comm, iod.mesh.Nx, iod.mesh.Ny, iod.mesh.Nz);
 
   //! Initialize VarFcn (EOS, etc.) TODO: each material should have a vf!
-  VarFcnBase *vf = NULL;
-  if(iod.eqs.materials.dataMap.size() != 1) {
-    print_error("Error: Found %d materials in the input file. Code is currently limited to 1 material.\n");
-    exit_mpi();
-  }
+
+  std::vector<VarFcnBase *> vf;
+  for(int i=0; i<iod.eqs.materials.dataMap.size(); i++)
+    vf.push_back(NULL); //allocate memory for the VarFcn pointers
+
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
+    int matid = it->first;
+    if(matid < 0 || matid >= vf.size()) {
+      print_error("Error: Detected error in the specification of material indices (id = %d).\n", matid);
+      exit_mpi();
+    }
     if(it->second->eos == MaterialModelData::STIFFENED_GAS)
-      vf = new VarFcnSG(*it->second, iod.output.verbose);
+      vf[matid] = new VarFcnSG(*it->second, iod.output.verbose);
     else if(it->second->eos == MaterialModelData::MIE_GRUNEISEN)
-      vf = new VarFcnMG(*it->second, iod.output.verbose);
+      vf[matid] = new VarFcnMG(*it->second, iod.output.verbose);
     else {
       print_error("Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
       exit_mpi();
@@ -69,7 +73,7 @@ int main(int argc, char* argv[])
   }
 
   //! Initialize space operator
-  SpaceOperator spo(comm, dms, iod, *vf, *ff);
+  SpaceOperator spo(comm, dms, iod, vf, *ff);
 
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
@@ -84,8 +88,8 @@ int main(int argc, char* argv[])
   std::set<int> ls_tracker;
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
-    if(matid<=0) {
-      print_error("Error: Cannot initialize a level set for tracking material %d. (id must be >0)\n", matid);
+    if(matid<=0 || matid>=vf.size()) { //cannot use ls to track material 0
+      print_error("Error: Cannot initialize a level set for tracking material %d.\n", matid);
       exit_mpi();
     }
     if(ls_tracker.find(matid) != ls_tracker.end()) {
@@ -103,7 +107,7 @@ int main(int argc, char* argv[])
   }  
   
   //! Initialize output
-  Output out(comm, dms, iod, *vf);
+  Output out(comm, dms, iod, vf); 
   out.InitializeOutput(spo.GetMeshCoordinates());
 
   //! Initialize time integrator
@@ -143,13 +147,8 @@ int main(int argc, char* argv[])
 
     time_step++;
 
-    // Apply boundary conditions by filling the ghost layer (outside the physical domain).
-    spo.ApplyBoundaryConditions(V);
-    for(int ls=0; ls<lso.size(); ls++) 
-      lso[ls]->ApplyBoundaryConditions(*Phi[ls]);
-    
     // Compute time step size
-    spo.ComputeTimeStepSize(V, dt, cfl); 
+    spo.ComputeTimeStepSize(V, ID, dt, cfl); 
 
     if(t+dt >= iod.ts.maxTime) { //update dt at the LAST time step so it terminates at maxTime
       cfl *= (iod.ts.maxTime - t)/dt;
@@ -162,8 +161,7 @@ int main(int argc, char* argv[])
     //----------------------------------------------------
     // Move forward by one time-step: Update V and Phi
     //----------------------------------------------------
-    integrator->AdvanceOneTimeStep(V, Phi, dt); 
-    spo.ClipDensityAndPressure(V);
+    integrator->AdvanceOneTimeStep(V, ID, Phi, dt); 
     //----------------------------------------------------
 
     t += dt;
@@ -203,7 +201,9 @@ int main(int argc, char* argv[])
 
   delete integrator;
   delete ff;
-  delete vf;
+
+  for(int i=0; i<vf.size(); i++)
+    delete vf[i];
 
   return 0;
 }

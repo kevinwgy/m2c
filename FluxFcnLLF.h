@@ -13,15 +13,15 @@ class FluxFcnLLF : public FluxFcnBase {
 
 public:
 
-  FluxFcnLLF(VarFcnBase *varFcn, IoData &iod) : FluxFcnBase(varFcn) { } 
+  FluxFcnLLF(std::vector<VarFcnBase*> &varFcn, IoData &iod) : FluxFcnBase(varFcn) { } 
     
   ~FluxFcnLLF() {}
 
   inline void ComputeNumericalFluxAtCellInterface(int dir /*0~x, 1~y, 2~z*/, double *Vm/*minus*/, 
-                                                  double *Vp/*plus*/, double *flux/*F,G,or H*/);
+                                                  double *Vp/*plus*/, int id, double *flux/*F,G,or H*/);
 
 private:
-  inline void ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, double &a);
+  inline void ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, int id, double &a);
 
 };
 
@@ -32,7 +32,7 @@ private:
 //----------------------------------------------------------------------------------------
 
 inline 
-void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, double &a)
+void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, int id, double &a)
 {
   
   double velocity_m, velocity_p;
@@ -40,10 +40,10 @@ void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, dou
   else if(dir==1) {velocity_m = Vm[2];  velocity_p = Vp[2];} //y --> v;
   else            {velocity_m = Vm[3];  velocity_p = Vp[3];} //z --> w;
 
-  double e_m = vf->GetInternalEnergyPerUnitMass(Vm[0], Vm[4]);
-  double e_p = vf->GetInternalEnergyPerUnitMass(Vp[0], Vp[4]);
-  double c_m = vf->ComputeSoundSpeed(Vm[0], e_m);
-  double c_p = vf->ComputeSoundSpeed(Vp[0], e_p);
+  double e_m = vf[id]->GetInternalEnergyPerUnitMass(Vm[0], Vm[4]);
+  double e_p = vf[id]->GetInternalEnergyPerUnitMass(Vp[0], Vp[4]);
+  double c_m = vf[id]->ComputeSoundSpeed(Vm[0], e_m);
+  double c_p = vf[id]->ComputeSoundSpeed(Vp[0], e_p);
 
   a = max( fabs(velocity_m) + c_m, 
            fabs(velocity_p) + c_p );
@@ -52,32 +52,32 @@ void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, dou
 //----------------------------------------------------------------------------------------
 
 inline
-void FluxFcnLLF::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double *Vp, double *flux)
+void FluxFcnLLF::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double *Vp, int id, double *flux)
 {
   // Compute lambda, alpha, and R
   int nDOF = 5;
   double a;
-  ComputeMaxEigenvalue(dir/*0~x,1~y,2~z*/, Vm, Vp, a);
+  ComputeMaxEigenvalue(dir/*0~x,1~y,2~z*/, Vm, Vp, id, a);
 
   //LLF flux
   double fm[5], fp[5];
   if(dir==0) {
-    EvaluateFluxFunction_F(Vm,fm);
-    EvaluateFluxFunction_F(Vp,fp);
+    EvaluateFluxFunction_F(Vm, id, fm);
+    EvaluateFluxFunction_F(Vp, id, fp);
   } else if (dir==1) {
-    EvaluateFluxFunction_G(Vm,fm);
-    EvaluateFluxFunction_G(Vp,fp);
+    EvaluateFluxFunction_G(Vm, id, fm);
+    EvaluateFluxFunction_G(Vp, id, fp);
   } else if (dir==2) {
-    EvaluateFluxFunction_H(Vm,fm);
-    EvaluateFluxFunction_H(Vp,fp);
+    EvaluateFluxFunction_H(Vm, id, fm);
+    EvaluateFluxFunction_H(Vp, id, fp);
   } else {
     print_error("Error: Dir. (%d) not recognized.\n", dir);
     exit_mpi();
   }
 
   double Um[5], Up[5];
-  vf->PrimitiveToConservative(Vm, Um);
-  vf->PrimitiveToConservative(Vp, Up);
+  vf[id]->PrimitiveToConservative(Vm, Um);
+  vf[id]->PrimitiveToConservative(Vp, Up);
 
   for(int i=0; i<nDOF; i++)
     flux[i] = 0.5*( (fm[i]+fp[i]) - a*(Up[i]-Um[i]) );

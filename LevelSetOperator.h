@@ -12,7 +12,6 @@ class SpaceOperator;
 class LevelSetOperator
 {
   MPI_Comm&       comm;
-  DataManagers3D& dm_all;
   IoData &iod;
   LevelSetSchemeData& iod_ls; //!< iod may have multiple levelsets, this is the relevant one.
 
@@ -48,6 +47,8 @@ public:
 
   void Reinitialize(SpaceVariable3D &Phi);
 
+  int GetMaterialID() {return materialid;}
+
   void Destroy();
 
 private:
@@ -56,6 +57,7 @@ private:
   void ComputeAdvectionFlux(SpaceVariable3D &R);
   double ComputeLocalAdvectionFlux(double phim, double phip, double um, double up);
   void AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R);
+
 };
 
 #endif

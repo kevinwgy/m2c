@@ -101,8 +101,9 @@ public:
   inline Vec& GetRefToGlobalVec() {return globalVec;}
 
   //! operators
-  void AXPlusB(double a, double b, bool workOnGhost = false); //self = a*self + b;
-  void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //self = a*self + b*vector_y
+  void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
+  void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y
+  void SetConstantValue(double a, bool workOnGhost = false); //!< set value to a
   
 };
 

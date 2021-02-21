@@ -5,8 +5,9 @@
 #include <Vector5D.h>
 #include <math.h>
 using std::fabs;
+
 /****************************************************************************************
- * Generalized Roe's Flux, for general EOS. Ref: Hu, Aadams, Iaccarino, JCP 2009
+ * Roe's Flux (Roe-Pike Flux) for general EOS. Ref: Hu, Aadams, Iaccarino, JCP 2009
  ***************************************************************************************/
 
 class FluxFcnGenRoe : public FluxFcnBase {
@@ -18,19 +19,19 @@ private:
 
 public:
 
-  FluxFcnGenRoe(VarFcnBase *varFcn, IoData &iod) : FluxFcnBase(varFcn) {
+  FluxFcnGenRoe(std::vector<VarFcnBase*> &varFcn, IoData &iod) : FluxFcnBase(varFcn) {
     del = iod.schemes.ns.delta; eps = 1e-10;} //!< Hard-coded for the moment. If needed, can be made a user input (IoData)
     
   ~FluxFcnGenRoe() {}
 
   inline void ComputeNumericalFluxAtCellInterface(int dir /*0~x, 1~y, 2~z*/, double *Vm/*minus*/, 
-                                                  double *Vp/*plus*/, double *flux/*F,G,or H*/);
+                                                  double *Vp/*plus*/, int id, double *flux/*F,G,or H*/);
 
 private:
   //! Internal functions
   inline double Average(double w1, double f1, double w2, double f2);
 
-  inline void ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp,
+  inline void ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, int id,
                                   double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                                   double &a1, double &a2, double &a3, double &a4, double &a5,
                                   double *r1, double *r2, double *r3, double *r4, double *r5);
@@ -55,7 +56,7 @@ double FluxFcnGenRoe::Average(double w1, double f1, double w2, double f2)
 //----------------------------------------------------------------------------------------
 
 inline 
-void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp,
+void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, double *Vp, int id,
                         double &lam1, double &lam2, double &lam3, double &lam4, double &lam5,
                         double &a1, double &a2, double &a3, double &a4, double &a5,
                         double *r1, double *r2, double *r3, double *r4, double *r5)
@@ -74,8 +75,8 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   v_hat = Average(sqrt_rhom, Vm[2], sqrt_rhop, Vp[2]);
   w_hat = Average(sqrt_rhom, Vm[3], sqrt_rhop, Vp[3]);
 
-  double Hm = vf->ComputeTotalEnthalpyPerUnitMass(Vm);
-  double Hp = vf->ComputeTotalEnthalpyPerUnitMass(Vp);
+  double Hm = vf[id]->ComputeTotalEnthalpyPerUnitMass(Vm);
+  double Hp = vf[id]->ComputeTotalEnthalpyPerUnitMass(Vp);
   H_hat = Average(sqrt_rhom, Hm, sqrt_rhop, Hp);
 
   // now calculate c_hat step by step
@@ -94,8 +95,8 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   double p_over_rho_hat = Average(sqrt_rhom, Vm[4]/Vm[0], sqrt_rhop, Vp[4]/Vp[0])
                         + 0.5*diff*diff;
 
-  double em   = vf->GetInternalEnergyPerUnitMass(Vm[0],Vm[4]);
-  double ep   = vf->GetInternalEnergyPerUnitMass(Vp[0],Vp[4]);
+  double em   = vf[id]->GetInternalEnergyPerUnitMass(Vm[0],Vm[4]);
+  double ep   = vf[id]->GetInternalEnergyPerUnitMass(Vp[0],Vp[4]);
   double de   = ep - em;
   double e_hat = Average(sqrt_rhom, em, sqrt_rhop, ep);
 
@@ -103,10 +104,10 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   double w_e   = de*de/(e_hat*e_hat);
   double denominator =  w_rho + w_e + eps;
 
-  double dpdrho_roeavg = Average(sqrt_rhom, vf->GetDpdrho(Vm[0],Vm[4]), 
-                                 sqrt_rhop, vf->GetDpdrho(Vp[0],Vp[4]));
-  double Gamma_roeavg = Average(sqrt_rhom, vf->GetBigGamma(Vm[0],Vm[4]), 
-                                sqrt_rhop, vf->GetBigGamma(Vp[0],Vp[4]));
+  double dpdrho_roeavg = Average(sqrt_rhom, vf[id]->GetDpdrho(Vm[0],Vm[4]), 
+                                 sqrt_rhop, vf[id]->GetDpdrho(Vp[0],Vp[4]));
+  double Gamma_roeavg = Average(sqrt_rhom, vf[id]->GetBigGamma(Vm[0],Vm[4]), 
+                                sqrt_rhop, vf[id]->GetBigGamma(Vp[0],Vp[4]));
 
   double dpdrho_hat_numerator_term1 = (w_e + eps)*dpdrho_roeavg;
   double dpdrho_hat_numerator_term2 = (dp - Gamma_roeavg*rho_hat*de)*drho/(rho_hat*rho_hat); //avoid dividing by drho (possibly 0)
@@ -129,7 +130,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   //    (lambda and R follow take the *form* of the exact eigenvalues & eigenvectors of the Jacobian matrix.)
   switch (dir) {
     case 0: //x-dir, i.e. for F
-      EvaluateEigensOfJacobian_F(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat,
+      EvaluateEigensOfJacobian_F(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, id,
                                  lam1, lam2, lam3, lam4, lam5, r1, r2, r3, r4, r5);
       a1 = (dp - rho_hat*c_hat*du)/(2*c_hat_square);
       a2 = -dp/c_hat_square + drho; 
@@ -138,7 +139,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
       a5 = (dp + rho_hat*c_hat*du)/(2*c_hat_square);
       break;
     case 1: //y-dir, i.e. for G
-      EvaluateEigensOfJacobian_G(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat,
+      EvaluateEigensOfJacobian_G(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, id,
                                  lam1, lam2, lam3, lam4, lam5, r1, r2, r3, r4, r5);
       a1 = (dp - rho_hat*c_hat*dv)/(2*c_hat_square);
       a2 = rho_hat*du;
@@ -147,7 +148,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
       a5 = (dp + rho_hat*c_hat*dv)/(2*c_hat_square);
       break;
     case 2: //z-dir, i.e. for H
-      EvaluateEigensOfJacobian_H(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat,
+      EvaluateEigensOfJacobian_H(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, id,
                                  lam1, lam2, lam3, lam4, lam5, r1, r2, r3, r4, r5);
       a1 = (dp - rho_hat*c_hat*dw)/(2*c_hat_square);
       a2 = rho_hat*du;
@@ -164,13 +165,13 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
 //----------------------------------------------------------------------------------------
 
 inline
-void FluxFcnGenRoe::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double *Vp, double *flux)
+void FluxFcnGenRoe::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double *Vp, int id, double *flux)
 {
   // Compute lambda, alpha, and R
   int nDOF = 5;
   double lam[nDOF], a[nDOF];
   Vec5D r[nDOF];
-  ComputeLambdaAlphaR(dir/*0~x,1~y,2~z*/, Vm, Vp, 
+  ComputeLambdaAlphaR(dir/*0~x,1~y,2~z*/, Vm, Vp, id,
                       lam[0], lam[1], lam[2], lam[3], lam[4], a[0], a[1], a[2], a[3], a[4], 
                       r[0], r[1], r[2], r[3], r[4]);
 
@@ -186,14 +187,14 @@ void FluxFcnGenRoe::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, dou
   //Roe's flux
   double fm[5], fp[5];
   if(dir==0) {
-    EvaluateFluxFunction_F(Vm,fm);
-    EvaluateFluxFunction_F(Vp,fp);
+    EvaluateFluxFunction_F(Vm, id, fm);
+    EvaluateFluxFunction_F(Vp, id, fp);
   } else if(dir==1) {
-    EvaluateFluxFunction_G(Vm,fm);
-    EvaluateFluxFunction_G(Vp,fp);
+    EvaluateFluxFunction_G(Vm, id, fm);
+    EvaluateFluxFunction_G(Vp, id, fp);
   } else { //dir = 2
-    EvaluateFluxFunction_H(Vm,fm);
-    EvaluateFluxFunction_H(Vp,fp);
+    EvaluateFluxFunction_H(Vm, id, fm);
+    EvaluateFluxFunction_H(Vp, id, fp);
   }
 
   for(int i=0; i<5; i++) {

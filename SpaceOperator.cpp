@@ -12,8 +12,8 @@ using std::min;
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                             VarFcnBase &varFcn_, FluxFcnBase &fluxFcn_) 
-  : comm(comm_), dm_all(dm_all_), iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_),
+                             vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_) 
+  : comm(comm_), iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)),
@@ -214,10 +214,12 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
 
 //-----------------------------------------------------
 
-void SpaceOperator::ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &V, bool workOnGhost)
+void SpaceOperator::ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V
+                                            bool workOnGhost)
 {
   Vec5D*** u = (Vec5D***) U.GetDataPointer();
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
 
   int myi0, myj0, myk0, myimax, myjmax, mykmax;
   if(workOnGhost)
@@ -228,18 +230,20 @@ void SpaceOperator::ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D 
   for(int k=myk0; k<mykmax; k++)
     for(int j=myj0; j<myjmax; j++)
       for(int i=myi0; i<myimax; i++)
-        varFcn.ConservativeToPrimitive((double*)u[k][j][i], (double*)v[k][j][i]); 
+        varFcn[id[k][j][i]]->ConservativeToPrimitive((double*)u[k][j][i], (double*)v[k][j][i]); 
 
   U.RestoreDataPointerToLocalVector(); //no changes made
   V.RestoreDataPointerAndInsert();
+  ID.RestoreDataPointerToLocalVector(); //no changes made
 }
 
 //-----------------------------------------------------
 
-void SpaceOperator::PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &U, bool workOnGhost)
+void SpaceOperator::PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &U, bool workOnGhost)
 {
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
   Vec5D*** u = (Vec5D***) U.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
 
   int myi0, myj0, myk0, myimax, myjmax, mykmax;
   if(workOnGhost)
@@ -250,11 +254,56 @@ void SpaceOperator::PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D 
   for(int k=myk0; k<mykmax; k++)
     for(int j=myj0; j<myjmax; j++)
       for(int i=myi0; i<myimax; i++)
-        varFcn.PrimitiveToConservative((double*)v[k][j][i], (double*)u[k][j][i]); 
+        varFcn[id[k][j][i]]->PrimitiveToConservative((double*)v[k][j][i], (double*)u[k][j][i]); 
 
   V.RestoreDataPointerToLocalVector(); //no changes made
   U.RestoreDataPointerAndInsert();
+  ID.RestoreDataPointerToLocalVector(); //no changes made
 }
+
+//-----------------------------------------------------
+
+int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                                          bool workOnGhost, bool checkState)
+{
+
+  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
+
+  int myi0, myj0, myk0, myimax, myjmax, mykmax;
+  if(workOnGhost)
+    V.GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+  else
+    V.GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+
+  int nClipped = 0;
+  for(int k=myk0; k<mykmax; k++) {
+    for(int j=myj0; j<myjmax; j++) {
+      for(int i=myi0; i<myimax; i++) {
+
+        nClipped += (int)varFcn[id[k][j][i]]->ClipDensityAndPressure(v[k][j][i]);
+
+        if(checkState) {
+          if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {
+            print_error("Error: State variables at (%d,%d,%d) violate hyperbolicity. matid = %d.\n", i,j,k, id[k][j][i]);
+            fprintf(stderr,"v[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+            exit_mpi();
+          }
+        }
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
+  if(nClipped)
+    print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
+
+
+  ID.RestoreDataPointerToLocalVector(); //no changes made
+  V.RestoreDataPointerAndInsert();
+
+  return nClipped;
+}  
 
 //-----------------------------------------------------
 
@@ -802,13 +851,14 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 
 //-----------------------------------------------------
 
-void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V,
+void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVariable3D &ID,
                         double *Vmin, double *Vmax, double &cmin, double &cmax,
                         double &Machmax, double &char_speed_max,
                         double &dx_over_char_speed_min)
 {
   Vec5D*** v    = (Vec5D***)V.GetDataPointer();
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
 
   for(int i=0; i<5; i++) {
     Vmin[i] = DBL_MAX; //max. double precision number
@@ -820,6 +870,7 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V,
 
   // Loop through the real domain (excluding the ghost layer)
   double c, mach, lam_f, lam_g, lam_h;
+  int myid;
   for(int k=k0; k<kmax; k++) {
     for(int j=j0; j<jmax; j++) {
       for(int i=i0; i<imax; i++) {
@@ -829,15 +880,17 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V,
           Vmax[p] = max(Vmax[p], v[k][j][i][p]);
         } 
 
-        c = varFcn.ComputeSoundSpeed(v[k][j][i][0]/*rho*/, 
-                       varFcn.GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
+        myid = id[k][j][i];
+
+        c = varFcn[myid]->ComputeSoundSpeed(v[k][j][i][0]/*rho*/, 
+                            varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
 
         cmin = min(cmin, c);
         cmax = max(cmax, c);
-        mach = varFcn.ComputeMachNumber(v[k][j][i]); 
+        mach = varFcn[myid]->ComputeMachNumber(v[k][j][i]); 
         Machmax = max(Machmax, mach); 
 
-        fluxFcn.EvaluateMaxEigenvalues(v[k][j][i], lam_f, lam_g, lam_h);
+        fluxFcn.EvaluateMaxEigenvalues(v[k][j][i], myid, lam_f, lam_g, lam_h);
         char_speed_max = max(max(max(char_speed_max, lam_f), lam_g), lam_h);
 
         dx_over_char_speed_min = min(dx_over_char_speed_min, 
@@ -857,14 +910,15 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V,
 
   V.RestoreDataPointerToLocalVector(); 
   delta_xyz.RestoreDataPointerToLocalVector(); 
+  ID.RestoreDataPointerToLocalVector();
 }
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, double &dt, double &cfl)
+void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl)
 {
   double Vmin[5], Vmax[5], cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min; 
-  FindExtremeValuesOfFlowVariables(V, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
+  FindExtremeValuesOfFlowVariables(V, ID, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
 
   if(iod.output.verbose == OutputData::ON)
     print("  - Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
@@ -882,7 +936,7 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, double &dt, double &
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &F)
+void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F)
 {
   //------------------------------------
   // Reconstruction w/ slope limiters.
@@ -898,6 +952,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   Vec5D*** vf = (Vec5D***) Vf.GetDataPointer();
   Vec5D*** f  = (Vec5D***) F.GetDataPointer();
 
+  double*** id = (double***) ID.GetDataPointer();
+
   //------------------------------------
   // Clip pressure and density for the reconstructed state
   // Verify hyperbolicity (i.e. c^2 > 0).
@@ -905,6 +961,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   int nClipped = 0;
   bool error = false;
   int corner;
+  int myid;
   for(int k=kk0; k<kkmax; k++) {
     for(int j=jj0; j<jjmax; j++) {
       for(int i=ii0; i<iimax; i++) {
@@ -916,20 +973,21 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
         if(corner>=2) //not needed
           continue;
 
+        myid = id[k][j][i];
 
-        nClipped += (int)varFcn.ClipDensityAndPressure(vl[k][j][i]);
-        nClipped += (int)varFcn.ClipDensityAndPressure(vr[k][j][i]);
-        nClipped += (int)varFcn.ClipDensityAndPressure(vb[k][j][i]);
-        nClipped += (int)varFcn.ClipDensityAndPressure(vt[k][j][i]);
-        nClipped += (int)varFcn.ClipDensityAndPressure(vk[k][j][i]);
-        nClipped += (int)varFcn.ClipDensityAndPressure(vf[k][j][i]);
+        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
+        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
+        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
+        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
+        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
+        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
          
-        error = varFcn.CheckState(vl[k][j][i]) || varFcn.CheckState(vr[k][j][i]) || 
-                varFcn.CheckState(vb[k][j][i]) || varFcn.CheckState(vt[k][j][i]) ||
-                varFcn.CheckState(vk[k][j][i]) || varFcn.CheckState(vf[k][j][i]);
+        error = varFcn[myid]->CheckState(vl[k][j][i]) || varFcn[myid]->CheckState(vr[k][j][i]) || 
+                varFcn[myid]->CheckState(vb[k][j][i]) || varFcn[myid]->CheckState(vt[k][j][i]) ||
+                varFcn[myid]->CheckState(vk[k][j][i]) || varFcn[myid]->CheckState(vf[k][j][i]);
 
         if(error) {
-          print_error("Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity.\n", i,j,k);
+          print_error("Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\n", i,j,k, myid);
           fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
           fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
           fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
@@ -964,9 +1022,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     for(int j=j0; j<jjmax; j++) {
       for(int i=i0; i<iimax; i++) {
 
+        myid = id[k][j][i];
+
         //calculate flux function F_{i-1/2,j,k}
-        if(k!=kkmax-1 && j!=jjmax-1) {
-          fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, localflux);
+        if(k!=kkmax-1 && j!=jjmax-1) { //TODO I AM HERE!
+          fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux);
           localflux *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
           f[k][j][i-1] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
@@ -980,7 +1040,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
         //calculate flux function G_{i,j-1/2,k}
         if(k!=kkmax-1 && i!=iimax-1) {
-          fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, localflux);
+          fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux);
           localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
           f[k][j-1][i] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
@@ -988,7 +1048,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
         //calculate flux function H_{i,j,k-1/2}
         if(j!=jjmax-1 && i!=iimax-1) {
-          fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, localflux);
+          fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux);
           localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
           f[k-1][j][i] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
@@ -1006,6 +1066,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   // Restore Spatial Variables
   //------------------------------------
   delta_xyz.RestoreDataPointerToLocalVector(); //no changes
+  ID.RestoreDataPointerToLocalVector(); //no changes
+
   V.RestoreDataPointerToLocalVector(); 
   Vl.RestoreDataPointerToLocalVector(); 
   Vr.RestoreDataPointerToLocalVector(); 
@@ -1021,9 +1083,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &R)
+void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
 {
-  ComputeAdvectionFluxes(V,R);
+  ComputeAdvectionFluxes(V, ID, R);
 
   // -------------------------------------------------
   // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
@@ -1045,47 +1107,6 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &R)
 
 
 //-----------------------------------------------------
-
-int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, bool workOnGhost, bool checkState)
-{
-
-  Vec5D*** v = (Vec5D***) V.GetDataPointer();
-
-  int myi0, myj0, myk0, myimax, myjmax, mykmax;
-  if(workOnGhost)
-    V.GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
-  else
-    V.GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
-
-  int nClipped = 0;
-  for(int k=myk0; k<mykmax; k++) {
-    for(int j=myj0; j<myjmax; j++) {
-      for(int i=myi0; i<myimax; i++) {
-        nClipped += (int)varFcn.ClipDensityAndPressure(v[k][j][i]);
-
-        if(checkState) {
-          if(varFcn.CheckState(v[k][j][i])) {
-            print_error("Error: State variables at (%d,%d,%d) violate hyperbolicity.\n", i,j,k);
-            fprintf(stderr,"v[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
-            exit_mpi();
-          }
-        }
-      }
-    }
-  }
-
-  MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
-  if(nClipped)
-    print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
-
-  V.RestoreDataPointerAndInsert();
-
-  return nClipped;
-}  
-
-//-----------------------------------------------------
-
-
 
 
 

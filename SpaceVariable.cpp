@@ -272,3 +272,28 @@ void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, bool work
 
 //---------------------------------------------------------
 
+void SpaceVariable3D::SetConstantValue(double a, bool workOnGhost)
+{
+  double*** v  = GetDataPointer();
+
+  int myi0, myj0, myk0, myimax, myjmax, mykmax;
+
+  if(workOnGhost)
+    GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+  else
+    GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+
+  for(int k=myk0; k<mykmax; k++)
+    for(int j=myj0; j<myjmax; j++)
+      for(int i=myi0; i<myimax; i++)
+        for(int p=0; p<dof; p++)
+          v[k][j][i*dof+p] = a;
+
+  if(!workOnGhost)
+    RestoreDataPointerAndInsert(); 
+  else
+    RestoreDataPointerToLocalVector(); //no need to communicate because the ghost region has been set to a const
+}
+
+//---------------------------------------------------------
+
