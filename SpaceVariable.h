@@ -100,6 +100,8 @@ public:
  
   inline Vec& GetRefToGlobalVec() {return globalVec;}
 
+  inline bool OutsidePhysicalDomain(int i, int j, int k) {return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
+
   //! operators
   void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
   void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y
