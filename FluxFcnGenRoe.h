@@ -130,7 +130,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   //    (lambda and R follow take the *form* of the exact eigenvalues & eigenvectors of the Jacobian matrix.)
   switch (dir) {
     case 0: //x-dir, i.e. for F
-      EvaluateEigensOfJacobian_F(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, id,
+      EvaluateEigensOfJacobian_F(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, 
                                  lam1, lam2, lam3, lam4, lam5, r1, r2, r3, r4, r5);
       a1 = (dp - rho_hat*c_hat*du)/(2*c_hat_square);
       a2 = -dp/c_hat_square + drho; 
@@ -139,7 +139,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
       a5 = (dp + rho_hat*c_hat*du)/(2*c_hat_square);
       break;
     case 1: //y-dir, i.e. for G
-      EvaluateEigensOfJacobian_G(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, id,
+      EvaluateEigensOfJacobian_G(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, 
                                  lam1, lam2, lam3, lam4, lam5, r1, r2, r3, r4, r5);
       a1 = (dp - rho_hat*c_hat*dv)/(2*c_hat_square);
       a2 = rho_hat*du;
@@ -148,7 +148,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
       a5 = (dp + rho_hat*c_hat*dv)/(2*c_hat_square);
       break;
     case 2: //z-dir, i.e. for H
-      EvaluateEigensOfJacobian_H(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, id,
+      EvaluateEigensOfJacobian_H(u_hat, v_hat, w_hat, e_hat, c_hat, H_hat, Gamma_hat, dpdrho_hat, 
                                  lam1, lam2, lam3, lam4, lam5, r1, r2, r3, r4, r5);
       a1 = (dp - rho_hat*c_hat*dw)/(2*c_hat_square);
       a2 = rho_hat*du;

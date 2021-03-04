@@ -3,6 +3,7 @@
 
 #include <SpaceOperator.h>
 #include <LevelSetOperator.h>
+#include <MultiPhaseOperator.h>
 #include <vector>
 using std::vector;
 

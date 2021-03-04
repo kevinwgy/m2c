@@ -37,9 +37,9 @@ public:
                 vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_); 
   ~SpaceOperator();
 
-  void ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V
+  void ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V,
                                bool workOnGhost = false);
-  void PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &U
+  void PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &U,
                                bool workOnGhost = false);
   int  ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &ID, 
                               bool workOnGhost = false, bool checkState = true);
