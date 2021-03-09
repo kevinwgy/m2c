@@ -1,10 +1,15 @@
 #include<ExactRiemannSolverBase.h>
+#include<assert>
+#include<utility> //std::pair
+#include<bits/stdc++.h> //std::swap
+#include<boost/math/tools/roots.hpp>
+using namespace boost::math::tools;
+using std::pair;
 
 //-----------------------------------------------------
 
-ExactRiemannSolverBase::ExactRiemannSolverBase(FluxFcnBase &ff_, 
-                            std::vector<VarFcnBase*> &vf_, IoData &iod)
-                      : ff(ff_), vf(vf_)
+ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, 
+                            IoData &iod) : vf(vf_)
 {
   // TODO: some of these parameters should goto IoData
   maxIts_main = 500;
@@ -40,7 +45,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 
   // Declare vairables in the "star region"
   double p0, ul0, ur0, rhol0, rhor0;
-  double p1, ul1, ur1, rhol1, rhor1; //two states in Secand Method ("k-1","k" in Kamm, (19))
+  double p1, ul1, ur1, rhol1, rhor1; //Secand Method ("k-1","k" in Kamm, (19))
   double p2, ul2, ur2, rhol2, rhor2; // "k+1"
 
   // -------------------------------
@@ -57,12 +62,12 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   p0 = (Cr*pl + Cl*pr + Cl*Cr*(ul - ur))/(Cl + Cr);
 
   // 1.2: Calculate ul0, ur0
-  ComputeRhoUStarLeft(rhol, ul, pl, p0, idl/*inputs*/, 
-                      rhol, (p0>pl) ? rhol*1.01 : rhol*0.99/*initial guesses for Hugo. eq.*/,
-                      rhol0, ul0/*outputs*/);
-  ComputeRhoUStarRight(rhor, ur, pr, p0, idr/*inputs*/, 
-                      rhor, (p0>pr) ? rhor*1.01 : rhor*0.99/*initial guesses for Hugo. eq.*/,
-                      rhor0, ur0/*outputs*/);
+  ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/, 
+                  rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
+                  rhol0, ul0/*outputs*/);
+  ComputeRhoUStar(3, rhor, ur, pr, p0, idr/*inputs*/, 
+                  rhor, (p0>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
+                  rhor0, ur0/*outputs*/);
   double f0 = ul0 - ur0; // Eq. (18) in Kamm
 
   // 1.3: Initialize p1 ((21)(22) of Kamm) 
@@ -71,12 +76,12 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   p1 = (Crbar*pl + Clbar*pr + Clbar*Crbar*(ul - ur))/(Clbar + Crbar); 
 
   // 1.4 Calculate ul1, ur1 
-  ComputeRhoUStarLeft(rhol, ul, pl, p1, idl/*inputs*/, 
-                      rhol, rhol0/*initial guesses for Hugo. eq.*/,
-                      rhol1, ul1/*outputs*/);
-  ComputeRhoUStarRight(rhor, ur, pr, p1, idr/*inputs*/, 
-                      rhor, rhor0/*initial guesses for Hugo. eq.*/,
-                      rhor1, ur1/*outputs*/);
+  ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/, 
+                  rhol, rhol0/*initial guesses for Hugo. eq.*/,
+                  rhol1, ul1/*outputs*/);
+  ComputeRhoUStar(3, rhor, ur, pr, p1, idr/*inputs*/, 
+                  rhor, rhor0/*initial guesses for Hugo. eq.*/,
+                  rhor1, ur1/*outputs*/);
   double f1 = ul1 - ur1; // Eq. (18) in Kamm
 
   // -------------------------------
@@ -103,14 +108,14 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
     p2 = p1 - f1*(p1-p0)/denom;
 
     // 2.2: Calculate ul2, ur2 
-    ComputeRhoUStarLeft(rhol, ul, pl, p2, idl/*inputs*/, 
-                        rhol0, rhol1/*initial guesses for Hugo. eq.*/,
-                        rhol2, ul2/*outputs*/, 
-                        &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
-    ComputeRhoUStarRight(rhor, ur, pr,  p2, idr/*inputs*/, 
-                         rhor0, rhor1/*initial guesses for Hugo. erq.*/,
-                         rhor2, ur2/*outputs*/,
-                         &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+    ComputeRhoUStar(1, rhol, ul, pl, p2, idl/*inputs*/, 
+                    rhol0, rhol1/*initial guesses for Hugo. eq.*/,
+                    rhol2, ul2/*outputs*/, 
+                    &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+    ComputeRhoUStar(3, rhor, ur, pr,  p2, idr/*inputs*/, 
+                    rhor0, rhor1/*initial guesses for Hugo. erq.*/,
+                    rhor2, ur2/*outputs*/,
+                    &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
     f2 = ul2 - ur2;
     
     // 2.3: Check stopping criterion
@@ -129,6 +134,10 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
     rhor0 = rhor1;
     rhor1 = rhor2;
     trans_rare = false;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.clear();
+#endif
 
   }
 
@@ -191,7 +200,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
           is_star_state = true;
       }
       else {//3-wave is shock
-        double us = (rhor2*u2 - rhor*ur)/(rhor2 - rhor);
+        double us = (rhor2*u2 - rhor*ur)/(rhor2 - rhor); //shock speed
         if(us >= 0)
           is_star_state = true;
       }
@@ -211,73 +220,324 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 
   // determine the tangential components of velocity -- upwinding
   int k;
-  if(u2>0) 
+  if(u2>0) {
     for(int i=1; i<=2; i++) {
       k = (dir + i)%3 + 1;
       V[k] = Vm[k];
     }
-  else if(u2<0)
+  } else if(u2<0) {
     for(int i=1; i<=2; i++) {
       k = (dir + i)%3 + 1;
       V[k] = Vp[k];
     }
-  else //u2 == 0
+  } else {//u2 == 0
     for(int i=1; i<=2; i++) {
       k = (dir + i)%3 + 1;
       V[k] = 0.5*(Vm[k]+Vp[k]);
     }
+  }
+
+
+#if PRINT_RIEMANN_SOLUTION == 1
+  std::sort(sol1d.begin(), sol1d.end(), 
+            [](vector<double> v1, vector<double> v2){return v1[0]<v2[0];});
+  int last = sol1d.size()-1;
+  double xi_span = sol1d[last][0] - sol1d[0][0];
+  sol1d.push_front(vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3]});
+  sol1d.push_back(vector<double>{sol1d[last][0]+xi_span, sol1d[last][1], sol1d[last][2], sol1d[last][3]});
+
+  FILE* solFile = fopen("RiemannSolution.txt", "w");
+  print(solFile, "## One-Dimensional Riemann Problem.\n");
+  print(solFile, "## Initial State: %e %e %e (left) | (right) %e %e %e.\n", rhol, ul, pl, rhor, ur, pr);
+
+  for(auto it = sol1d.begin(); it != sol1d.end(); it++) 
+    print(solFile,"%e    %e    %e    %e\n", (*it)[0], (*it)[1], (*it)[2], (*it)[3]);
+
+  fclose(solFile);
+#endif
 
 }
 
 //----------------------------------------------------------------------------------
 
-//! Connect the left initial state with the left star state (the 1-wave)
+//! Connect the left/right initial state with the left/right star state (the 1-wave or 3-wave)
 virtual void
-ExactRiemannSolverBase::ComputeRhoUStarLeft(double rhol, double ul, double pl, double ps, int idl/*inputs*/,
-                                            double rhols0, double rhols1/*initial guesses for Hugo. eq.*/,
-                                            double &rhols, double uls/*outputs*/, 
-                                            bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
+ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
+                                        double rho, double u, double p, double ps, int id/*inputs*/,
+                                        double rhos0, double rhos1/*initial guesses for Hugo. eq.*/,
+                                        double &rhos, double us/*outputs*/, 
+                                        bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
 {
-  if(pl >= ps) {//rarefaction --- numerical integration
+  // default
+  rhos = rho;
+  us   = u;
 
-    double dp_max = (pl-ps)/numSteps_rarefaction;
+  if(p > ps) {//rarefaction --- numerical integration
+
+    double dp_max = 2.0*(p-ps)/numSteps_rarefaction;
+    double dp_target = dp_max*0.5;
 
     // initialize drho
-    double drho = rhol/(numSteps_rarefaction*2); //initial step size
+    double drho = rho/(numSteps_rarefaction*5); //initial step size
 
-    // The "basic" 4th-order Runge-Kutta method for integration
-    double p1, p2, p3, p4, c1, c2, c3, c4, u1, u2, u3, u4;
+    // prepare for numerical integration
+    double rhos_0 = rho, us_0 = u, ps_0 = p, xi_0; //start point of each step
+    double rhos_1 = rho, us_1 = u, ps_1 = p, xi_1; //end point of each step
+    double dp;
 
-    double ps_0 = pl, ps_1 = pl;
+    double e = vf[id]->GetInternalEnergyPerUnitMass(rho, p);
+    double c = vf[id]->ComputeSoundSpeed(rho, e);
+    double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
+    xi_0 = xi;
 
-    while(ps_1 - ps > tol_rarefaction) {
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.push_back(vector<double>{xi, rho, u, p});
+#endif
 
-      ps_1 = RarefactionIntegration_OneStepRK4(rhos_0, us_0, ps_0, drho); //XXX I AM HERE
+    // integration by Runge-Kutta 4
+    for(int i=0; i<numSteps_rarefaction*5; i++) {
 
+      Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id
+                             rhos_0, us_0, ps_0 /*start state*/, drho /*step size*/,
+                             rhos_1, us_1, ps_1, xi_1 /*output: end state*/); 
 
+      dp = ps_0 - ps_1;
 
+      //Check if it went too far. If so, rewind and reduce step size
+      if(dp > dp_max) {
+        drho = drho/dp*dp_target;
+        continue;
+      }
+      if(ps_1 - ps < -tol_rarefaction) {
+        drho = drho/dp*(ps_0 - ps);
+        continue;
+      } 
 
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1});
+#endif
 
+      if(xi_0*xi_1<=0) {//transonic rarefaction, crossing x = xi = 0
+        *trans_rare = true;
+        double w0 = fabs(xi_1), w1 = fabs(xi_0);
+        double ww = w0 + w1;
+        w0 /= ww;
+        w1 /= ww;
+        Vrare_x0[0] = w0*rhos_0 + w1*rhos_1;
+        Vrare_x0[1] = w0*us_0   + w1*us_1;
+        Vrare_x0[2] = w0*ps_0   + w1*ps_1;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.push_back(vector<double>{0.0, Vrare_x0[0], Vrare_x0[1], Vrare_x0[2]});
+#endif
+
+      }
+
+      // Check if we have reached the final pressure ps
+      if(fabs(ps_1 - ps) <= tol_rarefaction) {
+        rhos = rhos_1;
+        us   = us_1;
+        break; //done!
+      }
+
+      // If the solver gets here, it means it hasn't reached the final pressure ps.
+      // Adjust step size, then update state
+      //
+      drho = max( (rhos_0-rhos_1)/dp*min(dp_target,ps_1-ps), //don't go beyond ps
+                  drho*4.0); //don't increase too much in one step
+       
+      rhos_0 = rhos_1;
+      us_0   = us_1;
+      ps_0   = ps_1;
+      xi_0   = xi_1;
 
     }
   }
 
+  else {// shock (p<=ps, rho<=rhos)
 
+    HugoniotEquation hugo(rho,p,ps,id);
 
+    //find a bracketing interval
+    double f0, f1;
+    double drho = fabs(rhos0 - rhos1); 
+    bool found_rhos0 = false, found_rhos1 = false;
+    if(min(rhos0,rhos1)>=rho) {//both rhos0 and rhos1 are physically admissible
+      f0 = hugo(rhos0);
+      f1 = hugo(rhos1);
+      if(f0*f1<=0) {
+        /*found bracketing interval [rhos0, rhos1]*/
+        if(rhos0>rhos1) {
+          std::swap(rhos0,rhos1);
+          std::swap(f0,f1);
+        }
+        found_rhos0 = found_rhos1 = true;
+      } else {
+        rhos0 = rhos1; //this is our starting point (presumably rhos1 is closer to sol'n)
+        f0    = f1; 
+      }
+    } else { //at least, the smaller one among rhos0, rhos1 is non-physical
+      if(rhos1>rhos0) {
+        rhos0 = rhos1; 
+        f0    = f1;
+      }
+      if(rhos0<rho) {//this one is also non-physical
+        rhos0 = rho;
+        f0    = hugo(rhos0);
+        found_rhos0 = true;
+      }
+    } 
+
+    if(!found_rhos0 || !found_rhos1) {
+      int i = 0;
+      double factor = 1.5; 
+      double tmp, ftmp;
+      // before the search, rhos0 = rhos1 = an adimissible point > rho
+      rhos1 = rhos0;
+      f1    = f0;
+      while(!found_rhos0) {
+        if(++i>=maxIts_shock) {
+          cout << "Error: Unable to find a bracketing interval after " << maxIts_shock 
+               << " iterations (in the solution of the Hugoniot equation)." << endl;
+          exit_mpi();
+        }
+        tmp = rhos1;
+        ftmp = f1;
+        //move to the left (towards rho)
+        rhos1 = rhos0;
+        f1    = f0;
+        rhos0 = rhos1 - factor*drho;
+        if(rhos0<=rho) {
+          rhos0 = rho;
+          found_rhos0 = true;
+        }
+        f0 = hugo(rhos0);
+
+        if(f0*f1<=0) {
+          found_rhos0 = found_rhos1 = true;
+        } else {
+          //move to the right
+          rhos1 = tmp;
+          f1    = ftmp;
+          tmp   = rhos0; //don't forget the smallest point
+          ftmp  = f0;
+          rhos0 = rhos1;
+          f0    = f1;
+          rhos1 = rhos0 + factor*drho;
+          f1 = hugo(rhos1);
+          if(f0*f1<=0) {
+            found_rhos0 = found_rhos1 = true;
+          } else {
+            rhos0 = tmp;
+            f0    = ftmp;
+            drho  = rhos1 - rhos0; //update drho
+          }
+        }
+      }
+
+      if(!found_rhos1) {//keep moving to the right
+        i = 0;
+        double factor = 2.5;
+        while(!found_rhos1) {
+          if(++i>=maxIts_shock) {
+            cout << "Error: Unable to find a bracketing interval after " << maxIts_shock 
+                 << " iterations (in the solution of the Hugoniot equation (2))." << endl;
+            exit_mpi();
+          }
+          rhos0 = rhos1;
+          f0    = f1;
+          rhos1 = rhos0 + factor*drho;
+          f1    = hugo(f1);
+          if(f0*f1<=0) {
+            found_rhos1 = true;
+          } else
+            drho = rhos1 - rhos0;
+        }
+      }
+
+    }
+
+    //*******************************************************************
+    // Calling boost function for root-finding
+    // Warning: "maxit" is BOTH AN INPUT AND AN OUTPUT
+    assert(fabs(f0-hugo(rhos0))<1e-8);
+    assert(fabs(f1-hugo(rhos1))<1e-8);
+    boost::uintmax_t maxit = maxIts_shock;
+    pair<double,double> sol = toms748_solve(hugo, rhos0, rhos1, f0, f1,
+                                            [](double r0, double r1){return r1-r0<tol_shock;}, 
+                                            maxit);
+    //*******************************************************************
+
+    rhos = 0.5*(sol.first+sol.second);
+
+    double du = -(ps-p)*(1.0/rhos-1.0/rho);
+    if(du<0) {
+      cout << "Error: Violation of hyperbolicitiy when enforcing the Rankine-Hugoniot jump conditions (du = "
+           << du << ")." << endl;
+      exit_mpi();
+    }
+    us = (wavenumber==1) ? u - sqrt(du) : u + sqrt(du);
+    
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    double xi = (rhos*us - rho*u)/(rhos-rho);
+    if(wavenumber==1) {
+      sol1d.push_back(vector<double>{xi-0.0001*fabs(xi), rho, u, p});
+      sol1d.push_back(vector<double>{xi, rhos, us, ps});
+    } else {
+      sol1d.push_back(vector<double>{xi, rhos, us, ps});
+      sol1d.push_back(vector<double>{xi+0.0001*fabs(xi), rho, u, p});
+    }
+#endif
+
+  }
 }
 
 //----------------------------------------------------------------------------------
 
-//! Connect the right initial state with the right star state (the 3-wave)
-virtual void
-ExactRiemannSolverBase::ComputeRhoUStarRight(double rhor, double ur, double pr, double ps, int idr/*inputs*/,
-                                             double rhors0, double rhors1/*initial guesses for Hugo. eq.*/,
-                                             double &rhors, double urs/*outputs*/,
-                                             bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
+virtual void 
+ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
+                            double rho_0, double u_0, double p_0 /*start state*/, 
+                            double drho /*step size*/,
+                            double &rho, double &u, double &p, double &xi /*output*/)
 {
+  drho = -drho; //drho is positive when passed in. It is actually negative if we follow Kamm's paper
+                // Equations (36 - 42)
+                
+  double e_0 = vf[id]->GetInternalEnergyPerUnitMass(rho_0, p_0);
+  double c_0 = vf[id]->ComputeSoundSpeed(rho_0, e_0);
+  double c_0_square = c_0*c_0;
 
+  double p_1 = p_0 + 0.5*drho*c_0_square;
+  double rho_1 = rho_0 + 0.5*drho;
+  double e_1 = vf[id]->GetInternalEnergyPerUnitMass(rho_1, p_1);
+  double c_1 = vf[id]->ComputeSoundSpeed(rho_1, e_1);
+  double c_1_square = c_1*c_1;
 
+  double p_2 = p_0 + 0.5*drho*c_1_square;
+  double rho_2 = rho_1;
+  double e_2 = vf[id]->GetInternalEnergyPerUnitMass(rho_2, p_2);
+  double c_2 = vf[id]->ComputeSoundSpeed(rho_2, e_2);
+  double c_2_square = c_2*c_2;
+ 
+  double p_3 = p_0 + drho*c_2_square;
+  double rho_3 = rho_0 + drho;
+  double e_3 = vf[id]->GetInternalEnergyPerUnitMass(rho_3, p_3);
+  double c_3 = vf[id]->ComputeSoundSpeed(rho_3, e_3);
+  double c_3_square = c_3*c_3;
 
+  // now, calculate the outputs
+  //
+  p = p_0 + 1.0/6.0*drho*(c_0_square + 2.0*(c_1_square+c_2_square) + c_3_square);
+
+  double du = 1.0/6.0*drho*( c_0/rho_0 + 2.0*(c_1/rho_1 + c_2/rho_2) + c_3/rho_3);
+  u = (wavenumber == 1) ? u_0 - du : u_0 + du;
+
+  rho = rho_0 + drho;
+
+  double e = vf[id]->GetInternalEnergyPerUnitMass(rho, p);
+  double c = vf[id]->ComputeSoundSpeed(rho, e);
+  xi = (wavenumber == 1) ? u - c : u + c;
 
 }
 
