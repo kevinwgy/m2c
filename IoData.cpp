@@ -506,6 +506,49 @@ void SchemesData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+ExactRiemannSolverData::ExactRiemannSolverData()
+{
+  maxIts_main = 200;
+  maxIts_shock = 200;
+  numSteps_rarefaction = 100;
+  tol_main = 1.0e-5;
+  tol_shock = 1.0e-6;
+  tol_rarefaction = 1.0e-5;
+}
+
+//------------------------------------------------------------------------------
+
+void ExactRiemannSolverData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+
+  new ClassInt<ExactRiemannSolverData>(ca, "MaxIts", this, 
+                                       &ExactRiemannSolverData::maxIts_main);
+
+  new ClassInt<ExactRiemannSolverData>(ca, "MaxItsShock", this, 
+                                       &ExactRiemannSolverData::maxIts_shock);
+
+  new ClassInt<ExactRiemannSolverData>(ca, "IntegrationSteps", this, 
+                                       &ExactRiemannSolverData::numSteps_rarefaction);
+
+  new ClassDouble<ExactRiemannSolverData>(ca, "Tolerance", this, 
+                                          &ExactRiemannSolverData::tol_main);
+
+  new ClassDouble<ExactRiemannSolverData>(ca, "ToleranceShock", this, 
+                                          &ExactRiemannSolverData::tol_shock);
+
+  new ClassDouble<ExactRiemannSolverData>(ca, "ToleranceRarefaction", this, 
+                                          &ExactRiemannSolverData::tol_rarefaction);
+}
+
+//------------------------------------------------------------------------------
+
+
+
+
+//------------------------------------------------------------------------------
+
 ExplicitData::ExplicitData()
 {
   type = RUNGE_KUTTA_2;
@@ -1171,6 +1214,9 @@ void IoData::setupCmdFileVariables()
   mesh.setup("Mesh");
 
   schemes.setup("Space");
+
+  exact_riemann.setup("ExactRiemannSolution");
+
   ts.setup("Time");
 
   output.setup("Output");

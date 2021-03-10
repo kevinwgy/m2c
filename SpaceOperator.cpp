@@ -1016,8 +1016,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
       for(int i=ii0; i<iimax; i++)
           f[k][j][i] = 0.0; //setting f[k][j][i][0] = ... = f[k][j][i][4] = 0.0;
 
-  // Loop through the domain interior, and the right and top ghost layers. For each cell, calculate the
-  // numerical flux across the left and lower cell boundaries/interfaces
+
+  int neighborid = -1;
+  int midid = -1;
+  double Vmid[5];
+  // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
+  // numerical flux across the left, lower, and back cell boundaries/interfaces
   for(int k=k0; k<kkmax; k++) {
     for(int j=j0; j<jjmax; j++) {
       for(int i=i0; i<iimax; i++) {
@@ -1025,22 +1029,35 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
         myid = id[k][j][i];
 
         //calculate flux function F_{i-1/2,j,k}
-        if(k!=kkmax-1 && j!=jjmax-1) { //TODO I AM HERE!
-          fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux);
+        if(k!=kkmax-1 && j!=jjmax-1) {
+ 
+          neighborid = id[k][j][i-1];
+          if(neighborid==myid) {
+            fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux);
+          } else {//material interface
+            riemann.ComputeRiemannSolution(0/*F*/, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid);
+            //Godunov flux
+            fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux);
+          }
+
           localflux *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
           f[k][j][i-1] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
 
-//          if(j==2 && k==2 && i>198 && i<203) {
-//            fprintf(stderr,"(%d,%d,%d) Vm = [%e %e %e %e %e]. \n", i,j,k, vr[k][j][i-1][0], vr[k][j][i-1][1], vr[k][j][i-1][2], vr[k][j][i-1][3], vr[k][j][i-1][4]);
-//            fprintf(stderr,"(%d,%d,%d) Vp = [%e %e %e %e %e]. \n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
-//            fprintf(stderr,"(%d,%d,%d) F = [%e %e %e %e %e]. area = %e.\n", i,j,k, localflux[0], localflux[1], localflux[2], localflux[3], localflux[4], dxyz[k][j][i][1]*dxyz[k][j][i][2]);
-//          }
         }
 
         //calculate flux function G_{i,j-1/2,k}
         if(k!=kkmax-1 && i!=iimax-1) {
-          fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux);
+
+          neighborid = id[k][j-1][i];
+          if(neighborid==myid) {
+            fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux);
+          } else {//material interface
+            riemann.ComputeRiemannSolution(1/*G*/, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid);
+            //Godunov flux
+            fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux);
+          }
+
           localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
           f[k][j-1][i] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
@@ -1048,16 +1065,21 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
         //calculate flux function H_{i,j,k-1/2}
         if(j!=jjmax-1 && i!=iimax-1) {
-          fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux);
+
+          neighborid = id[k-1][j][i];
+          if(neighborid==myid) {
+            fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux);
+          } else {//material interface
+            riemann.ComputeRiemannSolution(2/*H*/, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid);
+            //Godunov flux
+            fluxFcn.EvaluateFluxFunction_H(Vmid, midid, localflux);
+          }
+
           localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
           f[k-1][j][i] += localflux;
           f[k][j][i]   -= localflux;  // the scheme is conservative 
-//          if(i==2 && j==2 && k>198 && k<203) {
-//            fprintf(stderr,"(%d,%d,%d) Vm = [%e %e %e %e %e]. \n", i,j,k, vf[k-1][j][i][0], vf[k-1][j][i][1], vf[k-1][j][i][2], vf[k-1][j][i][3], vf[k-1][j][i][4]);
-//            fprintf(stderr,"(%d,%d,%d) Vp = [%e %e %e %e %e]. \n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
-//            fprintf(stderr,"(%d,%d,%d) H = [%e %e %e %e %e]. area = %e.\n", i,j,k, localflux[0], localflux[1], localflux[2], localflux[3], localflux[4], dxyz[k][j][i][0]*dxyz[k][j][i][1]);
-//          }
         }
+
       }
     }
   }

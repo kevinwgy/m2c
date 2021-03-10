@@ -2,6 +2,7 @@
 #define _SPACEOPERATOR_H_
 #include <IoData.h>
 #include <VarFcnBase.h>
+#include <ExactRiemannSolverBase.h>
 #include <FluxFcnBase.h>
 #include <SpaceVariable.h>
 #include <Reconstructor.h>
@@ -17,6 +18,9 @@ class SpaceOperator
   FluxFcnBase&              fluxFcn;
 
   vector<VarFcnBase*>& varFcn; //!< each material has a varFcn
+
+  //! Exact Riemann problem solver (multi-phase)
+  ExactRiemannSolverBase &riemann;
 
   //! Mesh info
   SpaceVariable3D coordinates;

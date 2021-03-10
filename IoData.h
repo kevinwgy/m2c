@@ -290,6 +290,24 @@ struct SchemesData {
 
 //------------------------------------------------------------------------------
 
+struct ExactRiemannSolverData {
+
+  int maxIts_main;
+  int maxIts_shock;
+  int numSteps_rarefaction;
+  double tol_main;
+  double tol_shock;
+  double tol_rarefaction;
+
+  ExactRiemannSolverData();
+  ~ExactRiemannSolverData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ExplicitData {
 
 //!time-integration scheme used
@@ -427,6 +445,9 @@ public:
   BcsData bc;  //!< boundary condition
 
   SchemesData schemes;
+
+  ExactRiemannSolverData exact_riemann;
+
   TsData ts;
 
   OutputData output;

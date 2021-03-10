@@ -11,6 +11,7 @@
 #include <FluxFcnHLLC.h>
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
+#include <ExactRiemannSolverBase.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -37,7 +38,7 @@ int main(int argc, char* argv[])
   //! Setup PETSc data array (da) structure for nodal variables
   DataManagers3D dms(comm, iod.mesh.Nx, iod.mesh.Ny, iod.mesh.Nz);
 
-  //! Initialize VarFcn (EOS, etc.) TODO: each material should have a vf!
+  //! Initialize VarFcn (EOS, etc.) 
 
   std::vector<VarFcnBase *> vf;
   for(int i=0; i<iod.eqs.materials.dataMap.size(); i++)
@@ -59,6 +60,10 @@ int main(int argc, char* argv[])
     }
   }
 
+  //! Initialize the exact Riemann problem solver.
+  ExactRiemannSolverBase riemann(vf, iod.exact_riemann);
+
+
   //! Initialize FluxFcn for the advector flux of the N-S equations
   FluxFcnBase *ff = NULL;
   if(iod.schemes.ns.flux == SchemeData::ROE)
@@ -73,7 +78,7 @@ int main(int argc, char* argv[])
   }
 
   //! Initialize space operator
-  SpaceOperator spo(comm, dms, iod, vf, *ff);
+  SpaceOperator spo(comm, dms, iod, vf, *ff, riemann);
 
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables

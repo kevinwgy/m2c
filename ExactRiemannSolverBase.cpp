@@ -1,34 +1,43 @@
 #include<ExactRiemannSolverBase.h>
-#include<assert>
+#include<assert.h>
 #include<utility> //std::pair
 #include<bits/stdc++.h> //std::swap
 #include<boost/math/tools/roots.hpp>
 using namespace boost::math::tools;
 using std::pair;
+using std::cout;
+using std::endl;
 
 //-----------------------------------------------------
 
 ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, 
-                            IoData &iod) : vf(vf_)
+                            ExactRiemannSolverData &iod_riemann) : vf(vf_)
 {
+  maxIts_main          = iod_riemann.maxIts_main;
+  maxIts_shock         = iod_riemann.maxIts_shock;
+  numSteps_rarefaction = iod_riemann.numSteps_rarefaction;
+  tol_main             = iod_riemann.tol_main;
+  tol_shock            = iod_riemann.tol_shock;
+  tol_rarefaction      = iod_riemann.tol_rarefaction;
+
   // TODO: some of these parameters should goto IoData
-  maxIts_main = 500;
-  maxIts_shock = 100;   
+  maxIts_main = 200;
+  maxIts_shock = 200;   
   numSteps_rarefaction = 100;
-  tol_main = 1.0e-3;
-  tol_shock = 1.0e-3;
-  tol_rarefaction = 1.0e-3;
+  tol_main = 1.0e-5;
+  tol_shock = 1.0e-6;
+  tol_rarefaction = 1.0e-5;
 }
 
 //-----------------------------------------------------
 /** Solves the one-dimensional Riemann problem. Extension of Kamm 2015 
  * to Two Materials. See KW's notes for details
  */
-virtual void
+void
 ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/, 
-                            double *Vm, int idl, /*"left" state*/, 
-                            double *Vp, int idr, /*"right" state*/, 
-                            double *V /*solution at xi = 0 (i.e. x=0) */)
+                            double *Vm, int idl /*"left" state*/, 
+                            double *Vp, int idr /*"right" state*/, 
+                            double *V, int &id /*solution at xi = 0 (i.e. x=0) */)
 {
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
@@ -64,10 +73,10 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   // 1.2: Calculate ul0, ur0
   ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/, 
                   rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
-                  rhol0, ul0/*outputs*/);
+                  rhol0, ul0/*outputs*/, NULL, NULL, true);
   ComputeRhoUStar(3, rhor, ur, pr, p0, idr/*inputs*/, 
                   rhor, (p0>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
-                  rhor0, ur0/*outputs*/);
+                  rhor0, ur0/*outputs*/, NULL, NULL, true);
   double f0 = ul0 - ur0; // Eq. (18) in Kamm
 
   // 1.3: Initialize p1 ((21)(22) of Kamm) 
@@ -78,16 +87,16 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   // 1.4 Calculate ul1, ur1 
   ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/, 
                   rhol, rhol0/*initial guesses for Hugo. eq.*/,
-                  rhol1, ul1/*outputs*/);
+                  rhol1, ul1/*outputs*/, NULL, NULL, true);
   ComputeRhoUStar(3, rhor, ur, pr, p1, idr/*inputs*/, 
                   rhor, rhor0/*initial guesses for Hugo. eq.*/,
-                  rhor1, ur1/*outputs*/);
+                  rhor1, ur1/*outputs*/, NULL, NULL, true);
   double f1 = ul1 - ur1; // Eq. (18) in Kamm
 
   // -------------------------------
   // Step 2: Main Loop (Secant Method) 
   // -------------------------------
-  double denom, f2;
+  double denom = 0, f2 = 0;
 
   // monitor if the solution involves a transonic rarefaction. This is special as the solution 
   // at xi = x = 0 is within the rarefaction fan.
@@ -96,6 +105,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 
   int iter = 0;
   double err_p = 1.0, err_u = 1.0;
+
+  p2 = p1; //to avoid compiler warning
 
   for(iter=0; iter<maxIts_main; iter++) {
 
@@ -119,8 +130,13 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
     f2 = ul2 - ur2;
     
     // 2.3: Check stopping criterion
-    err_p = fabs(p2 - p1)/max(fabs(p1), fabs(p2));
-    err_u = fabs(f2)/max(fabs(ul2), fabs(ur2));
+    err_p = fabs(p2 - p1)/std::max(fabs(p1), fabs(p2));
+    err_u = fabs(f2)/std::max(fabs(ul2), fabs(ur2));
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    cout << "Iter " << iter << ": err_p = " << err_p << ", err_u = " << err_u << "." << endl;
+#endif
+
     if( err_p < tol_main && err_u < tol_main )
       break; // converged
 
@@ -152,6 +168,17 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   // Step 3: Find state at xi = x = 0 (for output)
   // -------------------------------
   double u2 = 0.5*(ul2 + ur2);
+
+  // find material id at xi = x = 0
+  if(u2>=0)
+    id = idl;
+  else
+    id = idr;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+  sol1d.push_back(vector<double>{u2 - std::max(1e-6, 0.001*fabs(u2)), rhol2, u2, p2});
+  sol1d.push_back(vector<double>{u2, rhor2, u2, p2});
+#endif
 
   V[0] = V[1] = V[2] = V[3] = V[4] = 0.0;
 
@@ -243,12 +270,14 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
             [](vector<double> v1, vector<double> v2){return v1[0]<v2[0];});
   int last = sol1d.size()-1;
   double xi_span = sol1d[last][0] - sol1d[0][0];
-  sol1d.push_front(vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3]});
+  sol1d.insert(sol1d.begin(), vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3]});
+  last++;
   sol1d.push_back(vector<double>{sol1d[last][0]+xi_span, sol1d[last][1], sol1d[last][2], sol1d[last][3]});
 
   FILE* solFile = fopen("RiemannSolution.txt", "w");
   print(solFile, "## One-Dimensional Riemann Problem.\n");
-  print(solFile, "## Initial State: %e %e %e (left) | (right) %e %e %e.\n", rhol, ul, pl, rhor, ur, pr);
+  print(solFile, "## Initial State: %e %e %e, id %d (left) | (right) %e %e %e, id %d.\n", 
+        rhol, ul, pl, idl, rhor, ur, pr, idr);
 
   for(auto it = sol1d.begin(); it != sol1d.end(); it++) 
     print(solFile,"%e    %e    %e    %e\n", (*it)[0], (*it)[1], (*it)[2], (*it)[3]);
@@ -261,24 +290,29 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 //----------------------------------------------------------------------------------
 
 //! Connect the left/right initial state with the left/right star state (the 1-wave or 3-wave)
-virtual void
+void
 ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
                                         double rho, double u, double p, double ps, int id/*inputs*/,
                                         double rhos0, double rhos1/*initial guesses for Hugo. eq.*/,
-                                        double &rhos, double us/*outputs*/, 
-                                        bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
+                                        double &rhos, double &us/*outputs*/, 
+                                        bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/,
+                                        bool rough_estimate)
 {
   // default
   rhos = rho;
   us   = u;
 
+  int    N_rare   = rough_estimate ? 10   : numSteps_rarefaction;
+  double tol_rare = rough_estimate ? 1e-2 : tol_rarefaction;
+  double tol_sh   = rough_estimate ? 1e-2 : tol_shock;
+
   if(p > ps) {//rarefaction --- numerical integration
 
-    double dp_max = 2.0*(p-ps)/numSteps_rarefaction;
-    double dp_target = dp_max*0.5;
+    double dp_max = 1.25*(p-ps)/N_rare;
+    double dp_target = dp_max/1.25;
 
     // initialize drho
-    double drho = rho/(numSteps_rarefaction*5); //initial step size
+    double drho = rho/(N_rare*2.5); //initial step size
 
     // prepare for numerical integration
     double rhos_0 = rho, us_0 = u, ps_0 = p, xi_0; //start point of each step
@@ -297,7 +331,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     // integration by Runge-Kutta 4
     for(int i=0; i<numSteps_rarefaction*5; i++) {
 
-      Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id
+      Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
                              rhos_0, us_0, ps_0 /*start state*/, drho /*step size*/,
                              rhos_1, us_1, ps_1, xi_1 /*output: end state*/); 
 
@@ -308,7 +342,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         drho = drho/dp*dp_target;
         continue;
       }
-      if(ps_1 - ps < -tol_rarefaction) {
+      if(ps_1 - ps < -tol_rare) {
         drho = drho/dp*(ps_0 - ps);
         continue;
       } 
@@ -317,7 +351,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1});
 #endif
 
-      if(xi_0*xi_1<=0) {//transonic rarefaction, crossing x = xi = 0
+      if(trans_rare && Vrare_x0 && xi_0*xi_1<=0) {//transonic rarefaction, crossing x = xi = 0
         *trans_rare = true;
         double w0 = fabs(xi_1), w1 = fabs(xi_0);
         double ww = w0 + w1;
@@ -334,17 +368,22 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       }
 
       // Check if we have reached the final pressure ps
-      if(fabs(ps_1 - ps) <= tol_rarefaction) {
+      if(fabs(ps_1 - ps) <= tol_rare) {
         rhos = rhos_1;
         us   = us_1;
+      
+#if PRINT_RIEMANN_SOLUTION == 1
+        cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
+#endif
+
         break; //done!
       }
 
       // If the solver gets here, it means it hasn't reached the final pressure ps.
       // Adjust step size, then update state
       //
-      drho = max( (rhos_0-rhos_1)/dp*min(dp_target,ps_1-ps), //don't go beyond ps
-                  drho*4.0); //don't increase too much in one step
+      drho = std::min( (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), //don't go beyond ps
+                       drho*4.0); //don't increase too much in one step
        
       rhos_0 = rhos_1;
       us_0   = us_1;
@@ -356,13 +395,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
   else {// shock (p<=ps, rho<=rhos)
 
-    HugoniotEquation hugo(rho,p,ps,id);
+    HugoniotEquation hugo(vf[id],rho,p,ps);
 
     //find a bracketing interval
     double f0, f1;
     double drho = fabs(rhos0 - rhos1); 
     bool found_rhos0 = false, found_rhos1 = false;
-    if(min(rhos0,rhos1)>=rho) {//both rhos0 and rhos1 are physically admissible
+    if(std::min(rhos0,rhos1)>=rho) {//both rhos0 and rhos1 are physically admissible
       f0 = hugo(rhos0);
       f1 = hugo(rhos1);
       if(f0*f1<=0) {
@@ -379,12 +418,15 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     } else { //at least, the smaller one among rhos0, rhos1 is non-physical
       if(rhos1>rhos0) {
         rhos0 = rhos1; 
-        f0    = f1;
+        f0    = hugo(rhos0);
       }
       if(rhos0<rho) {//this one is also non-physical
         rhos0 = rho;
         f0    = hugo(rhos0);
         found_rhos0 = true;
+      } else {
+        /*rhos0 = rhos0;*/
+        f0 = hugo(rhos0);
       }
     } 
 
@@ -447,7 +489,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
           rhos0 = rhos1;
           f0    = f1;
           rhos1 = rhos0 + factor*drho;
-          f1    = hugo(f1);
+          f1    = hugo(rhos1);
           if(f0*f1<=0) {
             found_rhos1 = true;
           } else
@@ -460,13 +502,16 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     //*******************************************************************
     // Calling boost function for root-finding
     // Warning: "maxit" is BOTH AN INPUT AND AN OUTPUT
-    assert(fabs(f0-hugo(rhos0))<1e-8);
-    assert(fabs(f1-hugo(rhos1))<1e-8);
     boost::uintmax_t maxit = maxIts_shock;
     pair<double,double> sol = toms748_solve(hugo, rhos0, rhos1, f0, f1,
-                                            [](double r0, double r1){return r1-r0<tol_shock;}, 
+                                            [=](double r0, double r1){return r1-r0<tol_sh;}, 
                                             maxit);
     //*******************************************************************
+    
+#if PRINT_RIEMANN_SOLUTION == 1
+    cout << "  " << wavenumber << "-wave: shock, converged in " << maxit << " iterations. fun = " 
+         << hugo(0.5*(sol.first+sol.second)) << "." << endl;
+#endif
 
     rhos = 0.5*(sol.first+sol.second);
 
@@ -495,7 +540,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
 //----------------------------------------------------------------------------------
 
-virtual void 
+void 
 ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                             double rho_0, double u_0, double p_0 /*start state*/, 
                             double drho /*step size*/,
