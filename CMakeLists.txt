@@ -63,6 +63,7 @@ add_executable(m2c
 Main.cpp
 IoData.cpp
 SpaceVariable.cpp
+ExactRiemannSolverBase.cpp
 Output.cpp
 Reconstructor.cpp
 SpaceOperator.cpp
