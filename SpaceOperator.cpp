@@ -12,8 +12,9 @@ using std::min;
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                             vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_) 
-  : comm(comm_), iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_),
+                             vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
+                             ExactRiemannSolverBase &riemann_) 
+  : comm(comm_), iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)),
@@ -214,7 +215,7 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
 
 //-----------------------------------------------------
 
-void SpaceOperator::ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V
+void SpaceOperator::ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V,
                                             bool workOnGhost)
 {
   Vec5D*** u = (Vec5D***) U.GetDataPointer();
@@ -239,7 +240,8 @@ void SpaceOperator::ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D 
 
 //-----------------------------------------------------
 
-void SpaceOperator::PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &U, bool workOnGhost)
+void SpaceOperator::PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &U, 
+                                            bool workOnGhost)
 {
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
   Vec5D*** u = (Vec5D***) U.GetDataPointer();

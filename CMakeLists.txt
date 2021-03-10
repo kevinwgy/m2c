@@ -64,6 +64,7 @@ Main.cpp
 IoData.cpp
 SpaceVariable.cpp
 ExactRiemannSolverBase.cpp
+MultiPhaseOperator.cpp
 Output.cpp
 Reconstructor.cpp
 SpaceOperator.cpp

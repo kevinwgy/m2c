@@ -38,7 +38,8 @@ class SpaceOperator
 
 public:
   SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_); 
+                vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
+                ExactRiemannSolverBase &riemann_); 
   ~SpaceOperator();
 
   void ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V,

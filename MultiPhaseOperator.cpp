@@ -1,5 +1,6 @@
 #include<MultiPhaseOperator.h>
 #include<SpaceOperator.h>
+#include<LevelSetOperator.h>
 #include<Vector5D.h>
 //-----------------------------------------------------
 
@@ -24,6 +25,7 @@ MultiPhaseOperator::~MultiPhaseOperator()
 
 //-----------------------------------------------------
 
+void
 MultiPhaseOperator::Destroy()
 {
   Tag.Destroy();
@@ -134,7 +136,7 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
 
               // compute weight
               v1norm = v1.norm();
-              if(v1.norm != 0)
+              if(v1norm != 0)
                 v1 /= v1norm;
               x1x0 = x0 - x1; 
               x1x0 /= x1x0.norm();

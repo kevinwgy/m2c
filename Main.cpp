@@ -12,6 +12,7 @@
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
 #include <ExactRiemannSolverBase.h>
+#include <MultiPhaseOperator.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -111,6 +112,9 @@ int main(int argc, char* argv[])
           lso.size()-1, matid);
   }  
   
+  //! Initialize multiphase operator (for updating "phase change")
+  MultiPhaseOperator mpo(comm, dms, iod, spo, lso);
+
   //! Initialize output
   Output out(comm, dms, iod, vf); 
   out.InitializeOutput(spo.GetMeshCoordinates());
@@ -119,11 +123,11 @@ int main(int argc, char* argv[])
   TimeIntegratorBase *integrator = NULL;
   if(iod.ts.type == TsData::EXPLICIT) {
     if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
-      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso);
+      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
-      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso);
+      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
-      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso);
+      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo);
     else {
       print_error("Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();

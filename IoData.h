@@ -308,6 +308,19 @@ struct ExactRiemannSolverData {
 
 //------------------------------------------------------------------------------
 
+struct MultiPhaseData {
+
+  enum Flux {EXACT = 0, NUMERICAL = 1} flux;
+
+  MultiPhaseData();
+  ~MultiPhaseData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ExplicitData {
 
 //!time-integration scheme used
@@ -447,6 +460,8 @@ public:
   SchemesData schemes;
 
   ExactRiemannSolverData exact_riemann;
+
+  MultiPhaseData multiphase;
 
   TsData ts;
 

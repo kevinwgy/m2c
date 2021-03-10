@@ -48,7 +48,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i]); //compute Rn_ls (level set)
     Phi[i]->AXPlusBY(1.0, dt, *Rn_ls[i]);
-    lso[ls]->ApplyBoundaryConditions(*Phi[ls]);
+    lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
 
   // Update ID and V (skipped for single-material simulations)
