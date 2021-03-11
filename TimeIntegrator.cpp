@@ -139,6 +139,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
+  spo.ApplyBoundaryConditions(V);
   //***************************************************
 
 
@@ -269,6 +270,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
+  spo.ApplyBoundaryConditions(V);
   //***************************************************
 
 
