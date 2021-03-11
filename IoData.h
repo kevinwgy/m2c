@@ -257,7 +257,7 @@ struct LevelSetSchemeData {
 
   int materialid; //! The material in the phi<0 region ("inside")
 
-  enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1} flux;
+  enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, UPWIND = 2} flux;
 
   ReconstructionData rec;
   

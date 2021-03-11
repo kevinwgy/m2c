@@ -114,6 +114,7 @@ int main(int argc, char* argv[])
   
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, spo, lso);
+  mpo.UpdateMaterialID(Phi,ID); //populate the ghost layer of ID (outside domain boundary)
 
   //! Initialize output
   Output out(comm, dms, iod, vf); 
@@ -204,6 +205,7 @@ int main(int argc, char* argv[])
 
   out.FinalizeOutput();
   integrator->Destroy();
+  mpo.Destroy();
   spo.Destroy();
   dms.DestroyAllDataManagers();
   PetscFinalize();

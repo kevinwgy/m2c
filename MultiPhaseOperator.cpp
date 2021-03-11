@@ -94,7 +94,6 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
   double weight, sum_weight;
   Vec3D v1, x1x0;
   double v1norm;
-  int neigh_count;
 
   // work inside the real domain
   for(int k=k0; k<kmax; k++)
@@ -111,8 +110,6 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
         Vec3D& x0(coords[k][j][i]);
 
         sum_weight = 0.0;
-
-        neigh_count = 0;
 
         //go over the neighboring nodes 
         for(int neighk = k-1; neighk <= k+1; neighk++)         
@@ -144,7 +141,6 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
               weight = max(0.0, x1x0*v1);
 
               // add weighted s.v. at neighbor node
-              neigh_count++;
               sum_weight += weight;
               v[k][j][i] += weight*v[neighk][neighj][neighi];
             }

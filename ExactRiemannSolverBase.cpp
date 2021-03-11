@@ -114,6 +114,9 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
     denom = f1 - f0;
     if(denom == 0) {
       cout << "ERROR: Division-by-zero while using the secant method to solve the Riemann problem." << endl;
+      cout << "       left state: " << rhol << ", " << ul << ", " << pl << ", " << idl << " | right: " 
+                       << rhor << ", " << ur << ", " << pr << ", " << idr << endl;
+      cout << "       dir = " << dir << ", f0 = " << f0 << ", f1 = " << f1 << endl;
       exit_mpi();
     }
     p2 = p1 - f1*(p1-p0)/denom;

@@ -466,8 +466,8 @@ Assigner *LevelSetSchemeData::getAssigner()
 
   new ClassToken<LevelSetSchemeData>
     (ca, "Flux", this,
-     reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::flux), 2,
-     "Roe", 0, "LocalLaxFriedrichs", 1);
+     reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::flux), 3,
+     "Roe", 0, "LocalLaxFriedrichs", 1, "Upwind", 2);
 
   new ClassDouble<LevelSetSchemeData>(ca, "EntropyFixCoefficient", this, &LevelSetSchemeData::delta);
 

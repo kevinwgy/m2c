@@ -88,6 +88,13 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
       for(int i=ii0; i<iimax; i++)
         phi[k][j][i] = DBL_MAX;
 
+
+  //TODO: Add this feature later
+  if(iod.ic.specified[IcData::LEVELSET] || iod.ic.specified[IcData::MATERIALID]) {
+    print_error("Error: Currently, cannot read level set and material id from user-specified data file.\n");
+    exit_mpi();
+  }
+
   //initialize phi based on plane, cylinder-cones, and sphere.
   MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
 
@@ -441,19 +448,32 @@ void LevelSetOperator::ComputeAdvectionFlux(SpaceVariable3D &R)
 
 double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, double um, double up)
 {
-  double flux = 0.5*(phim*um + phip*up);
-  double lam, tol;
+  double flux = 0.0;
+  double lam, tol, vmid;
 
   switch (iod_ls.flux) {
-    case LevelSetSchemeData::LOCAL_LAX_FRIEDRICHS :
-      flux -= 0.5*max(fabs(um),fabs(up))*(phip-phim);
+
+    case LevelSetSchemeData::UPWIND :
+      vmid = 0.5*(um+up); 
+      if(vmid>0)
+        flux = phim*um;
+      else if(vmid<0)
+        flux = phip*up;
+      else
+        flux = 0.5*(phim*um + phip*up);
       break;
+
+    case LevelSetSchemeData::LOCAL_LAX_FRIEDRICHS :
+      flux = 0.5*(phim*um + phip*up) - 0.5*max(fabs(um),fabs(up))*(phip-phim);
+      break;
+
     case LevelSetSchemeData::ROE :
       lam = abs(0.5*(um+up));
       tol   = max(fabs(um), fabs(up))*iod_ls.delta;
       if(lam<tol) lam = (lam*lam + tol*tol)/(2*tol);
-      flux -= 0.5*lam*(phip-phim);
+      flux = 0.5*(phim*um + phip*up) - 0.5*lam*(phip-phim);
       break;
+
     default:
       print_error("Error: Level set flux function not recognized (code = %d).\n", iod_ls.flux);
       exit_mpi();      

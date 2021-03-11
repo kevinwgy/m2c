@@ -956,6 +956,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   double*** id = (double***) ID.GetDataPointer();
 
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer(); //for debugging
+
   //------------------------------------
   // Clip pressure and density for the reconstructed state
   // Verify hyperbolicity (i.e. c^2 > 0).
@@ -1055,6 +1057,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           if(neighborid==myid) {
             fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux);
           } else {//material interface
+//            fprintf(stderr,"coords[%d,%d,%d] = %e %e %e, id = %d.\n", k, j-1, i, coords[k][j-1][i][0], coords[k][j-1][i][1], coords[k][j-1][i][2], (int)id[k][j-1][i]);
+//            fprintf(stderr,"coords[%d,%d,%d] = %e %e %e, id = %d.\n", k, j, i, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], (int)id[k][j][i]);
             riemann.ComputeRiemannSolution(1/*G*/, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid);
             //Godunov flux
             fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux);
@@ -1091,6 +1095,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   delta_xyz.RestoreDataPointerToLocalVector(); //no changes
   ID.RestoreDataPointerToLocalVector(); //no changes
+  coordinates.RestoreDataPointerToLocalVector(); //no changes
 
   V.RestoreDataPointerToLocalVector(); 
   Vl.RestoreDataPointerToLocalVector(); 
