@@ -6,6 +6,7 @@
 #include <FluxFcnBase.h>
 #include <SpaceVariable.h>
 #include <Reconstructor.h>
+#include <RiemannSolutions.h>
 
 /*******************************************
  * class SpaceOperator drives computations
@@ -61,7 +62,8 @@ public:
   void ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl);
 
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
-  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R);
+  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
+                       RiemannSolutions *riemann_solutions = NULL);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}
@@ -74,7 +76,8 @@ private:
   void SetupMeshUniformRectangularDomain();
   void PopulateGhostBoundaryCoordinates();
 
-  void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F);
+  void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
+                              RiemannSolutions *riemann_solutions = NULL);
 };
 
 

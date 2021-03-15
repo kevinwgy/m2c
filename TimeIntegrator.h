@@ -4,6 +4,7 @@
 #include <SpaceOperator.h>
 #include <LevelSetOperator.h>
 #include <MultiPhaseOperator.h>
+#include <RiemannSolutions.h>
 #include <vector>
 using std::vector;
 
@@ -19,6 +20,9 @@ protected:
 
   vector<LevelSetOperator*>& lso;
   MultiPhaseOperator& mpo;  
+
+  //Solutions of exact Riemann problems
+  RiemannSolutions riemann_solutions;
 
 public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, SpaceOperator& spo_, 

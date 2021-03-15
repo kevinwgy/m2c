@@ -23,7 +23,9 @@ public:
 
   virtual void ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/, double *Vm, int idm /*"left" state*/, 
                                       double *Vp, int idp /*"right" state*/, 
-                                      double *V, int &id /*solution at xi = 0 (i.e. x=0) */);
+                                      double *V, int &id /*solution at xi = 0 (i.e. x=0) */,
+                                      double *Vsm /*left 'star' solution*/,
+                                      double *Vsp /*right 'star' solution*/);
 
 #if PRINT_RIEMANN_SOLUTION == 1
   vector<vector<double> > sol1d;

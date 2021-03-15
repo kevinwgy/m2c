@@ -547,6 +547,7 @@ void ExactRiemannSolverData::setup(const char *name, ClassAssigner *father)
 MultiPhaseData::MultiPhaseData()
 {
   flux = EXACT;
+  phasechange_type = EXTRAPOLATION;
 }
 
 //------------------------------------------------------------------------------
@@ -554,12 +555,17 @@ MultiPhaseData::MultiPhaseData()
 void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::flux), 2,
      "Exact", 0, "Numerical", 1);
+
+  new ClassToken<MultiPhaseData>
+    (ca, "PhaseChange", this,
+     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_type), 2,
+     "RiemannSolution", 0, "Extrapolation", 1);
 
 }
 

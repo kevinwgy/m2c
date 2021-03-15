@@ -10,11 +10,12 @@
  ******************************************/
 class SpaceOperator;
 class LevelSetOperator;
+class RiemannSolutions;
 
 class MultiPhaseOperator
 {
   MPI_Comm&       comm;
-  IoData &iod;
+  MultiPhaseData &iod_multiphase;
 
   //! Mesh info
   SpaceVariable3D& coordinates;
@@ -38,9 +39,14 @@ public:
   void UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
 
   void UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID,
-                                                SpaceVariable3D &V);
+                                                SpaceVariable3D &V, RiemannSolutions &riemann_solutions);
 
   void Destroy();
+
+protected:
+  void UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
+                                              SpaceVariable3D &V, RiemannSolutions &riemann_solutions);
+  void UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
 };
 
 #endif

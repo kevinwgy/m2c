@@ -37,7 +37,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
                                           vector<SpaceVariable3D*>& Phi, double dt)
 {
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, Rn); // compute Rn
+  spo.ComputeResidual(V, ID, Rn, &riemann_solutions); // compute Rn
   spo.PrimitiveToConservative(V, ID, Un); // get Un
   Un.AXPlusBY(1.0, dt, Rn);
   spo.ConservativeToPrimitive(Un, ID, V); //updates V = V(n+1)
@@ -55,7 +55,8 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   if(lso.size()) {
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
     mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
-    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V); //update V
+    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions); //update V
+    spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }
 
@@ -104,7 +105,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R); // compute R = R(V(n))
+  spo.ComputeResidual(V, ID, R, &riemann_solutions); // compute R = R(V(n))
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
   U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
@@ -157,7 +158,8 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   if(lso.size()) {
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
     mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
-    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V); //update V
+    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions); //update V
+    spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }
 
@@ -207,7 +209,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R); // get R = R(V(n))
+  spo.ComputeResidual(V, ID, R, &riemann_solutions); // get R = R(V(n))
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
   U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
@@ -289,7 +291,8 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   if(lso.size()) {
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
     mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
-    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V); //update V
+    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions); //update V
+    spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }
 

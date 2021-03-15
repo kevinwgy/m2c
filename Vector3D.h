@@ -19,6 +19,13 @@ struct Int3 {
   int &operator[](int i) {return v[i];}
   int operator[](int i) const {return v[i];}
   operator int*() { return v; } //convert Int3D to int*
+
+  bool operator<(const Int3& v2) const {
+    if     (v[0]<v2.v[0]) {return true;} else if(v[0]>v2.v[0]) {return false;} 
+    else if(v[1]<v2.v[1]) {return true;} else if(v[1]>v2.v[1]) {return false;} 
+    else if(v[2]<v2.v[2]) {return true;} else return false;
+  }
+
 };
 
 //------------------------------------------------------------------------------

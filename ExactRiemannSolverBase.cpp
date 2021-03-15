@@ -37,7 +37,9 @@ void
 ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/, 
                             double *Vm, int idl /*"left" state*/, 
                             double *Vp, int idr /*"right" state*/, 
-                            double *V, int &id /*solution at xi = 0 (i.e. x=0) */)
+                            double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
+                            double *Vsm /*left 'star' solution*/,
+                            double *Vsp /*right 'star' solution*/)
 {
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
@@ -183,12 +185,12 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   sol1d.push_back(vector<double>{u2, rhor2, u2, p2});
 #endif
 
-  V[0] = V[1] = V[2] = V[3] = V[4] = 0.0;
+  Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
 
   if(trans_rare) {
-    V[0]     = Vrare_x0[0];
-    V[dir+1] = Vrare_x0[1];
-    V[4]     = Vrare_x0[2];
+    Vs[0]     = Vrare_x0[0];
+    Vs[dir+1] = Vrare_x0[1];
+    Vs[4]     = Vrare_x0[2];
   }
   else { 
     //find state variables at xi = x = 0
@@ -210,13 +212,13 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
       }
 
       if(is_star_state) {
-        V[0]     = rhol2;
-        V[dir+1] = u2;
-        V[4]     = p2;
+        Vs[0]     = rhol2;
+        Vs[dir+1] = u2;
+        Vs[4]     = p2;
       } else {
-        V[0]     = rhol;
-        V[dir+1] = ul;
-        V[4]     = pl;
+        Vs[0]     = rhol;
+        Vs[dir+1] = ul;
+        Vs[4]     = pl;
       }
 
     } else { //either Vr or Vrstar --- check the 3-wave
@@ -236,13 +238,13 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
       }
 
       if(is_star_state) {
-        V[0]     = rhor2;
-        V[dir+1] = u2;
-        V[4]     = p2;
+        Vs[0]     = rhor2;
+        Vs[dir+1] = u2;
+        Vs[4]     = p2;
       } else {
-        V[0]     = rhor;
-        V[dir+1] = ur;
-        V[4]     = pr;
+        Vs[0]     = rhor;
+        Vs[dir+1] = ur;
+        Vs[4]     = pr;
       }
 
     }
@@ -253,18 +255,32 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   if(u2>0) {
     for(int i=1; i<=2; i++) {
       k = (dir + i)%3 + 1;
-      V[k] = Vm[k];
+      Vs[k] = Vm[k];
     }
   } else if(u2<0) {
     for(int i=1; i<=2; i++) {
       k = (dir + i)%3 + 1;
-      V[k] = Vp[k];
+      Vs[k] = Vp[k];
     }
   } else {//u2 == 0
     for(int i=1; i<=2; i++) {
       k = (dir + i)%3 + 1;
-      V[k] = 0.5*(Vm[k]+Vp[k]);
+      Vs[k] = 0.5*(Vm[k]+Vp[k]);
     }
+  }
+
+
+  // determine Vsm and Vsp, i.e. the star states on the minus and plus sides of the contact discontinuity
+  Vsm[0]     = rhol2;
+  Vsm[dir+1] = u2;
+  Vsm[4]     = p2;
+  Vsp[0]     = rhor2;
+  Vsp[dir+1] = u2;
+  Vsp[4]     = p2;
+  for(int i=1; i<=2; i++) { //tangential velocity
+    k = (dir + i)%3 + 1;
+    Vsm[k] = Vm[k];
+    Vsp[k] = Vp[k];
   }
 
 

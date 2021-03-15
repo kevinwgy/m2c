@@ -149,8 +149,22 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
   }
 
   if(iod.output.materialid==OutputData::ON) {
-    PetscObjectSetName((PetscObject)(ID.GetRefToGlobalVec()), "materialid"); //adding the name directly to ID.
-    VecView(ID.GetRefToGlobalVec(), viewer);
+    
+// TODO(KW): not sure why this does not work...
+//    PetscObjectSetName((PetscObject)(ID.GetRefToGlobalVec()), "materialid"); //adding the name directly to ID.
+//    VecView(ID.GetRefToGlobalVec(), viewer);
+
+    double*** s  = (double***) scalar.GetDataPointer();
+    double*** id  = (double***)ID.GetDataPointer();
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++)
+          s[k][j][i] = id[k][j][i];
+    scalar.RestoreDataPointerAndInsert();
+    ID.RestoreDataPointerToLocalVector();
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "materialid");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
+
   }
 
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {

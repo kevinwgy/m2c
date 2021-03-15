@@ -938,8 +938,15 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F)
+void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
+                                           RiemannSolutions *riemann_solutions)
 {
+  //------------------------------------
+  // Preparation: Delete previous riemann_solutions
+  //------------------------------------
+  if(riemann_solutions)
+    riemann_solutions->Clear();
+
   //------------------------------------
   // Reconstruction w/ slope limiters.
   //------------------------------------
@@ -1011,7 +1018,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Compute fluxes
   //------------------------------------
-  Vec5D localflux;
+  Vec5D localflux1, localflux2;
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   // Initialize F to 0
@@ -1024,6 +1031,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   int neighborid = -1;
   int midid = -1;
   double Vmid[5];
+  double Vsm[5], Vsp[5];
+  double area = 0.0;
+  Int3 ind;
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
   for(int k=k0; k<kkmax; k++) {
@@ -1032,58 +1042,132 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
         myid = id[k][j][i];
 
+        //*****************************************
         //calculate flux function F_{i-1/2,j,k}
+        //*****************************************
         if(k!=kkmax-1 && j!=jjmax-1) {
  
           neighborid = id[k][j][i-1];
+
           if(neighborid==myid) {
-            fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux);
+
+            fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux1);
+            localflux2 = localflux1;
+
           } else {//material interface
-            riemann.ComputeRiemannSolution(0/*F*/, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid);
+
+            riemann.ComputeRiemannSolution(0/*F*/, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+            if(riemann_solutions) {//store Riemann solution for "phase-change update"
+              ind[0] = k; ind[1] = j; ind[2] = i;
+              riemann_solutions->left[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+              ind[2] = i-1;
+              riemann_solutions->right[ind] = std::make_pair((Vec5D)Vsp, myid); 
+            }
+
+            if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+              fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux1);
+              localflux2 = localflux1;
+            } else {//Numerical flux function
+              fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+              fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux2);
+            }
+/*
+
+            fprintf(stderr, "Riemann inputs: [%d,%d,%d] %e %e %e, ID %d  | [%d,%d,%d] %e %e %e, ID %d\n",
+                    k,j,i-1, vr[k][j][i-1][0], vr[k][j][i-1][1], vr[k][j][i-1][4], neighborid,
+                    k,j,i,   vl[k][j][i][0],   vl[k][j][i][1],   vl[k][j][i][4], myid);
+            fprintf(stderr, "Riemann solution [%d,%d]: %e %e %e | %d.\n", i-1, i, Vmid[0], Vmid[1], Vmid[4], midid);
+*/
+
             //Godunov flux
-            fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux);
+            //fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux);
           }
 
-          localflux *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
-          f[k][j][i-1] += localflux;
-          f[k][j][i]   -= localflux;  // the scheme is conservative 
+          area = dxyz[k][j][i][1]*dxyz[k][j][i][2];
+          f[k][j][i-1] += localflux1*area;
+          f[k][j][i]   -= localflux2*area;
 
         }
 
+
+        //*****************************************
         //calculate flux function G_{i,j-1/2,k}
+        //*****************************************
         if(k!=kkmax-1 && i!=iimax-1) {
 
           neighborid = id[k][j-1][i];
+
           if(neighborid==myid) {
-            fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux);
+
+            fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux1);
+            localflux2 = localflux1;
+
           } else {//material interface
-//            fprintf(stderr,"coords[%d,%d,%d] = %e %e %e, id = %d.\n", k, j-1, i, coords[k][j-1][i][0], coords[k][j-1][i][1], coords[k][j-1][i][2], (int)id[k][j-1][i]);
-//            fprintf(stderr,"coords[%d,%d,%d] = %e %e %e, id = %d.\n", k, j, i, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], (int)id[k][j][i]);
-            riemann.ComputeRiemannSolution(1/*G*/, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid);
-            //Godunov flux
-            fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux);
+
+            riemann.ComputeRiemannSolution(1/*G*/, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+            if(riemann_solutions) {//store Riemann solution for "phase-change update"
+              ind[0] = k; ind[1] = j; ind[2] = i;
+              riemann_solutions->bottom[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+              ind[1] = j-1;
+              riemann_solutions->top[ind] = std::make_pair((Vec5D)Vsp, myid); 
+            }
+
+
+            if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+              fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux1);
+              localflux2 = localflux1;
+            } else {//Numerical flux function
+              fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+              fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux2);
+            }
+
           }
 
-          localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
-          f[k][j-1][i] += localflux;
-          f[k][j][i]   -= localflux;  // the scheme is conservative 
+          area = dxyz[k][j][i][0]*dxyz[k][j][i][2];
+          f[k][j-1][i] += localflux1*area;
+          f[k][j][i]   -= localflux2*area;
         }
 
+
+        //*****************************************
         //calculate flux function H_{i,j,k-1/2}
+        //*****************************************
         if(j!=jjmax-1 && i!=iimax-1) {
 
           neighborid = id[k-1][j][i];
+
           if(neighborid==myid) {
-            fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux);
+
+            fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux1);
+            localflux2 = localflux1;
+
           } else {//material interface
-            riemann.ComputeRiemannSolution(2/*H*/, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid);
-            //Godunov flux
-            fluxFcn.EvaluateFluxFunction_H(Vmid, midid, localflux);
+
+            riemann.ComputeRiemannSolution(2/*H*/, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+            if(riemann_solutions) {//store Riemann solution for "phase-change update"
+              ind[0] = k; ind[1] = j; ind[2] = i;
+              riemann_solutions->back[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+              ind[0] = k-1;
+              riemann_solutions->front[ind] = std::make_pair((Vec5D)Vsp, myid); 
+            }
+
+
+            if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+              fluxFcn.EvaluateFluxFunction_H(Vmid, midid, localflux1);
+              localflux2 = localflux1;
+            } else {//Numerical flux function
+              fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+              fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux2);
+            }
+
           }
 
-          localflux *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
-          f[k-1][j][i] += localflux;
-          f[k][j][i]   -= localflux;  // the scheme is conservative 
+          area = dxyz[k][j][i][0]*dxyz[k][j][i][1];
+          f[k-1][j][i] += localflux1*area;
+          f[k][j][i]   -= localflux2*area;
         }
 
       }
@@ -1112,9 +1196,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
+void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
+                                    RiemannSolutions *riemann_solutions)
 {
-  ComputeAdvectionFluxes(V, ID, R);
+  ComputeAdvectionFluxes(V, ID, R, riemann_solutions);
 
   // -------------------------------------------------
   // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
