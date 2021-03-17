@@ -55,7 +55,6 @@ MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariabl
     for(int k=kk0; k<kkmax; k++)
       for(int j=jj0; j<jjmax; j++)
         for(int i=ii0; i<iimax; i++) {
-
           if(phi[k][j][i]<0) {
             if(id[k][j][i] != 0) {
               overlap++;
@@ -85,7 +84,7 @@ MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariabl
 }
 
 //-----------------------------------------------------
-
+// Section 4.2.4 of Arthur Rallu's thesis
 void
 MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, 
                         SpaceVariable3D &ID, SpaceVariable3D &V, RiemannSolutions &riemann_solutions)
@@ -120,8 +119,6 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
   double weight, sum_weight;
-  Vec3D v1, x1x0;
-  double v1norm;
 
   Int3 ind;
   std::map<Int3, std::pair<Vec5D,int> >::iterator it;
@@ -134,13 +131,8 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         if(id[k][j][i] == idn[k][j][i]) //id remains the same. Skip
           continue;
         
-        fprintf(stderr,"Updating state for node[%d,%d,%d] ID: %d --> %d.\n", i,j,k, (int)idn[k][j][i], (int)id[k][j][i]);
-
         // re-set its state variables to 0
         v[k][j][i] = 0.0;
-
-        // coordinates of this node
-        Vec3D& x0(coords[k][j][i]);
 
         sum_weight = 0.0;
 
@@ -151,7 +143,9 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         it = riemann_solutions.left.find(ind);
         if(it != riemann_solutions.left.end())
           if(it->second.second/*ID*/ == id[k][j][i] && v[k][j][i-1][1] > 0) {
-            weight = v[k][j][i-1][1];
+            Vec3D v1(v[k][j][i-1][1], v[k][j][i-1][2], v[k][j][i-1][3]);
+            weight = v[k][j][i-1][1]/v1.norm();
+
             sum_weight += weight;
             v[k][j][i] += weight*it->second.first; /*riemann solution*/
           }
@@ -160,7 +154,9 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         it = riemann_solutions.right.find(ind);
         if(it != riemann_solutions.right.end())
           if(it->second.second/*ID*/ == id[k][j][i] && v[k][j][i+1][1] < 0) {
-            weight = -v[k][j][i+1][1];
+            Vec3D v1(v[k][j][i+1][1], v[k][j][i+1][2], v[k][j][i+1][3]);
+            weight = -v[k][j][i+1][1]/v1.norm();
+
             sum_weight += weight;
             v[k][j][i] += weight*it->second.first; /*riemann solution*/
           }
@@ -169,7 +165,9 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         it = riemann_solutions.bottom.find(ind);
         if(it != riemann_solutions.bottom.end())
           if(it->second.second/*ID*/ == id[k][j][i] && v[k][j-1][i][2] > 0) {
-            weight = v[k][j-1][i][2];
+            Vec3D v1(v[k][j-1][i][1], v[k][j-1][i][2], v[k][j-1][i][3]);
+            weight = v[k][j-1][i][2]/v1.norm();
+
             sum_weight += weight;
             v[k][j][i] += weight*it->second.first; /*riemann solution*/
           }
@@ -178,7 +176,9 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         it = riemann_solutions.top.find(ind);
         if(it != riemann_solutions.top.end())
           if(it->second.second/*ID*/ == id[k][j][i] && v[k][j+1][i][2] < 0) {
-            weight = -v[k][j+1][i][2];
+            Vec3D v1(v[k][j+1][i][1], v[k][j+1][i][2], v[k][j+1][i][3]);
+            weight = -v[k][j+1][i][2]/v1.norm();
+
             sum_weight += weight;
             v[k][j][i] += weight*it->second.first; /*riemann solution*/
           }
@@ -187,7 +187,9 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         it = riemann_solutions.back.find(ind);
         if(it != riemann_solutions.back.end())
           if(it->second.second/*ID*/ == id[k][j][i] && v[k-1][j][i][3] > 0) {
-            weight = v[k-1][j][i][3];
+            Vec3D v1(v[k-1][j][i][1], v[k-1][j][i][2], v[k-1][j][i][3]);
+            weight = v[k-1][j][i][3]/v1.norm();
+
             sum_weight += weight;
             v[k][j][i] += weight*it->second.first; /*riemann solution*/
           }
@@ -196,7 +198,9 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         it = riemann_solutions.front.find(ind);
         if(it != riemann_solutions.front.end())
           if(it->second.second/*ID*/ == id[k][j][i] && v[k+1][j][i][3] < 0) {
-            weight = -v[k+1][j][i][3];
+            Vec3D v1(v[k+1][j][i][1], v[k+1][j][i][2], v[k+1][j][i][3]);
+            weight = -v[k+1][j][i][3]/v1.norm();
+
             sum_weight += weight;
             v[k][j][i] += weight*it->second.first; /*riemann solution*/
           }
@@ -237,8 +241,6 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
 
         if(id[k][j][i] == idn[k][j][i]) //id remains the same. Skip
           continue;
-        
-        fprintf(stderr,"Updating state for node[%d,%d,%d] ID: %d --> %d.\n", i,j,k, (int)idn[k][j][i], (int)id[k][j][i]);
 
         // re-set its state variables to 0
         v[k][j][i] = 0.0;
@@ -279,12 +281,6 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
 
               // add weighted s.v. at neighbor node
               if(weight>0) {
-                fprintf(stderr," neighbor %d %d %d: weight %e, v = %e %e %e %e %e\n", neighi,neighj,neighk, weight, 
-                        v[neighk][neighj][neighi][0],
-                        v[neighk][neighj][neighi][1],
-                        v[neighk][neighj][neighi][2],
-                        v[neighk][neighj][neighi][3],
-                        v[neighk][neighj][neighi][4]);
                 sum_weight += weight;
                 v[k][j][i] += weight*v[neighk][neighj][neighi];
               }

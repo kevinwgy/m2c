@@ -20,13 +20,6 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   tol_shock            = iod_riemann.tol_shock;
   tol_rarefaction      = iod_riemann.tol_rarefaction;
 
-  // TODO: some of these parameters should goto IoData
-  maxIts_main = 200;
-  maxIts_shock = 200;   
-  numSteps_rarefaction = 100;
-  tol_main = 1.0e-5;
-  tol_shock = 1.0e-6;
-  tol_rarefaction = 1.0e-5;
 }
 
 //-----------------------------------------------------

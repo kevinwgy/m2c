@@ -150,7 +150,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i]);
     Phi[i]->AXPlusBY(0.5, 0.5, *Phi1[i]);
     Phi[i]->AXPlusBY(1.0, 0.5*dt, *Rls[i]);
-    lso[i]->ApplyBoundaryConditions(*Phi1[i]);
+    lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
   //***************************************************
 
@@ -282,7 +282,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i]);
     Phi[i]->AXPlusBY(1.0/3.0, 2.0/3.0, *Phi1[i]);
     Phi[i]->AXPlusBY(1.0, 2.0/3.0*dt, *Rls[i]);
-    lso[i]->ApplyBoundaryConditions(*Phi1[i]);
+    lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
   //***************************************************
 
