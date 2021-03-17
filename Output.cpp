@@ -54,7 +54,8 @@ bool Output::ToWriteSolutionSnapshot(double time, double dt, int time_step)
 {
   //! First check frequency_dt. If it is not specified, use frequency
   if(iod.output.frequency_dt > 0) {
-    if(time - last_snapshot_time >= iod.output.frequency_dt - 0.01*dt/*a small tolerance*/)
+    if(floor(time/iod.output.frequency_dt) != floor((time-dt)/iod.output.frequency_dt))
+//    if(time - last_snapshot_time >= iod.output.frequency_dt - 0.01*dt/*a small tolerance*/)
       return true;
     else
       return false;

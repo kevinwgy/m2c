@@ -312,6 +312,8 @@ struct MultiPhaseData {
 
   enum Flux {EXACT = 0, NUMERICAL = 1} flux;
 
+  enum ReconstructionAtInterface {CONSTANT = 0, LINEAR = 1} recon;
+
   enum PhaseChangeType {RIEMANN_SOLUTION = 0, EXTRAPOLATION = 1} phasechange_type;
 
   MultiPhaseData();
