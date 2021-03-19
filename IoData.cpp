@@ -319,6 +319,42 @@ void MieGruneisenModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+JonesWilkinsLeeModelData::JonesWilkinsLeeModelData() 
+{
+  //default values are for the gaseous products of TNT (Page 21 of Arthur Rallu's thesis)
+  omega = 0.28;     //nondimensional
+  A1    = 3.712e11; //Pa
+  A2    = 3.23e9;   //Pa
+  R1    = 4.15;     //nondimensional
+  R2    = 0.95;     //nondimensional
+  rho0  = 1.63e-3;  //g/mm3
+
+}
+
+//------------------------------------------------------------------------------
+
+void JonesWilkinsLeeModelData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+
+  new ClassDouble<JonesWilkinsLeeModelData>(ca, "Omega", this, 
+                                            &JonesWilkinsLeeModelData::omega);
+  new ClassDouble<JonesWilkinsLeeModelData>(ca, "A1", this, 
+                                            &JonesWilkinsLeeModelData::A1);
+  new ClassDouble<JonesWilkinsLeeModelData>(ca, "A2", this, 
+                                            &JonesWilkinsLeeModelData::A2);
+  new ClassDouble<JonesWilkinsLeeModelData>(ca, "R1", this, 
+                                            &JonesWilkinsLeeModelData::R1);
+  new ClassDouble<JonesWilkinsLeeModelData>(ca, "R2", this, 
+                                            &JonesWilkinsLeeModelData::R2);
+  new ClassDouble<JonesWilkinsLeeModelData>(ca, "rho0", this, 
+                                            &JonesWilkinsLeeModelData::rho0);
+
+}
+
+//------------------------------------------------------------------------------
+
 MaterialModelData::MaterialModelData()
 {
 
@@ -333,17 +369,19 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
-                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 2,
+                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
                                  "StiffenedGas", MaterialModelData::STIFFENED_GAS, 
-                                 "MieGruneisen", MaterialModelData::MIE_GRUNEISEN);
+                                 "MieGruneisen", MaterialModelData::MIE_GRUNEISEN,
+                                 "JonesWilkinsLee", MaterialModelData::JWL);
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
   new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
 
   sgModel.setup("StiffenedGasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
+  jwlModel.setup("JonesWilkinsLeeModel", ca);
 
   return ca;
 };

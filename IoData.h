@@ -175,15 +175,34 @@ struct MieGruneisenModelData {
 
 //------------------------------------------------------------------------------
 
+struct JonesWilkinsLeeModelData {
+
+  double omega;
+  double A1;
+  double A2;
+  double R1;
+  double R2;
+  double rho0;
+
+  JonesWilkinsLeeModelData();
+  ~JonesWilkinsLeeModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);  
+
+};
+
+//------------------------------------------------------------------------------
+
 struct MaterialModelData {
 
   int id;
-  enum EOS {STIFFENED_GAS = 0, MIE_GRUNEISEN = 1} eos;
+  enum EOS {STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2} eos;
   double rhomin;
   double pmin;
 
-  StiffenedGasModelData sgModel;
-  MieGruneisenModelData mgModel;
+  StiffenedGasModelData    sgModel;
+  MieGruneisenModelData    mgModel;
+  JonesWilkinsLeeModelData jwlModel;
 
   MaterialModelData();
   ~MaterialModelData() {}

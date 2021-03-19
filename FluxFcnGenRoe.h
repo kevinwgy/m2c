@@ -104,10 +104,10 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   double w_e   = de*de/(e_hat*e_hat);
   double denominator =  w_rho + w_e + eps;
 
-  double dpdrho_roeavg = Average(sqrt_rhom, vf[id]->GetDpdrho(Vm[0],Vm[4]), 
-                                 sqrt_rhop, vf[id]->GetDpdrho(Vp[0],Vp[4]));
-  double Gamma_roeavg = Average(sqrt_rhom, vf[id]->GetBigGamma(Vm[0],Vm[4]), 
-                                sqrt_rhop, vf[id]->GetBigGamma(Vp[0],Vp[4]));
+  double dpdrho_roeavg = Average(sqrt_rhom, vf[id]->GetDpdrho(Vm[0],em), 
+                                 sqrt_rhop, vf[id]->GetDpdrho(Vp[0],ep));
+  double Gamma_roeavg = Average(sqrt_rhom, vf[id]->GetBigGamma(Vm[0],em), 
+                                sqrt_rhop, vf[id]->GetBigGamma(Vp[0],ep));
 
   double dpdrho_hat_numerator_term1 = (w_e + eps)*dpdrho_roeavg;
   double dpdrho_hat_numerator_term2 = (dp - Gamma_roeavg*rho_hat*de)*drho/(rho_hat*rho_hat); //avoid dividing by drho (possibly 0)
@@ -120,6 +120,10 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
   double c_hat_square = dpdrho_hat + Gamma_hat*p_over_rho_hat;
   if(c_hat_square <= 0) {
     fprintf(stderr,"Warning: The artificial state in the generalized Roe flux function loses hyperbolicity (c_hat_square = %e). Setting c_hat = 0.\n", c_hat_square);
+    fprintf(stderr,"Vm = %e %e %e %e %e, Vp = %e %e %e %e %e, dir = %d, id = %d \n",
+            Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], dir, id);
+    //fprintf(stderr,"dpdrho_hat = %e, Gamma_hat = %e, p_over_rho_hat = %e\n", dpdrho_hat, Gamma_hat, p_over_rho_hat);
+    //fprintf(stderr,"denominator = %e, numerator_term1 = %e, numerator_term2 = %e.\n", denominator, Gamma_hat_numerator_term1, Gamma_hat_numerator_term2);
     c_hat = eps;
     c_hat_square = c_hat*c_hat;
   } else

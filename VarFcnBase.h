@@ -30,7 +30,7 @@ class VarFcnBase {
 
 public:
   
-  enum Type{ STIFFENED_GAS = 0, MIE_GRUNEISEN = 1} type;
+  enum Type{ STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2} type;
 
   double rhomin,pmin;
 
@@ -72,7 +72,13 @@ public:
 
   //checks that the Euler equations are still hyperbolic
   virtual bool CheckState(double *V) const{
-    print_error("*** Error:  VarFcnBase::checkState not implemented for this equation of state (type = %d)\n", type);
+    double e = GetInternalEnergyPerUnitMass(V[0],V[4]);
+    double c2 = GetDpdrho(V[0], e) + V[4]/V[0]*GetBigGamma(V[0], e);
+    if(c2<=0){
+      if(verbose)
+        fprintf(stdout, "Warning: Violating the hyperbolicity (JWL). rho = %e, p = %e.\n", V[0], V[4]);
+      return true;
+    }
     return false;
   }
 
