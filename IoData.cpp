@@ -288,13 +288,21 @@ void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 
 MieGruneisenModelData::MieGruneisenModelData() 
 {
-  //default values are for copper
-  rho0 = 8.96e-3;       // unit: g/mm3
-  cv = 3.90e8;          // unit: mm2/(s2.K)
-  C0 = 3.933e6;         // unit: mm/s
-  s = 1.5;              // non-dimensional
-  Gamma0 = 1.99;        // non-dimensional
+  // default values are for copper
+  // These values are taken from Wikipedia 
+  // (https://en.wikipedia.org/wiki/Mie%E2%80%93Gr%C3%BCneisen_equation_of_state),
+  // which cites two papers: Mitchell and Nellis (1981) "Shock compression of
+  // aluminum, copper, and tantalum", Journal of Applied Physics, and MacDonald and
+  // MacDonald (1981) "Thermodynamic properties of fcc metals at high temperaures",
+  // Physical Review B.
 
+  rho0 = 8.96e-3;       // unit: g/mm3
+  c0 = 3.933e6;         // unit: mm/s
+  Gamma0 = 1.99;        // non-dimensional
+  s = 1.5;              // non-dimensional
+  e0 = 0.0;         
+
+  cv = 3.90e8;          // unit: mm2/(s2.K)
 }
 
 //------------------------------------------------------------------------------
@@ -302,18 +310,20 @@ MieGruneisenModelData::MieGruneisenModelData()
 void MieGruneisenModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassDouble<MieGruneisenModelData>(ca, "ReferenceDensity", this, 
                                          &MieGruneisenModelData::rho0);
   new ClassDouble<MieGruneisenModelData>(ca, "SpecificHeatAtConstantVolume", this, 
                                          &MieGruneisenModelData::cv);
   new ClassDouble<MieGruneisenModelData>(ca, "BulkSpeedOfSound", this, 
-                                         &MieGruneisenModelData::C0);
+                                         &MieGruneisenModelData::c0);
   new ClassDouble<MieGruneisenModelData>(ca, "HugoniotSlope", this, 
                                          &MieGruneisenModelData::s);
-  new ClassDouble<MieGruneisenModelData>(ca, "Gamma0", this, 
+  new ClassDouble<MieGruneisenModelData>(ca, "ReferenceGamma", this, 
                                          &MieGruneisenModelData::Gamma0);
+  new ClassDouble<MieGruneisenModelData>(ca, "ReferenceInternalEnergyPerMass", this, 
+                                         &MieGruneisenModelData::e0);
 
 }
 
@@ -348,7 +358,7 @@ void JonesWilkinsLeeModelData::setup(const char *name, ClassAssigner *father)
                                             &JonesWilkinsLeeModelData::R1);
   new ClassDouble<JonesWilkinsLeeModelData>(ca, "R2", this, 
                                             &JonesWilkinsLeeModelData::R2);
-  new ClassDouble<JonesWilkinsLeeModelData>(ca, "rho0", this, 
+  new ClassDouble<JonesWilkinsLeeModelData>(ca, "Rho0", this, 
                                             &JonesWilkinsLeeModelData::rho0);
 
 }
@@ -742,7 +752,7 @@ void IcData::readUserSpecifiedIC()
   std::fstream input;
   input.open(user_specified_ic, std::fstream::in);
   if (!input.is_open()) {
-    print_error("Error: could not open user-specified initial condition file %s.\n", user_specified_ic);
+    print_error("*** Error: could not open user-specified initial condition file %s.\n", user_specified_ic);
     exit_mpi();
   } else
     print("- Reading user-specified initial condition file: %s.\n", user_specified_ic);
@@ -777,7 +787,7 @@ void IcData::readUserSpecifiedIC()
     readUserSpecifiedIC_Spherical(input);
   } 
   else {
-    print_error("Error: Unknown initial condition type %s.\n", word);
+    print_error("*** Error: Unknown initial condition type %s.\n", word);
     exit_mpi();
   }
 
@@ -860,14 +870,14 @@ void IcData::readUserSpecifiedIC_Planar(std::fstream &input)
       column2var[column] = TEMPERATURE;
       specified[TEMPERATURE] = 1;
     } else {
-      print_error("Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      print_error("*** Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
       exit_mpi();
     }
     column++;
   }
 
   if(column<2 || !specified[COORDINATE]) {
-    print_error("Error: Need additional data in the initial condition file.\n");
+    print_error("*** Error: Need additional data in the initial condition file.\n");
     exit_mpi();
   }
 
@@ -965,14 +975,14 @@ void IcData::readUserSpecifiedIC_Cylindrical(std::fstream &input)
       column2var[column] = TEMPERATURE;
       specified[TEMPERATURE] = 1;
     } else {
-      print_error("Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      print_error("*** Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
       exit_mpi();
     }
     column++;
   }
 
   if(column<2 || !specified[COORDINATE]) {
-    print_error("Error: Need additional data in the initial condition file.\n");
+    print_error("*** Error: Need additional data in the initial condition file.\n");
     exit_mpi();
   }
 
@@ -983,7 +993,7 @@ void IcData::readUserSpecifiedIC_Cylindrical(std::fstream &input)
   if(word.compare(0,4,"Axial",0,4) && 
      word.compare(0,4,"AXIAL",0,4) && 
      word.compare(0,4,"axial",0,4)) {
-    print_error("Error: Expect keyword 'Axial' in user-specified initial condition.\n");
+    print_error("*** Error: Expect keyword 'Axial' in user-specified initial condition.\n");
     exit_mpi();
   } 
   input.ignore(256,'\n'); //done with this line
@@ -1109,14 +1119,14 @@ void IcData::readUserSpecifiedIC_Spherical(std::fstream &input)
       column2var[column] = TEMPERATURE;
       specified[TEMPERATURE] = 1;
     } else {
-      print_error("Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
+      print_error("*** Error: I do not understand the word '%s' in the user-specified initial condition file.\n", word.c_str());
       exit_mpi();
     }
     column++;
   }
 
   if(column<2 || !specified[COORDINATE]) {
-    print_error("Error: Need additional data in the initial condition file.\n");
+    print_error("*** Error: Need additional data in the initial condition file.\n");
     exit_mpi();
   }
 
@@ -1228,7 +1238,7 @@ IoData::IoData(int argc, char** argv)
 void IoData::readCmdLine(int argc, char** argv)
 {
   if(argc==1) {
-    print_error("Error: Input file not provided!\n");
+    print_error("*** Error: Input file not provided!\n");
     exit_mpi();
   }
   cmdFileName = argv[1];

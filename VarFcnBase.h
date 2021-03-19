@@ -74,7 +74,7 @@ public:
   virtual bool CheckState(double *V) const{
     double e = GetInternalEnergyPerUnitMass(V[0],V[4]);
     double c2 = GetDpdrho(V[0], e) + V[4]/V[0]*GetBigGamma(V[0], e);
-    if(c2<=0){
+    if(V[0] <=0.0 || c2<=0){
       if(verbose)
         fprintf(stdout, "Warning: Violating the hyperbolicity (JWL). rho = %e, p = %e.\n", V[0], V[4]);
       return true;

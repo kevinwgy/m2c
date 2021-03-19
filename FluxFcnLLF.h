@@ -71,7 +71,7 @@ void FluxFcnLLF::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double
     EvaluateFluxFunction_H(Vm, id, fm);
     EvaluateFluxFunction_H(Vp, id, fp);
   } else {
-    print_error("Error: Dir. (%d) not recognized.\n", dir);
+    print_error("*** Error: Dir. (%d) not recognized.\n", dir);
     exit_mpi();
   }
 

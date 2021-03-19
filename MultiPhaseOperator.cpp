@@ -72,7 +72,7 @@ MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariabl
 
 
   if(overlap) {
-    print_error("Error: Found overlapping material interfaces. Number of overlapped cells: %d.\n", overlap);
+    print_error("*** Error: Found overlapping material interfaces. Number of overlapped cells: %d.\n", overlap);
     exit_mpi();
   } 
 
@@ -100,7 +100,7 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
       break;
 
     default :
-      print_error("Error: Specified method for phase-change update (%d) has not been implemented.\n", 
+      print_error("*** Error: Specified method for phase-change update (%d) has not been implemented.\n", 
                   (int)iod_multiphase.phasechange_type);
   }
 }

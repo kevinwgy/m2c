@@ -161,10 +161,12 @@ struct StiffenedGasModelData {
 struct MieGruneisenModelData {
 
   double rho0;
-  double cv; 
-  double C0;
-  double s;
+  double c0;
   double Gamma0;
+  double s;
+  double e0;
+
+  double cv; 
 
   MieGruneisenModelData();
   ~MieGruneisenModelData() {}

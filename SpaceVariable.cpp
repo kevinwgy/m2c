@@ -246,7 +246,7 @@ void SpaceVariable3D::AXPlusB(double a, double b, bool workOnGhost)
 void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost)
 {
   if(dof != y.NumDOF()) {
-    print_error("Error: Vector operation failed due to inconsistent sizes (%d vs. %d)\n", dof, y.NumDOF());
+    print_error("*** Error: Vector operation failed due to inconsistent sizes (%d vs. %d)\n", dof, y.NumDOF());
     exit_mpi();
   }
 

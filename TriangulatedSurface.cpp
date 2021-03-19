@@ -55,7 +55,7 @@ void TriangulatedSurface::BuildElementNormals()
     if(nrm > 0.0)
       elemNorm[i] /= nrm;
     else {
-      print_error("Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
+      print_error("*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
       exit_mpi();
     }
   }
@@ -64,12 +64,12 @@ void TriangulatedSurface::BuildElementNormals()
   if(degenerate) {
     for(int i=0; i<nElems; i++)
       if(n2!=n3) {
-        print_error("Error: Cannot handle a mix of triangles and line segments.\n");
+        print_error("*** Error: Cannot handle a mix of triangles and line segments.\n");
         exit_mpi();
       }
     for(int i=0; i<X.size(); i++)
       if(X[i][2] != 0) {
-        print_error("Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
+        print_error("*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
                      X[i][2]);
         exit_mpi();
       }

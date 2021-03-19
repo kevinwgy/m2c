@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
     int matid = it->first;
     if(matid < 0 || matid >= vf.size()) {
-      print_error("Error: Detected error in the specification of material indices (id = %d).\n", matid);
+      print_error("*** Error: Detected error in the specification of material indices (id = %d).\n", matid);
       exit_mpi();
     }
     if(it->second->eos == MaterialModelData::STIFFENED_GAS)
@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
     else if(it->second->eos == MaterialModelData::JWL)
       vf[matid] = new VarFcnJWL(*it->second, iod.output.verbose);
     else {
-      print_error("Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
+      print_error("*** Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
       exit_mpi();
     }
   }
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
   else if(iod.schemes.ns.flux == SchemeData::HLLC)
     ff = new FluxFcnHLLC(vf, iod);
   else {
-    print_error("Error: Unable to initialize flux calculator (FluxFcn) for the specified numerical method.\n");
+    print_error("*** Error: Unable to initialize flux calculator (FluxFcn) for the specified numerical method.\n");
     exit_mpi();
   }
 
@@ -98,11 +98,11 @@ int main(int argc, char* argv[])
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
     if(matid<=0 || matid>=vf.size()) { //cannot use ls to track material 0
-      print_error("Error: Cannot initialize a level set for tracking material %d.\n", matid);
+      print_error("*** Error: Cannot initialize a level set for tracking material %d.\n", matid);
       exit_mpi();
     }
     if(ls_tracker.find(matid) != ls_tracker.end()) {
-      print_error("Error: Cannot initialize multiple level sets for the same material (id=%d).\n", matid);
+      print_error("*** Error: Cannot initialize multiple level sets for the same material (id=%d).\n", matid);
       exit_mpi();
     }
     ls_tracker.insert(matid);    
@@ -133,11 +133,11 @@ int main(int argc, char* argv[])
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
       integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo);
     else {
-      print_error("Error: Unable to initialize time integrator for the specified (explicit) method.\n");
+      print_error("*** Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();
     }
   } else {
-    print_error("Error: Unable to initialize time integrator for the specified method.\n");
+    print_error("*** Error: Unable to initialize time integrator for the specified method.\n");
     exit_mpi();
   }
 

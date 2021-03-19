@@ -91,7 +91,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 
   //TODO: Add this feature later
   if(iod.ic.specified[IcData::LEVELSET] || iod.ic.specified[IcData::MATERIALID]) {
-    print_error("Error: Currently, cannot read level set and material id from user-specified data file.\n");
+    print_error("*** Error: Currently, cannot read level set and material id from user-specified data file.\n");
     exit_mpi();
   }
 
@@ -220,7 +220,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
             phi[k][j][ii0] = phi[k][j][ii0+1];
         break;
       default :
-        print_error("Error: Level set boundary condition at x=x0 cannot be specified!\n");
+        print_error("*** Error: Level set boundary condition at x=x0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -237,7 +237,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
             phi[k][j][iimax-1] = phi[k][j][iimax-2];
         break;
       default :
-        print_error("Error: Level set boundary condition at x=xmax cannot be specified!\n");
+        print_error("*** Error: Level set boundary condition at x=xmax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -254,7 +254,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
             phi[k][jj0][i] = phi[k][jj0+1][i];
         break;
       default :
-        print_error("Error: Level set boundary condition at y=y0 cannot be specified!\n");
+        print_error("*** Error: Level set boundary condition at y=y0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -271,7 +271,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
             phi[k][jjmax-1][i] = phi[k][jjmax-2][i]; 
         break;
       default :
-        print_error("Error: Level set boundary condition at y=ymax cannot be specified!\n");
+        print_error("*** Error: Level set boundary condition at y=ymax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -288,7 +288,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
             phi[kk0][j][i] = phi[kk0+1][j][i]; 
         break;
       default :
-        print_error("Error: Level set boundary condition at z=z0 cannot be specified!\n");
+        print_error("*** Error: Level set boundary condition at z=z0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -305,7 +305,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
             phi[kkmax-1][j][i] = phi[kkmax-2][j][i];
         break;
       default :
-        print_error("Error: Boundary condition at z=zmax cannot be specified!\n");
+        print_error("*** Error: Boundary condition at z=zmax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -475,7 +475,7 @@ double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, dou
       break;
 
     default:
-      print_error("Error: Level set flux function not recognized (code = %d).\n", iod_ls.flux);
+      print_error("*** Error: Level set flux function not recognized (code = %d).\n", iod_ls.flux);
       exit_mpi();      
   }
   return flux;
@@ -507,7 +507,7 @@ void LevelSetOperator::AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R)
 
 void LevelSetOperator::Reinitialize(SpaceVariable3D &Phi)
 {
-  print_error("Error: Level set reinitialization has not been implemented yet.\n");
+  print_error("*** Error: Level set reinitialization has not been implemented yet.\n");
   exit_mpi();
 }
 

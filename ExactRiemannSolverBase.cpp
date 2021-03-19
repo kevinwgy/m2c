@@ -451,7 +451,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       f1    = f0;
       while(!found_rhos0) {
         if(++i>=maxIts_shock) {
-          cout << "Error: Unable to find a bracketing interval after " << maxIts_shock 
+          cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
                << " iterations (in the solution of the Hugoniot equation)." << endl;
           exit_mpi();
         }
@@ -494,7 +494,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         double factor = 2.5;
         while(!found_rhos1) {
           if(++i>=maxIts_shock) {
-            cout << "Error: Unable to find a bracketing interval after " << maxIts_shock 
+            cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
                  << " iterations (in the solution of the Hugoniot equation (2))." << endl;
             exit_mpi();
           }
@@ -529,7 +529,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
     double du = -(ps-p)*(1.0/rhos-1.0/rho);
     if(du<0) {
-      cout << "Error: Violation of hyperbolicitiy when enforcing the Rankine-Hugoniot jump conditions (du = "
+      cout << "*** Error: Violation of hyperbolicitiy when enforcing the Rankine-Hugoniot jump conditions (du = "
            << du << ")." << endl;
       exit_mpi();
     }

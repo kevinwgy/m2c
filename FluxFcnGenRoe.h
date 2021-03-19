@@ -161,7 +161,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
       a5 = (dp + rho_hat*c_hat*dw)/(2*c_hat_square);
       break;
     default:
-      fprintf(stderr,"Error: Incorrect use of function FluxFcnGenRoe::ComputeLambdaAlphaR.\n");
+      fprintf(stderr,"*** Error: Incorrect use of function FluxFcnGenRoe::ComputeLambdaAlphaR.\n");
       exit_mpi();
   }
 }

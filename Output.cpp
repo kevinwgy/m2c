@@ -170,7 +170,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
 
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     if(it->first >= OutputData::MAXLS) {
-      print_error("Error: Not able to output level set %d (id must be less than %d).\n", it->first, OutputData::MAXLS);
+      print_error("*** Error: Not able to output level set %d (id must be less than %d).\n", it->first, OutputData::MAXLS);
       exit_mpi();
     }
     if(iod.output.levelset[it->first]==OutputData::ON) {

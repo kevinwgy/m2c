@@ -77,7 +77,7 @@ int Reconstructor::CalculateSlopeLimiterCoefficientK(double A, double B)
       if(B <= rhs) break;
     }
     if(k>=999) {
-      print_error("Error: Cannot setup slope limiter parameter k for A = %e, B = %e.\n", A, B);
+      print_error("*** Error: Cannot setup slope limiter parameter k for A = %e, B = %e.\n", A, B);
       exit_mpi();
     }
     return k;
@@ -337,7 +337,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
                 dq1 = (u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof]);
                 break;
               default:
-                print_error("Error: dir(%d) not recognized.\n", dir);
+                print_error("*** Error: dir(%d) not recognized.\n", dir);
                 exit_mpi();
             }
 

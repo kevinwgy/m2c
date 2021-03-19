@@ -287,7 +287,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
         if(checkState) {
           if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {
-            print_error("Error: State variables at (%d,%d,%d) violate hyperbolicity. matid = %d.\n", i,j,k, id[k][j][i]);
+            print_error("*** Error: State variables at (%d,%d,%d) violate hyperbolicity. matid = %d.\n", i,j,k, id[k][j][i]);
             fprintf(stderr,"v[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
             exit_mpi();
           }
@@ -643,7 +643,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("Error: Boundary condition at x=x0 cannot be specified!\n");
+        print_error("*** Error: Boundary condition at x=x0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -683,7 +683,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("Error: Boundary condition at x=xmax cannot be specified!\n");
+        print_error("*** Error: Boundary condition at x=xmax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -723,7 +723,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("Error: Boundary condition at y=y0 cannot be specified!\n");
+        print_error("*** Error: Boundary condition at y=y0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -763,7 +763,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("Error: Boundary condition at y=ymax cannot be specified!\n");
+        print_error("*** Error: Boundary condition at y=ymax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -803,7 +803,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("Error: Boundary condition at z=z0 cannot be specified!\n");
+        print_error("*** Error: Boundary condition at z=z0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -843,7 +843,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("Error: Boundary condition at z=zmax cannot be specified!\n");
+        print_error("*** Error: Boundary condition at z=zmax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -998,7 +998,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                 varFcn[myid]->CheckState(vk[k][j][i]) || varFcn[myid]->CheckState(vf[k][j][i]);
 
         if(error) {
-          print_error("Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\n", i,j,k, myid);
+          print_error("*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\n", i,j,k, myid);
           fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
           fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
           fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);

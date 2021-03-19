@@ -134,7 +134,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
       Sp = std::max(Vp[3] + cp, w_hat + c_hat); 
       break;
     default:
-      fprintf(stderr,"Error: Incorrect use of function FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage.\n");
+      fprintf(stderr,"*** Error: Incorrect use of function FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage.\n");
       exit_mpi();
   }
 }
@@ -218,7 +218,7 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
     else if (Sstar <= 0.0)
       ComputeFstar(dir, Vp, Sp, Sstar, id, flux);
     else {
-      fprintf(stderr,"Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface.\n");
+      fprintf(stderr,"*** Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface.\n");
       exit_mpi();
     }
   }
