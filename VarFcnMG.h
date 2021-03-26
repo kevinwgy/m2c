@@ -103,12 +103,12 @@ VarFcnMG::VarFcnMG(MaterialModelData &data, bool verbose_) : VarFcnBase(data,ver
 inline
 double VarFcnMG::GetDensity(double p, double e) const {
 
-  //solving a quadratic equation a*eta^2 + b*eta + c = 0 for eta.
+  //solving a quadratic equation a*eta^2 + b*eta + c = 0 for eta ==> rho = rho0/(1-eta)
   double c = p - Gamma0_rho0*(e - e0);
   double a = c*s*s + Gamma0_over_2*rho0_c0_c0;
   double b = -(2.0*c*s + rho0_c0_c0);
 
-  if(a==0) {//linear equation
+  if(a==0) {//linear equation: eta = -c/b, rho = rho0/(1-eta)
 
     return rho0/(1 + c/b);
 
