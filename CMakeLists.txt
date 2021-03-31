@@ -68,6 +68,7 @@ MultiPhaseOperator.cpp
 Output.cpp
 Reconstructor.cpp
 SpaceOperator.cpp
+MeshGenerator.cpp
 LevelSetOperator.cpp
 TimeIntegrator.cpp
 Utils.cpp)

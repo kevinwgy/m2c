@@ -194,6 +194,29 @@ void MultiInitialConditionsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+MeshResolution1DPointData::MeshResolution1DPointData()
+{
+  coord = 0.0;
+  h     = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *MeshResolution1DPointData::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 2, nullAssigner);
+
+  new ClassDouble<MeshResolution1DPointData>
+    (ca, "Coordinate", this, &MeshResolution1DPointData::coord);
+  new ClassDouble<MeshResolution1DPointData>
+    (ca, "CellWidth", this, &MeshResolution1DPointData::h);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
 MeshData::MeshData()
 {
   type = THREEDIMENSIONAL;
@@ -203,9 +226,9 @@ MeshData::MeshData()
   ymax = 1.0;
   z0 = 0.0;
   zmax = 1.0;
-  Nx = 50;
-  Ny = 50;
-  Nz = 50;
+  Nx = -1;
+  Ny = -1;
+  Nz = -1;
 
   bc_x0   = NONE;
   bc_xmax = NONE;
@@ -219,7 +242,7 @@ MeshData::MeshData()
 
 void MeshData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 16, father);
+  ClassAssigner *ca = new ClassAssigner(name, 20, father);
 
   new ClassToken<MeshData>(ca, "Type", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::type), 2,
@@ -233,6 +256,10 @@ void MeshData::setup(const char *name, ClassAssigner *father)
   new ClassInt<MeshData>(ca, "NumberOfCellsX", this, &MeshData::Nx);
   new ClassInt<MeshData>(ca, "NumberOfCellsY", this, &MeshData::Ny);
   new ClassInt<MeshData>(ca, "NumberOfCellsZ", this, &MeshData::Nz);
+
+  xpoints_map.setup("ControlPointX", ca);
+  ypoints_map.setup("ControlPointY", ca);
+  zpoints_map.setup("ControlPointZ", ca);
 
   new ClassToken<MeshData>(ca, "BoundaryConditionX0", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 5,

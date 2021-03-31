@@ -66,7 +66,6 @@ private:
     if(fabs(dq0*dq1)<1e-16) return 0.0;
     double dq0_power_k = pow(dq0,k);
     double dq1_power_k = pow(dq1,k);
-    double denom = dq0_power_k + A*dq1_power_k;
     return B*(dq1*dq0_power_k + dq0*dq1_power_k)/(dq0_power_k + A*dq1_power_k);
   }
 

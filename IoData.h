@@ -125,11 +125,29 @@ struct MultiInitialConditionsData {
 
 //------------------------------------------------------------------------------
 
+struct MeshResolution1DPointData {
+
+  double coord;
+  double h; 
+
+  MeshResolution1DPointData();
+  ~MeshResolution1DPointData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
 struct MeshData {
 
   enum Type {THREEDIMENSIONAL = 0, CYLINDRICAL = 1} type;
   double x0, xmax, y0, ymax, z0, zmax;
   int Nx, Ny, Nz;
+
+  // mesh resolution info
+  ObjectMap<MeshResolution1DPointData>  xpoints_map;
+  ObjectMap<MeshResolution1DPointData>  ypoints_map;
+  ObjectMap<MeshResolution1DPointData>  zpoints_map;
 
   enum BcType {NONE = 0, INLET = 1, OUTLET = 2, WALL = 3, SYMMETRY = 4, SIZE = 5};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;

@@ -2,6 +2,7 @@
 #include <petscdmda.h> //PETSc
 #include <Utils.h>
 #include <IoData.h>
+#include <MeshGenerator.h>
 #include <Output.h>
 #include <SpaceVariable.h>
 #include <VarFcnSG.h>
