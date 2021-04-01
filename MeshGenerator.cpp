@@ -22,13 +22,13 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
 
   vector<pair<double,double> > xpoints;
   for(auto it = iod_mesh.xpoints_map.dataMap.begin(); it != iod_mesh.xpoints_map.dataMap.end(); it++)
-    xpoints.push_back(make_pair(it->second->coord, it->second->h));
+    xpoints.push_back(std::make_pair(it->second->coord, it->second->h));
   vector<pair<double,double> > ypoints;
   for(auto it = iod_mesh.ypoints_map.dataMap.begin(); it != iod_mesh.ypoints_map.dataMap.end(); it++)
-    ypoints.push_back(make_pair(it->second->coord, it->second->h));
+    ypoints.push_back(std::make_pair(it->second->coord, it->second->h));
   vector<pair<double,double> > zpoints;
   for(auto it = iod_mesh.zpoints_map.dataMap.begin(); it != iod_mesh.zpoints_map.dataMap.end(); it++)
-    zpoints.push_back(make_pair(it->second->coord, it->second->h));
+    zpoints.push_back(std::make_pair(it->second->coord, it->second->h));
   
   // check for error
   if ( (Nx<=0 && xpoints.size()==0) || (Ny<=0 && ypoints.size()==0) || (Nz<=0 && zpoints.size()==0) ) {
@@ -47,48 +47,48 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
 
   // insert min and max
   if(xpoints.size() != 0) {
-    if(xpoints.front.first > x0)
-      xpoints.insert(xpoints.front, make_pair(x0, xpoints.front.second));
-    else if(xpoints.front.first < x0) {
+    if(xpoints.front().first > x0)
+      xpoints.insert(xpoints.begin(), std::make_pair(x0, xpoints.front().second));
+    else if(xpoints.front().first < x0) {
       print_error("*** Error: Detected mesh control point (x-dir) outside physical domain.\n");
       exit_mpi();
     }
       
-    if(xpoints.back.first < xmax)
-      xpoints.push_back(make_pair(xmax, xpoints.back.second));
-    else if (xpoints.back.first > xmax) {
+    if(xpoints.back().first < xmax)
+      xpoints.push_back(std::make_pair(xmax, xpoints.back().second));
+    else if (xpoints.back().first > xmax) {
       print_error("*** Error: Detected mesh control point (x-dir) outside physical domain.\n");
       exit_mpi();
     }
   }
 
   if(ypoints.size() != 0) {
-    if(ypoints.front.first > y0)
-      ypoints.insert(ypoints.front, make_pair(y0, ypoints.front.second));
-    else if(ypoints.front.first < y0) {
+    if(ypoints.front().first > y0)
+      ypoints.insert(ypoints.begin(), std::make_pair(y0, ypoints.front().second));
+    else if(ypoints.front().first < y0) {
       print_error("*** Error: Detected mesh control point (y-dir) outside physical domain.\n");
       exit_mpi();
     }
 
-    if(ypoints.back.first < ymax)
-      ypoints.push_back(make_pair(ymax, ypoints.back.second));
-    else if(ypoints.back.first > ymax) { 
+    if(ypoints.back().first < ymax)
+      ypoints.push_back(std::make_pair(ymax, ypoints.back().second));
+    else if(ypoints.back().first > ymax) { 
       print_error("*** Error: Detected mesh control point (y-dir) outside physical domain.\n");
       exit_mpi();
     }
   }
 
   if(zpoints.size() != 0) {
-    if(zpoints.front.first > z0)
-      zpoints.insert(zpoints.front, make_pair(z0, zpoints.front.second));
-    else if(zpoints.front.first < z0) {
+    if(zpoints.front().first > z0)
+      zpoints.insert(zpoints.begin(), std::make_pair(z0, zpoints.front().second));
+    else if(zpoints.front().first < z0) {
       print_error("*** Error: Detected mesh control point (z-dir) outside physical domain.\n");
       exit_mpi();
     }
 
-    if(zpoints.back.first < zmax)
-      zpoints.push_back(make_pair(zmax, zpoints.back.second));
-    else if(zpoints.back.first > zmax) {
+    if(zpoints.back().first < zmax)
+      zpoints.push_back(std::make_pair(zmax, zpoints.back().second));
+    else if(zpoints.back().first > zmax) {
       print_error("*** Error: Detected mesh control point (z-dir) outside physical domain.\n");
       exit_mpi();
     }
@@ -112,17 +112,29 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
   else
     ComputeMesh1DNonUniform(z0, zmax, zpoints, z, dz);
 
+
+  // Print mesh statistics to the screen
+  print("\nMesh Statistics:\n");
+  print("  X-Direction: [%e, %e], %d nodes/cells, dx_min = %e, dx_max = %e.\n", x0, xmax, x.size(), 
+         *std::min_element(dx.begin(), dx.end()), *std::max_element(dx.begin(), dx.end()));
+  print("  Y-Direction: [%e, %e], %d nodes/cells, dy_min = %e, dy_max = %e.\n", y0, ymax, y.size(), 
+         *std::min_element(dy.begin(), dy.end()), *std::max_element(dy.begin(), dy.end()));
+  print("  Z-Direction: [%e, %e], %d nodes/cells, dz_min = %e, dz_max = %e.\n", z0, zmax, z.size(), 
+         *std::min_element(dz.begin(), dz.end()), *std::max_element(dz.begin(), dz.end()));
+  print("  Total number of nodes/cells: %d.\n", x.size()*y.size()*z.size());
+  print("\n");
+
 }
 
 //-----------------------------------------------------
 
 void MeshGenerator::ComputeMesh1DUniform(double x0, double xmax, double Nx, 
-                                         vector<dobule> &x, vector<double> &dx)
+                                         vector<double> &x, vector<double> &dx)
 {
   x.clear();
   dx.clear();
 
-  double h = (xmax-xmin)/Nx;
+  double h = (xmax-x0)/Nx;
   dx.resize(Nx, h);
 
   x.resize(Nx);
@@ -132,7 +144,7 @@ void MeshGenerator::ComputeMesh1DUniform(double x0, double xmax, double Nx,
 
 //-----------------------------------------------------
 
-// Ref. Alfio Quarteroni, Numerical Models for Differential Problems, Chapter 6
+// Ref. (1) KW's notes. (2) Alfio Quarteroni, Numerical Models for Differential Problems, Chapter 6
 // Applying linear interpolation to get local cell size. (TODO: can be extended if needed)
 void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax, 
                                             vector<pair<double,double> > &xpoints,
@@ -141,16 +153,83 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
   //The cell size at x0 and xmax must be defined in xpoints. So the coords of the first & last
   //nodes (cell centers) are specified
   int Np = xpoints.size();
-  x0   = x0 + 0.5*xpoints[0].second();
-  xmax = xmax - 0.5*xpoints[Np-1].second();
 
   //Calculate the number nodes / cells (in the real domain)
-  double h = 
-  double Nreal = 0.0; //integration of 1/h from x0 to xmax
-  for(int i=0; i<Np; i++)
-    
-    
+  double Nreal = 0.0;
+  double a, b, xp1, xp2, h1, h2;
+  for(int i=0; i<Np-2; i++) {
+    xp1 = xpoints[i].first;
+    h1  = xpoints[i].second;
+    xp2 = xpoints[i+1].first;
+    h2  = xpoints[i+1].second;
+    a   = (h2 - h1)/(xp2 - xp1);
+    b   = (h1*xp2 - h2*xp1)/(xp2 - xp1);
+    Nreal += 1.0/a*log((a*xp2+b)/(a*xp1+b));
+  }  
+  int N = std::max(1, (int)Nreal); //(int)Nreal --> integer floor of Nreal (since Nreal>0)
 
+
+  //Calculating the coordinates of the cell boundaries
+  double kappa = N/Nreal;
+  double xi[N+1]; //these are the cell boundaries
+
+  xi[0] = x0;
+
+  int i = 0;
+  xp1 = xpoints[i].first;
+  h1  = xpoints[i].second;
+  xp2 = xpoints[i+1].first;
+  h2  = xpoints[i+1].second;
+  a   = (h2 - h1)/(xp2 - xp1);
+  b   = (h1*xp2 - h2*xp1)/(xp2 - xp1);
+
+  for(int k=0; k<N; k++) {
+
+    xi[k+1] = (xi[k] + b/a)*exp(a/kappa) - b/a;
+
+    if(xi[k+1] >= xp2) {
+      if(k+1==N && i+1 == xpoints.size()-1) {//done
+        xi[k+1] = xp2;
+        break;
+      } else if(k+1==N || i+1 == xpoints.size()-1) {
+        print_error("*** Error: Cannot generate mesh (possibly a software bug)\n");
+        exit_mpi();
+      }
+
+      double C = 1.0/a*log((a*xp2+b)/(a*x[k]+b));
+
+      i++;
+      xp1 = xp2; 
+      h1  = h2; 
+      xp2 = xpoints[i+1].first;
+      h2  = xpoints[i+1].second;
+      a   = (h2 - h1)/(xp2 - xp1);
+      b   = (h1*xp2 - h2*xp1)/(xp2 - xp1);
+
+      xi[k+1] = (xp1 + b/a)*exp(a*(1/kappa-C)) - b/a;
+
+      if(xi[k+1]>xp2) {
+        print_error("*** Error: Detected conflicts in mesh control points and cell widths. Cannot generate mesh.\n");
+        exit_mpi();
+      }
+    }
+
+  }
+  
+  if(xi[N]<xmax)
+    xi[N] = xmax;
+
+
+  // Now calculate x and dx
+  x.resize(N);
+  dx.resize(N);
+
+  for(int i=0; i<N; i++)
+    dx[i] = xi[i+1]-xi[i];
+
+  x[0] = x0 + 0.5*dx[0];
+  for(int i=0; i<N-1; i++)
+    x[i+1] = x[i] + 0.5*(dx[i]+dx[i+1]);
 }
 
 //-----------------------------------------------------

@@ -38,14 +38,19 @@ int main(int argc, char* argv[])
   //! Read user's input file
   IoData iod(argc, argv);
 
+  //! Calculate mesh coordinates
+  vector<double> xcoords, dx, ycoords, dy, zcoords, dz;
+  MeshGenerator meshgen;
+  meshgen.ComputeMeshCoordinatesAndDeltas(iod.mesh, xcoords, ycoords, zcoords, dx, dy, dz);
+  
   //! Setup PETSc data array (da) structure for nodal variables
-  DataManagers3D dms(comm, iod.mesh.Nx, iod.mesh.Ny, iod.mesh.Nz);
+  DataManagers3D dms(comm, xcoords.size(), ycoords.size(), zcoords.size());
 
   //! Initialize VarFcn (EOS, etc.) 
 
   std::vector<VarFcnBase *> vf;
   for(int i=0; i<iod.eqs.materials.dataMap.size(); i++)
-    vf.push_back(NULL); //allocate memory for the VarFcn pointers
+    vf.push_back(NULL); //allocate space for the VarFcn pointers
 
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
     int matid = it->first;
@@ -83,7 +88,7 @@ int main(int argc, char* argv[])
   }
 
   //! Initialize space operator
-  SpaceOperator spo(comm, dms, iod, vf, *ff, riemann);
+  SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
 
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables

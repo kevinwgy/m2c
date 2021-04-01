@@ -31,7 +31,7 @@ public:
 
 protected:
   //! Internal functions
-  void ComputeMesh1DUniform(double x0, double xmax, double Nx, vector<dobule> &x, vector<double> &dy);
+  void ComputeMesh1DUniform(double x0, double xmax, double Nx, vector<double> &x, vector<double> &dy);
   void ComputeMesh1DNonUniform(double x0, double xmax, vector<pair<double,double> > &xpoints,
                                vector<double> &x, vector<double> &dx);
 };

@@ -13,7 +13,9 @@ using std::min;
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                              vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
-                             ExactRiemannSolverBase &riemann_) 
+                             ExactRiemannSolverBase &riemann_,
+                             vector<double> &x, vector<double> &y, vector<double> &z,
+                             vector<double> &dx, vector<double> &dy, vector<double> &dz) 
   : comm(comm_), iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
@@ -30,7 +32,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
-  SetupMesh();
+  SetupMesh(x,y,z,dx,dy,dz);
 
   rec.Setup(); //this function requires mesh info (dxyz)
   
@@ -61,16 +63,43 @@ void SpaceOperator::Destroy()
 
 //-----------------------------------------------------
 
-void SpaceOperator::SetupMesh()
+void SpaceOperator::SetupMesh(vector<double> &x, vector<double> &y, vector<double> &z,
+                              vector<double> &dx, vector<double> &dy, vector<double> &dz)
 {
   //! Setup coordinates of cell centers and dx, dy, dz
-  if(true)
-    SetupMeshUniformRectangularDomain();
-  //! TODO: add more choices later
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+  //! get array to edit
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
+
+  //! Fill the actual subdomain, w/o ghost cells 
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        coords[k][j][i][0] = x[i];
+        coords[k][j][i][1] = y[j];
+        coords[k][j][i][2] = z[k];
+        dxyz[k][j][i][0] = dx[i];
+        dxyz[k][j][i][1] = dy[j];
+        dxyz[k][j][i][2] = dz[k];
+      } 
+
+  //! restore array
+  coordinates.RestoreDataPointerAndInsert(); //update localVec and globalVec;
+  delta_xyz.RestoreDataPointerAndInsert(); //update localVec and globalVec;
+
+  //! Populate the ghost cells (coordinates, dx, dy, dz)
+  PopulateGhostBoundaryCoordinates();
+
+
+  //(Obsolete. Can be used for debugging purpose though.) 
+  //SetupMeshUniformRectangularDomain();
 
 
   //! Compute mesh information
-  Vec3D***  dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  dxyz = (Vec3D***)delta_xyz.GetDataPointer();
   double*** vol  = (double***)volume.GetDataPointer();
 
 

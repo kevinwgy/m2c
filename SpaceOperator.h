@@ -40,7 +40,9 @@ class SpaceOperator
 public:
   SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                 vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
-                ExactRiemannSolverBase &riemann_); 
+                ExactRiemannSolverBase &riemann_,
+                vector<double> &x, vector<double> &y, vector<double> &z,
+                vector<double> &dx, vector<double> &dy, vector<double> &dz); 
   ~SpaceOperator();
 
   void ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V,
@@ -72,7 +74,8 @@ public:
   void Destroy();
 
 private:
-  void SetupMesh();
+  void SetupMesh(vector<double> &x, vector<double> &y, vector<double> &z,
+                 vector<double> &dx, vector<double> &dy, vector<double> &dz);
   void SetupMeshUniformRectangularDomain();
   void PopulateGhostBoundaryCoordinates();
 
