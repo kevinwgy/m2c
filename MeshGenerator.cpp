@@ -157,16 +157,17 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
   //Calculate the number nodes / cells (in the real domain)
   double Nreal = 0.0;
   double a, b, xp1, xp2, h1, h2;
-  for(int i=0; i<Np-2; i++) {
+  for(int i=0; i<Np-1; i++) {
     xp1 = xpoints[i].first;
     h1  = xpoints[i].second;
     xp2 = xpoints[i+1].first;
     h2  = xpoints[i+1].second;
     a   = (h2 - h1)/(xp2 - xp1);
     b   = (h1*xp2 - h2*xp1)/(xp2 - xp1);
-    Nreal += 1.0/a*log((a*xp2+b)/(a*xp1+b));
+    Nreal += (a==0.0) ? (xp2-xp1)/b : 1.0/a*log((a*xp2+b)/(a*xp1+b));
   }  
   int N = std::max(1, (int)Nreal); //(int)Nreal --> integer floor of Nreal (since Nreal>0)
+  fprintf(stderr,"N = %d, Nreal = %e.\n", N, Nreal);
 
 
   //Calculating the coordinates of the cell boundaries
@@ -185,10 +186,11 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
 
   for(int k=0; k<N; k++) {
 
-    xi[k+1] = (xi[k] + b/a)*exp(a/kappa) - b/a;
+    xi[k+1] = (a==0.0) ? xi[k] + b/kappa : (xi[k] + b/a)*exp(a/kappa) - b/a;
 
     if(xi[k+1] >= xp2) {
       if(k+1==N && i+1 == xpoints.size()-1) {//done
+        fprintf(stderr,"Here! xp2 = %e, xi[%d] = %e.\n", xp2, k+1, xi[k+1]);
         xi[k+1] = xp2;
         break;
       } else if(k+1==N || i+1 == xpoints.size()-1) {
@@ -196,7 +198,7 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
         exit_mpi();
       }
 
-      double C = 1.0/a*log((a*xp2+b)/(a*x[k]+b));
+      double C = (a==0.0) ? (xp2-xi[k])/b : 1.0/a*log((a*xp2+b)/(a*xi[k]+b));
 
       i++;
       xp1 = xp2; 
@@ -206,13 +208,15 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
       a   = (h2 - h1)/(xp2 - xp1);
       b   = (h1*xp2 - h2*xp1)/(xp2 - xp1);
 
-      xi[k+1] = (xp1 + b/a)*exp(a*(1/kappa-C)) - b/a;
+      xi[k+1] = (a==0.0) ? xp1 + b*(1/kappa - C) : (xp1 + b/a)*exp(a*(1/kappa - C)) - b/a;
 
       if(xi[k+1]>xp2) {
         print_error("*** Error: Detected conflicts in mesh control points and cell widths. Cannot generate mesh.\n");
         exit_mpi();
       }
     }
+
+    //fprintf(stderr,"xi[%d] = %e\n", k+1, xi[k+1]);
 
   }
   
