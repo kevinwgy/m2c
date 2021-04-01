@@ -166,8 +166,7 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
     b   = (h1*xp2 - h2*xp1)/(xp2 - xp1);
     Nreal += (a==0.0) ? (xp2-xp1)/b : 1.0/a*log((a*xp2+b)/(a*xp1+b));
   }  
-  int N = std::max(1, (int)Nreal); //(int)Nreal --> integer floor of Nreal (since Nreal>0)
-  fprintf(stderr,"N = %d, Nreal = %e.\n", N, Nreal);
+  int N = std::max(1, (int)(Nreal+1e-12)); //(int)Nreal --> integer floor of Nreal (since Nreal>0)
 
 
   //Calculating the coordinates of the cell boundaries
@@ -190,7 +189,6 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
 
     if(xi[k+1] >= xp2) {
       if(k+1==N && i+1 == xpoints.size()-1) {//done
-        fprintf(stderr,"Here! xp2 = %e, xi[%d] = %e.\n", xp2, k+1, xi[k+1]);
         xi[k+1] = xp2;
         break;
       } else if(k+1==N || i+1 == xpoints.size()-1) {
