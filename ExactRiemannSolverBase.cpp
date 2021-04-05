@@ -1,9 +1,12 @@
 #include<ExactRiemannSolverBase.h>
-#include<assert.h>
 #include<utility> //std::pair
 #include<bits/stdc++.h> //std::swap
+
+#ifndef WITHOUT_BOOST
 #include<boost/math/tools/roots.hpp>
 using namespace boost::math::tools;
+#endif
+
 using std::pair;
 using std::cout;
 using std::endl;
@@ -511,6 +514,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
     }
 
+#ifndef WITHOUT_BOOST
     //*******************************************************************
     // Calling boost function for root-finding
     // Warning: "maxit" is BOTH AN INPUT AND AN OUTPUT
@@ -519,7 +523,47 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
                                             [=](double r0, double r1){return r1-r0<tol_sh;}, 
                                             maxit);
     //*******************************************************************
+#else
+    //*******************************************************************
+    // Using a hybrid (Brent) method for root-finding
+    pair<double,double> sol;
+    if(f0==0.0)
+      sol.first = sol.second = rhos0;
+    else if(f1==0.0)
+      sol.first = sol.second = rhos1;
+    else {
+      double rhos2, f2;
+      int it;
+      for(it = 0; it<maxIts_shock; it++) {
+        drho = rhos1 - rhos0;
+        rhos2 = rhos1 - f1*(rhos1 - rhos0)/(f1 - f0); //secant method
+        if(rhos2 >= rhos1 || rhos2 <= rhos0) //discard and switch to bisection
+          rhos2 = 0.5*(rhos0+rhos1);
+        f2 = hugo(rhos2);
+        if(f2==0.0) {
+          sol.first = sol.second = rhos2;
+          break;
+        }
+        if(f2*f0<0) {
+          rhos1 = rhos2;
+          f1    = f2;
+        } else {
+          rhos0 = rhos2;
+          f0    = f2;
+        }
+        if(rhos1-rhos0<tol_sh) {
+          sol.first  = rhos0;
+          sol.second = rhos1;
+          break;
+        }
+      }
+      if(it==maxIts_shock)
+        fprintf(stderr,"*** Error: Root-finding method failed to converge after %d iterations.\n", it);
+    }
+    //*******************************************************************
+#endif
     
+
 #if PRINT_RIEMANN_SOLUTION == 1
     cout << "  " << wavenumber << "-wave: shock, converged in " << maxit << " iterations. fun = " 
          << hugo(0.5*(sol.first+sol.second)) << "." << endl;
