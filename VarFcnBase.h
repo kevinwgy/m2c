@@ -138,7 +138,7 @@ double VarFcnBase::ComputeSoundSpeed(double rho, double e)
 {
   double c2 = GetDpdrho(rho, e) + GetPressure(rho,e)/rho*GetBigGamma(rho, e);
   if(c2<=0) {
-    fprintf(stderr,"Error: Cannot calculate speed of sound (Square-root of a negative number): rho = %e, e = %e.\n",
+    fprintf(stderr,"*** Error: Cannot calculate speed of sound (Square-root of a negative number): rho = %e, e = %e.\n",
             rho, e);
     exit_mpi();
   }

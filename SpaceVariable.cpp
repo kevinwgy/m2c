@@ -126,7 +126,7 @@ SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : comm(comm_), global
   } else if(bx==DM_BOUNDARY_GHOSTED && by==DM_BOUNDARY_GHOSTED && bz==DM_BOUNDARY_GHOSTED) {
     ghosted = true;
   } else {
-    PetscPrintf(comm, "ERROR: Unsupported ghost type.\n");
+    PetscPrintf(comm, "*** Error: Unsupported ghost type.\n");
     MPI_Abort(comm, 1); 
   }
 

@@ -57,8 +57,7 @@ protected: //internal functions
                    double rho, double u, double p, double ps, int id/*inputs*/,
                    double rhos0, double rhos1/*initial guesses for Hugo. eq.*/,
                    double &rhos, double &us/*outputs*/,
-                   bool *trans_rare = NULL, double *Vrare_x0 = NULL/*filled only if found tran rf*/,
-                   bool rough_estimate = false/*set to true for the initial guesses*/);
+                   bool *trans_rare = NULL, double *Vrare_x0 = NULL/*filled only if found tran rf*/);
 
   virtual void Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                    double rho_0, double u_0, double p_0 /*start state*/,

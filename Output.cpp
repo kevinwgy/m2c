@@ -18,7 +18,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcn
 
   pvdfile  = fopen(f1,"w");
   if(!pvdfile) {
-    print("ERROR: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
+    print_error("*** Error: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
     exit_mpi();
   }
 
@@ -105,7 +105,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
   PetscViewer viewer;
   int code = PetscViewerVTKOpen(PETSC_COMM_WORLD, full_fname, FILE_MODE_WRITE, &viewer); 
   if(code) {
-    print("ERROR: Cannot open file '%s' for output. (code: %d)\n", full_fname, code);
+    print_error("*** Error: Cannot open file '%s' for output. (code: %d)\n", full_fname, code);
     exit_mpi();
   }
 
@@ -186,7 +186,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
   sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
   pvdfile  = fopen(f1,"r+");
   if(!pvdfile) {
-    print("ERROR: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
+    print_error("*** Error: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
     exit_mpi();
   }
   fseek(pvdfile, -27, SEEK_END); //!< overwrite the previous end of file script
