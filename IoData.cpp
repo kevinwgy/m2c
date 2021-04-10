@@ -704,6 +704,88 @@ void TsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+RectangleData::RectangleData()
+{
+  
+  cen_x  = 0.0;
+  cen_y  = 0.0;
+  cen_z  = 0.0;
+  normal_x = 0.0;
+  normal_y = 0.0;
+  normal_z = 0.0;
+  a = -1.0;
+  b = -1.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *RectangleData::getAssigner()
+{
+  
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+  
+  new ClassDouble<RectangleData> (ca, "Center_x", this, &RectangleData::cen_x);
+  new ClassDouble<RectangleData> (ca, "Center_y", this, &RectangleData::cen_y);
+  new ClassDouble<RectangleData> (ca, "Center_z", this, &RectangleData::cen_z);
+  new ClassDouble<RectangleData> (ca, "Normal_x", this, &RectangleData::normal_x);
+  new ClassDouble<RectangleData> (ca, "Normal_y", this, &RectangleData::normal_y);
+  new ClassDouble<RectangleData> (ca, "Normal_z", this, &RectangleData::normal_z);
+  new ClassDouble<RectangleData> (ca, "Dimension1", this, &RectangleData::a);
+  new ClassDouble<RectangleData> (ca, "Dimension2", this, &RectangleData::b);
+  
+  state.setup("BoundaryState", ca);
+  
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+
+DiskData::DiskData()
+{
+  
+  cen_x  = 0.0;
+  cen_y  = 0.0;
+  cen_z  = 0.0;
+  normal_x = 0.0;
+  normal_y = 0.0;
+  normal_z = 0.0;
+  radius = -1.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *DiskData::getAssigner()
+{
+  
+  ClassAssigner *ca = new ClassAssigner("normal", 8, nullAssigner);
+  
+  new ClassDouble<DiskData> (ca, "Center_x", this, &DiskData::cen_x);
+  new ClassDouble<DiskData> (ca, "Center_y", this, &DiskData::cen_y);
+  new ClassDouble<DiskData> (ca, "Center_z", this, &DiskData::cen_z);
+  new ClassDouble<DiskData> (ca, "Normal_x", this, &DiskData::normal_x);
+  new ClassDouble<DiskData> (ca, "Normal_y", this, &DiskData::normal_y);
+  new ClassDouble<DiskData> (ca, "Normal_z", this, &DiskData::normal_z);
+  new ClassDouble<DiskData> (ca, "Radius", this, &DiskData::radius);
+  
+  state.setup("BoundaryState", ca);
+  
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+void MultiBoundaryConditionsData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  diskMap.setup("Disk", ca);
+  rectangleMap.setup("Rectangle", ca);
+}
+
+//------------------------------------------------------------------------------
+
 BcsData::BcsData()
 {
 
@@ -714,11 +796,13 @@ BcsData::BcsData()
 void BcsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   inlet.setup("Inlet", ca);
   outlet.setup("Outlet", ca);
   wall.setup("Wall", ca);
+
+  multiBoundaryConditions.setup("GeometricEntities");
 
 }
 

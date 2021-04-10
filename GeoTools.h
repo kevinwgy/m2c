@@ -7,6 +7,32 @@
 namespace GeoTools {
 
 /**************************************************************************
+ * Check if a point in 2D is within a disk
+ *   Inputs:
+ *     x,y          -- coords of the point
+ *     cen_x, cen_y -- coords of the center of the disk
+ *     r            -- radius of the disk
+ *   Outputs: true or false
+ */
+inline bool IsPointInDisk(double x, double y, double cen_x, double cen_y, double r)
+{
+  return ( (x-cen_x)*(x-cen_x) + (y-cen_y)*(y-cen_y) <= r*r);
+}
+
+/**************************************************************************
+ * Check if a point in 2D is within a rectangle
+ *   Inputs:
+ *     x,y          -- coords of the point
+ *     cen_x, cen_y -- coords of the center of the rectangle
+ *     lx, ly       -- dimensions of the rectangle in x and y directions
+ *   Outputs: true or false
+ */
+inline bool IsPointInRectangle(double x, double y, double cen_x, double cen_y, double lx, double ly)
+{
+  return x >= cen_x - 0.5*lx  &&  x <= cen_x + 0.5*lx  &&  y >= cen_y - 0.5*ly  &&  y <= cen_y + 0.5*ly;
+}
+
+/**************************************************************************
  * Project a point onto a line in 3D, specified using an edge (line segment) 
  *   Inputs:
  *     x0 -- coords of the point

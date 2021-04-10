@@ -410,11 +410,52 @@ struct BcsWallData {
 
 //------------------------------------------------------------------------------
 
+struct DiskData {
+
+  double cen_x, cen_y, cen_z, radius;
+  double normal_x, normal_y, normal_z;
+  StateVariable state;
+
+  DiskData();
+  ~DiskData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct RectangleData {
+
+  double cen_x, cen_y, cen_z, a, b;
+  double normal_x, normal_y, normal_z;
+  StateVariable state;
+
+  RectangleData();
+  ~RectangleData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+
+struct MultiBoundaryConditionsData {
+
+  ObjectMap<DiskData>      diskMap;
+  ObjectMap<RectangleData> rectangleMap;
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
 struct BcsData {
 
   StateVariable inlet;
   StateVariable outlet;
   BcsWallData wall;
+
+  MultiBoundaryConditionsData multiBoundaryConditions;
 
   BcsData();
   ~BcsData() {}

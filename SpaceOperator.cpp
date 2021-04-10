@@ -2,12 +2,15 @@
 #include <SpaceOperator.h>
 #include <Vector3D.h>
 #include <Vector5D.h>
+#include <GeoTools.h>
 #include <algorithm> //std::upper_bound
 #include <cfloat> //DBL_MAX
 using std::cout;
 using std::endl;
 using std::max;
 using std::min;
+using std::map;
+using namespace GeoTools;
 
 //-----------------------------------------------------
 
@@ -877,7 +880,303 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
     }
   }
 
+  ApplyBoundaryConditionsGeometricEntities(v);
+
   V.RestoreDataPointerAndInsert();
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
+{
+
+  map<int, DiskData* >& disks(iod.bc.multiBoundaryConditions.diskMap.dataMap);
+  map<int, RectangleData* >& rectangles(iod.bc.multiBoundaryConditions.rectangleMap.dataMap);
+
+  if(!disks.size() && !rectangles.size())
+    return;
+
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);  
+
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  
+
+  if(ii0==-1) { 
+    if (iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_x == iod.mesh.x0)
+          mydisks.push_back(it->second); 
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_x == iod.mesh.x0)
+          myrects.push_back(it->second); 
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=k0; k<kmax; k++)
+          for(int j=j0; j<jmax; j++) {
+
+            for(int p=0; p<mydisks.size(); p++) {
+              if(IsPointInDisk(coords[k][j][ii0][1], coords[k][j][ii0][2],
+                               mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
+                v[k][j][ii0][0] = mydisks[p]->state.density;
+                v[k][j][ii0][1] = mydisks[p]->state.velocity_x;
+                v[k][j][ii0][2] = mydisks[p]->state.velocity_y;
+                v[k][j][ii0][3] = mydisks[p]->state.velocity_z;
+                v[k][j][ii0][4] = mydisks[p]->state.pressure;
+              }
+            }
+
+            for(int p=0; p<myrects.size(); p++) {
+              if(IsPointInRectangle(coords[k][j][ii0][1], coords[k][j][ii0][2],
+                                    myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
+                v[k][j][ii0][0] = myrects[p]->state.density;
+                v[k][j][ii0][1] = myrects[p]->state.velocity_x;
+                v[k][j][ii0][2] = myrects[p]->state.velocity_y;
+                v[k][j][ii0][3] = myrects[p]->state.velocity_z;
+                v[k][j][ii0][4] = myrects[p]->state.pressure;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  if(iimax==NX+1) { 
+    if (iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_x == iod.mesh.xmax)
+          mydisks.push_back(it->second); 
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_x == iod.mesh.xmax)
+          myrects.push_back(it->second); 
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=k0; k<kmax; k++)
+          for(int j=j0; j<jmax; j++) {
+
+            for(int p=0; p<mydisks.size(); p++) {
+              if(IsPointInDisk(coords[k][j][iimax-1][1], coords[k][j][iimax-1][2],
+                               mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
+                v[k][j][iimax-1][0] = mydisks[p]->state.density;
+                v[k][j][iimax-1][1] = mydisks[p]->state.velocity_x;
+                v[k][j][iimax-1][2] = mydisks[p]->state.velocity_y;
+                v[k][j][iimax-1][3] = mydisks[p]->state.velocity_z;
+                v[k][j][iimax-1][4] = mydisks[p]->state.pressure;
+              }
+            }
+
+            for(int p=0; p<myrects.size(); p++) {
+              if(IsPointInRectangle(coords[k][j][iimax-1][1], coords[k][j][iimax-1][2],
+                                    myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
+                v[k][j][iimax-1][0] = myrects[p]->state.density;
+                v[k][j][iimax-1][1] = myrects[p]->state.velocity_x;
+                v[k][j][iimax-1][2] = myrects[p]->state.velocity_y;
+                v[k][j][iimax-1][3] = myrects[p]->state.velocity_z;
+                v[k][j][iimax-1][4] = myrects[p]->state.pressure;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  
+  if(jj0==-1) { 
+    if (iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_y == iod.mesh.y0)
+          mydisks.push_back(it->second); 
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_y == iod.mesh.y0)
+          myrects.push_back(it->second); 
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=k0; k<kmax; k++)
+          for(int i=i0; i<imax; i++) {
+
+            for(int p=0; p<mydisks.size(); p++) {
+              if(IsPointInDisk(coords[k][jj0][i][2], coords[k][jj0][i][0],
+                               mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
+                v[k][jj0][i][0] = mydisks[p]->state.density;
+                v[k][jj0][i][1] = mydisks[p]->state.velocity_x;
+                v[k][jj0][i][2] = mydisks[p]->state.velocity_y;
+                v[k][jj0][i][3] = mydisks[p]->state.velocity_z;
+                v[k][jj0][i][4] = mydisks[p]->state.pressure;
+              }
+            }
+
+            for(int p=0; p<myrects.size(); p++) {
+              if(IsPointInRectangle(coords[k][jj0][i][2], coords[k][jj0][i][0],
+                                    myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
+                v[k][jj0][i][0] = myrects[p]->state.density;
+                v[k][jj0][i][1] = myrects[p]->state.velocity_x;
+                v[k][jj0][i][2] = myrects[p]->state.velocity_y;
+                v[k][jj0][i][3] = myrects[p]->state.velocity_z;
+                v[k][jj0][i][4] = myrects[p]->state.pressure;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  if(jjmax==NY+1) { 
+    if (iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_y == iod.mesh.ymax)
+          mydisks.push_back(it->second); 
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_y == iod.mesh.ymax)
+          myrects.push_back(it->second); 
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=k0; k<kmax; k++)
+          for(int i=i0; i<imax; i++) {
+
+            for(int p=0; p<mydisks.size(); p++) {
+              if(IsPointInDisk(coords[k][jjmax-1][i][2], coords[k][jjmax-1][i][0],
+                               mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
+                v[k][jjmax-1][i][0] = mydisks[p]->state.density;
+                v[k][jjmax-1][i][1] = mydisks[p]->state.velocity_x;
+                v[k][jjmax-1][i][2] = mydisks[p]->state.velocity_y;
+                v[k][jjmax-1][i][3] = mydisks[p]->state.velocity_z;
+                v[k][jjmax-1][i][4] = mydisks[p]->state.pressure;
+              }
+            }
+
+            for(int p=0; p<myrects.size(); p++) {
+              if(IsPointInRectangle(coords[k][jjmax-1][i][2], coords[k][jjmax-1][i][0],
+                                    myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
+                v[k][jjmax-1][i][0] = myrects[p]->state.density;
+                v[k][jjmax-1][i][1] = myrects[p]->state.velocity_x;
+                v[k][jjmax-1][i][2] = myrects[p]->state.velocity_y;
+                v[k][jjmax-1][i][3] = myrects[p]->state.velocity_z;
+                v[k][jjmax-1][i][4] = myrects[p]->state.pressure;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  
+  if(kk0==-1) { 
+    if (iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_z == iod.mesh.z0)
+          mydisks.push_back(it->second); 
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_z == iod.mesh.z0)
+          myrects.push_back(it->second); 
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+
+            for(int p=0; p<mydisks.size(); p++) {
+              if(IsPointInDisk(coords[kk0][j][i][0], coords[kk0][j][i][1],
+                               mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
+                v[kk0][j][i][0] = mydisks[p]->state.density;
+                v[kk0][j][i][1] = mydisks[p]->state.velocity_x;
+                v[kk0][j][i][2] = mydisks[p]->state.velocity_y;
+                v[kk0][j][i][3] = mydisks[p]->state.velocity_z;
+                v[kk0][j][i][4] = mydisks[p]->state.pressure;
+              }
+            }
+
+            for(int p=0; p<myrects.size(); p++) {
+              if(IsPointInRectangle(coords[kk0][j][i][0], coords[kk0][j][i][1],
+                                    myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
+                v[kk0][j][i][0] = myrects[p]->state.density;
+                v[kk0][j][i][1] = myrects[p]->state.velocity_x;
+                v[kk0][j][i][2] = myrects[p]->state.velocity_y;
+                v[kk0][j][i][3] = myrects[p]->state.velocity_z;
+                v[kk0][j][i][4] = myrects[p]->state.pressure;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  if(kkmax==NZ+1) { 
+    if (iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_z == iod.mesh.zmax)
+          mydisks.push_back(it->second); 
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_z == iod.mesh.zmax)
+          myrects.push_back(it->second); 
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+
+            for(int p=0; p<mydisks.size(); p++) {
+              if(IsPointInDisk(coords[kkmax-1][j][i][0], coords[kkmax-1][j][i][1],
+                               mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
+                v[kkmax-1][j][i][0] = mydisks[p]->state.density;
+                v[kkmax-1][j][i][1] = mydisks[p]->state.velocity_x;
+                v[kkmax-1][j][i][2] = mydisks[p]->state.velocity_y;
+                v[kkmax-1][j][i][3] = mydisks[p]->state.velocity_z;
+                v[kkmax-1][j][i][4] = mydisks[p]->state.pressure;
+              }
+            }
+
+            for(int p=0; p<myrects.size(); p++) {
+              if(IsPointInRectangle(coords[kkmax-1][j][i][0], coords[kkmax-1][j][i][1],
+                                    myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
+                v[kkmax-1][j][i][0] = myrects[p]->state.density;
+                v[kkmax-1][j][i][1] = myrects[p]->state.velocity_x;
+                v[kkmax-1][j][i][2] = myrects[p]->state.velocity_y;
+                v[kkmax-1][j][i][3] = myrects[p]->state.velocity_z;
+                v[kkmax-1][j][i][4] = myrects[p]->state.pressure;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+
+  coordinates.RestoreDataPointerToLocalVector(); //no changes
 }
 
 //-----------------------------------------------------

@@ -79,6 +79,8 @@ private:
   void SetupMeshUniformRectangularDomain();
   void PopulateGhostBoundaryCoordinates();
 
+  void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
+
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL);
 };
