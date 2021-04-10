@@ -26,6 +26,7 @@
  *  - 3 -  Equations of State Parameters
  *  - 4 -  EOS related functions
  ***************************************************************************/
+
 class VarFcnBase {
 
 public:
@@ -91,6 +92,7 @@ public:
   inline int GetType() const{ return type; }
 
   inline double ComputeSoundSpeed(double rho, double e);
+  inline double ComputeSoundSpeedSquare(double rho, double e); //!< this one does not crash on negative c^2
   inline double ComputeMachNumber(double *V);
   inline double ComputeTotalEnthalpyPerUnitMass(double *V); //!< H = 1/rho*(E + p)
 
@@ -148,10 +150,26 @@ double VarFcnBase::ComputeSoundSpeed(double rho, double e)
 //------------------------------------------------------------------------------
 
 inline 
+double VarFcnBase::ComputeSoundSpeedSquare(double rho, double e)
+{
+  return GetDpdrho(rho, e) + GetPressure(rho,e)/rho*GetBigGamma(rho, e);
+}
+
+//------------------------------------------------------------------------------
+
+inline 
 double VarFcnBase::ComputeMachNumber(double *V)
 {
   double e = GetInternalEnergyPerUnitMass(V[0],V[4]); 
-  double c = ComputeSoundSpeed(V[0], e);
+  double c = ComputeSoundSpeedSquare(V[0], e);
+
+  if(c<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in ComputeMachNumber. V = %e, %e, %e, %e, %e.\n",
+            c, V[0], V[1], V[2], V[3], V[4]);
+    exit_mpi();
+  } else
+    c = sqrt(c);
+
   return sqrt(V[1]*V[1]+V[2]*V[2]+V[3]*V[3])/c;
 }
 

@@ -113,8 +113,24 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   } else
     c_hat = sqrt(c_hat_square);
     
-  double cm = vf[id]->ComputeSoundSpeed(Vm[0], em);
-  double cp = vf[id]->ComputeSoundSpeed(Vp[0], ep);
+  double cm = vf[id]->ComputeSoundSpeedSquare(Vm[0], em);
+
+  if(cm<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
+            cm, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], id);
+    exit_mpi();
+  } else
+    cm = sqrt(cm);
+
+  double cp = vf[id]->ComputeSoundSpeedSquare(Vp[0], ep);
+
+  if(cp<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
+            cp, Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], id);
+    exit_mpi();
+  } else
+    cp = sqrt(cp);
+
 
   // 2. Calculate Sm and Sp, the minimum and maximum wave speeds.
   switch (dir) {

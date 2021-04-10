@@ -42,8 +42,23 @@ void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, dou
 
   double e_m = vf[id]->GetInternalEnergyPerUnitMass(Vm[0], Vm[4]);
   double e_p = vf[id]->GetInternalEnergyPerUnitMass(Vp[0], Vp[4]);
-  double c_m = vf[id]->ComputeSoundSpeed(Vm[0], e_m);
-  double c_p = vf[id]->ComputeSoundSpeed(Vp[0], e_p);
+  double c_m = vf[id]->ComputeSoundSpeedSquare(Vm[0], e_m);
+
+  if(c_m<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
+            c_m, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], id);
+    exit_mpi();
+  } else
+    c_m = sqrt(c_m);
+
+  double c_p = vf[id]->ComputeSoundSpeedSquare(Vp[0], e_p);
+
+  if(c_p<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
+            c_p, Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], id);
+    exit_mpi();
+  } else
+    c_p = sqrt(c_p);
 
   a = max( fabs(velocity_m) + c_m, 
            fabs(velocity_p) + c_p );

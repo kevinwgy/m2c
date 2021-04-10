@@ -44,7 +44,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   double rhor  = Vp[0];
   double ur    = Vp[dir+1];
   double pr    = Vp[4];
-  //fprintf(stderr,"left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
+  //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
 
   if(rhol == rhor && ul == ur && pl == pr) {//trivial
     Vs[0] = Vsm[0] = Vsp[0] = 0.5*(rhol+rhor);
@@ -57,9 +57,25 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   }
 
   double el = vf[idl]->GetInternalEnergyPerUnitMass(rhol, pl);
-  double cl = vf[idl]->ComputeSoundSpeed(rhol, el);
+  double cl = vf[idl]->ComputeSoundSpeedSquare(rhol, el);
+
+  if(cl<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in ComputeRiemannSolution(l). rho = %e, u = %e, p = %e, e = %e, ID = %d.\n",
+            cl, rhol, ul, pl, el, idl);
+    exit_mpi();
+  } else
+    cl = sqrt(cl);
+
   double er = vf[idr]->GetInternalEnergyPerUnitMass(rhor, pr);
-  double cr = vf[idr]->ComputeSoundSpeed(rhor, er);
+  double cr = vf[idr]->ComputeSoundSpeedSquare(rhor, er);
+
+  if(cr<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in ComputeRiemannSolution(r). rho = %e, u = %e, p = %e, e = %e, ID = %d.\n",
+            cr, rhor, ur, pr, er, idr);
+    exit_mpi();
+  } else
+    cr = sqrt(cr);
+
 
   // Declare vairables in the "star region"
   double p0, ul0, ur0, rhol0, rhor0;
@@ -79,6 +95,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   double Cr = rhor*cr; //acoustic impedance
   p0 = (Cr*pl + Cl*pr + Cl*Cr*(ul - ur))/(Cl + Cr);
 
+  fprintf(stderr,"cl = %e, cr = %e, p0 = %e\n", cl, cr, p0);
   // 1.2: Calculate ul0, ur0
   ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/, 
                   rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
@@ -95,6 +112,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   if(fabs(p1 - p0)<1.0e-12)
     p1 = p0 + 1.0e-12; //to avoid f0 = f1 (divide-by-zero)
 
+  fprintf(stderr,"Clbar = %e, Crbar = %e, p1 = %e\n", Clbar, Crbar, p1);
   // 1.4 Calculate ul1, ur1 
   ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/, 
                   rhol, rhol0/*initial guesses for Hugo. eq.*/,
@@ -131,7 +149,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
       exit_mpi();
     }
     p2 = p1 - f1*(p1-p0)/denom;
-    //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
+    fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
 
     // 2.2: Calculate ul2, ur2 
     ComputeRhoUStar(1, rhol, ul, pl, p2, idl/*inputs*/, 
@@ -215,7 +233,15 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 
       if(pl >= p2) {//1-wave is rarefaction
         double el2 = vf[idl]->GetInternalEnergyPerUnitMass(rhol2, p2);
-        double cl2 = vf[idl]->ComputeSoundSpeed(rhol2, el2);
+        double cl2 = vf[idl]->ComputeSoundSpeedSquare(rhol2, el2);
+
+        if(cl2<0) {
+          fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in ComputeRiemannSolution(l2). rho = %e, p = %e, e = %e, id = %d.\n",
+                  cl2, rhol2, pl, el2, idl);
+          exit_mpi();
+        } else
+          cl2 = sqrt(cl2);
+
         if(u2 - cl2 <= 0) //rarefaction tail speed
           is_star_state = true;
       } 
@@ -241,7 +267,15 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 
       if(pr >= p2) {//3-wave is rarefaction
         double er2 = vf[idr]->GetInternalEnergyPerUnitMass(rhor2, p2);
-        double cr2 = vf[idr]->ComputeSoundSpeed(rhor2, er2);
+        double cr2 = vf[idr]->ComputeSoundSpeedSquare(rhor2, er2);
+
+        if(cr2<0) {
+          fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in ComputeRiemannSolution(r2). rho = %e, p = %e, e = %e, id = %d.\n",
+                  cr2, rhor2, p2, er2, idr);
+          exit_mpi();
+        } else
+          cr2 = sqrt(cr2);
+
         if(u2 - cr2 >= 0)
           is_star_state = true;
       }
@@ -348,7 +382,15 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     double dp;
 
     double e = vf[id]->GetInternalEnergyPerUnitMass(rho, p);
-    double c = vf[id]->ComputeSoundSpeed(rho, e);
+    double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
+
+    if(c<0) {
+      fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in ComputeRhoUStar. rho = %e, p = %e, e = %e, id = %d.\n",
+              c, rho, p, e, id);
+      exit_mpi();
+    } else
+      c = sqrt(c);
+
     double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
     xi_0 = xi;
 
@@ -629,26 +671,47 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                 // Equations (36 - 42)
                 
   double e_0 = vf[id]->GetInternalEnergyPerUnitMass(rho_0, p_0);
-  double c_0 = vf[id]->ComputeSoundSpeed(rho_0, e_0);
+  double c_0 = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
   double c_0_square = c_0*c_0;
 
   double p_1 = p_0 + 0.5*drho*c_0_square;
   double rho_1 = rho_0 + 0.5*drho;
   double e_1 = vf[id]->GetInternalEnergyPerUnitMass(rho_1, p_1);
-  double c_1 = vf[id]->ComputeSoundSpeed(rho_1, e_1);
-  double c_1_square = c_1*c_1;
+  double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
+
+  if(c_1_square<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in Rarefaction_OneStepRK4(1). rho = %e, p = %e, e = %e, id = %d.\n",
+            c_1_square, rho_1, p_1, e_1, id);
+    exit_mpi();
+  } 
+
+  double c_1 = sqrt(c_1_square);
 
   double p_2 = p_0 + 0.5*drho*c_1_square;
   double rho_2 = rho_1;
   double e_2 = vf[id]->GetInternalEnergyPerUnitMass(rho_2, p_2);
-  double c_2 = vf[id]->ComputeSoundSpeed(rho_2, e_2);
-  double c_2_square = c_2*c_2;
+  double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
+
+  if(c_2_square<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in Rarefaction_OneStepRK4(2). rho = %e, p = %e, e = %e, id = %d.\n",
+            c_2_square, rho_2, p_2, e_2, id);
+    exit_mpi();
+  } 
+
+  double c_2 = sqrt(c_2_square);
  
   double p_3 = p_0 + drho*c_2_square;
   double rho_3 = rho_0 + drho;
   double e_3 = vf[id]->GetInternalEnergyPerUnitMass(rho_3, p_3);
-  double c_3 = vf[id]->ComputeSoundSpeed(rho_3, e_3);
-  double c_3_square = c_3*c_3;
+  double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
+
+  if(c_3_square<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in Rarefaction_OneStepRK4(3). rho = %e, p = %e, e = %e, id = %d.\n",
+            c_3_square, rho_3, p_3, e_3, id);
+    exit_mpi();
+  } 
+
+  double c_3 = sqrt(c_3_square);
 
   // now, calculate the outputs
   //
@@ -660,7 +723,15 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   rho = rho_0 + drho;
 
   double e = vf[id]->GetInternalEnergyPerUnitMass(rho, p);
-  double c = vf[id]->ComputeSoundSpeed(rho, e);
+  double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
+
+  if(c<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in Rarefaction_OneStepRK4(final). rho = %e, p = %e, e = %e, id = %d.\n",
+            c, rho, p, e, id);
+    exit_mpi();
+  } else
+    c = sqrt(c);
+
   xi = (wavenumber == 1) ? u - c : u + c;
 
 }

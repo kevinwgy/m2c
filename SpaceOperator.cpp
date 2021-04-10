@@ -913,8 +913,15 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
 
         myid = id[k][j][i];
 
-        c = varFcn[myid]->ComputeSoundSpeed(v[k][j][i][0]/*rho*/, 
+        c = varFcn[myid]->ComputeSoundSpeedSquare(v[k][j][i][0]/*rho*/, 
                             varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
+
+        if(c<0) {
+          fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. V = %e, %e, %e, %e, %e, ID = %d.\n",
+                  c, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], myid);
+          exit_mpi();
+        } else
+          c = sqrt(c);
 
         cmin = min(cmin, c);
         cmax = max(cmax, c);
