@@ -95,7 +95,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   double Cr = rhor*cr; //acoustic impedance
   p0 = (Cr*pl + Cl*pr + Cl*Cr*(ul - ur))/(Cl + Cr);
 
-  fprintf(stderr,"cl = %e, cr = %e, p0 = %e\n", cl, cr, p0);
+  //fprintf(stderr,"cl = %e, cr = %e, p0 = %e\n", cl, cr, p0);
   // 1.2: Calculate ul0, ur0
   ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/, 
                   rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
@@ -109,10 +109,11 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
   double Clbar = (ul0 == ul) ? Cl : fabs(p0 - pl)/fabs(ul0 - ul);
   double Crbar = (ur0 == ur) ? Cr : fabs(p0 - pr)/fabs(ur0 - ur);
   p1 = (Crbar*pl + Clbar*pr + Clbar*Crbar*(ul - ur))/(Clbar + Crbar); 
-  if(fabs(p1 - p0)<1.0e-12)
-    p1 = p0 + 1.0e-12; //to avoid f0 = f1 (divide-by-zero)
+  double tmp = std::max(fabs(p0), fabs(p1));
+  if(fabs(p1 - p0)/tmp<1.0e-8)
+    p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
 
-  fprintf(stderr,"Clbar = %e, Crbar = %e, p1 = %e\n", Clbar, Crbar, p1);
+  //fprintf(stderr,"Clbar = %e, Crbar = %e, p1 = %e\n", Clbar, Crbar, p1);
   // 1.4 Calculate ul1, ur1 
   ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/, 
                   rhol, rhol0/*initial guesses for Hugo. eq.*/,
@@ -149,7 +150,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
       exit_mpi();
     }
     p2 = p1 - f1*(p1-p0)/denom;
-    fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
+    //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
 
     // 2.2: Calculate ul2, ur2 
     ComputeRhoUStar(1, rhol, ul, pl, p2, idl/*inputs*/, 
