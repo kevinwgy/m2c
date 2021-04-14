@@ -107,7 +107,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
 
   double c_hat_square = dpdrho_hat + Gamma_hat*p_over_rho_hat;
   if(c_hat_square <= 0) {
-    fprintf(stderr,"Warning: The artificial state in the generalized Roe flux function loses hyperbolicity (c_hat_square = %e). Setting c_hat = 0.\n", c_hat_square);
+    fprintf(stderr,"Warning: The artificial state in the generalized Roe flux function loses hyperbolicity (c_hat_square = %e). Setting c_hat = %e.\n", c_hat_square, eps);
     c_hat = eps;
     c_hat_square = c_hat*c_hat;
   } else

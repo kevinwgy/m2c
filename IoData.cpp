@@ -1274,6 +1274,7 @@ OutputData::OutputData()
   pressure = OFF;
   materialid = OFF;
   temperature = OFF;
+  internal_energy = OFF;
   levelset0 = OFF;
   levelset1 = OFF;
   levelset2 = OFF;
@@ -1290,7 +1291,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 10+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 11+MAXLS, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -1312,6 +1313,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "Temperature", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "InternalEnergyPerUnitMass", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::internal_energy), 2,
                                "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "LevelSet0", this,

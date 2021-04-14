@@ -505,7 +505,7 @@ struct OutputData {
   const char *solution_filename_base; //!< filename without path
 
   enum Options {OFF = 0, ON = 1};
-  Options density, velocity, pressure, materialid, temperature;
+  Options density, velocity, pressure, materialid, internal_energy, temperature;
   Options verbose;
 
   const static int MAXLS = 5;
