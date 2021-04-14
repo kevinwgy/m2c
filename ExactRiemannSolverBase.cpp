@@ -584,7 +584,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       sol.first = sol.second = rhos1;
     else {
       sol = toms748_solve(hugo, rhos0, rhos1, f0, f1,
-                          [=](double r0, double r1){return r1-r0<tol_shock;}, 
+                          [=](double r0, double r1){return r1-r0<std::min(tol_shock,0.001*(rhos1-rhos0));}, 
                           maxit);
     }
     //*******************************************************************
