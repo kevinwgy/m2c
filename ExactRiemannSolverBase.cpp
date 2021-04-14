@@ -671,8 +671,15 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                 // Equations (36 - 42)
                 
   double e_0 = vf[id]->GetInternalEnergyPerUnitMass(rho_0, p_0);
-  double c_0 = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
-  double c_0_square = c_0*c_0;
+  double c_0_square = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
+
+  if(c_0_square<0) {
+    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in Rarefaction_OneStepRK4(0). rho = %e, p = %e, e = %e, id = %d.\n",
+            c_0_square, rho_0, p_0, e_0, id);
+    exit_mpi();
+  } 
+
+  double c_0 = sqrt(c_0_square);
 
   double p_1 = p_0 + 0.5*drho*c_0_square;
   double rho_1 = rho_0 + 0.5*drho;

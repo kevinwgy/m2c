@@ -802,7 +802,7 @@ void BcsData::setup(const char *name, ClassAssigner *father)
   outlet.setup("Outlet", ca);
   wall.setup("Wall", ca);
 
-  multiBoundaryConditions.setup("GeometricEntities");
+  multiBoundaryConditions.setup("GeometricEntities2D");
 
 }
 
