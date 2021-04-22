@@ -904,17 +904,22 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   
 
   if(ii0==-1) { 
-    if (iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET) {
+    if (iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET || iod.mesh.bc_x0 == MeshData::WALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
-        if(it->second->cen_x == iod.mesh.x0)
-          mydisks.push_back(it->second); 
+        if(it->second->cen_x == iod.mesh.x0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
       vector<RectangleData* > myrects;
       for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
-        if(it->second->cen_x == iod.mesh.x0)
-          myrects.push_back(it->second); 
-
+        if(it->second->cen_x == iod.mesh.x0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+         }
       if(mydisks.size() || myrects.size()) {
 
         for(int k=k0; k<kmax; k++)
@@ -949,16 +954,22 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(iimax==NX+1) { 
-    if (iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET) {
+    if (iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET || iod.mesh.bc_xmax == MeshData::WALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
-        if(it->second->cen_x == iod.mesh.xmax)
-          mydisks.push_back(it->second); 
+        if(it->second->cen_x == iod.mesh.xmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        } 
       vector<RectangleData* > myrects;
       for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
-        if(it->second->cen_x == iod.mesh.xmax)
-          myrects.push_back(it->second); 
+        if(it->second->cen_x == iod.mesh.xmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+         }
 
       if(mydisks.size() || myrects.size()) {
 
@@ -995,17 +1006,22 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(jj0==-1) { 
-    if (iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET) {
+    if (iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET || iod.mesh.bc_y0 == MeshData::WALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
-        if(it->second->cen_y == iod.mesh.y0)
-          mydisks.push_back(it->second); 
+        if(it->second->cen_y == iod.mesh.y0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
       vector<RectangleData* > myrects;
       for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
-        if(it->second->cen_y == iod.mesh.y0)
-          myrects.push_back(it->second); 
-
+        if(it->second->cen_y == iod.mesh.y0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
       if(mydisks.size() || myrects.size()) {
 
         for(int k=k0; k<kmax; k++)
@@ -1040,16 +1056,22 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(jjmax==NY+1) { 
-    if (iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET) {
+    if (iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET || iod.mesh.bc_ymax == MeshData::WALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
-        if(it->second->cen_y == iod.mesh.ymax)
-          mydisks.push_back(it->second); 
+        if(it->second->cen_y == iod.mesh.ymax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
       vector<RectangleData* > myrects;
       for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
-        if(it->second->cen_y == iod.mesh.ymax)
-          myrects.push_back(it->second); 
+        if(it->second->cen_y == iod.mesh.ymax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
 
       if(mydisks.size() || myrects.size()) {
 
@@ -1086,16 +1108,22 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(kk0==-1) { 
-    if (iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET) {
+    if (iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET || iod.mesh.bc_z0 == MeshData::WALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
-        if(it->second->cen_z == iod.mesh.z0)
-          mydisks.push_back(it->second); 
+        if(it->second->cen_z == iod.mesh.z0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
       vector<RectangleData* > myrects;
       for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
-        if(it->second->cen_z == iod.mesh.z0)
-          myrects.push_back(it->second); 
+        if(it->second->cen_z == iod.mesh.z0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
 
       if(mydisks.size() || myrects.size()) {
 
@@ -1131,16 +1159,23 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(kkmax==NZ+1) { 
-    if (iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET) {
+    if (iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET || iod.mesh.bc_zmax == MeshData::WALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
-        if(it->second->cen_z == iod.mesh.zmax)
-          mydisks.push_back(it->second); 
+        if(it->second->cen_z == iod.mesh.zmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
+
       vector<RectangleData* > myrects;
       for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
-        if(it->second->cen_z == iod.mesh.zmax)
-          myrects.push_back(it->second); 
+        if(it->second->cen_z == iod.mesh.zmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
 
       if(mydisks.size() || myrects.size()) {
 

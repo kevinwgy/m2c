@@ -234,7 +234,7 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
     else if (Sstar <= 0.0)
       ComputeFstar(dir, Vp, Sp, Sstar, id, flux);
     else {
-      fprintf(stderr,"*** Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface.\n");
+      fprintf(stderr,"*** Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface (Sstar = %e).\n", Sstar);
       exit_mpi();
     }
   }
