@@ -588,7 +588,7 @@ ExactRiemannSolverData::ExactRiemannSolverData()
   numSteps_rarefaction = 100;
   tol_main = 1.0e-5;
   tol_shock = 1.0e-6;
-  tol_rarefaction = 1.0e-5;
+  tol_rarefaction = 1.0e-6;
 }
 
 //------------------------------------------------------------------------------

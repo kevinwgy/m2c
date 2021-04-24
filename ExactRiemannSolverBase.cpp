@@ -253,8 +253,8 @@ ExactRiemannSolverBase::FinalizeSolution(int dir, double *Vm, double *Vp,
 
 #if PRINT_RIEMANN_SOLUTION == 1
   // the 2-wave
-  sol1d.push_back(vector<double>{u2 - std::max(1e-6, 0.001*fabs(u2)), rhol2, u2, p2});
-  sol1d.push_back(vector<double>{u2, rhor2, u2, p2});
+  sol1d.push_back(vector<double>{u2 - std::max(1e-6, 0.001*fabs(u2)), rhol2, u2, p2, (double)idl});
+  sol1d.push_back(vector<double>{u2, rhor2, u2, p2, (double)idr});
 #endif
 
   Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
@@ -379,17 +379,19 @@ ExactRiemannSolverBase::FinalizeSolution(int dir, double *Vm, double *Vp,
             [](vector<double> v1, vector<double> v2){return v1[0]<v2[0];});
   int last = sol1d.size()-1;
   double xi_span = sol1d[last][0] - sol1d[0][0];
-  sol1d.insert(sol1d.begin(), vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3]});
+  sol1d.insert(sol1d.begin(), vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3], sol1d[0][4]});
   last++;
-  sol1d.push_back(vector<double>{sol1d[last][0]+xi_span, sol1d[last][1], sol1d[last][2], sol1d[last][3]});
+  sol1d.push_back(vector<double>{sol1d[last][0]+xi_span, sol1d[last][1], sol1d[last][2], sol1d[last][3], sol1d[last][4]});
 
   FILE* solFile = fopen("RiemannSolution.txt", "w");
   print(solFile, "## One-Dimensional Riemann Problem.\n");
   print(solFile, "## Initial State: %e %e %e, id %d (left) | (right) %e %e %e, id %d.\n", 
         rhol, ul, pl, idl, rhor, ur, pr, idr);
+  print(solFile, "## xi(x/t) | density | velocity | pressure | internal energy per mass | material id\n");
 
   for(auto it = sol1d.begin(); it != sol1d.end(); it++) 
-    print(solFile,"%e    %e    %e    %e\n", (*it)[0], (*it)[1], (*it)[2], (*it)[3]);
+    print(solFile,"% e    % e    % e    % e    % e    % d\n", (*it)[0], (*it)[1], (*it)[2], (*it)[3], 
+                   vf[(int)(*it)[4]]->GetInternalEnergyPerUnitMass((*it)[1], (*it)[3]), (int)(*it)[4]);
 
   fclose(solFile);
 #endif
@@ -492,8 +494,10 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
   }
 
   if(i==maxIts_main) {
-    fprintf(stderr, "*** Error: Failed to find an initial bracketing interval.\n");
-    exit(-1);
+    cout << "*** Error: Exact Riemann solver failed. (Unable to find a bracketing interval) " << endl;
+    cout << "      left: " << rhol << ", " << ul << ", " << pl << " (" << idl << "); right: "
+                           << rhor << ", " << ur << ", " << pr << " (" << idr << ")." << endl;
+    exit_mpi();
   }
 
   return true;
@@ -690,7 +694,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     xi_0 = xi;
 
 #if PRINT_RIEMANN_SOLUTION == 1
-    sol1d.push_back(vector<double>{xi, rho, u, p});
+    sol1d.push_back(vector<double>{xi, rho, u, p, (double)id});
 #endif
 
     //fprintf(stderr,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
@@ -719,7 +723,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       } 
 
 #if PRINT_RIEMANN_SOLUTION == 1
-      sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1});
+      sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1, (double)id});
 #endif
 
       if(trans_rare && Vrare_x0 && xi_0*xi_1<=0) {//transonic rarefaction, crossing x = xi = 0
@@ -733,7 +737,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         Vrare_x0[2] = w0*ps_0   + w1*ps_1;
 
 #if PRINT_RIEMANN_SOLUTION == 1
-        sol1d.push_back(vector<double>{0.0, Vrare_x0[0], Vrare_x0[1], Vrare_x0[2]});
+        sol1d.push_back(vector<double>{0.0, Vrare_x0[0], Vrare_x0[1], Vrare_x0[2], (double)id});
 #endif
 
       }
@@ -812,9 +816,9 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       f1    = f0;
       while(!found_rhos0) {
         if(++i>=maxIts_shock) {
-          cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
-               << " iterations (in the solution of the Hugoniot equation)." << endl;
-          exit_mpi();
+//          cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
+//               << " iterations (in the solution of the Hugoniot equation)." << endl;
+          return false;
         }
         tmp = rhos1;
         ftmp = f1;
@@ -855,8 +859,8 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         double factor = 2.5;
         while(!found_rhos1) {
           if(++i>=maxIts_shock) {
-            cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
-                 << " iterations (in the solution of the Hugoniot equation (2))." << endl;
+//            cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
+//                 << " iterations (in the solution of the Hugoniot equation (2))." << endl;
             return false; //failure
           }
           rhos0 = rhos1;
@@ -953,11 +957,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 #if PRINT_RIEMANN_SOLUTION == 1
     double xi = (rhos*us - rho*u)/(rhos-rho);
     if(wavenumber==1) {
-      sol1d.push_back(vector<double>{xi-0.0001*fabs(xi), rho, u, p});
-      sol1d.push_back(vector<double>{xi, rhos, us, ps});
+      sol1d.push_back(vector<double>{xi-0.0001*fabs(xi), rho, u, p, (double)id});
+      sol1d.push_back(vector<double>{xi, rhos, us, ps, (double)id});
     } else {
-      sol1d.push_back(vector<double>{xi, rhos, us, ps});
-      sol1d.push_back(vector<double>{xi+0.0001*fabs(xi), rho, u, p});
+      sol1d.push_back(vector<double>{xi, rhos, us, ps, (double)id});
+      sol1d.push_back(vector<double>{xi+0.0001*fabs(xi), rho, u, p, (double)id});
     }
 #endif
 
