@@ -396,7 +396,7 @@ MaterialModelData::MaterialModelData()
 {
 
   eos = STIFFENED_GAS;
-  rhomin = -DBL_MAX; // By default, no clipping
+  rhomin = -1.0e-14; // By default, density cannot be zero or negative
   pmin = -DBL_MAX;   // By default, no clipping
 
 }

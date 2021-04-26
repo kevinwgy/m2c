@@ -77,7 +77,7 @@ public:
     double c2 = GetDpdrho(V[0], e) + V[4]/V[0]*GetBigGamma(V[0], e);
     if(V[0] <=0.0 || c2<=0){
       if(verbose)
-        fprintf(stdout, "Warning: Violating the hyperbolicity (JWL). rho = %e, p = %e.\n", V[0], V[4]);
+        fprintf(stdout, "Warning: Negative density of violation of hyperbolicity. rho = %e, p = %e.\n", V[0], V[4]);
       return true;
     }
     return false;
