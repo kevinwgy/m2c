@@ -46,7 +46,7 @@ public:
   inline bool CheckState(double *V) const{
     if(V[0] <= 0.0 || V[4]+Pstiff <= 0.0){
       if(verbose)
-        fprintf(stdout, "Warning:  found negative density (%e) or negative pressure (p = %e, Pstiff = %e).\n", V[0], V[4], Pstiff);
+        fprintf(stdout, "Warning: found negative density (%e) or negative pressure (p = %e, Pstiff = %e).\n", V[0], V[4], Pstiff);
       return true;
     }
     return false;

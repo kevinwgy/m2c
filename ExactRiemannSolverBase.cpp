@@ -220,7 +220,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
     cout << "Iter " << iter << ": err_p = " << err_p << ", err_u = " << err_u << "." << endl;
 #endif
 
-    if( err_p < tol_main && err_u < tol_main )
+    if( (err_p < tol_main && err_u < tol_main) || (err_p < tol_main*1e-3) || (err_u < tol_main*1e-3) )
       break; // converged
 
     trans_rare = false; //reset
