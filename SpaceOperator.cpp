@@ -303,6 +303,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
   double*** id = (double***) ID.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
   int myi0, myj0, myk0, myimax, myjmax, mykmax;
   if(workOnGhost)
@@ -319,8 +320,10 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
         if(checkState) {
           if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {
-            print_error("*** Error: State variables at (%d,%d,%d) violate hyperbolicity. matid = %d.\n", i,j,k, id[k][j][i]);
-            fprintf(stderr,"v[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+            fprintf(stderr, "\033[0;31m*** Error: State variables at (%e,%e,%e) violate hyperbolicity." 
+                    " matid = %d.\n\033[0m", coords[k][j][i][0],coords[k][j][i][1],coords[k][j][i][2], (int)id[k][j][i]);
+            fprintf(stderr, "\033[0;31mv[%d(k),%d(j),%d(i)] = [%e, %e, %e, %e, %e]\n\033[0m", 
+                    i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
             exit_mpi();
           }
         }
@@ -335,6 +338,8 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
   ID.RestoreDataPointerToLocalVector(); //no changes made
   V.RestoreDataPointerAndInsert();
+
+  coordinates.RestoreDataPointerToLocalVector(); //no changes
 
   return nClipped;
 }  
