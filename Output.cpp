@@ -7,7 +7,8 @@
 Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_) : comm(comm_), 
     iod(iod_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
-    vector3(comm_, &(dms.ghosted1_3dof))
+    vector3(comm_, &(dms.ghosted1_3dof)),
+    probe_output(comm_, iod_.output)
 {
   iFrame = 0;
 
@@ -31,6 +32,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcn
   print(pvdfile, "</VTKFile>\n");
 
   fclose(pvdfile); pvdfile = NULL;
+
 }
 
 //--------------------------------------------------------------------------
@@ -46,6 +48,7 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 {
   scalar.StoreMeshCoordinates(coordinates);
   vector3.StoreMeshCoordinates(coordinates);
+  probe_output.SetupInterpolation(coordinates);
 }
 
 //--------------------------------------------------------------------------
@@ -218,6 +221,14 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
    
   //print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
   print("- Wrote solution at %e to %s.\n", time, fname);
+}
+
+//--------------------------------------------------------------------------
+
+void Output::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &V, 
+                                   SpaceVariable3D &ID, vector<SpaceVariable3D*> &Phi)
+{
+  probe_output.WriteSolutionAtProbes(time, time_step, V, ID, Phi);
 }
 
 //--------------------------------------------------------------------------

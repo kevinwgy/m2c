@@ -161,6 +161,7 @@ int main(int argc, char* argv[])
   int time_step = 0;
   //! write initial condition to file
   out.WriteSolutionSnapshot(t, time_step, V, ID, Phi);
+  out.WriteSolutionAtProbes(t, time_step, V, ID, Phi);
 
   while(t<iod.ts.maxTime && time_step<iod.ts.maxIts) {
 
@@ -187,6 +188,7 @@ int main(int argc, char* argv[])
 
     if(out.ToWriteSolutionSnapshot(t, dt, time_step))
       out.WriteSolutionSnapshot(t, time_step, V, ID, Phi);
+    out.WriteSolutionAtProbes(t, time_step, V, ID, Phi);
 
   }
 

@@ -1291,7 +1291,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 11+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 13+MAXLS, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -1338,9 +1338,134 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::verbose), 2,
                                "Off", 0, "On", 1);
+
+  probes.setup("Probes", ca);
+
+  linePlots.setup("LinePlot", ca);
 }
 
 //------------------------------------------------------------------------------
+
+void Probes::Node::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+
+  new ClassDouble<Probes::Node>(ca, "LocationX",this,&Probes::Node::locationX);
+  new ClassDouble<Probes::Node>(ca, "LocationY",this,&Probes::Node::locationY);
+  new ClassDouble<Probes::Node>(ca, "LocationZ",this,&Probes::Node::locationZ);
+
+}
+
+//------------------------------------------------------------------------------
+
+Probes::Probes() {
+
+  frequency = 10;
+
+  prefix = "";
+  density = "";
+  pressure = "";
+  temperature = "";
+  velocity_x = "";
+  velocity_y = "";
+  velocity_z = "";
+  materialid = "";
+  levelset0 = "";
+  levelset1 = "";
+  levelset2 = "";
+  levelset3 = "";
+  levelset4 = "";
+
+}
+
+//------------------------------------------------------------------------------
+
+void Probes::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 150, father);
+
+  new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
+  new ClassStr<Probes>(ca, "Prefix", this, &Probes::prefix);
+  new ClassStr<Probes>(ca, "Density", this, &Probes::density);
+  new ClassStr<Probes>(ca, "Pressure", this, &Probes::pressure);
+  new ClassStr<Probes>(ca, "Temperature", this, &Probes::temperature);
+  new ClassStr<Probes>(ca, "VelocityX", this, &Probes::velocity_x);
+  new ClassStr<Probes>(ca, "VelocityY", this, &Probes::velocity_y);
+  new ClassStr<Probes>(ca, "VelocityZ", this, &Probes::velocity_z);
+  new ClassStr<Probes>(ca, "MaterialId", this, &Probes::materialid);
+  new ClassStr<Probes>(ca, "LevelSet0", this, &Probes::levelset0);
+  new ClassStr<Probes>(ca, "LevelSet1", this, &Probes::levelset1);
+  new ClassStr<Probes>(ca, "LevelSet2", this, &Probes::levelset2);
+  new ClassStr<Probes>(ca, "LevelSet3", this, &Probes::levelset3);
+  new ClassStr<Probes>(ca, "LevelSet4", this, &Probes::levelset4);
+
+  char nodename[12];
+  for (int i = 0; i < MAXNODES; ++i) {
+    sprintf(nodename,"Node%d",i);
+
+    myNodes[i].setup(nodename, ca);
+  }
+
+}
+
+//------------------------------------------------------------------------------
+
+LinePlot::LinePlot() {
+
+  density = "";
+  pressure = "";
+  temperature = "";
+  velocity_x = "";
+  velocity_y = "";
+  velocity_z = "";
+  materialid = "";
+  levelset0 = "";
+  levelset1 = "";
+  levelset2 = "";
+  levelset3 = "";
+  levelset4 = "";
+
+  numPoints = -1;
+  x0 = y0 = z0 = 0.0;
+  x1 = y1 = z1 = 0.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+Assigner* LinePlot::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 19, nullAssigner);
+  new ClassStr<LinePlot>(ca, "Density", this, &LinePlot::density);
+  new ClassStr<LinePlot>(ca, "Pressure", this, &LinePlot::pressure);
+  new ClassStr<LinePlot>(ca, "Temperature", this, &LinePlot::temperature);
+  new ClassStr<LinePlot>(ca, "VelocityX", this, &LinePlot::velocity_x);
+  new ClassStr<LinePlot>(ca, "VelocityY", this, &LinePlot::velocity_y);
+  new ClassStr<LinePlot>(ca, "VelocityZ", this, &LinePlot::velocity_z);
+  new ClassStr<LinePlot>(ca, "MaterialID", this, &LinePlot::materialid);
+  new ClassStr<LinePlot>(ca, "LevelSet0", this, &LinePlot::levelset0);
+  new ClassStr<LinePlot>(ca, "LevelSet1", this, &LinePlot::levelset1);
+  new ClassStr<LinePlot>(ca, "LevelSet2", this, &LinePlot::levelset2);
+  new ClassStr<LinePlot>(ca, "LevelSet3", this, &LinePlot::levelset3);
+  new ClassStr<LinePlot>(ca, "LevelSet4", this, &LinePlot::levelset4);
+
+  new ClassInt<LinePlot>(ca, "NumPoints", this, &LinePlot::numPoints);
+
+  new ClassDouble<LinePlot>(ca, "X0", this, &LinePlot::x0);
+  new ClassDouble<LinePlot>(ca, "Y0", this, &LinePlot::y0);
+  new ClassDouble<LinePlot>(ca, "Z0", this, &LinePlot::z0);
+  new ClassDouble<LinePlot>(ca, "X1", this, &LinePlot::x1);
+  new ClassDouble<LinePlot>(ca, "Y1", this, &LinePlot::y1);
+  new ClassDouble<LinePlot>(ca, "Z1", this, &LinePlot::z1);
+
+  return ca;
+
+}
+
+//------------------------------------------------------------------------------
+
 
 IoData::IoData(int argc, char** argv)
 {

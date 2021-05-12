@@ -13,6 +13,7 @@ struct Int3 {
   Int3(int x[3]) { v[0] = x[0]; v[1] = x[1]; v[2] = x[2]; }
   Int3(int i1, int i2, int i3) {v[0] = i1; v[1] = i2; v[2] = i3;}
   Int3(const Int3& v2) {for(int i=0; i<3; i++) v[i] = v2.v[i];}
+  Int3 &operator=(const int v2) {v[0] = v[1] = v[2] = v2; return *this;}
   Int3 &operator=(const Int3& v2) {for(int i=0; i<3; i++) v[i] = v2.v[i]; return *this;}
   Int3 operator+(const Int3& v2) {Int3 res; for(int i=0; i<3; i++) res.v[i] = v[i] + v2.v[i]; return res;}
   Int3 operator-(const Int3& v2) {Int3 res; for(int i=0; i<3; i++) res.v[i] = v[i] - v2.v[i]; return res;}

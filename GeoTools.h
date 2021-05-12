@@ -148,6 +148,27 @@ inline double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC,
   return dist;
 }
 
+/**************************************************************************
+ * Trilinear interpolation
+ *   Inputs:
+ *     xi = (xi1, xi2, xi3) -- local coordinates the interpolation point 
+ *     c000, c100, c010, c110, c001, c101, c011, c111 --- 8 nodal values (i,j,k)
+ *   Outputs:
+ *     return value: interpolated value.
+ */
+inline double TrilinearInterpolation(Vec3D &xi, double c000, double c100, double c010, double c110,
+                                     double c001, double c101, double c011, double c111)
+{
+  double c00 = c000*(1.0 - xi[0]) + c100*xi[0];
+  double c01 = c001*(1.0 - xi[0]) + c101*xi[0];
+  double c10 = c010*(1.0 - xi[0]) + c110*xi[0];
+  double c11 = c011*(1.0 - xi[0]) + c111*xi[0];
+
+  double c0  = c00*(1.0 - xi[1]) + c10*xi[1];
+  double c1  = c01*(1.0 - xi[1]) + c11*xi[1];
+
+  return c0*(1.0 - xi[2]) + c1*xi[2];
+}
 
 
 } //end of namespace

@@ -499,6 +499,74 @@ struct IcData {
 
 //------------------------------------------------------------------------------
 
+struct Probes {
+
+  const static int MAXNODES = 128;
+  struct Node {
+    Node() {locationX = locationY = locationZ = -1.0e20; } 
+    double locationX,locationY,locationZ;
+    void setup(const char *, ClassAssigner * = 0);
+  };
+
+  Node myNodes[MAXNODES];
+
+  int frequency;
+
+  enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
+              MATERIALID = 6, LEVELSET0 = 7, LEVELSET1 = 8, LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, SIZE = 12};
+
+  const char *prefix;
+  const char *density;
+  const char *velocity_x;
+  const char *velocity_y;
+  const char *velocity_z;
+  const char *pressure;
+  const char *temperature;
+  const char *materialid;
+  const char *levelset0;
+  const char *levelset1;
+  const char *levelset2;
+  const char *levelset3;
+  const char *levelset4;
+
+  Probes();
+  ~Probes() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
+struct LinePlot {
+
+  LinePlot();
+  ~LinePlot() {}
+
+  Assigner *getAssigner();
+  double x0,y0,z0;
+  double x1,y1,z1;
+
+  int numPoints;
+
+  enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
+              MATERIALID = 6, LEVELSET0 = 7, LEVELSET1 = 8, LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, SIZE = 12};
+
+  const char *density;
+  const char *pressure;
+  const char *temperature;
+  const char *velocity_x;
+  const char *velocity_y;
+  const char *velocity_z;
+  const char *materialid;
+  const char *levelset0;
+  const char *levelset1;
+  const char *levelset2;
+  const char *levelset3;
+  const char *levelset4;
+};
+
+//------------------------------------------------------------------------------
+
 struct OutputData {
 
   const char *prefix; //!< path
@@ -519,6 +587,12 @@ struct OutputData {
 
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
+
+
+  Probes probes;
+
+  ObjectMap<LinePlot> linePlots;
+
 
   OutputData();
   ~OutputData() {}
