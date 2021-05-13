@@ -27,7 +27,7 @@ class Output
   FILE* pvdfile;
 
   ProbeOutput probe_output;
-  //LineOutput  line_output;
+  std::vector<ProbeOutput*> line_outputs;
 
 
 public:
@@ -36,14 +36,15 @@ public:
 
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh
 
+  void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
+                       SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool must_write = false);
+
+  bool IsTimeToWrite(double time, double dt, int time_step, 
+                     double frequency_dt, int frequency); /**< check whether to write solution 
+                                                             * at this time & time-step */
   void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
                              vector<SpaceVariable3D*> &Phi); //!< write solution to file
 
-  void WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                             vector<SpaceVariable3D*> &Phi); //!< write probe solution to file
-
-  bool ToWriteSolutionSnapshot(double time, double dt, int time_step); /**< check whether to write solution 
-                                                                        * at this time & time-step */
   inline double GetLastSnapshotTime() {return last_snapshot_time;}
 
   void FinalizeOutput();

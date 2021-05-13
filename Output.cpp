@@ -33,6 +33,18 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcn
 
   fclose(pvdfile); pvdfile = NULL;
 
+  // setup line plots
+  int numLines = iod.output.linePlots.dataMap.size();
+  line_outputs.resize(numLines, NULL);
+  for(auto it = iod.output.linePlots.dataMap.begin(); it != iod.output.linePlots.dataMap.end(); it++) {
+    int line_number = it->first;
+    if(line_number<0 || line_number>=numLines) {
+      print_error("*** Error: Detected error in line output. Line number = %d (should be between 0 and %d)\n",
+                  line_number, numLines-1); 
+      exit(-1);
+    }
+    line_outputs[line_number] = new ProbeOutput(comm, iod.output, line_number);
+  }
 }
 
 //--------------------------------------------------------------------------
@@ -40,6 +52,8 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcn
 Output::~Output()
 {
   if(pvdfile) fclose(pvdfile);
+  for(int i=0; i<line_outputs.size(); i++)
+    if(line_outputs[i]) delete line_outputs[i];
 }
 
 //--------------------------------------------------------------------------
@@ -49,22 +63,40 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
   scalar.StoreMeshCoordinates(coordinates);
   vector3.StoreMeshCoordinates(coordinates);
   probe_output.SetupInterpolation(coordinates);
+  for(int i=0; i<line_outputs.size(); i++)
+    line_outputs[i]->SetupInterpolation(coordinates);
 }
 
 //--------------------------------------------------------------------------
 
-bool Output::ToWriteSolutionSnapshot(double time, double dt, int time_step)
+void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
+                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool must_write)
+{
+  //write solution snapshot
+  if(must_write || 
+     IsTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency))
+    WriteSolutionSnapshot(time, time_step, V, ID, Phi);
+
+  //write solutions at probes
+  probe_output.WriteSolutionAtProbes(time, time_step, V, ID, Phi, must_write);
+
+  //write solutions along lines
+  for(int i=0; i<line_outputs.size(); i++)
+    line_outputs[i]->WriteAllSolutionsAlongLine(time, time_step, V, ID, Phi, must_write);
+}
+//--------------------------------------------------------------------------
+
+bool Output::IsTimeToWrite(double time, double dt, int time_step, double frequency_dt, int frequency)
 {
   //! First check frequency_dt. If it is not specified, use frequency
-  if(iod.output.frequency_dt > 0) {
-    if(floor(time/iod.output.frequency_dt) != floor((time-dt)/iod.output.frequency_dt))
-//    if(time - last_snapshot_time >= iod.output.frequency_dt - 0.01*dt/*a small tolerance*/)
+  if(frequency_dt > 0) {
+    if(floor(time/frequency_dt) != floor((time-dt)/frequency_dt))
       return true;
     else
       return false;
   } 
   else { //!< use frequency
-    if((iod.output.frequency > 0) && (time_step % iod.output.frequency == 0))
+    if((frequency > 0) && (time_step % frequency == 0))
       return true;
     else
       return false;
@@ -221,14 +253,6 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
    
   //print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
   print("- Wrote solution at %e to %s.\n", time, fname);
-}
-
-//--------------------------------------------------------------------------
-
-void Output::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &V, 
-                                   SpaceVariable3D &ID, vector<SpaceVariable3D*> &Phi)
-{
-  probe_output.WriteSolutionAtProbes(time, time_step, V, ID, Phi);
 }
 
 //--------------------------------------------------------------------------

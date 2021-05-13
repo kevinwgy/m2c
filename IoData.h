@@ -515,7 +515,6 @@ struct Probes {
   enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
               MATERIALID = 6, LEVELSET0 = 7, LEVELSET1 = 8, LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, SIZE = 12};
 
-  const char *prefix;
   const char *density;
   const char *velocity_x;
   const char *velocity_y;
@@ -543,26 +542,15 @@ struct LinePlot {
   ~LinePlot() {}
 
   Assigner *getAssigner();
+
+  const char *filename_base; //!< filename without path
+
   double x0,y0,z0;
   double x1,y1,z1;
 
   int numPoints;
+  int frequency;
 
-  enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
-              MATERIALID = 6, LEVELSET0 = 7, LEVELSET1 = 8, LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, SIZE = 12};
-
-  const char *density;
-  const char *pressure;
-  const char *temperature;
-  const char *velocity_x;
-  const char *velocity_y;
-  const char *velocity_z;
-  const char *materialid;
-  const char *levelset0;
-  const char *levelset1;
-  const char *levelset2;
-  const char *levelset3;
-  const char *levelset4;
 };
 
 //------------------------------------------------------------------------------

@@ -1362,7 +1362,6 @@ Probes::Probes() {
 
   frequency = 10;
 
-  prefix = "";
   density = "";
   pressure = "";
   temperature = "";
@@ -1386,7 +1385,6 @@ void Probes::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 150, father);
 
   new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
-  new ClassStr<Probes>(ca, "Prefix", this, &Probes::prefix);
   new ClassStr<Probes>(ca, "Density", this, &Probes::density);
   new ClassStr<Probes>(ca, "Pressure", this, &Probes::pressure);
   new ClassStr<Probes>(ca, "Temperature", this, &Probes::temperature);
@@ -1413,23 +1411,13 @@ void Probes::setup(const char *name, ClassAssigner *father)
 
 LinePlot::LinePlot() {
 
-  density = "";
-  pressure = "";
-  temperature = "";
-  velocity_x = "";
-  velocity_y = "";
-  velocity_z = "";
-  materialid = "";
-  levelset0 = "";
-  levelset1 = "";
-  levelset2 = "";
-  levelset3 = "";
-  levelset4 = "";
-
-  numPoints = -1;
   x0 = y0 = z0 = 0.0;
   x1 = y1 = z1 = 0.0;
 
+  numPoints = 0;
+  frequency = 100;
+
+  filename_base = "";
 }
 
 //------------------------------------------------------------------------------
@@ -1437,21 +1425,12 @@ LinePlot::LinePlot() {
 Assigner* LinePlot::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 19, nullAssigner);
-  new ClassStr<LinePlot>(ca, "Density", this, &LinePlot::density);
-  new ClassStr<LinePlot>(ca, "Pressure", this, &LinePlot::pressure);
-  new ClassStr<LinePlot>(ca, "Temperature", this, &LinePlot::temperature);
-  new ClassStr<LinePlot>(ca, "VelocityX", this, &LinePlot::velocity_x);
-  new ClassStr<LinePlot>(ca, "VelocityY", this, &LinePlot::velocity_y);
-  new ClassStr<LinePlot>(ca, "VelocityZ", this, &LinePlot::velocity_z);
-  new ClassStr<LinePlot>(ca, "MaterialID", this, &LinePlot::materialid);
-  new ClassStr<LinePlot>(ca, "LevelSet0", this, &LinePlot::levelset0);
-  new ClassStr<LinePlot>(ca, "LevelSet1", this, &LinePlot::levelset1);
-  new ClassStr<LinePlot>(ca, "LevelSet2", this, &LinePlot::levelset2);
-  new ClassStr<LinePlot>(ca, "LevelSet3", this, &LinePlot::levelset3);
-  new ClassStr<LinePlot>(ca, "LevelSet4", this, &LinePlot::levelset4);
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+
+  new ClassStr<LinePlot>(ca, "FileName", this, &LinePlot::filename_base);
 
   new ClassInt<LinePlot>(ca, "NumPoints", this, &LinePlot::numPoints);
+  new ClassInt<LinePlot>(ca, "Frequency", this, &LinePlot::frequency);
 
   new ClassDouble<LinePlot>(ca, "X0", this, &LinePlot::x0);
   new ClassDouble<LinePlot>(ca, "Y0", this, &LinePlot::y0);
