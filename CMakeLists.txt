@@ -66,6 +66,7 @@ SpaceVariable.cpp
 ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp
 ProbeOutput.cpp
+MaterialVolumeOutput.cpp
 Output.cpp
 Reconstructor.cpp
 SpaceOperator.cpp

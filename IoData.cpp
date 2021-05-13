@@ -1259,6 +1259,27 @@ void IcData::readUserSpecifiedIC_Spherical(std::fstream &input)
   }
 
 }
+
+//------------------------------------------------------------------------------
+
+MaterialVolumes::MaterialVolumes()
+{
+  filename = "";
+  frequency = 10;
+}
+
+//------------------------------------------------------------------------------
+
+void MaterialVolumes::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+
+  new ClassStr<MaterialVolumes>(ca, "FileName", this, &MaterialVolumes::filename);
+  new ClassInt<MaterialVolumes>(ca, "Frequency", this, &MaterialVolumes::frequency);
+
+}
+
 //------------------------------------------------------------------------------
 
 OutputData::OutputData()
@@ -1291,7 +1312,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 13+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 14+MAXLS, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -1341,7 +1362,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   probes.setup("Probes", ca);
 
-  linePlots.setup("LinePlot", ca);
+  linePlots.setup("LinePlots", ca);
+
+  materialVolumes.setup("MaterialVolumes", ca);
 }
 
 //------------------------------------------------------------------------------

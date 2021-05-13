@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
   mpo.UpdateMaterialID(Phi,ID); //populate the ghost layer of ID (outside domain boundary)
 
   //! Initialize output
-  Output out(comm, dms, iod, vf); 
+  Output out(comm, dms, iod, vf, spo.GetMeshCellVolumes()); 
   out.InitializeOutput(spo.GetMeshCoordinates());
 
   //! Initialize time integrator

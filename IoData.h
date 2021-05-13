@@ -555,6 +555,19 @@ struct LinePlot {
 
 //------------------------------------------------------------------------------
 
+struct MaterialVolumes {
+
+  const char *filename;
+  int frequency;
+
+  MaterialVolumes();
+  ~MaterialVolumes() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
 struct OutputData {
 
   const char *prefix; //!< path
@@ -581,6 +594,7 @@ struct OutputData {
 
   ObjectMap<LinePlot> linePlots;
 
+  MaterialVolumes materialVolumes;
 
   OutputData();
   ~OutputData() {}

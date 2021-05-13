@@ -236,10 +236,17 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, int time_step, SpaceVariabl
   if(numNodes <= 0) //nothing to be done
     return;
 
+  if(frequency<=0)
+    return;
+
   if(time_step % frequency != 0 && !must_write) //should not output at this time step
     return;
 
   LinePlot* line(iod_output.linePlots.dataMap[line_number]);
+
+  if(line->filename_base[0] == 0) //file not proided
+    return;
+
   double dx = (line->x1 - line->x0)/(line->numPoints - 1);
   double dy = (line->y1 - line->y0)/(line->numPoints - 1);
   double dz = (line->z1 - line->z0)/(line->numPoints - 1);
@@ -311,6 +318,9 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
                                    std::vector<SpaceVariable3D*> &Phi, bool must_write)
 {
   if(numNodes <= 0) //nothing to be done
+    return;
+
+  if(frequency<=0)
     return;
 
   if(time_step % frequency != 0 && !must_write) //should not output at this time step

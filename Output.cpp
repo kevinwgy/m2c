@@ -4,11 +4,14 @@
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_) : comm(comm_), 
+Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, 
+               SpaceVariable3D &cell_volume) : 
+    comm(comm_), 
     iod(iod_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
-    probe_output(comm_, iod_.output)
+    probe_output(comm_, iod_.output),
+    matvol_output(comm_, iod_, cell_volume)
 {
   iFrame = 0;
 
@@ -83,6 +86,9 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
   //write solutions along lines
   for(int i=0; i<line_outputs.size(); i++)
     line_outputs[i]->WriteAllSolutionsAlongLine(time, time_step, V, ID, Phi, must_write);
+
+  //write material volumes
+  matvol_output.WriteSolution(time, time_step, ID, must_write);
 }
 //--------------------------------------------------------------------------
 
