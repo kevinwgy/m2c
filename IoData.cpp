@@ -1454,15 +1454,15 @@ Assigner* LinePlot::getAssigner()
 
   new ClassStr<LinePlot>(ca, "FileName", this, &LinePlot::filename_base);
 
-  new ClassInt<LinePlot>(ca, "NumPoints", this, &LinePlot::numPoints);
+  new ClassInt<LinePlot>(ca, "NumberOfPoints", this, &LinePlot::numPoints);
   new ClassInt<LinePlot>(ca, "Frequency", this, &LinePlot::frequency);
 
   new ClassDouble<LinePlot>(ca, "X0", this, &LinePlot::x0);
   new ClassDouble<LinePlot>(ca, "Y0", this, &LinePlot::y0);
   new ClassDouble<LinePlot>(ca, "Z0", this, &LinePlot::z0);
-  new ClassDouble<LinePlot>(ca, "X1", this, &LinePlot::x1);
-  new ClassDouble<LinePlot>(ca, "Y1", this, &LinePlot::y1);
-  new ClassDouble<LinePlot>(ca, "Z1", this, &LinePlot::z1);
+  new ClassDouble<LinePlot>(ca, "Xmax", this, &LinePlot::x1);
+  new ClassDouble<LinePlot>(ca, "Ymax", this, &LinePlot::y1);
+  new ClassDouble<LinePlot>(ca, "Zmax", this, &LinePlot::z1);
 
   return ca;
 
