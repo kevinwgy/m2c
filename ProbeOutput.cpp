@@ -11,21 +11,24 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) :
 
   frequency = iod_output.probes.frequency;
 
-  int i;
-  for (i = 0; i < Probes::MAXNODES; ++i) {
-    locations.push_back(Vec3D(iod_output.probes.myNodes[i].locationX,
-                         iod_output.probes.myNodes[i].locationY,
-                         iod_output.probes.myNodes[i].locationZ));
+  numNodes = iod_output.probes.myNodes.dataMap.size();
+  locations.resize(numNodes);
+  for (auto it = iod_output.probes.myNodes.dataMap.begin();
+       it!= iod_output.probes.myNodes.dataMap.end(); 
+       it++) {
+    int pid = it->first;
+    if(pid<0 || pid>=numNodes) {
+      print_error("*** Error: Probe node index (%d) out of range. Should be between 0 and %d.\n",
+                  pid, numNodes-1);
+      exit_mpi();
+    }
+    locations[pid] = Vec3D(it->second->locationX, it->second->locationY, it->second->locationZ);
 
-    if(locations[i][0] < -1e15)
-      break;
-    else
-      print("- [Probe] Node %d: Coords = (%e, %e, %e).\n", 
-            i, locations[i][0], locations[i][1], locations[i][2]);
+    print("- [Probe] Node %d: Coords = (%e, %e, %e).\n", 
+          it->first, locations[pid][0], locations[pid][1], locations[pid][2]);
   }
-  numNodes = i;
 
-  for(i=0; i<Probes::SIZE; i++) {
+  for(int i=0; i<Probes::SIZE; i++) {
     file[i] = NULL;
   }
 
@@ -115,10 +118,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) :
     delete [] filename;
   }
 
-  for(i=0; i<Probes::SIZE; i++)
+  for(int i=0; i<Probes::SIZE; i++)
     if(file[i]) { //write header
       for(int iNode = 0; iNode<numNodes; iNode++)
-        print(file[i], "## Probe %d: %e, %e, %e\n", locations[i][0], locations[i][1], locations[i][2]);
+        print(file[i], "## Probe %d: %e, %e, %e\n", iNode, locations[i][0], locations[i][1], locations[i][2]);
+      print(file[i], "## Time step  |  Time  |  Solutions at probe nodes (0, 1, 2, etc.)\n");
+      fflush(file[i]);
     }
 
 }
@@ -174,11 +179,18 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
   // get mesh coordinates
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
-  // find subdomain corners (not including the ghost layer)
+  // find subdomain corners (have to avoid overlapping & 
+  // to account for the ghost layer outside physical domain)
   int i0, j0, k0, imax, jmax, kmax;
+  int NX, NY, NZ;
+  coordinates.GetGhostedCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+  if(imax != NX+1) imax --;
+  if(jmax != NY+1) jmax --;
+  if(kmax != NZ+1) kmax --;
+
   Vec3D xyz0, xyzmax;
-  coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
-  xyz0 = coords[k0-1][j0-1][i0-1]; //lower corner of the ghost layer
+  xyz0 = coords[k0][j0][i0]; //lower corner of the ghost layer
   xyzmax = coords[kmax-1][jmax-1][imax-1]; 
 
   for(int iNode=0; iNode<numNodes; iNode++) {
@@ -218,12 +230,12 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
   } 
 
   MPI_Allreduce(MPI_IN_PLACE, found, numNodes, MPI_INT, MPI_SUM, comm);
-  for(int iNode = 0; iNode<numNodes; iNode++)
+  for(int iNode = 0; iNode<numNodes; iNode++) {
     if(found[iNode] != 1) {
-      print_error("*** Error: Cannot locate probe node %d in the mesh (found = %d).\n", iNode, found[iNode]);
+      print_error("*** Error: Cannot locate probe node %d in the domain (found = %d).\n", iNode, found[iNode]);
       exit_mpi();
     }
-  
+  } 
   coordinates.RestoreDataPointerToLocalVector();
 }
 
@@ -329,12 +341,13 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   double***  v  = (double***) V.GetDataPointer();
 
   if(file[Probes::DENSITY]) {
-    print(file[Probes::DENSITY], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::DENSITY], "%10d    %12.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 0);
       print(file[Probes::DENSITY], "%12.8e    ", sol);
     }
     print(file[Probes::DENSITY],"\n");
+    fflush(file[Probes::DENSITY]);
   }
 
   if(file[Probes::VELOCITY_X]) {
@@ -344,6 +357,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::VELOCITY_X], "%12.8e    ", sol);
     }
     print(file[Probes::VELOCITY_X],"\n");
+    fflush(file[Probes::VELOCITY_X]);
   }
 
   if(file[Probes::VELOCITY_Y]) {
@@ -353,6 +367,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::VELOCITY_Y], "%12.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Y],"\n");
+    fflush(file[Probes::VELOCITY_Y]);
   }
 
   if(file[Probes::VELOCITY_Z]) {
@@ -362,6 +377,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::VELOCITY_Z], "%12.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Z],"\n");
+    fflush(file[Probes::VELOCITY_Z]);
   }
 
   if(file[Probes::PRESSURE]) {
@@ -371,6 +387,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::PRESSURE], "%12.8e    ", sol);
     }
     print(file[Probes::PRESSURE],"\n");
+    fflush(file[Probes::PRESSURE]);
   }
 
   if(file[Probes::TEMPERATURE]) {
@@ -385,6 +402,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::MATERIALID], "%12.8e    ", sol);
     }
     print(file[Probes::MATERIALID],"\n");
+    fflush(file[Probes::MATERIALID]);
     ID.RestoreDataPointerToLocalVector();
   }
 
@@ -396,6 +414,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::LEVELSET0], "%12.8e    ", sol);
     }
     print(file[Probes::LEVELSET0],"\n");
+    fflush(file[Probes::LEVELSET0]);
     Phi[0]->RestoreDataPointerToLocalVector(); //no changes made
   }
 
@@ -407,6 +426,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::LEVELSET1], "%12.8e    ", sol);
     }
     print(file[Probes::LEVELSET1],"\n");
+    fflush(file[Probes::LEVELSET1]);
     Phi[1]->RestoreDataPointerToLocalVector(); //no changes made
   }
 
@@ -418,6 +438,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::LEVELSET2], "%12.8e    ", sol);
     }
     print(file[Probes::LEVELSET2],"\n");
+    fflush(file[Probes::LEVELSET2]);
     Phi[2]->RestoreDataPointerToLocalVector(); //no changes made
   }
 
@@ -429,6 +450,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::LEVELSET3], "%12.8e    ", sol);
     }
     print(file[Probes::LEVELSET3],"\n");
+    fflush(file[Probes::LEVELSET3]);
     Phi[3]->RestoreDataPointerToLocalVector(); //no changes made
   }
 
@@ -440,6 +462,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
       print(file[Probes::LEVELSET4], "%12.8e    ", sol);
     }
     print(file[Probes::LEVELSET4],"\n");
+    fflush(file[Probes::LEVELSET4]);
     Phi[4]->RestoreDataPointerToLocalVector(); //no changes made
   }
 

@@ -1362,21 +1362,28 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   probes.setup("Probes", ca);
 
-  linePlots.setup("LinePlots", ca);
+  linePlots.setup("LinePlot", ca);
 
   materialVolumes.setup("MaterialVolumes", ca);
 }
 
 //------------------------------------------------------------------------------
 
-void Probes::Node::setup(const char *name, ClassAssigner *father)
+ProbeNode::ProbeNode() {
+  locationX = locationY = locationZ = -1.0e20;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner* ProbeNode::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
 
-  new ClassDouble<Probes::Node>(ca, "LocationX",this,&Probes::Node::locationX);
-  new ClassDouble<Probes::Node>(ca, "LocationY",this,&Probes::Node::locationY);
-  new ClassDouble<Probes::Node>(ca, "LocationZ",this,&Probes::Node::locationZ);
+  new ClassDouble<ProbeNode>(ca, "X",this,&ProbeNode::locationX);
+  new ClassDouble<ProbeNode>(ca, "Y",this,&ProbeNode::locationY);
+  new ClassDouble<ProbeNode>(ca, "Z",this,&ProbeNode::locationZ);
 
+  return ca;
 }
 
 //------------------------------------------------------------------------------
@@ -1405,7 +1412,7 @@ Probes::Probes() {
 void Probes::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 150, father);
+  ClassAssigner *ca = new ClassAssigner(name, 14, father);
 
   new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
   new ClassStr<Probes>(ca, "Density", this, &Probes::density);
@@ -1414,19 +1421,14 @@ void Probes::setup(const char *name, ClassAssigner *father)
   new ClassStr<Probes>(ca, "VelocityX", this, &Probes::velocity_x);
   new ClassStr<Probes>(ca, "VelocityY", this, &Probes::velocity_y);
   new ClassStr<Probes>(ca, "VelocityZ", this, &Probes::velocity_z);
-  new ClassStr<Probes>(ca, "MaterialId", this, &Probes::materialid);
+  new ClassStr<Probes>(ca, "MaterialID", this, &Probes::materialid);
   new ClassStr<Probes>(ca, "LevelSet0", this, &Probes::levelset0);
   new ClassStr<Probes>(ca, "LevelSet1", this, &Probes::levelset1);
   new ClassStr<Probes>(ca, "LevelSet2", this, &Probes::levelset2);
   new ClassStr<Probes>(ca, "LevelSet3", this, &Probes::levelset3);
   new ClassStr<Probes>(ca, "LevelSet4", this, &Probes::levelset4);
 
-  char nodename[12];
-  for (int i = 0; i < MAXNODES; ++i) {
-    sprintf(nodename,"Node%d",i);
-
-    myNodes[i].setup(nodename, ca);
-  }
+  myNodes.setup("Node", ca);
 
 }
 

@@ -499,16 +499,24 @@ struct IcData {
 
 //------------------------------------------------------------------------------
 
+struct ProbeNode {
+
+  double locationX;
+  double locationY;
+  double locationZ;
+
+  ProbeNode();
+  ~ProbeNode() {}
+
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
 struct Probes {
 
-  const static int MAXNODES = 128;
-  struct Node {
-    Node() {locationX = locationY = locationZ = -1.0e20; } 
-    double locationX,locationY,locationZ;
-    void setup(const char *, ClassAssigner * = 0);
-  };
-
-  Node myNodes[MAXNODES];
+  ObjectMap<ProbeNode> myNodes;
 
   int frequency;
 
