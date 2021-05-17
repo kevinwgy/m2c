@@ -56,13 +56,13 @@ MaterialVolumeOutput::WriteSolution(double time, int time_step, SpaceVariable3D&
   double vol[numMaterials];
   ComputeMaterialVolumes(ID, vol);
 
-  print(file, "%8d  %12.8e  ", time_step, time);
+  print(file, "%8d  %16.8e  ", time_step, time);
   double sum = 0.0;
   for(int i=0; i<numMaterials; i++) {
-    print(file, "%12.8e  ", vol[i]);
+    print(file, "%16.8e  ", vol[i]);
     sum += vol[i];
   }
-  print(file, "%12.8e\n", sum);
+  print(file, "%16.8e\n", sum);
   fflush(file);
 }
 

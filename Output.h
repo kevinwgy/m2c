@@ -51,6 +51,9 @@ public:
 
   void FinalizeOutput();
 
+private:
+  void OutputMeshInformation(SpaceVariable3D& coordinates);
+
 };
 
 #endif

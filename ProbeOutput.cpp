@@ -121,7 +121,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) :
   for(int i=0; i<Probes::SIZE; i++)
     if(file[i]) { //write header
       for(int iNode = 0; iNode<numNodes; iNode++)
-        print(file[i], "## Probe %d: %e, %e, %e\n", iNode, locations[i][0], locations[i][1], locations[i][2]);
+        print(file[i], "## Probe %d: %e, %e, %e\n", iNode, locations[iNode][0], locations[iNode][1], 
+                       locations[iNode][2]);
       print(file[i], "## Time step  |  Time  |  Solutions at probe nodes (0, 1, 2, etc.)\n");
       fflush(file[i]);
     }
@@ -229,6 +230,13 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
         
   } 
 
+  for(int iNode = 0; iNode<numNodes; iNode++) {
+    if(found[iNode]) {
+      fprintf(stdout, "Probe %d: (%d, %d, %d): %e %e %e.\n", iNode, ijk[iNode][0], ijk[iNode][1], ijk[iNode][2],
+             trilinear_coords[iNode][0], trilinear_coords[iNode][1], trilinear_coords[iNode][2]);
+    }
+  }
+
   MPI_Allreduce(MPI_IN_PLACE, found, numNodes, MPI_INT, MPI_SUM, comm);
   for(int iNode = 0; iNode<numNodes; iNode++) {
     if(found[iNode] != 1) {
@@ -305,11 +313,11 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, int time_step, SpaceVariabl
     double vz  = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 3);
     double p   = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 4);
     double myid= InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], id, 1, 0);
-    print(file, "%12.8e  %12.8e  %12.8e  %12.8e  %12.8e  %12.8e  %12.8e  ", 
+    print(file, "%16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  ", 
                 iNode*h, rho, vx, vy, vz, p, myid);
     for(int i=0; i<Phi.size(); i++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi[i], 1, 0);
-      print(file, "%12.8e  ", sol);
+      print(file, "%16.8e  ", sol);
     }
     print(file, "\n");
   }
@@ -341,50 +349,50 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   double***  v  = (double***) V.GetDataPointer();
 
   if(file[Probes::DENSITY]) {
-    print(file[Probes::DENSITY], "%10d    %12.8e    ", time_step, time);
+    print(file[Probes::DENSITY], "%10d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 0);
-      print(file[Probes::DENSITY], "%12.8e    ", sol);
+      print(file[Probes::DENSITY], "%16.8e    ", sol);
     }
     print(file[Probes::DENSITY],"\n");
     fflush(file[Probes::DENSITY]);
   }
 
   if(file[Probes::VELOCITY_X]) {
-    print(file[Probes::VELOCITY_X], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::VELOCITY_X], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 1);
-      print(file[Probes::VELOCITY_X], "%12.8e    ", sol);
+      print(file[Probes::VELOCITY_X], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_X],"\n");
     fflush(file[Probes::VELOCITY_X]);
   }
 
   if(file[Probes::VELOCITY_Y]) {
-    print(file[Probes::VELOCITY_Y], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::VELOCITY_Y], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 2);
-      print(file[Probes::VELOCITY_Y], "%12.8e    ", sol);
+      print(file[Probes::VELOCITY_Y], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Y],"\n");
     fflush(file[Probes::VELOCITY_Y]);
   }
 
   if(file[Probes::VELOCITY_Z]) {
-    print(file[Probes::VELOCITY_Z], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::VELOCITY_Z], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 3);
-      print(file[Probes::VELOCITY_Z], "%12.8e    ", sol);
+      print(file[Probes::VELOCITY_Z], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Z],"\n");
     fflush(file[Probes::VELOCITY_Z]);
   }
 
   if(file[Probes::PRESSURE]) {
-    print(file[Probes::PRESSURE], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::PRESSURE], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 4);
-      print(file[Probes::PRESSURE], "%12.8e    ", sol);
+      print(file[Probes::PRESSURE], "%16.8e    ", sol);
     }
     print(file[Probes::PRESSURE],"\n");
     fflush(file[Probes::PRESSURE]);
@@ -395,11 +403,11 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   }
 
   if(file[Probes::MATERIALID]) {
-    print(file[Probes::MATERIALID], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::MATERIALID], "%8d    %16.8e    ", time_step, time);
     double*** id  = (double***)ID.GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], id, 1, 0);
-      print(file[Probes::MATERIALID], "%12.8e    ", sol);
+      print(file[Probes::MATERIALID], "%16.8e    ", sol);
     }
     print(file[Probes::MATERIALID],"\n");
     fflush(file[Probes::MATERIALID]);
@@ -407,11 +415,11 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   }
 
   if(file[Probes::LEVELSET0] && Phi.size()>=1) {
-    print(file[Probes::LEVELSET0], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::LEVELSET0], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[0]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
-      print(file[Probes::LEVELSET0], "%12.8e    ", sol);
+      print(file[Probes::LEVELSET0], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET0],"\n");
     fflush(file[Probes::LEVELSET0]);
@@ -419,11 +427,11 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   }
 
   if(file[Probes::LEVELSET1] && Phi.size()>=2) {
-    print(file[Probes::LEVELSET1], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::LEVELSET1], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[1]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
-      print(file[Probes::LEVELSET1], "%12.8e    ", sol);
+      print(file[Probes::LEVELSET1], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET1],"\n");
     fflush(file[Probes::LEVELSET1]);
@@ -431,11 +439,11 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   }
 
   if(file[Probes::LEVELSET2] && Phi.size()>=3) {
-    print(file[Probes::LEVELSET2], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::LEVELSET2], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[2]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
-      print(file[Probes::LEVELSET2], "%12.8e    ", sol);
+      print(file[Probes::LEVELSET2], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET2],"\n");
     fflush(file[Probes::LEVELSET2]);
@@ -443,11 +451,11 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   }
 
   if(file[Probes::LEVELSET3] && Phi.size()>=4) {
-    print(file[Probes::LEVELSET3], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::LEVELSET3], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[3]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
-      print(file[Probes::LEVELSET3], "%12.8e    ", sol);
+      print(file[Probes::LEVELSET3], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET3],"\n");
     fflush(file[Probes::LEVELSET3]);
@@ -455,11 +463,11 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   }
 
   if(file[Probes::LEVELSET4] && Phi.size()>=5) {
-    print(file[Probes::LEVELSET4], "%8d    %12.8e    ", time_step, time);
+    print(file[Probes::LEVELSET4], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[4]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
-      print(file[Probes::LEVELSET4], "%12.8e    ", sol);
+      print(file[Probes::LEVELSET4], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET4],"\n");
     fflush(file[Probes::LEVELSET4]);

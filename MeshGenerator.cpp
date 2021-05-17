@@ -124,6 +124,10 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
   print("  Total number of nodes/cells: %d.\n", x.size()*y.size()*z.size());
   print("\n");
 
+/*
+  for(int i=0; i<x.size(); i++)
+    print("x[%d] = %e.\n", i, x[i]);
+*/
 }
 
 //-----------------------------------------------------

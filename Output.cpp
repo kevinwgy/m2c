@@ -1,6 +1,7 @@
 #include <Utils.h>
 #include <Vector5D.h>
 #include <Output.h>
+#include <float.h> //DBL_MAX
 
 //--------------------------------------------------------------------------
 
@@ -68,6 +69,9 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
   probe_output.SetupInterpolation(coordinates);
   for(int i=0; i<line_outputs.size(); i++)
     line_outputs[i]->SetupInterpolation(coordinates);
+
+  if(iod.output.mesh_filename[0] != 0)
+    OutputMeshInformation(coordinates);
 }
 
 //--------------------------------------------------------------------------
@@ -259,6 +263,79 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
    
   //print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
   print("- Wrote solution at %e to %s.\n", time, fname);
+}
+
+//--------------------------------------------------------------------------
+
+void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
+{
+  if(iod.output.mesh_filename[0] == 0)
+    return; //nothing to do
+
+  char fname[256];
+  sprintf(fname, "%s%s", iod.output.prefix, iod.output.mesh_filename);
+  FILE* file = fopen(fname, "w");
+
+  int ii0, jj0, kk0, iimax, jjmax, kkmax;
+  coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+
+  int NX, NY, NZ; 
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+  int nGhost = coordinates.NumGhostLayers();
+
+  print(file, "## Number of Cells/Nodes (Excluding Ghost Layer(s)): NX = %d, NY = %d, NZ = %d.\n",
+        NX, NY, NZ); 
+  print(file, "## Number of Ghost Layers: %d\n", nGhost);
+  print(file, "## Index  |  x  |  y  |  z\n");
+
+  vector<double> x,y,z;
+  x.resize(NX+2*nGhost, -DBL_MAX);
+  y.resize(NY+2*nGhost, -DBL_MAX);
+  z.resize(NZ+2*nGhost, -DBL_MAX);
+
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  for(int i=ii0; i<iimax; i++) {
+    if((i==ii0 && i>=0) || (i==iimax-1 && i<NX)) //internal ghost layer
+      continue;
+    x[i+nGhost] = coords[kk0][jj0][i][0];
+  }
+  for(int j=jj0; j<jjmax; j++) {
+    if((j==jj0 && j>=0) || (j==jjmax-1 && j<NY)) //internal ghost layer
+      continue;
+    y[j+nGhost] = coords[kk0][j][ii0][1];
+  }
+  for(int k=kk0; k<kkmax; k++) {
+    if((k==kk0 && k>=0) || (k==kkmax-1 && k<NZ)) //internal ghost layer
+      continue;
+    z[k+nGhost] = coords[k][jj0][ii0][2];
+  }
+
+  // Collect data
+  MPI_Allreduce(MPI_IN_PLACE, x.data(), x.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, y.data(), y.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, z.data(), z.size(), MPI_DOUBLE, MPI_MAX, comm);
+
+  for(int i=0; i<std::max(std::max(x.size(),y.size()),z.size()); i++) {
+    print(file,"%8d\t", i-nGhost);
+    if(i<x.size())
+      print(file,"%16.8e\t", x[i]);
+    else
+      print(file,"                \t");
+    if(i<y.size())
+      print(file,"%16.8e\t", y[i]);
+    else
+      print(file,"                \t");
+    if(i<z.size())
+      print(file,"%16.8e", z[i]);
+    else
+      print(file,"                ");
+    print(file,"\n");
+  }
+
+  coordinates.RestoreDataPointerToLocalVector();
+  fclose(file);
 }
 
 //--------------------------------------------------------------------------

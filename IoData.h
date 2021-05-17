@@ -604,6 +604,8 @@ struct OutputData {
 
   MaterialVolumes materialVolumes;
 
+  const char *mesh_filename; //!< file for nodal coordinates
+
   OutputData();
   ~OutputData() {}
 

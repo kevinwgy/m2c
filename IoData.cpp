@@ -1305,6 +1305,8 @@ OutputData::OutputData()
   for(int i=0; i<MAXLS; i++)
     levelset[i] = OFF;
 
+  mesh_filename = "";
+
   verbose = OFF;
 }
 
@@ -1312,7 +1314,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 14+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 15+MAXLS, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -1355,6 +1357,7 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                reinterpret_cast<int OutputData::*>(&OutputData::levelset4), 2,
                                "Off", 0, "On", 1);
 
+  new ClassStr<OutputData>(ca, "MeshInformation", this, &OutputData::mesh_filename);
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::verbose), 2,

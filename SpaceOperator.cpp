@@ -377,9 +377,11 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
     if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
 
       if(iod.ic.type == IcData::PLANAR)
-        print("- Applying file-based initial condition (planar).\n");
+        print("- Applying initial condition specified in %s (planar).\n", 
+              iod.ic.user_specified_ic);
       else
-        print("- Applying file-based initial condition (with cylindrical symmetry).\n");
+        print("- Applying initial condition specified in %s (with cylindrical symmetry).\n", 
+              iod.ic.user_specified_ic);
  
       Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
       dir /= dir.norm();
@@ -479,7 +481,8 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
 
     else if (iod.ic.type == IcData::SPHERICAL) {
 
-      print("- Applying file-based initial condition (with spherical symmetry).\n");
+      print("- Applying initial condition in %s (with spherical symmetry).\n", 
+            iod.ic.user_specified_ic);
  
       double x;
       int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
