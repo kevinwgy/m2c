@@ -40,7 +40,8 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
-  rec.Setup(); //this function requires mesh info (dxyz)
+  rec.Setup(spo.GetPointerToInnerGhostNodes(),
+            spo.GetPointerToOuterGhostNodes()); //this function requires mesh info (dxyz)
 
 }
 

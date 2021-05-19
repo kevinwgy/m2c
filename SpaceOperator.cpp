@@ -37,7 +37,9 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
 
   SetupMesh(x,y,z,dx,dy,dz);
 
-  rec.Setup(); //this function requires mesh info (dxyz)
+  CreateGhostNodeLists(); //create ghost_nodes_inner and ghost_nodes_outer
+
+  rec.Setup(&ghost_nodes_inner, &ghost_nodes_outer); //this function requires mesh info (dxyz)
   
 }
 
@@ -116,8 +118,10 @@ void SpaceOperator::SetupMesh(vector<double> &x, vector<double> &y, vector<doubl
 //        fprintf(stderr,"(%d,%d,%d), dx = %e, dy = %e, dz = %e, vol = %e.\n", i,j,k, dxyz[k][j][i][0], dxyz[k][j][i][1], dxyz[k][j][i][2], vol[k][j][i]);
       }
 
+
   delta_xyz.RestoreDataPointerAndInsert();
   volume.RestoreDataPointerAndInsert();
+
 }
 
 //-----------------------------------------------------
@@ -243,6 +247,106 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
   
   coordinates.RestoreDataPointerAndInsert();
   delta_xyz.RestoreDataPointerAndInsert();
+}
+
+//-----------------------------------------------------
+
+void SpaceOperator::CreateGhostNodeLists()
+{
+  ghost_nodes_inner.clear();
+  ghost_nodes_outer.clear();
+
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  Int3 image;
+  Vec3D proj(0.0), out_normal(0.0);
+  MeshData::BcType bcType = MeshData::NONE;
+  int counter;
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        if(k>=k0 && k<kmax && j>=j0 && j<jmax && i>=i0 && i<imax)
+          continue; //interior of the subdomain
+
+        if(coordinates.OutsidePhysicalDomain(i,j,k)) {//outside physical domain
+
+          //determine the image, the projection point and boundary condition
+          image      = 0;
+          proj       = 0.0; 
+          out_normal = 0.0;
+          counter    = 0; 
+          bcType     = MeshData::NONE;
+
+          if(i<0)        {image[0] = -i-1;
+                          proj[0]  = iod.mesh.x0;      out_normal[0] = -1.0; 
+                          bcType   = iod.mesh.bc_x0;   counter++;}
+          else if(i>=NX) {image[0] = NX+(i-NX)-1;
+                          proj[0]  = iod.mesh.xmax;    out_normal[0] =  1.0; 
+                          bcType   = iod.mesh.bc_xmax; counter++;}
+          else           {image[0] = i;
+                          proj[0]  = coords[k][j][i][0];}
+                     
+
+          if(j<0)        {image[1] = -j-1;
+                          proj[1]  = iod.mesh.y0;      out_normal[1] = -1.0; 
+                          bcType   = iod.mesh.bc_y0;   counter++;}
+          else if(j>=NY) {image[1] = NY+(j-NY)-1;
+                          proj[1]  = iod.mesh.ymax;    out_normal[1] =  1.0; 
+                          bcType   = iod.mesh.bc_ymax; counter++;}
+          else           {image[1] = j;
+                          proj[1]  = coords[k][j][i][1];}
+         
+
+          if(k<0)        {image[2] = -k-1;
+                          proj[2]  = iod.mesh.z0;      out_normal[2] = -1.0;
+                          bcType   = iod.mesh.bc_z0;   counter++;}
+          else if(k>=NZ) {image[2] = NZ+(k-NZ)-1;
+                          proj[2]  = iod.mesh.zmax;    out_normal[2] =  1.0; 
+                          bcType   = iod.mesh.bc_zmax; counter++;}
+          else           {image[2] = k;
+                          proj[2]  = coords[k][j][i][2];}
+         
+          out_normal /= out_normal.norm();
+
+          assert(counter<=3 && counter>0);
+
+          if(counter == 1)
+            ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::FACE,
+                                        proj, out_normal, (int)bcType));
+          else if(counter == 2)
+            ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::EDGE,
+                                        proj, out_normal, 0));
+          else
+            ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::VERTEX,
+                                        proj, out_normal, 0));
+
+        } 
+        else //inside physical domain
+          ghost_nodes_inner.push_back(GhostPoint(i,j,k));
+
+      }
+
+  int nInner = ghost_nodes_inner.size();
+  int nOuter = ghost_nodes_outer.size();
+  MPI_Allreduce(MPI_IN_PLACE, &nInner, 1, MPI_INT, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &nOuter, 1, MPI_INT, MPI_SUM, comm);
+  print("  Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
+        nInner);
+  print("  Number of ghost nodes outside computational domain: %d\n",
+        nOuter);
+  print("\n");
+
+
+/*
+  for(int i=0; i<ghost_nodes_outer.size(); i++)
+    fprintf(stderr,"Ghost %d: (%d, %d, %d) | Image: (%d, %d, %d) | ProjType = %d | BcType = %d | Proj: (%e, %e, %e), (%e, %e, %e)\n", i, ghost_nodes_outer[i].ijk[0], ghost_nodes_outer[i].ijk[1], ghost_nodes_outer[i].ijk[2], ghost_nodes_outer[i].image_ijk[0], ghost_nodes_outer[i].image_ijk[1], ghost_nodes_outer[i].image_ijk[2], ghost_nodes_outer[i].type_projection, ghost_nodes_outer[i].bcType, ghost_nodes_outer[i].boundary_projection[0], ghost_nodes_outer[i].boundary_projection[1], ghost_nodes_outer[i].boundary_projection[2], ghost_nodes_outer[i].outward_normal[0], ghost_nodes_outer[i].outward_normal[1], ghost_nodes_outer[i].outward_normal[2]);
+*/
+
+  coordinates.RestoreDataPointerToLocalVector();
 }
 
 //-----------------------------------------------------
@@ -1330,6 +1434,14 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf);
 
+  //------------------------------------
+  // Check reconstructed states (clip & check)
+  //------------------------------------
+  CheckReconstructedStates(V, Vl, Vr, Vb, Vt, Vk, Vf, ID);
+
+  //------------------------------------
+  // Extract data
+  //------------------------------------
   Vec5D*** v  = (Vec5D***) V.GetDataPointer();
   Vec5D*** vl = (Vec5D***) Vl.GetDataPointer();
   Vec5D*** vr = (Vec5D***) Vr.GetDataPointer();
@@ -1342,57 +1454,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   double*** id = (double***) ID.GetDataPointer();
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer(); //for debugging
-
-  //------------------------------------
-  // Clip pressure and density for the reconstructed state
-  // Verify hyperbolicity (i.e. c^2 > 0).
-  //------------------------------------
-  int nClipped = 0;
-  bool error = false;
-  int corner;
-  int myid;
-  for(int k=kk0; k<kkmax; k++) {
-    for(int j=jj0; j<jjmax; j++) {
-      for(int i=ii0; i<iimax; i++) {
-
-        corner = 0;
-        if(k==kk0 || k==kkmax-1) corner++;
-        if(j==jj0 || j==jjmax-1) corner++;
-        if(i==ii0 || i==iimax-1) corner++;
-        if(corner>=2) //not needed
-          continue;
-
-        myid = id[k][j][i];
-
-        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
-        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
-        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
-        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
-        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
-        nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
-         
-        error = varFcn[myid]->CheckState(vl[k][j][i]) || varFcn[myid]->CheckState(vr[k][j][i]) || 
-                varFcn[myid]->CheckState(vb[k][j][i]) || varFcn[myid]->CheckState(vt[k][j][i]) ||
-                varFcn[myid]->CheckState(vk[k][j][i]) || varFcn[myid]->CheckState(vf[k][j][i]);
-
-        if(error) {
-          print_error("*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\n", i,j,k, myid);
-          fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
-          fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
-          fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
-          fprintf(stderr, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
-          fprintf(stderr, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
-          fprintf(stderr, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
-          fprintf(stderr, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
-          exit_mpi();
-        } 
-      }
-    }
-  }
-  MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
-  if(nClipped)
-    print("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
-  
+ 
   //------------------------------------
   // Compute fluxes
   //------------------------------------
@@ -1406,17 +1468,28 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           f[k][j][i] = 0.0; //setting f[k][j][i][0] = ... = f[k][j][i][4] = 0.0;
 
 
+  int myid;
   int neighborid = -1;
   int midid = -1;
   double Vmid[5];
   double Vsm[5], Vsp[5];
   double area = 0.0;
   Int3 ind;
+
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
   for(int k=k0; k<kkmax; k++) {
     for(int j=j0; j<jjmax; j++) {
       for(int i=i0; i<iimax; i++) {
+
+/*
+        //debug only
+        bool thisone = false;
+        if(fabs(coords[k][j][i][0] - (-1.546437e-01))<1e-5 &&
+           fabs(coords[k][j][i][1] -   2.000000e-03)<1e-5 &&
+           fabs(coords[k][j][i][2] -   0.000000e-00)<1e-5)
+          thisone = true;
+*/
 
         myid = id[k][j][i];
 
@@ -1573,7 +1646,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           f[k-1][j][i] += localflux1*area;
           f[k][j][i]   -= localflux2*area;
         }
-
+/*
+        if(thisone)
+          fprintf(stderr,"f[k=%d][j=%d][i=%d] = %e %e %e %e %e\n", k,j,i, f[k][j][i][0], f[k][j][i][1], f[k][j][i][2], f[k][j][i][3], f[k][j][i][4]);
+*/
       }
     }
   }
@@ -1596,6 +1672,106 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   F.RestoreDataPointerToLocalVector(); //NOTE: although F has been updated, there is no need of 
                                        //      cross-subdomain communications. So, no need to 
                                        //      update the global vec.
+}
+
+//-----------------------------------------------------
+
+void 
+SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
+                                        SpaceVariable3D &Vl, SpaceVariable3D &Vr, SpaceVariable3D &Vb,
+                                        SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
+                                        SpaceVariable3D &ID)
+{
+
+  Vec5D*** v  = (Vec5D***) V.GetDataPointer();
+  Vec5D*** vl = (Vec5D***) Vl.GetDataPointer();
+  Vec5D*** vr = (Vec5D***) Vr.GetDataPointer();
+  Vec5D*** vb = (Vec5D***) Vb.GetDataPointer();
+  Vec5D*** vt = (Vec5D***) Vt.GetDataPointer();
+  Vec5D*** vk = (Vec5D***) Vk.GetDataPointer();
+  Vec5D*** vf = (Vec5D***) Vf.GetDataPointer();
+
+  double*** id = (double***) ID.GetDataPointer();
+
+  //------------------------------------
+  // Clip pressure and density for the reconstructed state
+  // Verify hyperbolicity (i.e. c^2 > 0).
+  //------------------------------------
+  int nClipped = 0;
+  bool error = false;
+  int boundary;
+  int myid;
+  for(int k=kk0; k<kkmax; k++) {
+    for(int j=jj0; j<jjmax; j++) {
+      for(int i=ii0; i<iimax; i++) {
+
+        boundary = 0;
+        if(k==kk0 || k==kkmax-1) boundary++;
+        if(j==jj0 || j==jjmax-1) boundary++;
+        if(i==ii0 || i==iimax-1) boundary++;
+        if(boundary>=2) //not needed
+          continue;
+
+        myid = id[k][j][i];
+
+        if(boundary==0) {//interior
+          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
+          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
+          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
+          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
+          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
+          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
+         
+          error = varFcn[myid]->CheckState(vl[k][j][i]) || varFcn[myid]->CheckState(vr[k][j][i]) || 
+                  varFcn[myid]->CheckState(vb[k][j][i]) || varFcn[myid]->CheckState(vt[k][j][i]) ||
+                  varFcn[myid]->CheckState(vk[k][j][i]) || varFcn[myid]->CheckState(vf[k][j][i]);
+        } else {//boundary face
+          if(i==ii0) {
+            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
+            error = error || varFcn[myid]->CheckState(vr[k][j][i]);
+          } else if (i==iimax-1) {
+            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
+            error = error || varFcn[myid]->CheckState(vl[k][j][i]);
+          } else if (j==jj0) {
+            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
+            error = error || varFcn[myid]->CheckState(vt[k][j][i]);
+          } else if (j==jjmax-1) {
+            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
+            error = error || varFcn[myid]->CheckState(vb[k][j][i]);
+          } else if (k==kk0) {
+            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
+            error = error || varFcn[myid]->CheckState(vf[k][j][i]);
+          } else if (k==kkmax-1) {
+            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
+            error = error || varFcn[myid]->CheckState(vk[k][j][i]);
+          } 
+        }
+
+        if(error) {
+          print_error("*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\n", i,j,k, myid);
+          fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+          fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
+          fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
+          fprintf(stderr, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
+          fprintf(stderr, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
+          fprintf(stderr, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
+          fprintf(stderr, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
+          exit_mpi();
+        } 
+      }
+    }
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
+  if(nClipped)
+    print("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
+ 
+  Vl.RestoreDataPointerToLocalVector(); //no need to communicate
+  Vr.RestoreDataPointerToLocalVector(); 
+  Vb.RestoreDataPointerToLocalVector(); 
+  Vt.RestoreDataPointerToLocalVector(); 
+  Vk.RestoreDataPointerToLocalVector(); 
+  Vf.RestoreDataPointerToLocalVector(); 
+  ID.RestoreDataPointerToLocalVector();
 }
 
 //-----------------------------------------------------

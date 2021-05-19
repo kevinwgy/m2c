@@ -122,7 +122,6 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
   print("  Z-Direction: [%e, %e], %d nodes/cells, dz_min = %e, dz_max = %e.\n", z0, zmax, z.size(), 
          *std::min_element(dz.begin(), dz.end()), *std::max_element(dz.begin(), dz.end()));
   print("  Total number of nodes/cells: %d.\n", x.size()*y.size()*z.size());
-  print("\n");
 
 /*
   for(int i=0; i<x.size(); i++)

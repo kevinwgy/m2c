@@ -2,6 +2,7 @@
 #define _RECONSTRUCTOR_H_
 #include <IoData.h>
 #include <SpaceVariable.h>
+#include <GhostPoint.h>
 using std::min;
 using std::max;
 
@@ -17,6 +18,10 @@ class Reconstructor
   //! Mesh info
   SpaceVariable3D &delta_xyz;
   
+  //! Pointer to ghost node lists
+  vector<GhostPoint> *ghost_nodes_inner;
+  vector<GhostPoint> *ghost_nodes_outer;
+
   /** Internal variables
    *  CoeffA, CoeffB, and CoeffK are only defined within the real domain
    */
@@ -31,7 +36,7 @@ public:
 
   ~Reconstructor();
 
-  void Setup(); //!< compute AB and K
+  void Setup(vector<GhostPoint>* inner, vector<GhostPoint>* outer); //!< compute AB and K
 
   /** Linear reconstruction in 3D 
     * Although the input argument is denoted by U, this function can be applied to

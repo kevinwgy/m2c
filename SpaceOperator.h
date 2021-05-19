@@ -7,6 +7,7 @@
 #include <SpaceVariable.h>
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
+#include <GhostPoint.h>
 
 /*******************************************
  * class SpaceOperator drives computations
@@ -28,6 +29,9 @@ class SpaceOperator
   SpaceVariable3D delta_xyz;
   SpaceVariable3D volume; //!< volume of node-centered control volumes
   
+  vector<GhostPoint> ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  vector<GhostPoint> ghost_nodes_outer; //!< ghost nodes outside the physical domain
+
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
@@ -71,6 +75,9 @@ public:
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}
   SpaceVariable3D& GetMeshCellVolumes() {return volume;}
 
+  vector<GhostPoint>* GetPointerToInnerGhostNodes() {return &ghost_nodes_inner;}
+  vector<GhostPoint>* GetPointerToOuterGhostNodes() {return &ghost_nodes_outer;}
+
   void Destroy();
 
 private:
@@ -79,7 +86,14 @@ private:
   void SetupMeshUniformRectangularDomain();
   void PopulateGhostBoundaryCoordinates();
 
+  void CreateGhostNodeLists();
+
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
+
+  void CheckReconstructedStates(SpaceVariable3D &V,
+                                SpaceVariable3D &Vl, SpaceVariable3D &Vr, SpaceVariable3D &Vb,
+                                SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
+                                SpaceVariable3D &ID);
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL);

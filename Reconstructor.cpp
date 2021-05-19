@@ -11,7 +11,8 @@ Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, Reconstru
                    : iod_rec(iod_rec_), delta_xyz(delta_xyz_),
                      CoeffA(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffB(comm_, &(dm_all_.ghosted1_3dof)), 
-                     CoeffK(comm_, &(dm_all_.ghosted1_3dof))
+                     CoeffK(comm_, &(dm_all_.ghosted1_3dof)),
+                     ghost_nodes_inner(NULL), ghost_nodes_outer(NULL)
 {
 
 }
@@ -25,10 +26,14 @@ Reconstructor::~Reconstructor()
 
 //--------------------------------------------------------------------------
 /** Compute AB and K */
-void Reconstructor::Setup()
+void Reconstructor::Setup(vector<GhostPoint> *inner, vector<GhostPoint> *outer)
 {
   //! Note: This function should be called after coordinates and delta_xyz have been computed
   
+  //! Store pointers to ghost nodes
+  ghost_nodes_inner = inner;
+  ghost_nodes_outer = outer;
+
   //! Get domain info
   int i0, j0, k0, imax, jmax, kmax;
   delta_xyz.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -125,43 +130,23 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
   int nDOF = U.NumDOF();
 
   /***************************************************************
-   *  Loop through all the (real and ghost) cells.
+   *  Loop through all the real cells.
    *  Calculate slope limiter --> slope --> face values
-   *  Rules:
-   *    - Ouside the physical domain (i.e. the external ghost layer): constant reconstruction
-   *    - Within the first layer of cells inside the physical domain: constant reconstruction in
-   *      the normal direction (normal to the physical domain boundary
-   *    - Within the internal ghost layer (i.e. shared with some other subdomains): do not compute
-   *    - Otherwise: Normal computation based on user input.
    ***************************************************************/
   double sigma[3]; //!< slope
   double dq0[3], dq1[3];
 
   double a[3], b[3];
   double alpha = iod_rec.generalized_minmod_coeff; //!< only needed for gen. minmod
-  int kk[3]; //!< only for Van Albada
+  int kay[3]; //!< only for Van Albada
 
-  for(int k=kk0; k<kkmax; k++) {
-    for(int j=jj0; j<jjmax; j++) {
-      for(int i=ii0; i<iimax; i++) {
+  //----------------------------------------------------------------
+  // Step 1: Reconstruction within the interior of each subdomain
+  //----------------------------------------------------------------
+  for(int k=k0; k<kmax; k++) {
+    for(int j=j0; j<jmax; j++) {
+      for(int i=i0; i<imax; i++) {
 
-        if(i==ii0 || i==iimax-1 || j==jj0 || j==jjmax-1 || k==kk0 || k==kkmax-1) {// ghost layer
-          if(i == -1 || i==NX || j==-1 || j==NY || k==-1 || k==NZ) { //!< outside the physical domain
-            for(int dof=0; dof<nDOF; dof++) {
-              ul[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-              ur[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-              ub[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-              ut[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-              uk[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-              uf[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            }
-          } else { //!< inside the physical domain (overlapped with another subdomain)
-            /*do nothing*/
-          }
-          continue;
-        }
-
-        //! In the real part of the subdomain 
         for(int dof=0; dof<nDOF; dof++) {
 
           //! calculate slope limiter phi within cell (i,j) 
@@ -192,12 +177,12 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
                 sigma[2] = GeneralizedMinMod(a[2], b[2], alpha, dq0[2], dq1[2]);
                 break;
               case ReconstructionData::VANALBADA :
-                kk[0] = round(K[k][j][i][0]);
-                kk[1] = round(K[k][j][i][1]);
-                kk[2] = round(K[k][j][i][2]);
-                sigma[0] = VanAlbada(a[0], b[0], kk[0], dq0[0], dq1[0]);
-                sigma[1] = VanAlbada(a[1], b[1], kk[1], dq0[1], dq1[1]);
-                sigma[2] = VanAlbada(a[2], b[2], kk[2], dq0[2], dq1[2]);
+                kay[0] = round(K[k][j][i][0]);
+                kay[1] = round(K[k][j][i][1]);
+                kay[2] = round(K[k][j][i][2]);
+                sigma[0] = VanAlbada(a[0], b[0], kay[0], dq0[0], dq1[0]);
+                sigma[1] = VanAlbada(a[1], b[1], kay[1], dq0[1], dq1[1]);
+                sigma[2] = VanAlbada(a[2], b[2], kay[2], dq0[2], dq1[2]);
                 break;
               case ReconstructionData::NONE :
                 sigma[0] = 0.5*(dq0[0]+dq1[0]);
@@ -215,25 +200,87 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
           uk[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] - 0.5*sigma[2];
           uf[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] + 0.5*sigma[2];
 
-          //! For first-layer cells, switch back to constant reconstruction in the normal dir.
-          if(i==0 || i==NX-1) {
-            ul[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            ur[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-          }
-          if(j==0 || j==NY-1) {
-            ub[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            ut[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-          }
-          if(k==0 || k==NZ-1) {
-            uk[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            uf[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-          }
-
         }
 
       }
     }
   }
+
+  
+  //----------------------------------------------------------------
+  // Step 2: Exchange info with neighbors
+  //----------------------------------------------------------------
+  Ul.RestoreDataPointerAndInsert();
+  Ur.RestoreDataPointerAndInsert();
+  Ub.RestoreDataPointerAndInsert();
+  Ut.RestoreDataPointerAndInsert();
+  Uk.RestoreDataPointerAndInsert();
+  Uf.RestoreDataPointerAndInsert();
+
+
+  //----------------------------------------------------------------
+  // Step 3: Update ghost layer outside the physical domain
+  //----------------------------------------------------------------
+  ul = (double***) Ul.GetDataPointer(); 
+  ur = (double***) Ur.GetDataPointer(); 
+  ub = (double***) Ub.GetDataPointer(); 
+  ut = (double***) Ut.GetDataPointer(); 
+  uk = (double***) Uk.GetDataPointer(); 
+  uf = (double***) Uf.GetDataPointer(); 
+  int i,j,k,ii,jj,kk;
+
+  for(auto gp = ghost_nodes_outer->begin(); gp != ghost_nodes_outer->end(); gp++) {
+
+    if(gp->type_projection != GhostPoint::FACE)
+      continue; //skip edges and corners (not needed)
+
+    i  = gp->ijk[0];
+    j  = gp->ijk[1];
+    k  = gp->ijk[2];
+    ii = gp->image_ijk[0];
+    jj = gp->image_ijk[1];
+    kk = gp->image_ijk[2];
+    
+    // check boundary condition
+    switch (gp->bcType) {
+
+      case MeshData::INLET :
+      case MeshData::OUTLET :
+        //constant reconstruction (Dirichlet b.c.)
+      
+        if     (i<0)   copyarray(&u[kk][jj][ii*nDOF], &ur[k][j][i*nDOF], nDOF);
+        else if(i>=NX) copyarray(&u[kk][jj][ii*nDOF], &ul[k][j][i*nDOF], nDOF);
+        else if(j<0)   copyarray(&u[kk][jj][ii*nDOF], &ut[k][j][i*nDOF], nDOF);
+        else if(j>=NY) copyarray(&u[kk][jj][ii*nDOF], &ub[k][j][i*nDOF], nDOF);
+        else if(k<0)   copyarray(&u[kk][jj][ii*nDOF], &uf[k][j][i*nDOF], nDOF);
+        else if(k>=NZ) copyarray(&u[kk][jj][ii*nDOF], &uk[k][j][i*nDOF], nDOF);
+
+        break;
+
+      case MeshData::SYMMETRY :
+      case MeshData::WALL :
+        //constant or linear reconstruction, matching the image
+
+        if     (i<0)   copyarray_flip(&ul[kk][jj][ii*nDOF], &ur[k][j][i*nDOF], nDOF, 1);
+        else if(i>=NX) copyarray_flip(&ur[kk][jj][ii*nDOF], &ul[k][j][i*nDOF], nDOF, 1);
+        else if(j<0)   copyarray_flip(&ub[kk][jj][ii*nDOF], &ut[k][j][i*nDOF], nDOF, 2);
+        else if(j>=NY) copyarray_flip(&ut[kk][jj][ii*nDOF], &ub[k][j][i*nDOF], nDOF, 2);
+        else if(k<0)   copyarray_flip(&uk[kk][jj][ii*nDOF], &uf[k][j][i*nDOF], nDOF, 3);
+        else if(k>=NZ) copyarray_flip(&uf[kk][jj][ii*nDOF], &uk[k][j][i*nDOF], nDOF, 3);
+
+        break;
+
+      default :
+        fprintf(stderr,"*** Error: Cannot perform reconstruction for b.c. %d.\n",
+                gp->bcType);
+    }
+  }
+  Ul.RestoreDataPointerToLocalVector(); //no need to communicate
+  Ur.RestoreDataPointerToLocalVector(); //no need to communicate
+  Ub.RestoreDataPointerToLocalVector(); //no need to communicate
+  Ut.RestoreDataPointerToLocalVector(); //no need to communicate
+  Uk.RestoreDataPointerToLocalVector(); //no need to communicate
+  Uf.RestoreDataPointerToLocalVector(); //no need to communicate
 
   //! Restore vectors
   CoeffA.RestoreDataPointerToLocalVector(); //!< no changes to vector
@@ -241,12 +288,6 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
   CoeffK.RestoreDataPointerToLocalVector(); //!< no changes to vector
   U.RestoreDataPointerToLocalVector(); //!< no changes to vector
   delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
-  Ul.RestoreDataPointerAndInsert();
-  Ur.RestoreDataPointerAndInsert();
-  Ub.RestoreDataPointerAndInsert();
-  Ut.RestoreDataPointerAndInsert();
-  Uk.RestoreDataPointerAndInsert();
-  Uf.RestoreDataPointerAndInsert();
 
 }
 
@@ -275,40 +316,26 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
     
   //! Number of DOF per cell
   int nDOF = U.NumDOF();
+  if(nDOF != 1) {
+    print_error("*** Error: ReconstructIn1D only works with nDOF = 1 at the moment. "
+                "Detected nDOF = %d.\n", nDOF);
+    exit_mpi();
+  }
 
   /***************************************************************
-   *  Loop through all the (real and ghost) cells.
+   *  Loop through all the real cells.
    *  Calculate slope limiter --> slope --> face values
-   *  Rules:
-   *    - Ouside the physical domain (i.e. the external ghost layer): constant reconstruction
-   *    - Within the first layer of cells inside the physical domain: constant reconstruction in
-   *      the normal direction (normal to the physical domain boundary
-   *    - Within the internal ghost layer (i.e. shared with some other subdomains): do not compute
-   *    - Otherwise: Normal computation based on user input.
    ***************************************************************/
   double sigma; //!< slope
   double dq0 = 0.0, dq1 = 0.0;
 
   double a, b;
   double alpha = iod_rec.generalized_minmod_coeff; //!< only needed for gen. minmod
-  int kk; //!< only for Van Albada
+  int kay; //!< only for Van Albada
 
-  for(int k=kk0; k<kkmax; k++) {
-    for(int j=jj0; j<jjmax; j++) {
-      for(int i=ii0; i<iimax; i++) {
-
-        if(i==ii0 || i==iimax-1 || j==jj0 || j==jjmax-1 || k==kk0 || k==kkmax-1) {// ghost layer
-          if(i == -1 || i==NX || j==-1 || j==NY || k==-1 || k==NZ) { //!< outside the physical domain
-            for(int dof=0; dof<nDOF; dof++) {
-              um[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-              up[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-              if(slope) slope[k][j][i*nDOF+dof] = 0.0;
-            }
-          } else { //!< inside the physical domain (overlapped with another subdomain)
-            /*do nothing*/
-          }
-          continue;
-        }
+  for(int k=k0; k<kmax; k++) {
+    for(int j=j0; j<jmax; j++) {
+      for(int i=i0; i<imax; i++) {
 
         //! In the real part of the subdomain 
         for(int dof=0; dof<nDOF; dof++) {
@@ -346,8 +373,8 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
                 sigma = GeneralizedMinMod(a, b, alpha, dq0, dq1);
                 break;
               case ReconstructionData::VANALBADA :
-                kk = round(K[k][j][i][dir]);
-                sigma = VanAlbada(a, b, kk, dq0, dq1);
+                kay = round(K[k][j][i][dir]);
+                sigma = VanAlbada(a, b, kay, dq0, dq1);
                 break;
               case ReconstructionData::NONE :
                 sigma = 0.5*(dq0+dq1);
@@ -361,28 +388,91 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
 
           if(slope) slope[k][j][i*nDOF+dof] = sigma/dxyz[k][j][i][dir];
 
-          //! For first-layer cells, switch back to constant reconstruction in the normal dir.
-          if(dir==0 && (i==0 || i==NX-1)) {
-            um[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            up[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            if(slope) slope[k][j][i*nDOF+dof] = 0.0;
-          }
-          if(dir==1 && (j==0 || j==NY-1)) {
-            um[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            up[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            if(slope) slope[k][j][i*nDOF+dof] = 0.0;
-          }
-          if(dir==2 && (k==0 || k==NZ-1)) {
-            um[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            up[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof];
-            if(slope) slope[k][j][i*nDOF+dof] = 0.0;
-          }
-
         }
 
       }
     }
   }
+
+  Um.RestoreDataPointerAndInsert();
+  Up.RestoreDataPointerAndInsert();
+
+  if(Slope)
+    Slope->RestoreDataPointerAndInsert(); 
+
+
+  // Now, go over the ghost layer
+  um   = (double***) Um.GetDataPointer(); 
+  up   = (double***) Up.GetDataPointer(); 
+  slope = (Slope) ? (double***)Slope->GetDataPointer() : NULL;
+
+  int i,j,k,ii,jj,kk;
+
+  for(auto gp = ghost_nodes_outer->begin(); gp != ghost_nodes_outer->end(); gp++) {
+
+    if(gp->type_projection != GhostPoint::FACE)
+      continue; //skip edges and corners (not needed)
+
+    i  = gp->ijk[0];
+    j  = gp->ijk[1];
+    k  = gp->ijk[2];
+    ii = gp->image_ijk[0];
+    jj = gp->image_ijk[1];
+    kk = gp->image_ijk[2];
+    
+    // check boundary condition
+    switch (gp->bcType) {
+
+      case MeshData::INLET :
+      case MeshData::OUTLET :
+        //constant reconstruction (Dirichlet b.c.)
+      
+        if(dir==0) {
+          if     (i<0)   copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(i>=NX) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        else if(dir==1) {
+          if     (j<0)   copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(j>=NY) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        else if(dir==2) {
+          if(k<0)        copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(k>=NZ) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        if(slope) setValue(&slope[k][j][i*nDOF], nDOF, 0.0);
+        break;
+
+      case MeshData::SYMMETRY :
+      case MeshData::WALL :
+        //constant or linear reconstruction, matching the image
+
+        //relying on nDOF = 1!!
+        if(dir==0) {
+          if     (i<0)   um[k][j][i] = -up[kk][jj][ii];
+          else if(i>=NX) up[k][j][i] = -um[kk][jj][ii]; 
+          slope[k][j][i] = -slope[kk][jj][ii];
+        }
+        if(dir==1) {
+          if     (j<0)   um[k][j][i] = -up[kk][jj][ii];
+          else if(j>=NY) up[k][j][i] = -um[kk][jj][ii]; 
+          slope[k][j][i] = -slope[kk][jj][ii];
+        }
+        if(dir==2) {
+          if     (k<0)   um[k][j][i] = -up[kk][jj][ii];
+          else if(k>=NZ) up[k][j][i] = -um[kk][jj][ii]; 
+          slope[k][j][i] = -slope[kk][jj][ii];
+        }
+
+        break;
+
+      default :
+        fprintf(stderr,"*** Error: Cannot perform reconstruction for b.c. %d.\n",
+                gp->bcType);
+    }
+  }
+  Um.RestoreDataPointerToLocalVector(); //no need to communicate
+  Up.RestoreDataPointerToLocalVector(); //no need to communicate
+
 
   //! Restore vectors
   CoeffA.RestoreDataPointerToLocalVector(); //!< no changes to vector
@@ -390,11 +480,6 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
   CoeffK.RestoreDataPointerToLocalVector(); //!< no changes to vector
   U.RestoreDataPointerToLocalVector(); //!< no changes to vector
   delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
-  Um.RestoreDataPointerAndInsert();
-  Up.RestoreDataPointerAndInsert();
-
-  if(Slope)
-    Slope->RestoreDataPointerToLocalVector(); //no changes to vector
 }
 
 //--------------------------------------------------------------------------
