@@ -202,6 +202,11 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
   // estimates of min and max wave speeds
   double Sm = 0.0, Sp = 0.0;
   ComputeMinMaxWaveSpeedsByRoeAverage(dir, Vm, Vp, id, Sm, Sp);
+  if(m2c_isnan(Sm) || m2c_isnan(Sp)) {
+    fprintf(stderr, "id = %d, Vm = %e %e %e %e %e, Vp = %e %e %e %e %e\n", id, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4],
+            Vp[0], Vp[1], Vp[2], Vp[3], Vp[4]);
+
+  }
 
   // calculate the HLLC flux function
   if (0.0 <= Sm) {
@@ -235,7 +240,9 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
       ComputeFstar(dir, Vp, Sp, Sstar, id, flux);
     else {
       fprintf(stderr,"*** Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface (Sstar = %e).\n", Sstar);
-      exit_mpi();
+      fprintf(stderr,"           rhom = %e, Sm = %e, velo_m = %e, rhop = %e, Sp = %e, velo_p = %e\n",
+              Vm[0], Sm, velo_m, Vp[0], Sp, velo_p);
+      exit(-1);
     }
   }
 }

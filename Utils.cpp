@@ -146,7 +146,7 @@ void printHeader(int argc, char *argv[])
 // Terminate program properly
 void exit_mpi()
 {
-  //MPI_Finalize();
+  MPI_Finalize();
   exit(-1);
 }
 

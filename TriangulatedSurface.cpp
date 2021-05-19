@@ -1,5 +1,4 @@
 #include <TriangulatedSurface.h>
-#include <Utils.h>
 
 //----------------------------------------------------
 
@@ -55,8 +54,8 @@ void TriangulatedSurface::BuildElementNormals()
     if(nrm > 0.0)
       elemNorm[i] /= nrm;
     else {
-      print_error("*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
-      exit_mpi();
+      fprintf(stderr, "*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
+      exit(-1);
     }
   }
 
@@ -64,14 +63,14 @@ void TriangulatedSurface::BuildElementNormals()
   if(degenerate) {
     for(int i=0; i<nElems; i++)
       if(n2!=n3) {
-        print_error("*** Error: Cannot handle a mix of triangles and line segments.\n");
-        exit_mpi();
+        fprintf(stderr, "*** Error: Cannot handle a mix of triangles and line segments.\n");
+        exit(-1);
       }
     for(int i=0; i<X.size(); i++)
       if(X[i][2] != 0) {
-        print_error("*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
+        fprintf(stderr, "*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
                      X[i][2]);
-        exit_mpi();
+        exit(-1);
       }
   }
 }

@@ -3,7 +3,6 @@
 
 #include <VarFcnBase.h>
 #include <fstream>
-#include <Utils.h>
 #include <boost/math/tools/roots.hpp>
 using namespace boost::math::tools;
 
@@ -80,7 +79,7 @@ VarFcnJWL::VarFcnJWL(MaterialModelData &data, bool verbose_) : VarFcnBase(data,v
 
   if(data.eos != MaterialModelData::JWL){
     fprintf(stderr, "*** Error: MaterialModelData is not of type JWL\n");
-    exit_mpi();
+    exit(-1);
   }
 
   type = JWL;

@@ -3,7 +3,6 @@
 
 #include <VarFcnBase.h>
 #include <fstream>
-#include <Utils.h>
 
 /********************************************************************************
  * This class is the VarFcn class for the Stiffened Gas EOS in Euler
@@ -61,7 +60,7 @@ VarFcnSG::VarFcnSG(MaterialModelData &data, bool verbose_) : VarFcnBase(data,ver
 
   if(data.eos != MaterialModelData::STIFFENED_GAS){
     fprintf(stderr, "*** Error: MaterialModelData is not of type GAS\n");
-    exit_mpi();
+    exit(-1);
   }
 
   type = STIFFENED_GAS;

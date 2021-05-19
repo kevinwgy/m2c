@@ -91,7 +91,7 @@ MaterialVolumeOutput::ComputeMaterialVolumes(SpaceVariable3D& ID, double* vol)
         if(myid<0 || myid>=numMaterials) {
           fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n", 
                   myid);
-          exit_mpi();
+          exit(-1);
         }
         vol[myid] += cell[k][j][i];
       }
