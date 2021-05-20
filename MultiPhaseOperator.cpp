@@ -116,14 +116,11 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
   double*** id  = (double***)ID.GetDataPointer();
   Vec5D***  v   = (Vec5D***) V.GetDataPointer();
 
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-
-  double weight, sum_weight;
-
   Int3 ind;
   std::map<Int3, std::pair<Vec5D,int> >::iterator it;
 
   // work inside the real domain
+  int counter = 0;
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
@@ -134,88 +131,114 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         // re-set its state variables to 0
         v[k][j][i] = 0.0;
 
-        sum_weight = 0.0;
-
-        //go over the stored Riemann solutions (connected by edges)
-        ind[0] = k; ind[1] = j; ind[2] = i;
-
-        // left
-        it = riemann_solutions.left.find(ind);
-        if(it != riemann_solutions.left.end())
-          if(it->second.second/*ID*/ == id[k][j][i] && v[k][j][i-1][1] > 0) {
-            Vec3D v1(v[k][j][i-1][1], v[k][j][i-1][2], v[k][j][i-1][3]);
-            weight = v[k][j][i-1][1]/v1.norm();
-
-            sum_weight += weight;
-            v[k][j][i] += weight*it->second.first; /*riemann solution*/
-          }
-     
-        // right 
-        it = riemann_solutions.right.find(ind);
-        if(it != riemann_solutions.right.end())
-          if(it->second.second/*ID*/ == id[k][j][i] && v[k][j][i+1][1] < 0) {
-            Vec3D v1(v[k][j][i+1][1], v[k][j][i+1][2], v[k][j][i+1][3]);
-            weight = -v[k][j][i+1][1]/v1.norm();
-
-            sum_weight += weight;
-            v[k][j][i] += weight*it->second.first; /*riemann solution*/
-          }
- 
-        // bottom 
-        it = riemann_solutions.bottom.find(ind);
-        if(it != riemann_solutions.bottom.end())
-          if(it->second.second/*ID*/ == id[k][j][i] && v[k][j-1][i][2] > 0) {
-            Vec3D v1(v[k][j-1][i][1], v[k][j-1][i][2], v[k][j-1][i][3]);
-            weight = v[k][j-1][i][2]/v1.norm();
-
-            sum_weight += weight;
-            v[k][j][i] += weight*it->second.first; /*riemann solution*/
-          }
-     
-        // top 
-        it = riemann_solutions.top.find(ind);
-        if(it != riemann_solutions.top.end())
-          if(it->second.second/*ID*/ == id[k][j][i] && v[k][j+1][i][2] < 0) {
-            Vec3D v1(v[k][j+1][i][1], v[k][j+1][i][2], v[k][j+1][i][3]);
-            weight = -v[k][j+1][i][2]/v1.norm();
-
-            sum_weight += weight;
-            v[k][j][i] += weight*it->second.first; /*riemann solution*/
-          }
-  
-        // back 
-        it = riemann_solutions.back.find(ind);
-        if(it != riemann_solutions.back.end())
-          if(it->second.second/*ID*/ == id[k][j][i] && v[k-1][j][i][3] > 0) {
-            Vec3D v1(v[k-1][j][i][1], v[k-1][j][i][2], v[k-1][j][i][3]);
-            weight = v[k-1][j][i][3]/v1.norm();
-
-            sum_weight += weight;
-            v[k][j][i] += weight*it->second.first; /*riemann solution*/
-          }
-     
-        // front 
-        it = riemann_solutions.front.find(ind);
-        if(it != riemann_solutions.front.end())
-          if(it->second.second/*ID*/ == id[k][j][i] && v[k+1][j][i][3] < 0) {
-            Vec3D v1(v[k+1][j][i][1], v[k+1][j][i][2], v[k+1][j][i][3]);
-            weight = -v[k+1][j][i][3]/v1.norm();
-
-            sum_weight += weight;
-            v[k][j][i] += weight*it->second.first; /*riemann solution*/
-          }
-     
-        v[k][j][i] /= sum_weight; 
-
+        counter = LocalUpdateByRiemannSolutions(i, j, k, id[k][j][i], v[k][j][i-1], v[k][j][i+1], 
+                      v[k][j-1][i], v[k][j+1][i], v[k-1][j][i], v[k+1][j][i], riemann_solutions,
+                      v[k][j][i], true);
+        if(counter==0)
+          LocalUpdateByRiemannSolutions(i, j, k, id[k][j][i], v[k][j][i-1], v[k][j][i+1], 
+              v[k][j-1][i], v[k][j+1][i], v[k-1][j][i], v[k+1][j][i], riemann_solutions,
+              v[k][j][i], false);
       }  
 
-  coordinates.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
   IDn.RestoreDataPointerToLocalVector();
 
   V.RestoreDataPointerAndInsert(); //insert data & communicate with neighbor subd's
 
 } 
+
+//-----------------------------------------------------
+
+int
+MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, Vec5D &vl, Vec5D &vr, 
+                        Vec5D &vb, Vec5D &vt, Vec5D &vk, Vec5D &vf, RiemannSolutions &riemann_solutions, 
+                        Vec5D &v, bool upwind)
+{
+  int counter = 0;
+  double weight = 0, sum_weight = 0;
+  Int3 ind(k,j,i);
+
+  // left
+  auto it = riemann_solutions.left.find(ind);
+  if(it != riemann_solutions.left.end()) {
+    if(it->second.second/*ID*/ == id && (!upwind || vl[1] > 0)) {
+      Vec3D v1(vl[1], vl[2], vl[3]);
+      weight = upwind ? vl[1]/v1.norm() : 1.0;
+      sum_weight += weight;
+      v += weight*it->second.first; /*riemann solution*/
+      counter++;
+    }
+  }
+
+  // right
+  it = riemann_solutions.right.find(ind);
+  if(it != riemann_solutions.right.end()) {
+    if(it->second.second/*ID*/ == id && (!upwind || vr[1] < 0)) {
+      Vec3D v1(vr[1], vr[2], vr[3]);
+      weight = upwind ? -vr[1]/v1.norm() : 1.0;
+      sum_weight += weight;
+      v += weight*it->second.first; /*riemann solution*/
+      counter++;
+    }
+  }
+
+  // bottom
+  it = riemann_solutions.bottom.find(ind);
+  if(it != riemann_solutions.bottom.end()) {
+    if(it->second.second/*ID*/ == id && (!upwind || vb[2] > 0)) {
+      Vec3D v1(vb[1], vb[2], vb[3]);
+      weight = upwind ? vb[2]/v1.norm() : 1.0;
+      sum_weight += weight;
+      v += weight*it->second.first; /*riemann solution*/
+      counter++;
+    }
+  }
+
+  // top
+  it = riemann_solutions.top.find(ind);
+  if(it != riemann_solutions.top.end()) {
+    if(it->second.second/*ID*/ == id && (!upwind || vt[2] < 0)) {
+      Vec3D v1(vt[1], vt[2], vt[3]);
+      weight = upwind ? -vt[2]/v1.norm() : 1.0;
+      sum_weight += weight;
+      v += weight*it->second.first; /*riemann solution*/
+      counter++;
+    }
+  }
+
+  // back
+  it = riemann_solutions.back.find(ind);
+  if(it != riemann_solutions.back.end()) {
+    if(it->second.second/*ID*/ == id && (!upwind || vk[3] > 0)) {
+      Vec3D v1(vk[1], vk[2], vk[3]);
+      weight = upwind ? vk[3]/v1.norm() : 1.0;
+      sum_weight += weight;
+      v += weight*it->second.first; /*riemann solution*/
+      counter++;
+    }
+  }
+
+  // front
+  it = riemann_solutions.front.find(ind);
+  if(it != riemann_solutions.front.end()) {
+    if(it->second.second/*ID*/ == id && (!upwind || vf[3] < 0)) {
+      Vec3D v1(vf[1], vf[2], vf[3]);
+      weight = upwind ? -vf[3]/v1.norm() : 1.0;
+      sum_weight += weight;
+      v += weight*it->second.first; /*riemann solution*/
+      counter++;
+    }
+  }
+
+  if(sum_weight > 0.0)
+    v /= sum_weight;
+  else if(upwind)
+    fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d) based on upwinding.\n", i,j,k);
+  else 
+    fprintf(stderr,"*** Error: Unable to update phase change at (%d,%d,%d) by averaging Riemann solutions.\n", i,j,k);
+
+  return counter;
+}
 
 //-----------------------------------------------------
 

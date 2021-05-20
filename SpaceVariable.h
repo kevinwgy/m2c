@@ -102,6 +102,15 @@ public:
 
   inline bool OutsidePhysicalDomain(int i, int j, int k) {return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
 
+  inline bool IsHere(int i, int j, int k, bool include_ghost = false)
+  {
+    if(include_ghost) 
+      return i>=ghost_i0 && i<ghost_imax && j>=ghost_j0 && j<=ghost_jmax && k>=ghost_k0 && k<ghost_kmax;
+    else
+      return i>=i0 && i<imax && j>=j0 && j<jmax && k>=k0 && k<kmax;
+    return false;
+  }
+
   //! operators
   void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
   void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y

@@ -43,6 +43,10 @@ public:
 
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + Pstiff < 0 (Not p + gamma*Pstiff). 
   inline bool CheckState(double *V) const{
+    if(m2c_isnan(V[0]) || m2c_isnan(V[1]) || m2c_isnan(V[2]) || m2c_isnan(V[3]) || m2c_isnan(V[4])) {
+      fprintf(stderr, "*** Error: CheckState failed. V = %e %e %e %e %e\n", V[0], V[1], V[2], V[3], V[4]);
+      return true;
+    }
     if(V[0] <= 0.0 || V[4]+Pstiff <= 0.0){
       if(verbose)
         fprintf(stdout, "Warning: found negative density (%e) or negative pressure (p = %e, Pstiff = %e).\n", V[0], V[4], Pstiff);

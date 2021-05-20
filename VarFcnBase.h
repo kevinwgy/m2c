@@ -74,7 +74,7 @@ public:
   virtual bool CheckState(double *V) const{
     if(m2c_isnan(V[0]) || m2c_isnan(V[1]) || m2c_isnan(V[2]) || m2c_isnan(V[3]) || m2c_isnan(V[4])) {
       fprintf(stderr, "*** Error: CheckState failed. V = %e %e %e %e %e\n", V[0], V[1], V[2], V[3], V[4]);
-      exit(-1);
+      return true;
     }
     double e = GetInternalEnergyPerUnitMass(V[0],V[4]);
     double c2 = GetDpdrho(V[0], e) + V[4]/V[0]*GetBigGamma(V[0], e);

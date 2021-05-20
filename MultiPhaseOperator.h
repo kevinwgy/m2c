@@ -3,14 +3,16 @@
 #include<IoData.h>
 #include<SpaceVariable.h>
 
+class Vec5D;
+class SpaceOperator;
+class LevelSetOperator;
+class RiemannSolutions;
+
 /*******************************************
  * class MultiPhaseOperator contains functions
  * for updating material information and state
  * variables at/around material interfaces
  ******************************************/
-class SpaceOperator;
-class LevelSetOperator;
-class RiemannSolutions;
 
 class MultiPhaseOperator
 {
@@ -46,7 +48,14 @@ public:
 protected:
   void UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
                                               SpaceVariable3D &V, RiemannSolutions &riemann_solutions);
+
   void UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
+
+  int LocalUpdateByRiemannSolutions(int i, int j, int k, int id, Vec5D &vl, Vec5D &vr, Vec5D &vb, Vec5D &vt,
+                                    Vec5D &vk, Vec5D &vf, RiemannSolutions &riemann_solutions, Vec5D &v,
+                                    bool upwind = true);
+
+
 };
 
 #endif
