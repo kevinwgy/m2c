@@ -4,6 +4,7 @@
 #include <SpaceOperator.h>
 #include <Vector5D.h>
 #include <GeoTools.h>
+#include <DistancePointToSpheroid.h>
 #include <map>
 
 using std::min;

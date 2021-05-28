@@ -44,7 +44,6 @@ struct Vec2D {
   Vec2D operator+(const Vec2D &) const;
   Vec2D operator-(const Vec2D &) const;
   Vec2D operator-() const;
-  Vec2D operator^(const Vec2D &) const;
 
   double operator*(const Vec2D &) const;
 

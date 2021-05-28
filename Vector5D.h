@@ -31,7 +31,6 @@ struct Vec5D {
   Vec5D operator+(const Vec5D &) const;
   Vec5D operator-(const Vec5D &) const;
   Vec5D operator-() const;
-  Vec5D operator^(const Vec5D &) const;
 
   double operator*(const Vec5D &) const;
 
