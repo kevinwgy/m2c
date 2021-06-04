@@ -1504,7 +1504,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           if(neighborid==myid) {
 
-            if(m2c_isnan(vr[k][j][i-1][0])) fprintf(stderr,"HERE 1\n");
             fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux1);
             localflux2 = localflux1;
 
@@ -1531,8 +1530,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             } else {//Numerical flux function
 
               if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                if(m2c_isnan(Vsm[0])) fprintf(stderr,"HERE 2\n");
-                if(m2c_isnan(Vsp[0])) fprintf(stderr,"HERE 3\n");
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
               } else {//linear reconstruction w/ limiter
@@ -1560,13 +1557,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           if(neighborid==myid) {
 
-            if(m2c_isnan(vt[k][j-1][i][0])) {
-
-              fprintf(stderr,"HERE 4, ijk = %d, %d, %d\n", i,j,k);
-              
-
-            }
-
             fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux1);
             localflux2 = localflux1;
 
@@ -1592,8 +1582,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             } else {//Numerical flux function
 
               if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                if(m2c_isnan(Vsm[0])) fprintf(stderr,"HERE 5\n");
-                if(m2c_isnan(Vsp[0])) fprintf(stderr,"HERE 6\n");
                 fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
                 fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
               } else {
@@ -1620,7 +1608,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           if(neighborid==myid) {
 
-            if(m2c_isnan(vf[k-1][j][i][0])) fprintf(stderr,"HERE 7\n");
             fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux1);
             localflux2 = localflux1;
 
@@ -1646,8 +1633,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             } else {//Numerical flux function
 
               if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                if(m2c_isnan(Vsm[0])) fprintf(stderr,"HERE 8\n");
-                if(m2c_isnan(Vsp[0])) fprintf(stderr,"HERE 9\n");
                 fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
                 fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
               } else {
