@@ -194,6 +194,30 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
         }
   }
 
+
+  // spheroids
+  for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
+
+    if(it->second->initialConditions.materialid != materialid)
+      continue; //not the right one
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
+
+    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
+
+    double dist;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          if(fabs(dist)<fabs(phi[k][j][i]))
+            phi[k][j][i] = dist; //>0 outside the spheroid
+        }
+  }
+
+
   coordinates.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerAndInsert();
 

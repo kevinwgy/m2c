@@ -142,6 +142,45 @@ Assigner *SphereData::getAssigner()
 
 //------------------------------------------------------------------------------
 
+SpheroidData::SpheroidData()
+{
+
+  cen_x  = 0.0;
+  cen_y  = 0.0;
+  cen_z  = 0.0;
+
+  axis_x = 0.0;
+  axis_y = 0.0;
+  axis_z = 0.0;
+
+  length = 0.0;
+  diameter = 0.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *SpheroidData::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+
+  new ClassDouble<SpheroidData> (ca, "Center_x", this, &SpheroidData::cen_x);
+  new ClassDouble<SpheroidData> (ca, "Center_y", this, &SpheroidData::cen_y);
+  new ClassDouble<SpheroidData> (ca, "Center_z", this, &SpheroidData::cen_z);
+  new ClassDouble<SpheroidData> (ca, "Axis_x", this, &SpheroidData::axis_x);
+  new ClassDouble<SpheroidData> (ca, "Axis_y", this, &SpheroidData::axis_y);
+  new ClassDouble<SpheroidData> (ca, "Axis_z", this, &SpheroidData::axis_z);
+  new ClassDouble<SpheroidData> (ca, "Length", this, &SpheroidData::length);
+  new ClassDouble<SpheroidData> (ca, "Diameter", this, &SpheroidData::diameter);
+
+  initialConditions.setup("InitialState", ca);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
 CylinderConeData::CylinderConeData() {
 
   cen_x  = 0.0;
@@ -189,6 +228,7 @@ void MultiInitialConditionsData::setup(const char *name, ClassAssigner *father)
   pointMap.setup("Point", ca);
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);
+  spheroidMap.setup("Spheroid", ca);
   cylinderconeMap.setup("CylinderAndCone", ca);
 }
 
