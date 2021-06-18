@@ -281,13 +281,13 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, int time_step, SpaceVariabl
 
   char full_fname[256];
   if(iFrame<10) 
-    sprintf(full_fname, "%s%s_000%d.vtr", iod_output.prefix, line->filename_base, iFrame);
+    sprintf(full_fname, "%s%s_000%d.txt", iod_output.prefix, line->filename_base, iFrame);
   else if(iFrame<100)
-    sprintf(full_fname, "%s%s_00%d.vtr", iod_output.prefix, line->filename_base, iFrame);
+    sprintf(full_fname, "%s%s_00%d.txt", iod_output.prefix, line->filename_base, iFrame);
   else if(iFrame<1000)
-    sprintf(full_fname, "%s%s_0%d.vtr", iod_output.prefix, line->filename_base, iFrame);
+    sprintf(full_fname, "%s%s_0%d.txt", iod_output.prefix, line->filename_base, iFrame);
   else
-    sprintf(full_fname, "%s%s_%d.vtr", iod_output.prefix, line->filename_base, iFrame);
+    sprintf(full_fname, "%s%s_%d.txt", iod_output.prefix, line->filename_base, iFrame);
 
   //open file & write the header
   FILE *file = fopen(full_fname, "w");

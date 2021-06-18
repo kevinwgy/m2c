@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
   if(iod.schemes.ns.flux == SchemeData::ROE)
     ff = new FluxFcnGenRoe(vf, iod);
   else if(iod.schemes.ns.flux == SchemeData::LOCAL_LAX_FRIEDRICHS)
-    ff = new FluxFcnGenRoe(vf, iod);
+    ff = new FluxFcnLLF(vf, iod);
   else if(iod.schemes.ns.flux == SchemeData::HLLC)
     ff = new FluxFcnHLLC(vf, iod);
   else {

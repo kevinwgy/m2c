@@ -530,9 +530,11 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
 
   if(!success || i==maxIts_main) {
     cout << "*** Warning: Exact Riemann solver failed. (Unable to find a bracketing interval) " << endl;
-    cout << "      left: " << rhol << ", " << ul << ", " << pl << " (" << idl << "); right: "
-                           << rhor << ", " << ur << ", " << pr << " (" << idr << ")."
-                           << " Residual (|ulstar-urstar|): " << fmin << endl;
+    cout << "      left: " << std::setprecision(10) << rhol << ", " << std::setprecision(10) << ul << ", " 
+                           << std::setprecision(10) << pl << " (" << idl << "); right: "
+                           << std::setprecision(10) << rhor << ", " << std::setprecision(10) << ur << ", " 
+                           << std::setprecision(10) << pr << " (" << idr << ")."
+                           << " Residual (|ulstar-urstar|): " << std::setprecision(10) << fmin << endl;
     p0    = p1    = p_fmin;
     rhol0 = rhol1 = rhol_fmin;
     rhor0 = rhor1 = rhor_fmin;
