@@ -60,8 +60,8 @@ KDTree<Obj, dim, CompType>::KDTree(int nobj, Obj *allObjs, int depth) {
   dir = depth % dim;
   int firstDir = dir;
   int split;
-  int bestDir;
-  double quality[dim], bestQuality;
+  int bestDir = 0;
+  double quality[dim], bestQuality = 0.0;
 
   while(1) {
     if(nObj <= 4) {

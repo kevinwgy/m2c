@@ -6,6 +6,8 @@
 #include <DistancePointToSpheroid.h>
 #include <algorithm> //std::upper_bound
 #include <cfloat> //DBL_MAX
+#include <KDTree.h>
+#include <rbf_interp_2d.hpp>
 using std::cout;
 using std::endl;
 using std::max;
@@ -582,7 +584,172 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
             }
           }
 
-    } 
+    }
+
+    else if (iod.ic.type == IcData::GENERALCYLINDRICAL) {
+
+      Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
+      dir /= dir.norm();
+
+      int N = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
+
+      print("- Applying initial condition in %s (%d points, cylindrical symmetry).\n", 
+            iod.ic.user_specified_ic, N);
+
+      //Store sample points in a KDTree (K = 2)
+      Vec2D *xy = new Vec2D[N]; 
+      PointIn2D *p = new PointIn2D[N];
+      for(int i=0; i<N; i++) {
+        xy[i] = Vec2D(iod.ic.user_data[IcData::COORDINATE][i], iod.ic.user_data[IcData::RADIALCOORDINATE][i]);
+        p[i]  = PointIn2D(i, xy[i]);
+      }
+      KDTree<PointIn2D,2/*dim*/> tree(N, p);
+
+      int numPoints = 15; //this is the number of points for interpolation
+      int maxCand = numPoints*8;
+      PointIn2D candidates[maxCand]; 
+
+
+      // tentative cutoff distance --- will be adjusted
+      double cutoff = sqrt((iod.ic.xmax[0]-iod.ic.xmin[0])*(iod.ic.xmax[1]-iod.ic.xmin[1])/N);
+
+      Vec2D pnode;
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+
+            //3D -> 2D
+            pnode[0] = (coords[k][j][i] - x0)*dir; //!< projection onto the 1D axis
+            if(pnode[0]<iod.ic.xmin[0] || pnode[0]>iod.ic.xmax[0])
+              continue;
+            pnode[1] = (coords[k][j][i] - x0 - pnode[0]*dir).norm();
+            if(pnode[1]<iod.ic.xmin[1] || pnode[1]>iod.ic.xmax[1])
+              continue;
+ 
+            //RBF interpolation w/ KDTree
+            int nFound = 0, counter = 0;
+            while(nFound<numPoints || nFound>maxCand) {
+              if(++counter>2000) {
+                fprintf(stderr,"*** Error: Cannot find required number of sample points for "
+                               "interpolation (by RBF) after 2000 iterations. "
+                               "Candidates: %d, cutoff = %e.\n", nFound, cutoff);
+                exit(-1);
+              }
+              nFound = tree.findCandidatesWithin(pnode, candidates, maxCand, cutoff);
+              if(nFound==0)              cutoff *= 4.0;
+              else if(nFound<numPoints)  cutoff *= 1.5*sqrt((double)numPoints/(double)nFound);
+              else if(nFound>maxCand)    cutoff /= 1.5*sqrt((double)nFound/(double)maxCand);
+            }
+
+            //figure out the actual points for interpolation (numPoints)
+            vector<pair<double,int> > dist2node;
+            for(int i=0; i<nFound; i++) 
+              dist2node.push_back(std::make_pair((candidates[i].x-pnode).norm(), candidates[i].id));
+
+            if(nFound>numPoints)
+              sort(dist2node.begin(), dist2node.end());         
+            dist2node.resize(numPoints);
+
+            //prepare to interpolate
+            double xd[2*numPoints];
+            for(int i=0; i<numPoints; i++) {
+              xd[2*i]   = xy[dist2node[i].second][0];
+              xd[2*i+1] = xy[dist2node[i].second][1];
+            }
+            double r0; //smaller than maximum separation, larger than typical separation
+            r0 = dist2node.front().first + dist2node.back().first;
+            double fd[numPoints];
+            double *rbf_weight, *interp;
+
+            if(iod.ic.specified[IcData::DENSITY]) {
+              for(int i=0; i<numPoints; i++)
+                fd[i] = iod.ic.user_data[IcData::DENSITY][dist2node[i].second];
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
+                                                 MathTools::phi1, //multiquadric RBF
+                                                 fd);
+              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
+                                             MathTools::phi1, rbf_weight,
+                                             1, pnode);
+              v[k][j][i][0] = interp[0];
+
+              delete [] rbf_weight;
+              delete [] interp;
+            }
+
+            if(iod.ic.specified[IcData::VELOCITY] || iod.ic.specified[IcData::RADIALVELOCITY])
+              v[k][j][i][1] = v[k][j][i][2] = v[k][j][i][3] = 0.0;
+
+            if(iod.ic.specified[IcData::VELOCITY]) {
+              for(int i=0; i<numPoints; i++)
+                fd[i] = iod.ic.user_data[IcData::VELOCITY][dist2node[i].second];
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
+                                                 MathTools::phi1, //multiquadric RBF
+                                                 fd);
+              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
+                                             MathTools::phi1, rbf_weight,
+                                             1, pnode);
+              v[k][j][i][1] = interp[0]*dir[0]; 
+              v[k][j][i][2] = interp[0]*dir[1]; 
+              v[k][j][i][3] = interp[0]*dir[2];
+
+              delete [] rbf_weight;
+              delete [] interp;
+            }
+
+            if(iod.ic.specified[IcData::RADIALVELOCITY]) {
+              for(int i=0; i<numPoints; i++)
+                fd[i] = iod.ic.user_data[IcData::RADIALVELOCITY][dist2node[i].second];
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
+                                                 MathTools::phi1, //multiquadric RBF
+                                                 fd);
+              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
+                                             MathTools::phi1, rbf_weight,
+                                             1, pnode);
+              Vec3D dir2 = coords[k][j][i] - x0 - pnode[0]*dir;
+              v[k][j][i][1] += interp[0]*dir2[0]; 
+              v[k][j][i][2] += interp[0]*dir2[1]; 
+              v[k][j][i][3] += interp[0]*dir2[2];
+
+              delete [] rbf_weight;
+              delete [] interp;
+            }
+
+            if(iod.ic.specified[IcData::PRESSURE]) {
+              for(int i=0; i<numPoints; i++)
+                fd[i] = iod.ic.user_data[IcData::PRESSURE][dist2node[i].second];
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
+                                                 MathTools::phi1, //multiquadric RBF
+                                                 fd);
+              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
+                                             MathTools::phi1, rbf_weight,
+                                             1, pnode);
+              v[k][j][i][4] = interp[0];
+
+              delete [] rbf_weight;
+              delete [] interp;
+            }
+
+            if(iod.ic.specified[IcData::MATERIALID]) {
+              for(int i=0; i<numPoints; i++)
+                fd[i] = iod.ic.user_data[IcData::PRESSURE][dist2node[i].second];
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
+                                                 MathTools::phi1, //multiquadric RBF
+                                                 fd);
+              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
+                                             MathTools::phi1, rbf_weight,
+                                             1, pnode);
+              v[k][j][i][4] = std::round(interp[0]);
+
+              delete [] rbf_weight;
+              delete [] interp;
+            }
+
+          }
+
+      delete [] xy;
+      delete [] p;
+
+    }
 
     else if (iod.ic.type == IcData::SPHERICAL) {
 

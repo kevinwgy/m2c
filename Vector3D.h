@@ -321,13 +321,14 @@ Vec3D max( const Vec3D& a, const Vec3D& b) {
 
 // An instantiation of "Obj" in KDTree.h
 class PointIn3D {
+public:
   int id;
   Vec3D x;
 public:
   PointIn3D() {}
   PointIn3D(int i, Vec3D &xin) {id = i; x = xin;}
   double val(int i) const {return x[i];}
-//  double width(int i) const {return 0.0;}
+  double width(int i) const {return 0.0;}
   int pid() const {return id;}
 };
 

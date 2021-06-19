@@ -5,6 +5,7 @@
 #include <map>
 #include "parser/Assigner.h"
 #include "parser/Dictionary.h"
+#include <Vector2D.h>
 #include <Vector3D.h>
 #include <Utils.h>
 
@@ -491,11 +492,16 @@ struct IcData {
   //! user-specified file
   const char *user_specified_ic;
 
-  enum Type {NONE = 0, PLANAR = 1, CYLINDRICAL = 2, SPHERICAL = 3} type;
+  enum Type {NONE = 0, PLANAR = 1, CYLINDRICAL = 2, SPHERICAL = 3, 
+             GENERALCYLINDRICAL = 4} type;
   Vec3D x0;
-  Vec3D dir; //!< relevant for PLANAR and CYLINDRICAL
-  enum Vars {COORDINATE = 0, DENSITY = 1, VELOCITY = 2, PRESSURE = 3,
-             LEVELSET = 4, MATERIALID = 5, TEMPERATURE = 6, SIZE = 7};
+  Vec3D dir; //!< relevant for PLANAR, CYLINDRICAL and GENERALCYLINDRICAL
+
+  Vec2D xmin, xmax; //!< bounding box for interpolation, only for GENERALCYLINDRICAL
+
+  enum Vars {COORDINATE = 0, RADIALCOORDINATE = 1, DENSITY = 2, VELOCITY = 3, 
+             RADIALVELOCITY = 4, PRESSURE = 5, LEVELSET = 6, MATERIALID = 7, 
+             TEMPERATURE = 8, SIZE = 9};
 
   int specified[SIZE];  //!< 0~unspecified, 1~specified
 
@@ -512,6 +518,7 @@ struct IcData {
   void readUserSpecifiedIC_Planar(std::fstream &input);
   void readUserSpecifiedIC_Cylindrical(std::fstream &input);
   void readUserSpecifiedIC_Spherical(std::fstream &input);
+  void readUserSpecifiedIC_GeneralCylindrical(std::fstream &input);
 };
 
 //------------------------------------------------------------------------------

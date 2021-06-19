@@ -50,6 +50,7 @@ ADD_CUSTOM_COMMAND(
 # add include and link directories 
 include_directories("${CMAKE_SOURCE_DIR}")
 include_directories(${CMAKE_SOURCE_DIR}/GeoTools)
+include_directories(${CMAKE_SOURCE_DIR}/MathTools)
 link_directories(${CMAKE_SOURCE_DIR}/parser)
 
 # compile the parser
