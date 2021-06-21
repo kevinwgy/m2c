@@ -911,7 +911,9 @@ void IcData::readUserSpecifiedIC()
 
   std::string word, line;
 
-  // Read the first line of user-specified file
+  input.ignore(512,'\n'); //done with line 1 (not read, user's comment)
+
+  // Read the second line of user-specified file
   input.ignore(2,' '); //This line should start with ## (so the file can be plotted
                        //directly using gnuplot). It must then specify the type of initial cond.
 
@@ -921,28 +923,28 @@ void IcData::readUserSpecifiedIC()
        word.compare(0,4,"PLANAR",0,4) && 
        word.compare(0,4,"planar",0,4))) {
     type = PLANAR;
-    input.ignore(256,'\n'); //done with line 1
+    input.ignore(256,'\n'); //done with line 2
     readUserSpecifiedIC_Planar(input);
   } 
   else if(!(word.compare(0,4,"Cylindrical",0,4) && 
             word.compare(0,4,"CYLINDRICAL",0,4) && 
             word.compare(0,4,"cylindrical",0,4))) {
     type = CYLINDRICAL;
-    input.ignore(256,'\n'); //done with line 1
+    input.ignore(256,'\n'); //done with line 2
     readUserSpecifiedIC_Cylindrical(input);
   } 
   else if(!(word.compare(0,4,"Spherical",0,4) && 
             word.compare(0,4,"SPHERICAL",0,4) && 
             word.compare(0,4,"spherical",0,4))) {
     type = SPHERICAL;
-    input.ignore(256,'\n'); //done with line 1
+    input.ignore(256,'\n'); //done with line 2
     readUserSpecifiedIC_Spherical(input);
   } 
   else if(!(word.compare(0,4,"GeneralCylindrical",0,4) && 
             word.compare(0,4,"GENERALCYLINDRICAL",0,4) && 
             word.compare(0,4,"generalcylindrical",0,4))) {
     type = GENERALCYLINDRICAL;
-    input.ignore(256,'\n'); //done with line 1
+    input.ignore(256,'\n'); //done with line 2
     readUserSpecifiedIC_GeneralCylindrical(input);
   } 
   else {
@@ -961,7 +963,7 @@ void IcData::readUserSpecifiedIC_Planar(std::fstream &input)
 {
   std::string word, line;
 
-  // Read the second line of user-specified file
+  // Read the third line of user-specified file
   input.ignore(2,' '); //This line should start with ## 
                        //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
                        //of the "0" in this data file within the actual mesh
@@ -1065,7 +1067,7 @@ void IcData::readUserSpecifiedIC_Cylindrical(std::fstream &input)
 {
   std::string word, line;
 
-  // Read the second line of user-specified file
+  // Read the third line of user-specified file
   input.ignore(2,' '); //This line should start with ## 
                        //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
                        //of the "0" in this data file within the actual mesh
@@ -1215,7 +1217,7 @@ void IcData::readUserSpecifiedIC_GeneralCylindrical(std::fstream &input)
 {
   std::string word, line;
 
-  // Read the second line of user-specified file
+  // Read the third line of user-specified file
   input.ignore(2,' '); //This line should start with ## 
                        //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
                        //of the "0" in this data file within the actual mesh
@@ -1344,7 +1346,7 @@ void IcData::readUserSpecifiedIC_Spherical(std::fstream &input)
 {
   std::string word, line;
 
-  // Read the second line of user-specified file
+  // Read the third line of user-specified file
   input.ignore(2,' '); //This line should start with ## 
                        //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
                        //of the "0" in this data file within the actual mesh
