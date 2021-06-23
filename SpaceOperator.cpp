@@ -462,6 +462,11 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   double*** id = (double***) ID.GetDataPointer();
 
   //! 1. apply the inlet (i.e. farfield) state
+  if(iod.bc.inlet.materialid != 0) {
+    print_error("*** Error: Material at the inlet boundary should have MaterialID = 0. (Found %d instead.)\n", 
+                iod.bc.inlet.materialid);
+    exit_mpi();
+  }
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
@@ -484,10 +489,10 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
     if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
 
       if(iod.ic.type == IcData::PLANAR)
-        print("- Applying initial condition specified in %s (planar).\n", 
+        print("- Applying the initial condition specified in %s (planar).\n", 
               iod.ic.user_specified_ic);
       else
-        print("- Applying initial condition specified in %s (with cylindrical symmetry).\n", 
+        print("- Applying the initial condition specified in %s (with cylindrical symmetry).\n", 
               iod.ic.user_specified_ic);
  
       Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
@@ -593,7 +598,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
 
       int N = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
 
-      print("- Applying initial condition in %s (%d points, cylindrical symmetry).\n", 
+      print("- Applying the initial condition specified in %s (%d points, cylindrical symmetry).\n", 
             iod.ic.user_specified_ic, N);
 
       //Store sample points in a KDTree (K = 2)
@@ -604,9 +609,10 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
         p[i]  = PointIn2D(i, xy[i]);
       }
       KDTree<PointIn2D,2/*dim*/> tree(N, p);
+      print("    o Constructed a KDTree (K=2) to store the data points.\n");
 
       int numPoints = 15; //this is the number of points for interpolation
-      int maxCand = numPoints*8;
+      int maxCand = numPoints*20;
       PointIn2D candidates[maxCand]; 
 
 
@@ -632,7 +638,10 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
               if(++counter>2000) {
                 fprintf(stderr,"*** Error: Cannot find required number of sample points for "
                                "interpolation (by RBF) after 2000 iterations. "
-                               "Candidates: %d, cutoff = %e.\n", nFound, cutoff);
+                               "Coord(3D):%e %e %e  | Coord(2D):%e %e. "
+                               "Candidates: %d, cutoff = %e.\n", 
+                               coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2],
+                               pnode[0], pnode[1], nFound, cutoff);
                 exit(-1);
               }
               nFound = tree.findCandidatesWithin(pnode, candidates, maxCand, cutoff);
@@ -706,6 +715,8 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
                                              MathTools::phi1, rbf_weight,
                                              1, pnode);
               Vec3D dir2 = coords[k][j][i] - x0 - pnode[0]*dir;
+              if(dir2.norm()>0)
+                dir2 /= dir2.norm();
               v[k][j][i][1] += interp[0]*dir2[0]; 
               v[k][j][i][2] += interp[0]*dir2[1]; 
               v[k][j][i][3] += interp[0]*dir2[2];
@@ -731,14 +742,14 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
 
             if(iod.ic.specified[IcData::MATERIALID]) {
               for(int i=0; i<numPoints; i++)
-                fd[i] = iod.ic.user_data[IcData::PRESSURE][dist2node[i].second];
+                fd[i] = iod.ic.user_data[IcData::MATERIALID][dist2node[i].second];
               rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
                                                  MathTools::phi1, //multiquadric RBF
                                                  fd);
               interp = MathTools::rbf_interp(2, numPoints, xd, r0,
                                              MathTools::phi1, rbf_weight,
                                              1, pnode);
-              v[k][j][i][4] = std::round(interp[0]);
+              id[k][j][i] = std::round(interp[0]);
 
               delete [] rbf_weight;
               delete [] interp;
@@ -753,7 +764,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
 
     else if (iod.ic.type == IcData::SPHERICAL) {
 
-      print("- Applying initial condition in %s (with spherical symmetry).\n", 
+      print("- Applying the initial condition specified in %s (with spherical symmetry).\n", 
             iod.ic.user_specified_ic);
  
       double x;

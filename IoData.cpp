@@ -1250,15 +1250,15 @@ void IcData::readUserSpecifiedIC_GeneralCylindrical(std::fstream &input)
   int column = 0; 
   for(;iss>>word;) {
     // just check the first four letters
-    if(!(word.compare(0,4,"AxialCoordinate",0,4) && 
-         word.compare(0,4,"AXIALCOORDINATE",0,4) && 
-         word.compare(0,4,"axialcoordinate",0,4))) {
+    if(!(word.compare(0,10,"AxialCoordinate",0,10) && 
+         word.compare(0,10,"AXIALCOORDINATE",0,10) && 
+         word.compare(0,10,"axialcoordinate",0,10))) {
       column2var[column] = COORDINATE;
       specified[COORDINATE] = 1;
     } 
-    if(!(word.compare(0,4,"RadialCoordinate",0,4) && 
-         word.compare(0,4,"RADIALCOORDINATE",0,4) && 
-         word.compare(0,4,"radialcoordinate",0,4))) {
+    else if(!(word.compare(0,10,"RadialCoordinate",0,10) && 
+         word.compare(0,10,"RADIALCOORDINATE",0,10) && 
+         word.compare(0,10,"radialcoordinate",0,10))) {
       column2var[column] = RADIALCOORDINATE;
       specified[RADIALCOORDINATE] = 1;
     } 
@@ -1268,15 +1268,15 @@ void IcData::readUserSpecifiedIC_GeneralCylindrical(std::fstream &input)
       column2var[column] = DENSITY;
       specified[DENSITY] = 1;
     } 
-    else if(!(word.compare(0,4,"AxialVelocity",0,4) && 
-              word.compare(0,4,"AXIALVELOCITY",0,4) && 
-              word.compare(0,4,"axialvelocity",0,4))) {
+    else if(!(word.compare(0,10,"AxialVelocity",0,10) && 
+              word.compare(0,10,"AXIALVELOCITY",0,10) && 
+              word.compare(0,10,"axialvelocity",0,10))) {
       column2var[column] = VELOCITY;
       specified[VELOCITY] = 1;
     } 
-    else if(!(word.compare(0,4,"RadialVelocity",0,4) && 
-              word.compare(0,4,"RADIALVELOCITY",0,4) && 
-              word.compare(0,4,"radialvelocity",0,4))) {
+    else if(!(word.compare(0,10,"RadialVelocity",0,10) && 
+              word.compare(0,10,"RADIALVELOCITY",0,10) && 
+              word.compare(0,10,"radialvelocity",0,10))) {
       column2var[column] = RADIALVELOCITY;
       specified[RADIALVELOCITY] = 1;
     } 
