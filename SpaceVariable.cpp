@@ -1,5 +1,6 @@
 #include <SpaceVariable.h>
 #include <Utils.h>
+#include <bits/stdc++.h> //min_element, max_element
 
 //---------------------------------------------------------
 // DataManagers3D
@@ -246,7 +247,7 @@ void SpaceVariable3D::AXPlusB(double a, double b, bool workOnGhost)
 void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost)
 {
   if(dof != y.NumDOF()) {
-    print_error("*** Error: Vector operation failed due to inconsistent sizes (%d vs. %d)\n", dof, y.NumDOF());
+    print_error("*** Error: Vector operation (AXPlusBY) failed due to inconsistent sizes (%d vs. %d)\n", dof, y.NumDOF());
     exit_mpi();
   }
 
@@ -265,6 +266,56 @@ void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, bool work
       for(int i=myi0; i<myimax; i++)
         for(int p=0; p<dof; p++)
           v[k][j][i*dof+p] = a*v[k][j][i*dof+p] + b*v2[k][j][i*dof+p];
+
+  RestoreDataPointerAndInsert();
+  y.RestoreDataPointerToLocalVector(); //no changes
+}
+
+//---------------------------------------------------------
+// takes in two vectors that identify the indices of X and Y that are involved in this operation
+void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, std::vector<int> Xindices,
+                               std::vector<int> Yindices, bool workOnGhost)
+{
+  //check for common errors
+  if(Xindices.size() != Yindices.size()) {
+    print_error("*** Error: Vector operation (AXPlusBY) failed due to inconsistent number of indices (%d vs. %d)\n", 
+                Xindices.size(), Yindices.size());
+    exit_mpi();
+  }
+  if(*std::min_element(Xindices.begin(), Xindices.end())<0 ||  
+     *std::max_element(Xindices.begin(), Xindices.end())>=dof) {
+    print_error("*** Error: Vector operation (AXPlusBY) failed due to incorrect X index (min:%d, max:%d).\n", 
+                *std::min_element(Xindices.begin(), Xindices.end()),
+                *std::max_element(Xindices.begin(), Xindices.end()));
+    exit_mpi();
+  }
+  if(*std::min_element(Yindices.begin(), Yindices.end())<0 ||  
+     *std::max_element(Yindices.begin(), Yindices.end())>=y.NumDOF()) {
+    print_error("*** Error: Vector operation (AXPlusBY) failed due to incorrect Y index (min:%d, max:%d).\n", 
+                *std::min_element(Yindices.begin(), Yindices.end()),
+                *std::max_element(Yindices.begin(), Yindices.end()));
+    exit_mpi();
+  }
+
+  double*** v  = GetDataPointer();
+  double*** v2 = y.GetDataPointer();
+
+  int myi0, myj0, myk0, myimax, myjmax, mykmax;
+
+  if(workOnGhost)
+    GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+  else
+    GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+
+  int px, py;
+  for(int k=myk0; k<mykmax; k++)
+    for(int j=myj0; j<myjmax; j++)
+      for(int i=myi0; i<myimax; i++)
+        for(int id=0; id<Xindices.size(); id++) {
+          px = Xindices[id];
+          py = Yindices[id];
+          v[k][j][i*dof+px] = a*v[k][j][i*dof+px] + b*v2[k][j][i*dof+py];
+        }
 
   RestoreDataPointerAndInsert();
   y.RestoreDataPointerToLocalVector(); //no changes

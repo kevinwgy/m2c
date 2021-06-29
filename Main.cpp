@@ -15,6 +15,7 @@
 #include <TimeIntegrator.h>
 #include <ExactRiemannSolverBase.h>
 #include <MultiPhaseOperator.h>
+#include <Interpolator.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -89,6 +90,11 @@ int main(int argc, char* argv[])
 
   //! Initialize space operator
   SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
+
+  //! Set interpolator
+  InterpolatorBase *interp = NULL;
+  if(true) //may add more choices later
+    interp = new InterpolatorLinear(comm, dms, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ());
 
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables

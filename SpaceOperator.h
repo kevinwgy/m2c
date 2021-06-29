@@ -38,6 +38,9 @@ class SpaceOperator
   //! Class for spatial reconstruction
   Reconstructor rec;
 
+  //! Class for calculating spatial gradients of variables
+  ViscosityOperator visco;
+
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;
 
@@ -97,6 +100,7 @@ private:
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL);
+
 };
 
 

@@ -250,9 +250,35 @@ struct MaterialModelData {
 
 //------------------------------------------------------------------------------
 
+struct ViscosityModelData {
+
+  enum Type {NONE = 0, CONSTANT = 0, SUTHERLAND = 1, ARTIFICIAL_RODIONOV = 2} type;
+
+  // constant
+  double dynamicViscosity;
+  double bulkViscosity;
+
+  // Sutherland
+  double sutherlandConstant;
+  double sutherlandReferenceTemperature;
+
+  // Artificial viscosity (Rodionov)
+  double Cav, Cth; 
+
+
+  ViscosityModelData();
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct EquationsData {
 
   ObjectMap<MaterialModelData> materials;
+
+  ViscosityModelData viscosity;
 
   EquationsData();
   ~EquationsData() {}

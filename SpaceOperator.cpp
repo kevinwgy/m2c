@@ -1690,17 +1690,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
         myid = id[k][j][i];
 
-/*
-
-        if(k==0 && j==1 && i==569) {
-
-          fprintf(stderr,"(569,1,0): id = %d, V = %e %e %e %e %e\n", myid, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
-
-
-        }
-*/
-
-
         //*****************************************
         //calculate flux function F_{i-1/2,j,k}
         //*****************************************
@@ -1983,7 +1972,13 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
                                     RiemannSolutions *riemann_solutions)
 {
+  // -------------------------------------------------
+  // calculate fluxes on the left hand side of the equation   
+  // -------------------------------------------------
   ComputeAdvectionFluxes(V, ID, R, riemann_solutions);
+
+  if(iod.eqs.viscosity.type != ViscosityModelData::NONE)
+    visco.AddDiffusionFluxes(V, ID, R);
 
   // -------------------------------------------------
   // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
@@ -1995,23 +1990,16 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
     for(int j=j0; j<jmax; j++) 
       for(int i=i0; i<imax; i++) {
         r[k][j][i] /= -vol[k][j][i];
-
-
-/*
-
-        if(k==0 && j==1 && i==569) {
-
-          fprintf(stderr,"(569,1,0): r = %e %e %e %e %e\n", r[k][j][i][0], r[k][j][i][1], r[k][j][i][2], r[k][j][i][3], r[k][j][i][4]);
-
-        }
-*/
-
       }
 
   // restore spatial variables
   R.RestoreDataPointerToLocalVector(); //NOTE: although R has been updated, there is no need of 
                                        //      cross-subdomain communications. So, no need to 
                                        //      update the global vec.
+
+
+  
+
   volume.RestoreDataPointerToLocalVector();
 }
 

@@ -67,6 +67,8 @@ IoData.cpp
 SpaceVariable.cpp
 ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp
+Interpolator.cpp
+GradientCalculator.cpp
 ProbeOutput.cpp
 MaterialVolumeOutput.cpp
 Output.cpp
