@@ -1,10 +1,8 @@
 #ifndef _SPACEOPERATOR_H_
 #define _SPACEOPERATOR_H_
-#include <IoData.h>
-#include <VarFcnBase.h>
 #include <ExactRiemannSolverBase.h>
+#include <ViscosityOperator.h>
 #include <FluxFcnBase.h>
-#include <SpaceVariable.h>
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
 #include <GhostPoint.h>
@@ -58,6 +56,8 @@ public:
                                bool workOnGhost = false);
   int  ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &ID, 
                               bool workOnGhost = false, bool checkState = true);
+
+  void SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
   void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID);
     

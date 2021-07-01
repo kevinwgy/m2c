@@ -16,7 +16,7 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                     DV(comm_, &(dm_all_.ghosted1_3dof)),
                     DW(comm_, &(dm_all_.ghosted1_3dof)),
                     Var(comm_, &(dm_all_.ghosted1_1dof)),
-                    interpolator(NULL)
+                    interpolator(NULL), grad(NULL)
 {
   //set internal variables to 0 (including ghost layer)
   G.SetConstantValue(0.0, true);
@@ -41,7 +41,7 @@ ViscosityOperator::~ViscosityOperator()
 void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
 {
   //1. Calculate the x, y, and z velocities at cell interfaces by interpolation 
-  assert(interpolator!=NULL);
+  assert(interpolator);//make sure it is not NULL
   interpolator->InterpolateAtCellInterfaces(0/*x-dir*/, V, std::vector<int>{1,2,3}, 
                                             V_i_minus_half, std::vector<int>{0,1,2});
   interpolator->InterpolateAtCellInterfaces(1/*y-dir*/, V, std::vector<int>{1,2,3}, 

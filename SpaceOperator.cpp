@@ -32,7 +32,8 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vb(comm_, &(dm_all_.ghosted1_5dof)),
     Vt(comm_, &(dm_all_.ghosted1_5dof)),
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
-    Vf(comm_, &(dm_all_.ghosted1_5dof))
+    Vf(comm_, &(dm_all_.ghosted1_5dof)),
+    visco(comm_, dm_all_, iod_.eqs.viscosity, coordinates, delta_xyz)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -58,6 +59,8 @@ SpaceOperator::~SpaceOperator()
 void SpaceOperator::Destroy()
 {
   rec.Destroy();
+  visco.Destroy();
+
   coordinates.Destroy();
   delta_xyz.Destroy();
   volume.Destroy();
@@ -68,6 +71,10 @@ void SpaceOperator::Destroy()
   Vk.Destroy();
   Vf.Destroy();
 }
+
+//-----------------------------------------------------
+
+void SpaceOperator::XXX
 
 //-----------------------------------------------------
 
@@ -450,6 +457,13 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
   return nClipped;
 }  
+
+//-----------------------------------------------------
+//assign interpolator and gradien calculator (pointers) to the viscosity operator
+void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_)
+{
+  visco.Setup(interpolator_, grad_);
+}
 
 //-----------------------------------------------------
 

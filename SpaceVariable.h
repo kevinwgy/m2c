@@ -102,6 +102,9 @@ public:
 
   inline bool OutsidePhysicalDomain(int i, int j, int k) {return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
 
+  inline int BoundaryType(int i, int j, int k) //0~interior, 1~boundary-face, 2~boundary-edge, 3~boundary-corner
+  {return int(i<0) + int(i>=NX) + int(j<0) + int(j>=NY) + int(k<0) + int(k>=NZ);}
+
   inline bool IsHere(int i, int j, int k, bool include_ghost = false)
   {
     if(include_ghost) 

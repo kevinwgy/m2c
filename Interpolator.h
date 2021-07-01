@@ -36,6 +36,8 @@ public:
     exit_mpi();
   }
   
+  virtual void Destroy() {}
+
 };
 
 /****************************************************
@@ -62,6 +64,9 @@ public:
   void InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/, 
                                    SpaceVariable3D &Vin, std::vector<int> &input_dof, 
                                    SpaceVariable3D &Vout, std::vector<int> &output_dof);
+
+  void Destroy() {
+    Cl.Destroy(); Cr.Destroy(); Ct.Destroy(); Cb.Destroy(); Ck.Destroy(); Cf.Destroy();}
 
 private:
 

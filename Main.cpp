@@ -1,10 +1,7 @@
 #include <time.h>
 #include <petscdmda.h> //PETSc
-#include <Utils.h>
-#include <IoData.h>
 #include <MeshGenerator.h>
 #include <Output.h>
-#include <SpaceVariable.h>
 #include <VarFcnSG.h>
 #include <VarFcnMG.h>
 #include <VarFcnJWL.h>
@@ -13,9 +10,8 @@
 #include <FluxFcnHLLC.h>
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
-#include <ExactRiemannSolverBase.h>
 #include <MultiPhaseOperator.h>
-#include <Interpolator.h>
+#include <GradientCalculator.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -91,10 +87,18 @@ int main(int argc, char* argv[])
   //! Initialize space operator
   SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
 
-  //! Set interpolator
+  //! Initialize interpolator
   InterpolatorBase *interp = NULL;
   if(true) //may add more choices later
     interp = new InterpolatorLinear(comm, dms, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ());
+
+  //! Initialize (sptial) gradient calculator
+  GradientCalculatorBase *grad = NULL;
+  if(true) //may add more choices later
+    grad = new GradientCalculatorCentral(comm, dms, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), *interp);
+  
+  //! Setup viscosity operator in spo
+  spo.SetupViscosityOperator(interp, grad);
 
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
@@ -221,6 +225,8 @@ int main(int argc, char* argv[])
   integrator->Destroy();
   mpo.Destroy();
   spo.Destroy();
+  if(grad) grad->Destroy();
+  if(interpolator) interpolator->Destroy();
   dms.DestroyAllDataManagers();
   PetscFinalize();
 
