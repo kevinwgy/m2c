@@ -10,6 +10,8 @@
  ***************************************************/
 class InterpolatorBase 
 {
+
+protected:
   //! Mesh info
   SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;

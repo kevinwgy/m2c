@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
   if(true) //may add more choices later
     grad = new GradientCalculatorCentral(comm, dms, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), *interp);
   
-  //! Setup viscosity operator in spo
+  //! Setup viscosity operator in spo (if viscosity model is not NONE)
   spo.SetupViscosityOperator(interp, grad);
 
   //! Initialize State Variables
@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
   mpo.Destroy();
   spo.Destroy();
   if(grad) grad->Destroy();
-  if(interpolator) interpolator->Destroy();
+  if(interp) interp->Destroy();
   dms.DestroyAllDataManagers();
   PetscFinalize();
 

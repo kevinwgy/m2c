@@ -69,6 +69,7 @@ ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp
 Interpolator.cpp
 GradientCalculator.cpp
+ViscosityOperator.cpp
 ProbeOutput.cpp
 MaterialVolumeOutput.cpp
 Output.cpp

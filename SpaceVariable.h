@@ -1,6 +1,7 @@
 #ifndef _SPACEVARIABLE_
 #define _SPACEVARIABLE_
 #include <petscdmda.h>
+#include <vector>
 
 /*******************************************
  * This class stores all the DM's
@@ -118,7 +119,7 @@ public:
   void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
   void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y
   void AXPlusBY(double a, double b, SpaceVariable3D &y, std::vector<int> Xindices,
-                std::vector<int> Yindices, bool workOnGhost, bool workOnGhost = false); //!< customized version
+                std::vector<int> Yindices, bool workOnGhost = false); //!< customized version
   void SetConstantValue(double a, bool workOnGhost = false); //!< set value to a
   
 };

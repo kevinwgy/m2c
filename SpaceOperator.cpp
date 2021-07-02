@@ -22,7 +22,8 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
                              ExactRiemannSolverBase &riemann_,
                              vector<double> &x, vector<double> &y, vector<double> &z,
                              vector<double> &dx, vector<double> &dy, vector<double> &dz) 
-  : comm(comm_), iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
+  : comm(comm_), dm_all(dm_all_),
+    iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)),
@@ -33,7 +34,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vt(comm_, &(dm_all_.ghosted1_5dof)),
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
-    visco(comm_, dm_all_, iod_.eqs.viscosity, coordinates, delta_xyz)
+    visco(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -59,7 +60,7 @@ SpaceOperator::~SpaceOperator()
 void SpaceOperator::Destroy()
 {
   rec.Destroy();
-  visco.Destroy();
+  if(visco) visco->Destroy();
 
   coordinates.Destroy();
   delta_xyz.Destroy();
@@ -71,10 +72,6 @@ void SpaceOperator::Destroy()
   Vk.Destroy();
   Vf.Destroy();
 }
-
-//-----------------------------------------------------
-
-void SpaceOperator::XXX
 
 //-----------------------------------------------------
 
@@ -462,7 +459,20 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 //assign interpolator and gradien calculator (pointers) to the viscosity operator
 void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_)
 {
-  visco.Setup(interpolator_, grad_);
+  bool hasViscosity = false;
+  for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
+    if(it->second->viscosity.type != ViscosityModelData::NONE) {
+      hasViscosity = true;
+      break; //initialize visco if any material has viscosity
+    }
+  }
+
+  if(hasViscosity) {
+    assert(interpolator_); //make sure it is not NULL
+    assert(grad_);
+    visco = new ViscosityOperator(comm, dm_all, iod.eqs, varFcn, coordinates, delta_xyz,
+                                  *interpolator_, *grad_);
+  }
 }
 
 //-----------------------------------------------------
@@ -1991,8 +2001,8 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   ComputeAdvectionFluxes(V, ID, R, riemann_solutions);
 
-  if(iod.eqs.viscosity.type != ViscosityModelData::NONE)
-    visco.AddDiffusionFluxes(V, ID, R);
+  if(visco)
+    visco->AddDiffusionFluxes(V, ID, R);
 
   // -------------------------------------------------
   // multiply flux by -1, and divide by cell volume (for cells within the actual domain)

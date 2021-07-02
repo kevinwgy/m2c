@@ -231,6 +231,30 @@ struct JonesWilkinsLeeModelData {
 
 //------------------------------------------------------------------------------
 
+struct ViscosityModelData {
+
+  enum Type {NONE = 0, CONSTANT = 1, SUTHERLAND = 2, ARTIFICIAL_RODIONOV = 3} type;
+
+  // constant
+  double dynamicViscosity;
+  double bulkViscosity;
+
+  // Sutherland
+  double sutherlandConstant;
+  double sutherlandT0;
+  double sutherlandMu0;
+
+  // Artificial viscosity (Rodionov)
+  double Cav, Cth; 
+
+  ViscosityModelData();
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct MaterialModelData {
 
   int id;
@@ -242,43 +266,20 @@ struct MaterialModelData {
   MieGruneisenModelData    mgModel;
   JonesWilkinsLeeModelData jwlModel;
 
+  ViscosityModelData viscosity;
+
   MaterialModelData();
   ~MaterialModelData() {}
   Assigner *getAssigner();
 
 };
 
-//------------------------------------------------------------------------------
-
-struct ViscosityModelData {
-
-  enum Type {NONE = 0, CONSTANT = 0, SUTHERLAND = 1, ARTIFICIAL_RODIONOV = 2} type;
-
-  // constant
-  double dynamicViscosity;
-  double bulkViscosity;
-
-  // Sutherland
-  double sutherlandConstant;
-  double sutherlandReferenceTemperature;
-
-  // Artificial viscosity (Rodionov)
-  double Cav, Cth; 
-
-
-  ViscosityModelData();
-
-  void setup(const char *, ClassAssigner * = 0);
-
-};
 
 //------------------------------------------------------------------------------
 
 struct EquationsData {
 
   ObjectMap<MaterialModelData> materials;
-
-  ViscosityModelData viscosity;
 
   EquationsData();
   ~EquationsData() {}

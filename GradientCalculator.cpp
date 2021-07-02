@@ -4,7 +4,7 @@
 
 GradientCalculatorCentral::GradientCalculatorCentral(MPI_Comm &comm_, DataManagers3D &dm_all_,
                                SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
-                               Interpolator &interpolator_)
+                               InterpolatorBase &interpolator_)
                           : GradientCalculatorBase(coordinates_, delta_xyz_),
                             Cx(comm_, &(dm_all_.ghosted1_3dof)),
                             Cy(comm_, &(dm_all_.ghosted1_3dof)),
@@ -24,7 +24,7 @@ GradientCalculatorCentral::GradientCalculatorCentral(MPI_Comm &comm_, DataManage
 
 void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,1~d/dy,2~d/dz*/,
                                     SpaceVariable3D &V, std::vector<int> &input_dof,
-                                    SpaceVariable3D &DV, std::vector<int> &output_dof);
+                                    SpaceVariable3D &DV, std::vector<int> &output_dof)
 {
   //check for common errors
   if(input_dof.size() != output_dof.size()) {
@@ -63,8 +63,8 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
   V.GetGlobalSize(&NX, &NY, &NZ);
 
   if(dir==0) { //calculating d/dx
-    double pin, pout;
-    double*** cx = (double***)Cx.GetDataPointer();
+    int pin, pout;
+    Vec3D*** cx = (Vec3D***)Cx.GetDataPointer();
 
     // loop through domain interior and the relevant ghost region
     for(int k=kk0; k<kkmax; k++)
@@ -108,8 +108,8 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
   }  
 
   else if(dir==1) { //calculating d/dy
-    double pin, pout;
-    double*** cy = (double***)Cy.GetDataPointer();
+    int pin, pout;
+    Vec3D*** cy = (Vec3D***)Cy.GetDataPointer();
 
     // loop through domain interior and the relevant ghost region
     for(int k=kk0; k<kkmax; k++)
@@ -151,8 +151,8 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
   }
 
   else if(dir==2) { //calculating d/dz
-    double pin, pout;
-    double*** cz = (double***)Cz.GetDataPointer();
+    int pin, pout;
+    Vec3D*** cz = (Vec3D***)Cz.GetDataPointer();
 
     // loop through domain interior and the relevant ghost region
     for(int k=k0; k<kmax; k++)
@@ -257,9 +257,9 @@ void GradientCalculatorCentral::CalculateCoefficients()
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
 
-  Vec3D*** cx = (double***)Cx.GetDataPointer();
-  Vec3D*** cy = (double***)Cy.GetDataPointer();
-  Vec3D*** cz = (double***)Cz.GetDataPointer();
+  Vec3D*** cx = (Vec3D***)Cx.GetDataPointer();
+  Vec3D*** cy = (Vec3D***)Cy.GetDataPointer();
+  Vec3D*** cz = (Vec3D***)Cz.GetDataPointer();
 
   //Loop through the real cells
   for(int k=k0; k<kmax; k++)
@@ -317,7 +317,7 @@ void GradientCalculatorCentral::CentralDifferencingAtCellInterfaces(int dir/*0~d
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
-  double pin, pout;
+  int pin, pout;
 
   if(dir==0) {
     for(int k=k0; k<kkmax; k++)

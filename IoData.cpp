@@ -447,7 +447,7 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
@@ -461,6 +461,8 @@ Assigner *MaterialModelData::getAssigner()
   mgModel.setup("MieGruneisenModel", ca);
   jwlModel.setup("JonesWilkinsLeeModel", ca);
 
+  viscosity.setup("ViscosityModel", ca);
+  
   return ca;
 };
 
@@ -470,11 +472,12 @@ ViscosityModelData::ViscosityModelData() {
 
   type = NONE;
 
-  dynamicViscosity   = -1.0;
+  dynamicViscosity   = 1.716e-5; //air, Pa.s
   bulkViscosity      = 0.0;
 
-  sutherlandReferenceTemperature = 110.6;
-  sutherlandConstant = 1.458e-6;
+  sutherlandConstant = 111.0; //air, Kelvin
+  sutherlandT0 = 273.0;  //air, Kelvin
+  sutherlandMu0 = 1.716e-5;   //air, Pa.s
 
   Cav = 0.8;
   Cth = 0.05;
@@ -484,21 +487,27 @@ ViscosityModelData::ViscosityModelData() {
 
 void ViscosityModelData::setup(const char *name, ClassAssigner *father) {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 8, father);
+
   new ClassToken<ViscosityModelData>(ca, "Type", this,
                                      reinterpret_cast<int ViscosityModelData::*>(&ViscosityModelData::type), 4,
                                      "None",        ViscosityModelData::NONE,
                                      "Constant",        ViscosityModelData::CONSTANT,
                                      "Sutherland",      ViscosityModelData::SUTHERLAND,
                                      "Artificial", ViscosityModelData::ARTIFICIAL_RODIONOV);
-  new ClassDouble<ViscosityModelData>(ca, "SutherlandReferenceTemperature", this,
-                                      &ViscosityModelData::sutherlandReferenceTemperature);
+
+  new ClassDouble<ViscosityModelData>(ca, "ReferenceTemperature", this,
+                                      &ViscosityModelData::sutherlandT0);
+  new ClassDouble<ViscosityModelData>(ca, "ReferenceDynamicViscosity", this,
+                                      &ViscosityModelData::sutherlandMu0);
   new ClassDouble<ViscosityModelData>(ca, "SutherlandConstant", this,
                                       &ViscosityModelData::sutherlandConstant);
+
   new ClassDouble<ViscosityModelData>(ca, "DynamicViscosity", this,
                                       &ViscosityModelData::dynamicViscosity);
   new ClassDouble<ViscosityModelData>(ca, "BulkViscosity", this,
                                       &ViscosityModelData::bulkViscosity);
+
   new ClassDouble<ViscosityModelData>(ca, "Cav", this,
                                       &ViscosityModelData::Cav);
   new ClassDouble<ViscosityModelData>(ca, "Cth", this,
@@ -517,12 +526,10 @@ EquationsData::EquationsData()
 
 void EquationsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 1, father); 
 
   materials.setup("Material", ca);
 
-  viscosity.setup("ViscosityModel", ca);
-  
 }
 
 //------------------------------------------------------------------------------

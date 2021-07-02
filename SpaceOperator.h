@@ -14,6 +14,7 @@
 class SpaceOperator
 {
   MPI_Comm&                 comm;
+  DataManagers3D&           dm_all;
   IoData&                   iod;
   FluxFcnBase&              fluxFcn;
 
@@ -37,7 +38,7 @@ class SpaceOperator
   Reconstructor rec;
 
   //! Class for calculating spatial gradients of variables
-  ViscosityOperator visco;
+  ViscosityOperator* visco;
 
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;

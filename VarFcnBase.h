@@ -70,6 +70,11 @@ public:
     print_error("*** Error:  GetBigGamma Function not defined\n");
     exit(-1); return 0.0;}
 
+  //! temperature law, defined separately for each EOS
+  virtual double GetTemperature(double rho, double e) const{
+    print_error("*** Error:  GetTemperature Function not defined\n");
+    exit(-1); return 0.0;}
+
   //checks that the Euler equations are still hyperbolic
   virtual bool CheckState(double *V) const{
     if(m2c_isnan(V[0]) || m2c_isnan(V[1]) || m2c_isnan(V[2]) || m2c_isnan(V[3]) || m2c_isnan(V[4])) {

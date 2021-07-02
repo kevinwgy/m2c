@@ -1,8 +1,8 @@
-#ifndef VISCOSITY_OPERATOR_H_
-#define VISCOSITY_OPERATOR_H_
+#ifndef _VISCOSITY_OPERATOR_H_
+#define _VISCOSITY_OPERATOR_H_
 
 #include <GradientCalculator.h>
-#include <VarFcnBase.h>
+#include <ViscoFcn.h>
 
 /***************************************************
  * class ViscosityOperator calculates the viscous
@@ -13,53 +13,60 @@
 
 class ViscosityOperator
 {
-  ViscosityModelData& iod_viscosity;
+  EquationsData& iod_eqs;
   
   //! Variable function
   vector<VarFcnBase*>& varFcn; //!< each material has a varFcn
+
+  //! Viscosity function (one for each material)
+  vector<ViscoFcnBase*> visFcn;
 
   //! Mesh info
   SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;
 
+  int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
+  int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
+
   //! interpolator
-  InterpolatorBase *interpolator;
+  InterpolatorBase &interpolator;
 
   //! gradient calculator
-  GradientCalculatorBase *grad;
+  GradientCalculatorBase &grad;
 
   //! internal variables -- storing data at cell interfaces
-  SpaceVariable3D G;             //!< viscous fluxes (dim = 5)
   SpaceVariable3D V_i_minus_half;//!< velocity (dim = 3) 
   SpaceVariable3D V_j_minus_half;//!< velocity (dim = 3) 
   SpaceVariable3D V_k_minus_half;//!< velocity (dim = 3) 
-  SpaceVariable3D DU;            //!< partial derivatives of x-velocity (dim = 3)  
-  SpaceVariable3D DV;            //!< partial derivatives of x-velocity (dim = 3)  
-  SpaceVariable3D DW;            //!< partial derivatives of x-velocity (dim = 3)  
+  SpaceVariable3D dVdx_i_minus_half;  //!< du/dx, dv/dx, dw/dx at i +/- 1/2 (dim = 3)  
+  SpaceVariable3D dVdx_j_minus_half;  //!< du/dx, dv/dx, dw/dx at j +/- 1/2 (dim = 3)
+  SpaceVariable3D dVdx_k_minus_half;  //!< du/dx, dv/dx, dw/dx at k +/- 1/2 (dim = 3)
+  SpaceVariable3D dVdy_i_minus_half;  //!< du/dy, dv/dy, dw/dy at i +/- 1/2 (dim = 3)  
+  SpaceVariable3D dVdy_j_minus_half;  //!< du/dy, dv/dy, dw/dy at j +/- 1/2 (dim = 3)
+  SpaceVariable3D dVdy_k_minus_half;  //!< du/dy, dv/dy, dw/dy at k +/- 1/2 (dim = 3)
+  SpaceVariable3D dVdz_i_minus_half;  //!< du/dz, dv/dz, dw/dz at i +/- 1/2 (dim = 3)  
+  SpaceVariable3D dVdz_j_minus_half;  //!< du/dz, dv/dz, dw/dz at j +/- 1/2 (dim = 3)
+  SpaceVariable3D dVdz_k_minus_half;  //!< du/dz, dv/dz, dw/dz at k +/- 1/2 (dim = 3)
 
-  //! internal variables -- storing data at cell center 
-  SpaceVariable3D Var;           //!< temporary variable (dim = 5)
- 
 
 public:
 
-  ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, ViscosityModelData &iod_viscosity_,
-                    SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_);
-  ~ViscosityOperator();
+  ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, EquationsData &iod_eqs_,
+                    vector<VarFcnBase*> &varFcn_,
+                    SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
+                    InterpolatorBase &interpolator_, GradientCalculatorBase &grad_);
 
-  //! assign an interpolator (set to a NULL pointer in the constructor)
-  void Setup(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_) {
-    interpolator = interpolator_;
-    grad = grad_;
-  }
+  ~ViscosityOperator();
 
   //! calculate diffusion fluxes (on the left-hand-side of the N-S equations; add them to R) 
   void AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R);
 
   //! destroy internal variables
   void Destroy() {
-    G.Destroy();  V_i_minus_half.Destroy();  V_j_minus_half.Destroy();  V_k_minus_half.Destroy();
-    DU.Destroy();  DV.Destroy();  DW.Destroy();}
+    V_i_minus_half.Destroy();  V_j_minus_half.Destroy();  V_k_minus_half.Destroy();
+    dVdx_i_minus_half.Destroy();  dVdx_j_minus_half.Destroy();  dVdx_k_minus_half.Destroy();
+    dVdy_i_minus_half.Destroy();  dVdy_j_minus_half.Destroy();  dVdy_k_minus_half.Destroy();
+    dVdz_i_minus_half.Destroy();  dVdz_j_minus_half.Destroy();  dVdz_k_minus_half.Destroy();}
 
 };
 

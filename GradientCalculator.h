@@ -12,6 +12,8 @@
 
 class GradientCalculatorBase
 {
+
+protected:
   //! Mesh info
   SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;
@@ -42,12 +44,12 @@ public:
   virtual void CalculateFirstDerivativeAtCellInterfaces(int dir/*0~d/dx,1~d/dy,2~d/dz*/, 
                                                         int inter/*0~i +/- 1/2, 1~j +/- 1/2, 2~k +/- 1/2*/,
                                                         SpaceVariable3D &V, std::vector<int> &input_dof,
-                                                        SpaceVariable3D &DV, std::vector<int> &output_dof);
+                                                        SpaceVariable3D &DV, std::vector<int> &output_dof) {
     print_error("*** Error: CalculateFirstDerivativeAtCellInterfaces not defined\n");
     exit_mpi();
   }
 
-  virtual void Destroy();
+  virtual void Destroy() {}
 
 };
 
@@ -70,13 +72,13 @@ class GradientCalculatorCentral : public GradientCalculatorBase
   SpaceVariable3D Var;
 
   //! interpolator
-  Interpolator &interpolator;
+  InterpolatorBase &interpolator;
 
 public:
 
   GradientCalculatorCentral(MPI_Comm &comm_, DataManagers3D &dm_all_,
                             SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
-                            Interpolator &interpolator_);
+                            InterpolatorBase &interpolator_);
 
   ~GradientCalculatorCentral() {}
 

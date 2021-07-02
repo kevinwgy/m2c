@@ -2,7 +2,7 @@
 
 //--------------------------------------------------------------------------
 
-InterpolatorLinear::InterpolatorLinear(MPI_Comm, &comm_, DataManagers3D &dm_all_,
+InterpolatorLinear::InterpolatorLinear(MPI_Comm &comm_, DataManagers3D &dm_all_,
                                        SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_)
                    : InterpolatorBase(coordinates_,delta_xyz_),
                      Cl(comm_, &(dm_all_.ghosted1_1dof)),
@@ -60,7 +60,7 @@ void InterpolatorLinear::InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/,
   if(dir == 0) {
     // Interpolate Vin at i-1/2 and i+1/2 within the physical domain (not the ghost boundary outside the physical
     // domain). Specifically, Vout[k][j][i] is the interpolated value at (i-1/2, j, k)
-    double pin, pout;
+    int pin, pout;
     double*** cl = (double***)Cl.GetDataPointer();
     double*** cr = (double***)Cr.GetDataPointer();
     for(int k=k0; k<kkmax; k++)
@@ -84,7 +84,7 @@ void InterpolatorLinear::InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/,
   else if(dir == 1) {
     // Interpolate Vin at j-1/2 and j+1/2 within the physical domain (not the ghost boundary outside the physical
     // domain). Specifically, Vout[k][j][i] is the interpolated value at (i, j-1/2, k)
-    double pin, pout;
+    int pin, pout;
     double*** cb = (double***)Cb.GetDataPointer();
     double*** ct = (double***)Ct.GetDataPointer();
     for(int k=k0; k<kkmax; k++)
@@ -108,7 +108,7 @@ void InterpolatorLinear::InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/,
   else if(dir == 2) {
     // Interpolate Vin at k-1/2 and k+1/2 within the physical domain (not the ghost boundary outside the physical
     // domain). Specifically, Vout[k][j][i] is the interpolated value at (i, j, k-1/2)
-    double pin, pout;
+    int pin, pout;
     double*** ck = (double***)Ck.GetDataPointer();
     double*** cf = (double***)Cf.GetDataPointer();
     for(int k=k0; k<kkmax; k++)
