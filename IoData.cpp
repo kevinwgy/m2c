@@ -539,13 +539,15 @@ ReconstructionData::ReconstructionData()
   type = LINEAR;
   limiter = GENERALIZED_MINMOD;
   generalized_minmod_coeff = 2.0; //The MC Limiter
+
+  varType = PRIMITIVE;
 }
 
 //------------------------------------------------------------------------------
 
 void ReconstructionData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 3, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 4, father); 
 
   new ClassToken<ReconstructionData>
     (ca, "Type", this,
@@ -559,6 +561,11 @@ void ReconstructionData::setup(const char *name, ClassAssigner *father)
 
   new ClassDouble<ReconstructionData>(ca, "GeneralizedMinModCoefficient", this, 
     &ReconstructionData::generalized_minmod_coeff);
+
+  new ClassToken<ReconstructionData>
+    (ca, "VariableType", this,
+     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::varType), 3,
+     "Primitive", 0, "Conservative", 1, "Characteristic", 2);
 }
 
 //------------------------------------------------------------------------------

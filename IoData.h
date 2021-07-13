@@ -295,6 +295,11 @@ struct ReconstructionData {
   enum Limiter {NONE = 0, GENERALIZED_MINMOD = 1, VANALBADA = 2} limiter; 
   double generalized_minmod_coeff;
 
+  // for nonlinear conservation laws, reconstruction can be done for variables
+  // of different forms (primitive, conservative, characteristic), and the effect
+  // can be different.
+  enum VariableType {PRIMITIVE = 0, CONSERVATIVE = 1, CHARACTERISTIC = 2} varType;
+
   ReconstructionData();
   ~ReconstructionData() {}
 
