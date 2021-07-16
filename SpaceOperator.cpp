@@ -1662,7 +1662,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Reconstruction w/ slope limiters.
   //------------------------------------
-  rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf);
+  rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID);
 
   //------------------------------------
   // Check reconstructed states (clip & check)

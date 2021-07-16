@@ -538,6 +538,8 @@ ReconstructionData::ReconstructionData()
 {
   type = LINEAR;
   limiter = GENERALIZED_MINMOD;
+  slopeNearInterface = ZERO;
+
   generalized_minmod_coeff = 2.0; //The MC Limiter
 
   varType = PRIMITIVE;
@@ -547,12 +549,17 @@ ReconstructionData::ReconstructionData()
 
 void ReconstructionData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 4, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 5, father); 
 
   new ClassToken<ReconstructionData>
     (ca, "Type", this,
      reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::type), 2,
      "Constant", 0, "Linear", 1);
+
+  new ClassToken<ReconstructionData>
+    (ca, "SlopeNearInterface", this,
+     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::slopeNearInterface), 2,
+     "Zero", 0, "NonZero", 1);
 
   new ClassToken<ReconstructionData>
     (ca, "Limiter", this,
@@ -565,7 +572,8 @@ void ReconstructionData::setup(const char *name, ClassAssigner *father)
   new ClassToken<ReconstructionData>
     (ca, "VariableType", this,
      reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::varType), 3,
-     "Primitive", 0, "Conservative", 1, "Characteristic", 2);
+     "Primitive", 0, "Conservative", 1, "PrimitiveCharacteristic", 2,
+     "ConservativeCharacteristic", 3);
 }
 
 //------------------------------------------------------------------------------

@@ -23,8 +23,8 @@ class Reconstructor
   /** Variable functions and flux functions. This is optional, only used for
     * reconstructing the conservative or characteristic fluid state variables.
     * By default, the pointers are set to NULL. */
-  vector<VarFcnBase*>* vf;
-  FluxFcnBase* ff;
+  vector<VarFcnBase*>* varFcn;
+  FluxFcnBase* fluxFcn;
 
   //! Mesh info
   SpaceVariable3D &delta_xyz;
@@ -40,6 +40,8 @@ class Reconstructor
   SpaceVariable3D CoeffB;  //!< constant coefficient for non-uniform meshes, dim=3 for 3D 
   SpaceVariable3D CoeffK;  //!< the integer k in Zeng's 2016 paper for Van Albada (stored as real numbers)
 
+  /** Another internal variable for var. conversion*/
+  SpaceVariable3D U;
 
 public:
   Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, ReconstructionData &iod_rec_, 
@@ -51,11 +53,15 @@ public:
   void Setup(vector<GhostPoint>* inner, vector<GhostPoint>* outer); //!< compute AB and K
 
   /** Linear reconstruction in 3D 
-    * Although the input argument is denoted by U, this function can be applied to
-    * any other form (e.g., primitive state variables, characteristic varaibles, etc.*/
-  void Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVariable3D &Ur, 
-           SpaceVariable3D &Ub, SpaceVariable3D &Ut, SpaceVariable3D &Uk, SpaceVariable3D &Uf);
+    * The input and output variables are assumed to be primitive variables. If IoData specifies a
+    * different variable to be reconstructed (e.g., primitive or characterstic), a conversion is
+    * performed within this function. */
+  void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVariable3D &Vr, 
+           SpaceVariable3D &Vb, SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
+           SpaceVariable3D *ID = NULL);
 
+  /** This function applies reconstruction directly to the input variable U. In other words, no
+    * conversions are done inside the function.*/
   void ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U, SpaceVariable3D &Um, SpaceVariable3D &Up,
                        SpaceVariable3D *Slope = NULL);
 

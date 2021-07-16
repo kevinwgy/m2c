@@ -9,13 +9,17 @@ using std::round;
 Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, ReconstructionData &iod_rec_, 
                              SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
                              vector<VarFcnBase*>* vf_, FluxFcnBase* ff_)
-                   : iod_rec(iod_rec_), delta_xyz(delta_xyz_), vf(vf_), ff(ff_),
+                   : iod_rec(iod_rec_), delta_xyz(delta_xyz_), varFcn(vf_), fluxFcn(ff_),
                      CoeffA(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffB(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffK(comm_, &(dm_all_.ghosted1_3dof)),
+                     U(comm_, &(dm_all_.ghosted1_5dof)),
                      ghost_nodes_inner(NULL), ghost_nodes_outer(NULL)
 {
-
+  if(iod_rec.varType != ReconstructionData::PRIMITIVE && (!varFcn || !fluxFcn)) {
+    print_error("*** Error: Reconstructor needs to know VarFcn and FluxFcn. (Software bug)\n");
+    exit_mpi();
+  }
 }
 
 //--------------------------------------------------------------------------
@@ -100,14 +104,42 @@ void Reconstructor::Destroy()
   CoeffA.Destroy();
   CoeffB.Destroy();
   CoeffK.Destroy();
+  U.Destroy();
 }
 
 //--------------------------------------------------------------------------
-
-void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVariable3D &Ur,
-           SpaceVariable3D &Ub, SpaceVariable3D &Ut, SpaceVariable3D &Uk, SpaceVariable3D &Uf)
+/** Linear reconstruction in 3D
+ *  The input and output variables are assumed to be primitive variables. If IoData specifies a
+ *  different variable to be reconstructed (e.g., primitive or characterstic), a conversion is
+ *  performed within this function. */
+void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVariable3D &Vr,
+           SpaceVariable3D &Vb, SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
+           SpaceVariable3D *ID)
 {
 
+  //! Constant reconstruction is trivial.
+  if(iod_rec.type == ReconstructionData::CONSTANT) {
+    Vl.AXPlusBY(0.0, 1.0, V, true);
+    Vr.AXPlusBY(0.0, 1.0, V, true);
+    Vb.AXPlusBY(0.0, 1.0, V, true);
+    Vt.AXPlusBY(0.0, 1.0, V, true);
+    Vk.AXPlusBY(0.0, 1.0, V, true);
+    Vf.AXPlusBY(0.0, 1.0, V, true);
+    return;
+  }
+
+
+  //! Linear reconstruction from now on
+
+  //! Check for obvious errors
+  if(iod_rec.varType != ReconstructionData::PRIMITIVE && ID == NULL) {
+    print_error("*** Error: Reconstructor::Reconstruct needs materiald ID, which is not provided.\n");
+    exit_mpi();
+  }
+  if(iod_rec.varType != ReconstructionData::PRIMITIVE && V.NumDOF() != 5) {
+    print_error("*** Error: In Reconstructor::Reconstruct, expect NumDOF = 5, but got %d.\n", V.NumDOF());
+    exit_mpi();
+  }
   //! Get mesh info
   int i0, j0, k0, imax, jmax, kmax, ii0, jj0, kk0, iimax, jjmax, kkmax, NX, NY, NZ;
   delta_xyz.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -115,27 +147,38 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
   delta_xyz.GetGlobalSize(&NX, &NY, &NZ);
 
   //! Extract "natural" vectors
-  double*** u    = (double***) U.GetDataPointer(); 
-  double*** ul   = (double***) Ul.GetDataPointer(); 
-  double*** ur   = (double***) Ur.GetDataPointer(); 
-  double*** ub   = (double***) Ub.GetDataPointer(); 
-  double*** ut   = (double***) Ut.GetDataPointer(); 
-  double*** uk   = (double***) Uk.GetDataPointer(); 
-  double*** uf   = (double***) Uf.GetDataPointer(); 
+  double*** v    = (double***) V.GetDataPointer(); 
+  double*** id   = ID ? (double***) ID->GetDataPointer() : NULL;
+  double*** vl   = (double***) Vl.GetDataPointer(); 
+  double*** vr   = (double***) Vr.GetDataPointer(); 
+  double*** vb   = (double***) Vb.GetDataPointer(); 
+  double*** vt   = (double***) Vt.GetDataPointer(); 
+  double*** vk   = (double***) Vk.GetDataPointer(); 
+  double*** vf   = (double***) Vf.GetDataPointer(); 
   Vec3D*** A    = (Vec3D***)CoeffA.GetDataPointer();
   Vec3D*** B    = (Vec3D***)CoeffB.GetDataPointer();
   Vec3D*** K    = (Vec3D***)CoeffK.GetDataPointer();
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   //! Number of DOF per cell
-  int nDOF = U.NumDOF();
+  int nDOF = V.NumDOF();
+
+  //! Convert V to U (conservative) if needed
+  double*** u = (double***) U.GetDataPointer(); 
+  if(iod_rec.varType == ReconstructionData::CONSERVATIVE ||
+     iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++)
+          (*varFcn)[id[k][j][i]]->PrimitiveToConservative(&v[k][j][i*nDOF], &u[k][j][i*nDOF]);          
+  }
 
   /***************************************************************
    *  Loop through all the real cells.
    *  Calculate slope limiter --> slope --> face values
    ***************************************************************/
-  double sigma[3]; //!< slope
-  double dq0[3], dq1[3];
+  double dql[nDOF], dqr[nDOF], dqb[nDOF], dqt[nDOF], dqk[nDOF], dqf[nDOF];
+  double sigmax[nDOF], sigmay[nDOF], sigmaz[nDOF]; 
 
   double a[3], b[3];
   double alpha = iod_rec.generalized_minmod_coeff; //!< only needed for gen. minmod
@@ -147,59 +190,192 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
   for(int k=k0; k<kmax; k++) {
     for(int j=j0; j<jmax; j++) {
       for(int i=i0; i<imax; i++) {
+        
+        //---------------------------
+        // Step 1.1. Calculate dq
+        //---------------------------
+        if(iod_rec.varType == ReconstructionData::PRIMITIVE ||
+           iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+
+          for(int dof=0; dof<nDOF; dof++) {
+            dql[dof] = v[k][j][i*nDOF+dof]     - v[k][j][(i-1)*nDOF+dof];
+            dqr[dof] = v[k][j][(i+1)*nDOF+dof] - v[k][j][i*nDOF+dof];
+            dqb[dof] = v[k][j][i*nDOF+dof]     - v[k][j-1][i*nDOF+dof];
+            dqt[dof] = v[k][j+1][i*nDOF+dof]   - v[k][j][i*nDOF+dof];
+            dqk[dof] = v[k][j][i*nDOF+dof]     - v[k-1][j][i*nDOF+dof];
+            dqf[dof] = v[k+1][j][i*nDOF+dof]   - v[k][j][i*nDOF+dof];
+          }
+
+          if(iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+            // convert to characteristic
+            int myid = (int)id[k][j][i];
+            double dw[5];
+            fluxFcn->PrimitiveToPrimitiveCharacteristic(0, &v[k][j][i*nDOF], dql, myid, dw);
+            copyarray(dw, dql, 5);
+            fluxFcn->PrimitiveToPrimitiveCharacteristic(0, &v[k][j][i*nDOF], dqr, myid, dw);
+            copyarray(dw, dqr, 5);
+            fluxFcn->PrimitiveToPrimitiveCharacteristic(1, &v[k][j][i*nDOF], dqb, myid, dw);
+            copyarray(dw, dqb, 5);
+            fluxFcn->PrimitiveToPrimitiveCharacteristic(1, &v[k][j][i*nDOF], dqt, myid, dw);
+            copyarray(dw, dqt, 5);
+            fluxFcn->PrimitiveToPrimitiveCharacteristic(2, &v[k][j][i*nDOF], dqk, myid, dw);
+            copyarray(dw, dqk, 5);
+            fluxFcn->PrimitiveToPrimitiveCharacteristic(2, &v[k][j][i*nDOF], dqf, myid, dw);
+            copyarray(dw, dqf, 5);
+          }
+
+        } 
+        else if (iod_rec.varType == ReconstructionData::CONSERVATIVE ||
+                 iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) { 
+
+          for(int dof=0; dof<nDOF; dof++) {
+            dql[dof] = u[k][j][i*nDOF+dof]     - u[k][j][(i-1)*nDOF+dof];
+            dqr[dof] = u[k][j][(i+1)*nDOF+dof] - u[k][j][i*nDOF+dof];
+            dqb[dof] = u[k][j][i*nDOF+dof]     - u[k][j-1][i*nDOF+dof];
+            dqt[dof] = u[k][j+1][i*nDOF+dof]   - u[k][j][i*nDOF+dof];
+            dqk[dof] = u[k][j][i*nDOF+dof]     - u[k-1][j][i*nDOF+dof];
+            dqf[dof] = u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof];
+          }
+
+          if(iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+            // convert to characteristic
+            int myid = (int)id[k][j][i];
+            double dw[5];
+            fluxFcn->ConservativeToConservativeCharacteristic(0, &v[k][j][i*nDOF], dql, myid, dw);
+            copyarray(dw, dql, 5);
+            fluxFcn->ConservativeToConservativeCharacteristic(0, &v[k][j][i*nDOF], dqr, myid, dw);
+            copyarray(dw, dqr, 5);
+            fluxFcn->ConservativeToConservativeCharacteristic(1, &v[k][j][i*nDOF], dqb, myid, dw);
+            copyarray(dw, dqb, 5);
+            fluxFcn->ConservativeToConservativeCharacteristic(1, &v[k][j][i*nDOF], dqt, myid, dw);
+            copyarray(dw, dqt, 5);
+            fluxFcn->ConservativeToConservativeCharacteristic(2, &v[k][j][i*nDOF], dqk, myid, dw);
+            copyarray(dw, dqk, 5);
+            fluxFcn->ConservativeToConservativeCharacteristic(2, &v[k][j][i*nDOF], dqf, myid, dw);
+            copyarray(dw, dqf, 5);
+          }
+
+        }
+
+        //------------------------------------------------------------
+        // Step 2.2. Calculate slope, component by component
+        //------------------------------------------------------------
 
         for(int dof=0; dof<nDOF; dof++) {
+          
+          sigmax[dof] = sigmay[dof] = sigmaz[dof] = 0.0;
 
-          //! calculate slope limiter phi within cell (i,j) 
-          sigma[0] = sigma[1] = sigma[2] = 0.0;
+          //! get constant coefficients
+          a[0] = A[k][j][i][0];
+          a[1] = A[k][j][i][1];
+          a[2] = A[k][j][i][2];
+          b[0] = B[k][j][i][0];
+          b[1] = B[k][j][i][1];
+          b[2] = B[k][j][i][2];
 
-          if(iod_rec.type == ReconstructionData::LINEAR) {
-
-            //! get constant coefficients
-            a[0] = A[k][j][i][0];
-            a[1] = A[k][j][i][1];
-            a[2] = A[k][j][i][2];
-            b[0] = B[k][j][i][0];
-            b[1] = B[k][j][i][1];
-            b[2] = B[k][j][i][2];
-
-            //! calculate theta: input argument of slope limiter function
-            dq0[0] = (u[k][j][i*nDOF+dof]     - u[k][j][(i-1)*nDOF+dof]);
-            dq1[0] = (u[k][j][(i+1)*nDOF+dof] - u[k][j][i*nDOF+dof]);
-            dq0[1] = (u[k][j][i*nDOF+dof]     - u[k][j-1][i*nDOF+dof]);
-            dq1[1] = (u[k][j+1][i*nDOF+dof]   - u[k][j][i*nDOF+dof]);
-            dq0[2] = (u[k][j][i*nDOF+dof]     - u[k-1][j][i*nDOF+dof]);
-            dq1[2] = (u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof]);
-
-            switch (iod_rec.limiter) {
-              case ReconstructionData::GENERALIZED_MINMOD :
-                sigma[0] = GeneralizedMinMod(a[0], b[0], alpha, dq0[0], dq1[0]);
-                sigma[1] = GeneralizedMinMod(a[1], b[1], alpha, dq0[1], dq1[1]);
-                sigma[2] = GeneralizedMinMod(a[2], b[2], alpha, dq0[2], dq1[2]);
-                break;
-              case ReconstructionData::VANALBADA :
-                kay[0] = round(K[k][j][i][0]);
-                kay[1] = round(K[k][j][i][1]);
-                kay[2] = round(K[k][j][i][2]);
-                sigma[0] = VanAlbada(a[0], b[0], kay[0], dq0[0], dq1[0]);
-                sigma[1] = VanAlbada(a[1], b[1], kay[1], dq0[1], dq1[1]);
-                sigma[2] = VanAlbada(a[2], b[2], kay[2], dq0[2], dq1[2]);
-                break;
-              case ReconstructionData::NONE :
-                sigma[0] = 0.5*(dq0[0]+dq1[0]);
-                sigma[1] = 0.5*(dq0[1]+dq1[1]);
-                sigma[2] = 0.5*(dq0[2]+dq1[2]);
-                break;
-            }
+          //! calculate theta: input argument of slope limiter function
+          switch (iod_rec.limiter) {
+            case ReconstructionData::GENERALIZED_MINMOD :
+              sigmax[dof] = GeneralizedMinMod(a[0], b[0], alpha, dql[dof], dqr[dof]);
+              sigmay[dof] = GeneralizedMinMod(a[1], b[1], alpha, dqb[dof], dqt[dof]);
+              sigmaz[dof] = GeneralizedMinMod(a[2], b[2], alpha, dqk[dof], dqf[dof]);
+              break;
+            case ReconstructionData::VANALBADA :
+              kay[0] = round(K[k][j][i][0]);
+              kay[1] = round(K[k][j][i][1]);
+              kay[2] = round(K[k][j][i][2]);
+              sigmax[dof] = VanAlbada(a[0], b[0], kay[0], dql[dof], dqr[dof]);
+              sigmay[dof] = VanAlbada(a[1], b[1], kay[1], dqb[dof], dqt[dof]);
+              sigmaz[dof] = VanAlbada(a[2], b[2], kay[2], dqk[dof], dqf[dof]);
+              break;
+            case ReconstructionData::NONE :
+              sigmax[dof] = 0.5*(dql[dof]+dqr[dof]);
+              sigmay[dof] = 0.5*(dqb[dof]+dqt[dof]);
+              sigmaz[dof] = 0.5*(dqk[dof]+dqf[dof]);
+              break;
           }
-  
-          //! calculate face values
-          ul[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] - 0.5*sigma[0];
-          ur[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] + 0.5*sigma[0];
-          ub[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] - 0.5*sigma[1];
-          ut[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] + 0.5*sigma[1];
-          uk[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] - 0.5*sigma[2];
-          uf[k][j][i*nDOF+dof] = u[k][j][i*nDOF+dof] + 0.5*sigma[2];
+
+        }
+
+        //------------------------------------------------------------
+        // Step 2.3. Convert back to differences in primitive or conservative variables
+        //------------------------------------------------------------
+        if(iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+          int myid = (int)id[k][j][i];
+          double dw[5];
+          fluxFcn->PrimitiveCharacteristicToPrimitive(0, &v[k][j][i*nDOF], sigmax, myid, dw);
+          copyarray(dw, sigmax, 5);
+          fluxFcn->PrimitiveCharacteristicToPrimitive(1, &v[k][j][i*nDOF], sigmay, myid, dw);
+          copyarray(dw, sigmay, 5);
+          fluxFcn->PrimitiveCharacteristicToPrimitive(2, &v[k][j][i*nDOF], sigmaz, myid, dw);
+          copyarray(dw, sigmaz, 5);
+        }
+        else if (iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+          int myid = (int)id[k][j][i];
+          double dw[5];
+          fluxFcn->ConservativeCharacteristicToConservative(0, &v[k][j][i*nDOF], sigmax, myid, dw);
+          copyarray(dw, sigmax, 5);
+          fluxFcn->ConservativeCharacteristicToConservative(1, &v[k][j][i*nDOF], sigmay, myid, dw);
+          copyarray(dw, sigmay, 5);
+          fluxFcn->ConservativeCharacteristicToConservative(2, &v[k][j][i*nDOF], sigmaz, myid, dw);
+          copyarray(dw, sigmaz, 5);
+        }
+
+        //------------------------------------------------------------------------------------
+        // Step 2.4. (Optional) Switch back to constant reconstruction near material interface
+        //------------------------------------------------------------------------------------
+        if(iod_rec.slopeNearInterface == ReconstructionData::ZERO) {
+          if(id[k][j][i] != id[k][j][i-1] || id[k][j][i] != id[k][j][i+1])
+            setValue(sigmax, 0.0, nDOF);
+          if(id[k][j][i] != id[k][j-1][i] || id[k][j][i] != id[k][j+1][i])
+            setValue(sigmay, 0.0, nDOF);
+          if(id[k][j][i] != id[k-1][j][i] || id[k][j][i] != id[k+1][j][i])
+            setValue(sigmaz, 0.0, nDOF);
+        }
+
+        //------------------------------------------------------------
+        // Step 2.5. Calculate interface values
+        //------------------------------------------------------------
+        if(iod_rec.varType == ReconstructionData::PRIMITIVE || 
+           iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+          for(int dof=0; dof<nDOF; dof++) {
+            vl[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] - 0.5*sigmax[dof];
+            vr[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] + 0.5*sigmax[dof];
+            vb[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] - 0.5*sigmay[dof];
+            vt[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] + 0.5*sigmay[dof];
+            vk[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] - 0.5*sigmaz[dof];
+            vf[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] + 0.5*sigmaz[dof];
+          }
+        }
+        else if(iod_rec.varType == ReconstructionData::CONSERVATIVE ||
+                iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+
+          int myid = (int)id[k][j][i];
+          double u2[nDOF]; //temporary variable
+
+          for(int dof=0; dof<nDOF; dof++)
+            u2[dof] = u[k][j][i*nDOF+dof] - 0.5*sigmax[dof];
+          (*varFcn)[myid]->ConservativeToPrimitive(u2, &vl[k][j][i*nDOF]);
+
+          for(int dof=0; dof<nDOF; dof++)
+            u2[dof] = u[k][j][i*nDOF+dof] + 0.5*sigmax[dof];
+          (*varFcn)[myid]->ConservativeToPrimitive(u2, &vr[k][j][i*nDOF]);
+
+          for(int dof=0; dof<nDOF; dof++)
+            u2[dof] = u[k][j][i*nDOF+dof] - 0.5*sigmay[dof];
+          (*varFcn)[myid]->ConservativeToPrimitive(u2, &vb[k][j][i*nDOF]);
+
+          for(int dof=0; dof<nDOF; dof++)
+            u2[dof] = u[k][j][i*nDOF+dof] + 0.5*sigmay[dof];
+          (*varFcn)[myid]->ConservativeToPrimitive(u2, &vt[k][j][i*nDOF]);
+
+          for(int dof=0; dof<nDOF; dof++)
+            u2[dof] = u[k][j][i*nDOF+dof] - 0.5*sigmaz[dof];
+          (*varFcn)[myid]->ConservativeToPrimitive(u2, &vk[k][j][i*nDOF]);
+
+          for(int dof=0; dof<nDOF; dof++)
+            u2[dof] = u[k][j][i*nDOF+dof] + 0.5*sigmaz[dof];
+          (*varFcn)[myid]->ConservativeToPrimitive(u2, &vf[k][j][i*nDOF]);
 
         }
 
@@ -211,23 +387,23 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
   //----------------------------------------------------------------
   // Step 2: Exchange info with neighbors
   //----------------------------------------------------------------
-  Ul.RestoreDataPointerAndInsert();
-  Ur.RestoreDataPointerAndInsert();
-  Ub.RestoreDataPointerAndInsert();
-  Ut.RestoreDataPointerAndInsert();
-  Uk.RestoreDataPointerAndInsert();
-  Uf.RestoreDataPointerAndInsert();
+  Vl.RestoreDataPointerAndInsert();
+  Vr.RestoreDataPointerAndInsert();
+  Vb.RestoreDataPointerAndInsert();
+  Vt.RestoreDataPointerAndInsert();
+  Vk.RestoreDataPointerAndInsert();
+  Vf.RestoreDataPointerAndInsert();
 
 
   //----------------------------------------------------------------
   // Step 3: Update ghost layer outside the physical domain
   //----------------------------------------------------------------
-  ul = (double***) Ul.GetDataPointer(); 
-  ur = (double***) Ur.GetDataPointer(); 
-  ub = (double***) Ub.GetDataPointer(); 
-  ut = (double***) Ut.GetDataPointer(); 
-  uk = (double***) Uk.GetDataPointer(); 
-  uf = (double***) Uf.GetDataPointer(); 
+  vl = (double***) Vl.GetDataPointer(); 
+  vr = (double***) Vr.GetDataPointer(); 
+  vb = (double***) Vb.GetDataPointer(); 
+  vt = (double***) Vt.GetDataPointer(); 
+  vk = (double***) Vk.GetDataPointer(); 
+  vf = (double***) Vf.GetDataPointer(); 
   int i,j,k,ii,jj,kk;
 
   for(auto gp = ghost_nodes_outer->begin(); gp != ghost_nodes_outer->end(); gp++) {
@@ -249,12 +425,12 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
       case MeshData::OUTLET :
         //constant reconstruction (Dirichlet b.c.)
       
-        if     (i<0)   copyarray(&u[kk][jj][ii*nDOF], &ur[k][j][i*nDOF], nDOF);
-        else if(i>=NX) copyarray(&u[kk][jj][ii*nDOF], &ul[k][j][i*nDOF], nDOF);
-        else if(j<0)   copyarray(&u[kk][jj][ii*nDOF], &ut[k][j][i*nDOF], nDOF);
-        else if(j>=NY) copyarray(&u[kk][jj][ii*nDOF], &ub[k][j][i*nDOF], nDOF);
-        else if(k<0)   copyarray(&u[kk][jj][ii*nDOF], &uf[k][j][i*nDOF], nDOF);
-        else if(k>=NZ) copyarray(&u[kk][jj][ii*nDOF], &uk[k][j][i*nDOF], nDOF);
+        if     (i<0)   copyarray(&v[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF);
+        else if(i>=NX) copyarray(&v[kk][jj][ii*nDOF], &vl[k][j][i*nDOF], nDOF);
+        else if(j<0)   copyarray(&v[kk][jj][ii*nDOF], &vt[k][j][i*nDOF], nDOF);
+        else if(j>=NY) copyarray(&v[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF);
+        else if(k<0)   copyarray(&v[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF);
+        else if(k>=NZ) copyarray(&v[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF);
 
         break;
 
@@ -262,12 +438,12 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
       case MeshData::WALL :
         //constant or linear reconstruction, matching the image
 
-        if     (i<0)   copyarray_flip(&ul[kk][jj][ii*nDOF], &ur[k][j][i*nDOF], nDOF, 1);
-        else if(i>=NX) copyarray_flip(&ur[kk][jj][ii*nDOF], &ul[k][j][i*nDOF], nDOF, 1);
-        else if(j<0)   copyarray_flip(&ub[kk][jj][ii*nDOF], &ut[k][j][i*nDOF], nDOF, 2);
-        else if(j>=NY) copyarray_flip(&ut[kk][jj][ii*nDOF], &ub[k][j][i*nDOF], nDOF, 2);
-        else if(k<0)   copyarray_flip(&uk[kk][jj][ii*nDOF], &uf[k][j][i*nDOF], nDOF, 3);
-        else if(k>=NZ) copyarray_flip(&uf[kk][jj][ii*nDOF], &uk[k][j][i*nDOF], nDOF, 3);
+        if     (i<0)   copyarray_flip(&vl[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF, 1);
+        else if(i>=NX) copyarray_flip(&vr[kk][jj][ii*nDOF], &vl[k][j][i*nDOF], nDOF, 1);
+        else if(j<0)   copyarray_flip(&vb[kk][jj][ii*nDOF], &vt[k][j][i*nDOF], nDOF, 2);
+        else if(j>=NY) copyarray_flip(&vt[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF, 2);
+        else if(k<0)   copyarray_flip(&vk[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF, 3);
+        else if(k>=NZ) copyarray_flip(&vf[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF, 3);
 
         break;
 
@@ -276,19 +452,23 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
                 gp->bcType);
     }
   }
-  Ul.RestoreDataPointerToLocalVector(); //no need to communicate
-  Ur.RestoreDataPointerToLocalVector(); //no need to communicate
-  Ub.RestoreDataPointerToLocalVector(); //no need to communicate
-  Ut.RestoreDataPointerToLocalVector(); //no need to communicate
-  Uk.RestoreDataPointerToLocalVector(); //no need to communicate
-  Uf.RestoreDataPointerToLocalVector(); //no need to communicate
+  Vl.RestoreDataPointerToLocalVector(); //no need to communicate
+  Vr.RestoreDataPointerToLocalVector(); //no need to communicate
+  Vb.RestoreDataPointerToLocalVector(); //no need to communicate
+  Vt.RestoreDataPointerToLocalVector(); //no need to communicate
+  Vk.RestoreDataPointerToLocalVector(); //no need to communicate
+  Vf.RestoreDataPointerToLocalVector(); //no need to communicate
 
   //! Restore vectors
   CoeffA.RestoreDataPointerToLocalVector(); //!< no changes to vector
   CoeffB.RestoreDataPointerToLocalVector(); //!< no changes to vector
   CoeffK.RestoreDataPointerToLocalVector(); //!< no changes to vector
-  U.RestoreDataPointerToLocalVector(); //!< no changes to vector
+  V.RestoreDataPointerToLocalVector(); //!< no changes to vector
   delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
+
+  if(ID) ID->RestoreDataPointerToLocalVector(); //!< no changes to vector
+
+  U.RestoreDataPointerToLocalVector(); //!< internal variable
 
 }
 
@@ -297,6 +477,10 @@ void Reconstructor::Reconstruct(SpaceVariable3D &U, SpaceVariable3D &Ul, SpaceVa
 void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U, 
                                     SpaceVariable3D &Um, SpaceVariable3D &Up, SpaceVariable3D *Slope)
 {
+  if(iod_rec.varType != ReconstructionData::PRIMITIVE) {
+    print_error("*** Error: Calling Reconstructor::ReconstructIn1D to reconstruct a 'non-primitive' variable.\n");
+    exit_mpi();
+  }
 
   //! Get mesh info
   int i0, j0, k0, imax, jmax, kmax, ii0, jj0, kk0, iimax, jjmax, kkmax, NX, NY, NZ;
@@ -440,7 +624,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
           if(k<0)        copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
           else if(k>=NZ) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
         }
-        if(slope) setValue(&slope[k][j][i*nDOF], nDOF, 0.0);
+        if(slope) setValue(&slope[k][j][i*nDOF], 0.0, nDOF);
         break;
 
       case MeshData::SYMMETRY :
