@@ -2,18 +2,29 @@
 #define _RECONSTRUCTOR_H_
 #include <IoData.h>
 #include <SpaceVariable.h>
+#include <FluxFcnBase.h>
 #include <GhostPoint.h>
 using std::min;
 using std::max;
 
-/*******************************************
- * class Reconstructor handles spatial
- * reconstruction and slope limiters 
- * (for variables of any dimension)
- ******************************************/
+/*****************************************************************************
+ * Class Reconstructor handles spatial reconstruction and slope limiters. It
+ * includes both "general" functions for reconstructing any variables and a
+ * special function particularly for reconstructing fluid state variables,
+ * including conversion among primitive, conservative, and characteristic
+ * variables.
+ * Multiple instantiations of Class Reconstructor can be created in the solver
+ * for reconstructing different variables.
+ ****************************************************************************/
 class Reconstructor
 {
   ReconstructionData& iod_rec;
+
+  /** Variable functions and flux functions. This is optional, only used for
+    * reconstructing the conservative or characteristic fluid state variables.
+    * By default, the pointers are set to NULL. */
+  vector<VarFcnBase*>* vf;
+  FluxFcnBase* ff;
 
   //! Mesh info
   SpaceVariable3D &delta_xyz;
@@ -32,7 +43,8 @@ class Reconstructor
 
 public:
   Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, ReconstructionData &iod_rec_, 
-                SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_);
+                SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, 
+                vector<VarFcnBase*>* vf_ = NULL, FluxFcnBase* ff_ = NULL);
 
   ~Reconstructor();
 

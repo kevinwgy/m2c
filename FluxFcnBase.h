@@ -299,6 +299,13 @@ void FluxFcnBase::PrimitiveToPrimitiveCharacteristic(int dir/*0~x/F,1~y/G,2~z/H*
   //Step 1. Multiply dV by Q0 (dU/dV evaluated at V0)
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
+  if(c0<0) {
+    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveToPrimitiveCharacteristic. "
+                   "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
+    exit_mpi();
+  } else
+    c0 = sqrt(c0);
+
   double dpdrho0 = vf[id]->GetDpdrho(V0[0], e0);
   double Gamma0 = vf[id]->GetBigGamma(V0[0], e0);
   double kin0 = 0.5*(V0[1]*V0[1]+V0[2]*V0[2]+V0[3]*V0[3]);
@@ -352,6 +359,13 @@ void FluxFcnBase::PrimitiveCharacteristicToPrimitive(int dir/*0~x/F,1~y/G,2~z/H*
   double n[3] = {0,0,0}; n[dir] = 1.0; //normal direction 
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
+  if(c0<0) {
+    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveCharacteristicToPrimitive. "
+                   "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
+    exit_mpi();
+  } else
+    c0 = sqrt(c0);
+
   double dpdrho0 = vf[id]->GetDpdrho(V0[0], e0);
   double Gamma0 = vf[id]->GetBigGamma(V0[0], e0);
   double kin0 = 0.5*(V0[1]*V0[1]+V0[2]*V0[2]+V0[3]*V0[3]);
@@ -401,6 +415,13 @@ void FluxFcnBase::ConservativeToConservativeCharacteristic(int dir/*0~x/F,1~y/G,
   //Multiply dU by R0^{-1}
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
+  if(c0<0) {
+    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in ConservativeToConservativeCharacteristic. "
+                   "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
+    exit_mpi();
+  } else
+    c0 = sqrt(c0);
+
   double dpdrho0 = vf[id]->GetDpdrho(V0[0], e0);
   double Gamma0 = vf[id]->GetBigGamma(V0[0], e0);
   double kin0 = 0.5*(V0[1]*V0[1]+V0[2]*V0[2]+V0[3]*V0[3]);
@@ -444,6 +465,13 @@ void FluxFcnBase::ConservativeCharacteristicToConservative(int dir/*0~x/F,1~y/G,
   double n[3] = {0,0,0}; n[dir] = 1.0; //normal direction 
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
+  if(c0<0) {
+    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in ConservativeCharacteristicToConservative. "
+                   "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
+    exit_mpi();
+  } else
+    c0 = sqrt(c0);
+
   double dpdrho0 = vf[id]->GetDpdrho(V0[0], e0);
   double Gamma0 = vf[id]->GetBigGamma(V0[0], e0);
   double kin0 = 0.5*(V0[1]*V0[1]+V0[2]*V0[2]+V0[3]*V0[3]);

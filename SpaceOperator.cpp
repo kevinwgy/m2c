@@ -34,12 +34,6 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vt(comm_, &(dm_all_.ghosted1_5dof)),
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
-    Var1(comm_, &(dm_all_.ghosted1_5dof)),
-    Var2(comm_, &(dm_all_.ghosted1_5dof)),
-    Var3(comm_, &(dm_all_.ghosted1_5dof)),
-    Var4(comm_, &(dm_all_.ghosted1_5dof)),
-    Var5(comm_, &(dm_all_.ghosted1_5dof)),
-    Var6(comm_, &(dm_all_.ghosted1_5dof)),
     visco(NULL)
 {
   
@@ -77,13 +71,6 @@ void SpaceOperator::Destroy()
   Vt.Destroy();
   Vk.Destroy();
   Vf.Destroy();
-
-  Var1.Destroy();
-  Var2.Destroy();
-  Var3.Destroy();
-  Var4.Destroy();
-  Var5.Destroy();
-  Var6.Destroy();
 }
 
 //-----------------------------------------------------
@@ -1675,21 +1662,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Reconstruction w/ slope limiters.
   //------------------------------------
-  switch (iod.schemes.ns.rec.varType) {
-    case ReconstructionData::PRIMITIVE :
-      rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf);
-      break;
-    case ReconstructionData::CONSERVATIVE :
-      PrimitiveToConservative(V, ID, Var1, true);
-      rec.Reconstruct(Var1, Var2, Var3, Var4, Var5, Var6);
-
-  k
-  if(iod.schemes.ns.rec.varType == ReconstructionData::PRIMITIVE) {
-    rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf);
-  }
-  else if(iod.schemes.ns.rec.varType == ReconstructionData::CONSERVATIVE) {
-
-  } else if(
+  rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf);
 
   //------------------------------------
   // Check reconstructed states (clip & check)

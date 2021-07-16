@@ -7,8 +7,9 @@ using std::round;
 //--------------------------------------------------------------------------
 
 Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, ReconstructionData &iod_rec_, 
-                             SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_)
-                   : iod_rec(iod_rec_), delta_xyz(delta_xyz_),
+                             SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
+                             vector<VarFcnBase*>* vf_, FluxFcnBase* ff_)
+                   : iod_rec(iod_rec_), delta_xyz(delta_xyz_), vf(vf_), ff(ff_),
                      CoeffA(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffB(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffK(comm_, &(dm_all_.ghosted1_3dof)),
