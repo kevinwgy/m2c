@@ -578,6 +578,7 @@ struct Probes {
   ObjectMap<ProbeNode> myNodes;
 
   int frequency;
+  double frequency_dt;
 
   enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
               MATERIALID = 6, LEVELSET0 = 7, LEVELSET1 = 8, LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, SIZE = 12};
@@ -617,6 +618,7 @@ struct LinePlot {
 
   int numPoints;
   int frequency;
+  double frequency_dt;
 
 };
 
@@ -626,6 +628,7 @@ struct MaterialVolumes {
 
   const char *filename;
   int frequency;
+  double frequency_dt;
 
   MaterialVolumes();
   ~MaterialVolumes() {}

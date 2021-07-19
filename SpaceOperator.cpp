@@ -27,7 +27,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)),
-    rec(comm_, dm_all_, iod_.schemes.ns.rec, coordinates, delta_xyz),
+    rec(comm_, dm_all_, iod_.schemes.ns.rec, coordinates, delta_xyz, &varFcn, &fluxFcn),
     Vl(comm_, &(dm_all_.ghosted1_5dof)),
     Vr(comm_, &(dm_all_.ghosted1_5dof)),
     Vb(comm_, &(dm_all_.ghosted1_5dof)),
@@ -1965,7 +1965,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
         }
 
         if(error) {
-          print_error("*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\n", i,j,k, myid);
+          fprintf(stderr, "\033[0;31m*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\033[0m\n", i,j,k, myid);
           fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
           fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
           fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
@@ -1973,7 +1973,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
           fprintf(stderr, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
           fprintf(stderr, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
           fprintf(stderr, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
-          exit_mpi();
+          exit(-1);
         } 
       }
     }

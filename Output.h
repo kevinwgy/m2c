@@ -39,15 +39,10 @@ public:
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh
 
   void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
-                       SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool must_write = false);
+                       SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool force_write);
 
-  bool IsTimeToWrite(double time, double dt, int time_step, 
-                     double frequency_dt, int frequency); /**< check whether to write solution 
-                                                             * at this time & time-step */
   void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
                              vector<SpaceVariable3D*> &Phi); //!< write solution to file
-
-  inline double GetLastSnapshotTime() {return last_snapshot_time;}
 
   void FinalizeOutput();
 

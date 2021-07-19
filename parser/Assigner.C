@@ -52,6 +52,7 @@ ClassToken<T>::assignToken(int t)
     }
   fprintf(stderr, "ERROR: Token not understood: %s\n", 
 		  dictionary->word(t).c_str());
+  exit(-1);
 }
 
 template <class T>

@@ -8,6 +8,9 @@ MaterialVolumeOutput::MaterialVolumeOutput(MPI_Comm &comm_, IoData &iod,
                       comm(comm_), cell_volume(cell_volume_)
 {
   frequency = iod.output.materialVolumes.frequency;
+  frequency_dt = iod.output.materialVolumes.frequency_dt;
+
+  last_snapshot_time = -1.0;
 
   numMaterials = iod.eqs.materials.dataMap.size() + 1; //an extra one for "ghost/inactive" 
 
@@ -43,14 +46,14 @@ MaterialVolumeOutput::~MaterialVolumeOutput()
 //-------------------------------------------------------------------------
 
 void
-MaterialVolumeOutput::WriteSolution(double time, int time_step, SpaceVariable3D& ID, 
-                                    bool must_write)
+MaterialVolumeOutput::WriteSolution(double time, double dt, int time_step, SpaceVariable3D& ID, 
+                                    bool force_write)
 {
 
-  if(frequency <=0 || file == NULL)
+  if(file == NULL)
     return;
 
-  if(time_step % frequency != 0 && !must_write) //should not output at this time step
+  if(!isTimeToWrite(time,dt,time_step,frequency_dt,frequency,last_snapshot_time,force_write))
     return;
 
   double vol[numMaterials];
@@ -64,6 +67,9 @@ MaterialVolumeOutput::WriteSolution(double time, int time_step, SpaceVariable3D&
   }
   print(file, "%16.8e\n", sum);
   fflush(file);
+
+  last_snapshot_time = time;
+
 }
 
 //-------------------------------------------------------------------------

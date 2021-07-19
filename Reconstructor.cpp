@@ -324,7 +324,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
         //------------------------------------------------------------------------------------
         // Step 2.4. (Optional) Switch back to constant reconstruction near material interface
         //------------------------------------------------------------------------------------
-        if(iod_rec.slopeNearInterface == ReconstructionData::ZERO) {
+        if(ID && iod_rec.slopeNearInterface == ReconstructionData::ZERO) {
           if(id[k][j][i] != id[k][j][i-1] || id[k][j][i] != id[k][j][i+1])
             setValue(sigmax, 0.0, nDOF);
           if(id[k][j][i] != id[k][j-1][i] || id[k][j][i] != id[k][j+1][i])

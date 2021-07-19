@@ -77,42 +77,23 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 //--------------------------------------------------------------------------
 
 void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
-                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool must_write)
+                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool force_write)
 {
   //write solution snapshot
-  if(must_write || 
-     IsTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency))
+  if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
+     last_snapshot_time, force_write))
     WriteSolutionSnapshot(time, time_step, V, ID, Phi);
 
   //write solutions at probes
-  probe_output.WriteSolutionAtProbes(time, time_step, V, ID, Phi, must_write);
+  probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, force_write);
 
   //write solutions along lines
   for(int i=0; i<line_outputs.size(); i++)
-    line_outputs[i]->WriteAllSolutionsAlongLine(time, time_step, V, ID, Phi, must_write);
+    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, V, ID, Phi, force_write);
 
   //write material volumes
-  matvol_output.WriteSolution(time, time_step, ID, must_write);
+  matvol_output.WriteSolution(time, dt, time_step, ID, force_write);
 }
-//--------------------------------------------------------------------------
-
-bool Output::IsTimeToWrite(double time, double dt, int time_step, double frequency_dt, int frequency)
-{
-  //! First check frequency_dt. If it is not specified, use frequency
-  if(frequency_dt > 0) {
-    if(floor(time/frequency_dt) != floor((time-dt)/frequency_dt))
-      return true;
-    else
-      return false;
-  } 
-  else { //!< use frequency
-    if((frequency > 0) && (time_step % frequency == 0))
-      return true;
-    else
-      return false;
-  } 
-}
-
 //--------------------------------------------------------------------------
 
 void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 

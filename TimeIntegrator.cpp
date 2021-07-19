@@ -219,8 +219,6 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
 
   Vec5D*** v1 = (Vec5D***) V1.GetDataPointer();
-  if(V1.IsHere(569,1,0, true))
-    fprintf(stderr,"v1 = %e %e %e %e %e\n", v1[0][1][569][0], v1[0][1][569][1], v1[0][1][569][2], v1[0][1][569][3], v1[0][1][569][4]);
   V1.RestoreDataPointerToLocalVector();
 
 
@@ -254,8 +252,6 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   spo.ConservativeToPrimitive(U1, ID, V1); //get V2
 
   v1 = (Vec5D***) V1.GetDataPointer();
-  if(V1.IsHere(569,1,0, true))
-    fprintf(stderr,"v2 = %e %e %e %e %e\n", v1[0][1][569][0], v1[0][1][569][1], v1[0][1][569][2], v1[0][1][569][3], v1[0][1][569][4]);
   V1.RestoreDataPointerToLocalVector();
 
   clipped = spo.ClipDensityAndPressure(V1, ID);
@@ -287,8 +283,6 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
 
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
-  if(V1.IsHere(569,1,0, true))
-    fprintf(stderr,"v3 = %e %e %e %e %e\n", v[0][1][569][0], v[0][1][569][1], v[0][1][569][2], v[0][1][569][3], v[0][1][569][4]);
   V.RestoreDataPointerToLocalVector();
 
   spo.ClipDensityAndPressure(V, ID);
@@ -316,8 +310,6 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     double*** idn = (double***) IDn.GetDataPointer();
     double*** id  = (double***) ID.GetDataPointer();
     Vec5D*** v = (Vec5D***) V.GetDataPointer();
-    if(V1.IsHere(569,1,0, true))
-      fprintf(stderr,"*** id(%d->%d), v = %e %e %e %e %e\n", (int)idn[0][1][569], (int)id[0][1][569], v[0][1][569][0], v[0][1][569][1], v[0][1][569][2], v[0][1][569][3], v[0][1][569][4]);
     IDn.RestoreDataPointerToLocalVector();
     ID.RestoreDataPointerToLocalVector();
     V.RestoreDataPointerToLocalVector();

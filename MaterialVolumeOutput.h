@@ -14,6 +14,9 @@ class MaterialVolumeOutput {
   SpaceVariable3D& cell_volume;
 
   int frequency;
+  double frequency_dt;
+  double last_snapshot_time;
+
   FILE* file;
 
   int numMaterials;
@@ -23,7 +26,7 @@ public:
   MaterialVolumeOutput(MPI_Comm &comm_, IoData &iod, SpaceVariable3D& cell_volume_);
   ~MaterialVolumeOutput();
 
-  void WriteSolution(double time, int time_step, SpaceVariable3D& ID, bool must_write = false);  
+  void WriteSolution(double time, double dt, int time_step, SpaceVariable3D& ID, bool force_write);  
 
 private:
 

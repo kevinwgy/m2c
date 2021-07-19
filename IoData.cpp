@@ -537,10 +537,10 @@ void EquationsData::setup(const char *name, ClassAssigner *father)
 ReconstructionData::ReconstructionData() 
 {
   type = LINEAR;
-  limiter = GENERALIZED_MINMOD;
-  slopeNearInterface = ZERO;
+  limiter = NONE;
+  slopeNearInterface = NONZERO;
 
-  generalized_minmod_coeff = 2.0; //The MC Limiter
+  generalized_minmod_coeff = 1.2; //The generalized MC Limiter
 
   varType = PRIMITIVE;
 }
@@ -571,7 +571,7 @@ void ReconstructionData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<ReconstructionData>
     (ca, "VariableType", this,
-     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::varType), 3,
+     reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::varType), 4,
      "Primitive", 0, "Conservative", 1, "PrimitiveCharacteristic", 2,
      "ConservativeCharacteristic", 3);
 }
@@ -1510,6 +1510,7 @@ MaterialVolumes::MaterialVolumes()
 {
   filename = "";
   frequency = 10;
+  frequency_dt = -1.0;
 }
 
 //------------------------------------------------------------------------------
@@ -1517,10 +1518,11 @@ MaterialVolumes::MaterialVolumes()
 void MaterialVolumes::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
   new ClassStr<MaterialVolumes>(ca, "FileName", this, &MaterialVolumes::filename);
   new ClassInt<MaterialVolumes>(ca, "Frequency", this, &MaterialVolumes::frequency);
+  new ClassDouble<MaterialVolumes>(ca, "TimeInterval", this, &MaterialVolumes::frequency_dt);
 
 }
 
@@ -1637,7 +1639,8 @@ Assigner* ProbeNode::getAssigner()
 
 Probes::Probes() {
 
-  frequency = 10;
+  frequency = -100;
+  frequency_dt = -1;
 
   density = "";
   pressure = "";
@@ -1659,9 +1662,10 @@ Probes::Probes() {
 void Probes::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 14, father);
+  ClassAssigner *ca = new ClassAssigner(name, 15, father);
 
   new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
+  new ClassDouble<Probes>(ca, "TimeInterval", this, &Probes::frequency_dt);
   new ClassStr<Probes>(ca, "Density", this, &Probes::density);
   new ClassStr<Probes>(ca, "Pressure", this, &Probes::pressure);
   new ClassStr<Probes>(ca, "Temperature", this, &Probes::temperature);
@@ -1687,7 +1691,8 @@ LinePlot::LinePlot() {
   x1 = y1 = z1 = 0.0;
 
   numPoints = 0;
-  frequency = 100;
+  frequency = -100;
+  frequency_dt = -1.0;
 
   filename_base = "";
 }
@@ -1697,12 +1702,13 @@ LinePlot::LinePlot() {
 Assigner* LinePlot::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 10, nullAssigner);
 
   new ClassStr<LinePlot>(ca, "FileName", this, &LinePlot::filename_base);
 
   new ClassInt<LinePlot>(ca, "NumberOfPoints", this, &LinePlot::numPoints);
   new ClassInt<LinePlot>(ca, "Frequency", this, &LinePlot::frequency);
+  new ClassDouble<LinePlot>(ca, "TimeInterval", this, &LinePlot::frequency_dt);
 
   new ClassDouble<LinePlot>(ca, "X0", this, &LinePlot::x0);
   new ClassDouble<LinePlot>(ca, "Y0", this, &LinePlot::y0);

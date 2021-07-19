@@ -35,6 +35,10 @@ void printHeader(int argc, char* argv[]);
 //! Call MPI_Finalize and exit (with error)
 void exit_mpi();
 //--------------------------------------------------
+//! Determine if solution snapshot should be written
+bool isTimeToWrite(double time, double dt, int time_step, double frequency_dt, int frequency,
+                   double last_snapshot_time, bool force_write);
+//--------------------------------------------------
 //! Copy a double array of known dimension
 inline void copyarray(double* in, double* out, int dim)
 {

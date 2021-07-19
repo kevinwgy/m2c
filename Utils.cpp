@@ -5,6 +5,7 @@
 #include <version.h>
 #include <stdio.h>
 #include <cstring>
+#include <cmath> //floor
 using std::cout;
 using std::endl;
 //--------------------------------------------------
@@ -150,10 +151,29 @@ void exit_mpi()
   exit(-1);
 }
 
+//--------------------------------------------------
 
+bool isTimeToWrite(double time, double dt, int time_step, double frequency_dt, int frequency,
+                   double last_snapshot_time, bool force_write)
+{
+  //! If "force_write", just avoid duplication
+  if(force_write)
+     return (time > last_snapshot_time + 0.1*dt);
 
-
-
+  //! Check frequency_dt. If it is not specified, use frequency
+  if(frequency_dt > 0) {
+    if(floor(time/frequency_dt) != floor((time-dt)/frequency_dt))
+      return true;
+    else
+      return false;
+  }
+  else { //!< use frequency
+    if((frequency > 0) && (time_step % frequency == 0))
+      return true;
+    else
+      return false;
+  }
+}
 
 
 

@@ -7,9 +7,14 @@
 ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) : 
              comm(comm_), iod_output(iod_output_)
 {
+  iFrame = 0;
+
   line_number = -1; //not used in this case
 
   frequency = iod_output.probes.frequency;
+  frequency_dt = iod_output.probes.frequency_dt;
+
+  last_snapshot_time = -1.0;
 
   numNodes = iod_output.probes.myNodes.dataMap.size();
   locations.resize(numNodes);
@@ -134,6 +139,7 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) :
 ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, int line_number_) : 
              comm(comm_), iod_output(iod_output_)
 {
+  iFrame = 0;
 
   line_number = line_number_;
 
@@ -141,14 +147,19 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, int line_numb
 
   numNodes = line->numPoints;
   frequency = line->frequency;
+  frequency_dt = line->frequency_dt;
+  last_snapshot_time = -1.0;
 
   locations.clear();
-  if(numNodes > 0 && frequency > 0) {
+  if(numNodes > 1) {
     double dx = (line->x1 - line->x0)/(line->numPoints - 1);
     double dy = (line->y1 - line->y0)/(line->numPoints - 1);
     double dz = (line->z1 - line->z0)/(line->numPoints - 1);
     for(int i=0; i<line->numPoints; i++)
       locations.push_back(Vec3D(line->x0 + i*dx, line->y0 + i*dy, line->z0 + i*dz));
+  } else if(numNodes == 1) {
+    print_error("*** Error: Must have more than 1 point for a line plot.\n");
+    exit(-1);
   }
 
   for(int i=0; i<Probes::SIZE; i++) {
@@ -250,34 +261,23 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
 //-------------------------------------------------------------------------
 
 void 
-ProbeOutput::WriteAllSolutionsAlongLine(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                                        std::vector<SpaceVariable3D*> &Phi, bool must_write)
+ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
+                                        std::vector<SpaceVariable3D*> &Phi, bool force_write)
 {
-  if(numNodes <= 0) //nothing to be done
+  if(numNodes <= 0)
     return;
 
-  if(frequency<=0)
-    return;
-
-  if(time_step % frequency != 0 && !must_write) //should not output at this time step
+  if(!isTimeToWrite(time, dt, time_step, frequency_dt, frequency, last_snapshot_time, force_write))
     return;
 
   LinePlot* line(iod_output.linePlots.dataMap[line_number]);
-
-  if(line->filename_base[0] == 0) //file not proided
+  if(line->filename_base[0] == 0)
     return;
 
   double dx = (line->x1 - line->x0)/(line->numPoints - 1);
   double dy = (line->y1 - line->y0)/(line->numPoints - 1);
   double dz = (line->z1 - line->z0)/(line->numPoints - 1);
   double h = sqrt(dx*dx + dy*dy + dz*dz);
-
-  //figure out file name
-  int iFrame;
-  if(time_step % frequency == 0)
-    iFrame = time_step/frequency;
-  else //"must_write" must be true
-    iFrame = time_step/frequency + 1;
 
   char full_fname[256];
   if(iFrame<10) 
@@ -329,21 +329,21 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, int time_step, SpaceVariabl
   for(int i=0; i<Phi.size(); i++)
     Phi[i]->RestoreDataPointerToLocalVector();
 
+  iFrame++;
+  last_snapshot_time = time;
 }
 
 //-------------------------------------------------------------------------
 
 void 
-ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                                   std::vector<SpaceVariable3D*> &Phi, bool must_write)
+ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
+                                   std::vector<SpaceVariable3D*> &Phi, bool force_write)
 {
+
   if(numNodes <= 0) //nothing to be done
     return;
 
-  if(frequency<=0)
-    return;
-
-  if(time_step % frequency != 0 && !must_write) //should not output at this time step
+  if(!isTimeToWrite(time,dt,time_step,frequency_dt,frequency,last_snapshot_time,force_write))
     return;
 
   double***  v  = (double***) V.GetDataPointer();
@@ -475,6 +475,8 @@ ProbeOutput::WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &
   }
 
   V.RestoreDataPointerToLocalVector();
+
+  last_snapshot_time = time;
 
 }
 

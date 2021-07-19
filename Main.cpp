@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
   double cfl = 0.0;
   int time_step = 0;
   //! write initial condition to file
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, true/*must_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, true/*force_write*/);
 
   while(t<iod.ts.maxTime && time_step<iod.ts.maxIts) {
 
@@ -195,12 +195,11 @@ int main(int argc, char* argv[])
 
     t += dt;
 
-    out.OutputSolutions(t, dt, time_step, V, ID, Phi);
+    out.OutputSolutions(t, dt, time_step, V, ID, Phi, false/*force_write*/);
 
   }
 
-  if(t > out.GetLastSnapshotTime()+0.1*dt) //!< write final solution to file (if it has not been written)
-    out.OutputSolutions(t, dt, time_step, V, ID, Phi, true/*must_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, true/*force_write*/);
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");

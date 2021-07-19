@@ -17,6 +17,9 @@ class ProbeOutput {
 
   int numNodes;
   int frequency;
+  double frequency_dt;
+  int iFrame;
+  double last_snapshot_time;
 
   std::vector<Vec3D> locations;
   FILE *file[Probes::SIZE]; //!< one file per solution variable
@@ -38,13 +41,14 @@ public:
 
   void SetupInterpolation(SpaceVariable3D &coordinates);
 
-  void WriteSolutionAtProbes(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-           std::vector<SpaceVariable3D*> &Phi, bool must_write = false); //!< write probe solution to file
+  void WriteSolutionAtProbes(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
+           std::vector<SpaceVariable3D*> &Phi, bool force_write); //!< write probe solution to file
 
-  void WriteAllSolutionsAlongLine(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-           std::vector<SpaceVariable3D*> &Phi, bool must_write = false);
+  void WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
+           std::vector<SpaceVariable3D*> &Phi, bool force_write);
 
 private:
+
   double InterpolateSolutionAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, int dim, int p);
 
 };
