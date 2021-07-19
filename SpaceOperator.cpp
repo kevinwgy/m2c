@@ -1667,7 +1667,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Check reconstructed states (clip & check)
   //------------------------------------
-  CheckReconstructedStates(V, Vl, Vr, Vb, Vt, Vk, Vf, ID);
+  //CheckReconstructedStates(V, Vl, Vr, Vb, Vt, Vk, Vf, ID); //KW(07/18/2021--Done in Reconstructor)
 
   //------------------------------------
   // Extract data

@@ -187,15 +187,19 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
   //----------------------------------------------------------------
   // Step 1: Reconstruction within the interior of each subdomain
   //----------------------------------------------------------------
+  int vType;
   for(int k=k0; k<kmax; k++) {
     for(int j=j0; j<jmax; j++) {
       for(int i=i0; i<imax; i++) {
         
+        vType = iod_rec.varType;
+
+RETRY: 
         //---------------------------
         // Step 1.1. Calculate dq
         //---------------------------
-        if(iod_rec.varType == ReconstructionData::PRIMITIVE ||
-           iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+        if(vType == ReconstructionData::PRIMITIVE ||
+           vType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
 
           for(int dof=0; dof<nDOF; dof++) {
             dql[dof] = v[k][j][i*nDOF+dof]     - v[k][j][(i-1)*nDOF+dof];
@@ -206,7 +210,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
             dqf[dof] = v[k+1][j][i*nDOF+dof]   - v[k][j][i*nDOF+dof];
           }
 
-          if(iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+          if(vType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
             // convert to characteristic
             int myid = (int)id[k][j][i];
             double dw[5];
@@ -225,8 +229,8 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
           }
 
         } 
-        else if (iod_rec.varType == ReconstructionData::CONSERVATIVE ||
-                 iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) { 
+        else if (vType == ReconstructionData::CONSERVATIVE ||
+                 vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) { 
 
           for(int dof=0; dof<nDOF; dof++) {
             dql[dof] = u[k][j][i*nDOF+dof]     - u[k][j][(i-1)*nDOF+dof];
@@ -237,7 +241,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
             dqf[dof] = u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof];
           }
 
-          if(iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+          if(vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
             // convert to characteristic
             int myid = (int)id[k][j][i];
             double dw[5];
@@ -300,7 +304,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
         //------------------------------------------------------------
         // Step 2.3. Convert back to differences in primitive or conservative variables
         //------------------------------------------------------------
-        if(iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+        if(vType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
           int myid = (int)id[k][j][i];
           double dw[5];
           fluxFcn->PrimitiveCharacteristicToPrimitive(0, &v[k][j][i*nDOF], sigmax, myid, dw);
@@ -310,7 +314,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
           fluxFcn->PrimitiveCharacteristicToPrimitive(2, &v[k][j][i*nDOF], sigmaz, myid, dw);
           copyarray(dw, sigmaz, 5);
         }
-        else if (iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+        else if (vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
           int myid = (int)id[k][j][i];
           double dw[5];
           fluxFcn->ConservativeCharacteristicToConservative(0, &v[k][j][i*nDOF], sigmax, myid, dw);
@@ -336,8 +340,8 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
         //------------------------------------------------------------
         // Step 2.5. Calculate interface values
         //------------------------------------------------------------
-        if(iod_rec.varType == ReconstructionData::PRIMITIVE || 
-           iod_rec.varType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
+        if(vType == ReconstructionData::PRIMITIVE || 
+           vType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
           for(int dof=0; dof<nDOF; dof++) {
             vl[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] - 0.5*sigmax[dof];
             vr[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] + 0.5*sigmax[dof];
@@ -347,8 +351,8 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
             vf[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof] + 0.5*sigmaz[dof];
           }
         }
-        else if(iod_rec.varType == ReconstructionData::CONSERVATIVE ||
-                iod_rec.varType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+        else if(vType == ReconstructionData::CONSERVATIVE ||
+                vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
 
           int myid = (int)id[k][j][i];
           double u2[nDOF]; //temporary variable
@@ -377,6 +381,67 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
             u2[dof] = u[k][j][i*nDOF+dof] + 0.5*sigmaz[dof];
           (*varFcn)[myid]->ConservativeToPrimitive(u2, &vf[k][j][i*nDOF]);
 
+        }
+
+        //------------------------------------------------------------
+        // Step 2.6. Check reconstructed values
+        //------------------------------------------------------------
+        if(ID && nDOF==5) { //reconstructing the fluid state variables
+          int myid = (int)id[k][j][i];
+          if((*varFcn)[myid]->CheckState(&vl[k][j][i*nDOF])) {
+            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(vType == ReconstructionData::PRIMITIVE) // constant rec...
+              copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], 5);
+            else {
+              vType = ReconstructionData::PRIMITIVE;
+              goto RETRY;
+            }
+          }
+          else if((*varFcn)[myid]->CheckState(&vr[k][j][i*nDOF])) {
+            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(vType == ReconstructionData::PRIMITIVE) // constant rec...
+              copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], 5);
+            else {
+              vType = ReconstructionData::PRIMITIVE;
+              goto RETRY;
+            }
+          }
+          else if((*varFcn)[myid]->CheckState(&vb[k][j][i*nDOF])) {
+            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(vType == ReconstructionData::PRIMITIVE) // constant rec...
+              copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], 5);
+            else {
+              vType = ReconstructionData::PRIMITIVE;
+              goto RETRY;
+            }
+          }
+          else if((*varFcn)[myid]->CheckState(&vt[k][j][i*nDOF])) {
+            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(vType == ReconstructionData::PRIMITIVE) // constant rec...
+              copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], 5);
+            else {
+              vType = ReconstructionData::PRIMITIVE;
+              goto RETRY;
+            }
+          }
+          else if((*varFcn)[myid]->CheckState(&vk[k][j][i*nDOF])) {
+            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(vType == ReconstructionData::PRIMITIVE) // constant rec...
+              copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], 5);
+            else {
+              vType = ReconstructionData::PRIMITIVE;
+              goto RETRY;
+            }
+          }
+          else if((*varFcn)[myid]->CheckState(&vf[k][j][i*nDOF])) {
+            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(vType == ReconstructionData::PRIMITIVE) // constant rec...
+              copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], 5);
+            else {
+              vType = ReconstructionData::PRIMITIVE;
+              goto RETRY;
+            }
+          }
         }
 
       }
