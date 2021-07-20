@@ -314,7 +314,7 @@ struct ReconstructionData {
 
 struct SchemeData {
 
-  enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, HLLC = 2} flux;
+  enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, HLLC = 2, GODUNOV = 3} flux;
  
   double delta; //! The coeffient in Harten's entropy fix.
 

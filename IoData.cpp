@@ -580,8 +580,9 @@ void ReconstructionData::setup(const char *name, ClassAssigner *father)
 
 SchemeData::SchemeData() 
 {
-  flux = ROE;
-  delta = 0.2; //the coefficient in Harten's entropy fix.
+  flux = HLLC;
+
+  delta = 0.2; //the coefficient in Harten's entropy fix (for Roe flux)
 }
 
 //------------------------------------------------------------------------------
@@ -594,8 +595,8 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<SchemeData>
     (ca, "Flux", this,
-     reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 3,
-     "Roe", 0, "LocalLaxFriedrichs", 1, "HLLC", 2);
+     reinterpret_cast<int SchemeData::*>(&SchemeData::flux), 4,
+     "Roe", 0, "LocalLaxFriedrichs", 1, "HLLC", 2, "Godunov", 3);
 
   new ClassDouble<SchemeData>(ca, "EntropyFixCoefficient", this, &SchemeData::delta);
 

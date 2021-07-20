@@ -8,6 +8,7 @@
 #include <FluxFcnGenRoe.h>
 #include <FluxFcnLLF.h>
 #include <FluxFcnHLLC.h>
+#include <FluxFcnGodunov.h>
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
 #include <MultiPhaseOperator.h>
@@ -79,6 +80,8 @@ int main(int argc, char* argv[])
     ff = new FluxFcnLLF(vf, iod);
   else if(iod.schemes.ns.flux == SchemeData::HLLC)
     ff = new FluxFcnHLLC(vf, iod);
+  else if(iod.schemes.ns.flux == SchemeData::GODUNOV)
+    ff = new FluxFcnGodunov(vf, iod);
   else {
     print_error("*** Error: Unable to initialize flux calculator (FluxFcn) for the specified numerical method.\n");
     exit_mpi();
