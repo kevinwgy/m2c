@@ -56,7 +56,7 @@ protected:
                                     bool upwind = true);
 
   void FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
-                          SpaceVariable3D &V);
+                          SpaceVariable3D &V); 
 
 
 };
