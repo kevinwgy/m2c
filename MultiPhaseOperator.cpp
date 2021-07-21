@@ -3,13 +3,14 @@
 #include<LevelSetOperator.h>
 #include<Vector5D.h>
 #include<RiemannSolutions.h>
+#include<algorithm>//find
 using std::cout;
 using std::endl;
 //-----------------------------------------------------
 
 MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                        SpaceOperator &spo, vector<LevelSetOperator*> &lso)
-                  : comm(comm_), iod_multiphase(iod_.multiphase),
+                  : comm(comm_), iod(iod_),
                     coordinates(spo.GetMeshCoordinates()),
                     delta_xyz(spo.GetMeshDeltaXYZ()),
                     Tag(comm_, &(dm_all_.ghosted1_1dof))
@@ -89,7 +90,7 @@ void
 MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, 
                         SpaceVariable3D &ID, SpaceVariable3D &V, RiemannSolutions &riemann_solutions)
 {
-  switch (iod_multiphase.phasechange_type) {
+  switch (iod.multiphase.phasechange_type) {
 
     case MultiPhaseData::RIEMANN_SOLUTION :
       UpdateStateVariablesByRiemannSolutions(IDn, ID, V, riemann_solutions);
@@ -101,7 +102,7 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
 
     default :
       print_error("*** Error: Specified method for phase-change update (%d) has not been implemented.\n", 
-                  (int)iod_multiphase.phasechange_type);
+                  (int)iod.multiphase.phasechange_type);
   }
 }
 
@@ -116,8 +117,8 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
   double*** id  = (double***)ID.GetDataPointer();
   Vec5D***  v   = (Vec5D***) V.GetDataPointer();
 
-  Int3 ind;
-  std::map<Int3, std::pair<Vec5D,int> >::iterator it;
+  // create a vector that temporarily stores unresolved nodes (which will be resolved separately)
+  vector<Int3> unresolved;
 
   // work inside the real domain
   int counter = 0;
@@ -127,23 +128,47 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
 
         if(id[k][j][i] == idn[k][j][i]) //id remains the same. Skip
           continue;
-        
-        // re-set its state variables to 0
-        v[k][j][i] = 0.0;
+
+
+        if(i==582 && j==277 && k==0) {
+          fprintf(stderr,"(%d,%d,%d): Current -- %f; L: %f; R: %f; B: %f; T: %f; K: %f; F: %f.\n",
+                  i,j,k,id[k][j][i],id[k][j][i-1],id[k][j][i+1],id[k][j-1][i],id[k][j+1][i],id[k-1][j][i],id[k+1][j][i]);
+
+          for(int kk=k-1; kk<k+1; kk++)
+            for(int jj=j-1; jj<j+1; jj++)
+              for(int ii=i-1; ii<i+1; ii++)
+                fprintf(stderr,"(%d,%d,%d): Current -- %f.\n", ii,jj,kk,id[kk][jj][ii]);
+
+          fprintf(stderr,"(%d,%d,%d): Last    -- %f; L: %f; R: %f; B: %f; T: %f; K: %f; F: %f.\n",
+                  i,j,k,idn[k][j][i],idn[k][j][i-1],idn[k][j][i+1],idn[k][j-1][i],idn[k][j+1][i],idn[k-1][j][i],idn[k+1][j][i]);
+          for(int kk=k-1; kk<k+1; kk++)
+            for(int jj=j-1; jj<j+1; jj++)
+              for(int ii=i-1; ii<i+1; ii++)
+                fprintf(stderr,"(%d,%d,%d): Last    -- %f.\n", ii,jj,kk,idn[kk][jj][ii]);
+
+        }
 
         counter = LocalUpdateByRiemannSolutions(i, j, k, id[k][j][i], v[k][j][i-1], v[k][j][i+1], 
                       v[k][j-1][i], v[k][j+1][i], v[k-1][j][i], v[k+1][j][i], riemann_solutions,
                       v[k][j][i], true);
         if(counter==0)
-          LocalUpdateByRiemannSolutions(i, j, k, id[k][j][i], v[k][j][i-1], v[k][j][i+1], 
+          counter = LocalUpdateByRiemannSolutions(i, j, k, id[k][j][i], v[k][j][i-1], v[k][j][i+1], 
               v[k][j-1][i], v[k][j+1][i], v[k-1][j][i], v[k+1][j][i], riemann_solutions,
               v[k][j][i], false);
+
+        if(counter==0) //add it to unresolved nodes...
+          unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i
+
       }  
+
 
   ID.RestoreDataPointerToLocalVector();
   IDn.RestoreDataPointerToLocalVector();
 
   V.RestoreDataPointerAndInsert(); //insert data & communicate with neighbor subd's
+
+  if(!unresolved.empty())
+    FixUnresolvedNodes(unresolved, IDn, ID, V); 
 
 } 
 
@@ -158,14 +183,22 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   double weight = 0, sum_weight = 0;
   Int3 ind(k,j,i);
 
+  bool here = false;
+  if(i==582 && j==277 && k==0)
+    here = true;
+
   // left
   auto it = riemann_solutions.left.find(ind);
   if(it != riemann_solutions.left.end()) {
+    if(here) fprintf(stderr,"left id = %d, myid = %d.\n", it->second.second, id);
     if(it->second.second/*ID*/ == id && (!upwind || vl[1] > 0)) {
       Vec3D v1(vl[1], vl[2], vl[3]);
       weight = upwind ? vl[1]/v1.norm() : 1.0;
       sum_weight += weight;
-      v += weight*it->second.first; /*riemann solution*/
+      if(counter==0) 
+        v = weight*it->second.first; /*riemann solution*/
+      else 
+        v += weight*it->second.first; /*riemann solution*/
       counter++;
     }
   }
@@ -173,11 +206,15 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   // right
   it = riemann_solutions.right.find(ind);
   if(it != riemann_solutions.right.end()) {
+    if(here) fprintf(stderr,"right id = %d, myid = %d.\n", it->second.second, id);
     if(it->second.second/*ID*/ == id && (!upwind || vr[1] < 0)) {
       Vec3D v1(vr[1], vr[2], vr[3]);
       weight = upwind ? -vr[1]/v1.norm() : 1.0;
       sum_weight += weight;
-      v += weight*it->second.first; /*riemann solution*/
+      if(counter==0)
+        v = weight*it->second.first; /*riemann solution*/
+      else
+        v += weight*it->second.first; /*riemann solution*/
       counter++;
     }
   }
@@ -185,11 +222,15 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   // bottom
   it = riemann_solutions.bottom.find(ind);
   if(it != riemann_solutions.bottom.end()) {
+    if(here) fprintf(stderr,"bottom id = %d, myid = %d.\n", it->second.second, id);
     if(it->second.second/*ID*/ == id && (!upwind || vb[2] > 0)) {
       Vec3D v1(vb[1], vb[2], vb[3]);
       weight = upwind ? vb[2]/v1.norm() : 1.0;
       sum_weight += weight;
-      v += weight*it->second.first; /*riemann solution*/
+      if(counter==0)
+        v = weight*it->second.first; /*riemann solution*/
+      else
+        v += weight*it->second.first; /*riemann solution*/
       counter++;
     }
   }
@@ -197,11 +238,15 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   // top
   it = riemann_solutions.top.find(ind);
   if(it != riemann_solutions.top.end()) {
+    if(here) fprintf(stderr,"top id = %d, myid = %d.\n", it->second.second, id);
     if(it->second.second/*ID*/ == id && (!upwind || vt[2] < 0)) {
       Vec3D v1(vt[1], vt[2], vt[3]);
       weight = upwind ? -vt[2]/v1.norm() : 1.0;
       sum_weight += weight;
-      v += weight*it->second.first; /*riemann solution*/
+      if(counter==0)
+        v = weight*it->second.first; /*riemann solution*/
+      else
+        v += weight*it->second.first; /*riemann solution*/
       counter++;
     }
   }
@@ -209,11 +254,15 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   // back
   it = riemann_solutions.back.find(ind);
   if(it != riemann_solutions.back.end()) {
+    if(here) fprintf(stderr,"back id = %d, myid = %d.\n", it->second.second, id);
     if(it->second.second/*ID*/ == id && (!upwind || vk[3] > 0)) {
       Vec3D v1(vk[1], vk[2], vk[3]);
       weight = upwind ? vk[3]/v1.norm() : 1.0;
       sum_weight += weight;
-      v += weight*it->second.first; /*riemann solution*/
+      if(counter==0)
+        v = weight*it->second.first; /*riemann solution*/
+      else
+        v += weight*it->second.first; /*riemann solution*/
       counter++;
     }
   }
@@ -221,11 +270,15 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   // front
   it = riemann_solutions.front.find(ind);
   if(it != riemann_solutions.front.end()) {
+    if(here) fprintf(stderr,"front id = %d, myid = %d.\n", it->second.second, id);
     if(it->second.second/*ID*/ == id && (!upwind || vf[3] < 0)) {
       Vec3D v1(vf[1], vf[2], vf[3]);
       weight = upwind ? -vf[3]/v1.norm() : 1.0;
       sum_weight += weight;
-      v += weight*it->second.first; /*riemann solution*/
+      if(counter==0)
+        v = weight*it->second.first; /*riemann solution*/
+      else
+        v += weight*it->second.first; /*riemann solution*/
       counter++;
     }
   }
@@ -233,9 +286,9 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   if(sum_weight > 0.0)
     v /= sum_weight;
   else if(upwind)
-    fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d) based on upwinding.\n", i,j,k);
+    fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d) by averaging Riemann solutions w/ upwinding.\n", i,j,k);
   else 
-    fprintf(stderr,"*** Error: Unable to update phase change at (%d,%d,%d) by averaging Riemann solutions.\n", i,j,k);
+    fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d) by averaging Riemann solutions.\n", i,j,k);
 
   return counter;
 }
@@ -257,6 +310,9 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
   Vec3D v1, x1x0;
   double v1norm;
 
+  // create a vector that temporarily stores unresolved nodes (which will be resolved separately)
+  vector<Int3> unresolved;
+
   // work inside the real domain
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
@@ -265,13 +321,12 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
         if(id[k][j][i] == idn[k][j][i]) //id remains the same. Skip
           continue;
 
-        // re-set its state variables to 0
-        v[k][j][i] = 0.0;
-
         // coordinates of this node
         Vec3D& x0(coords[k][j][i]);
 
         sum_weight = 0.0;
+
+        bool reset = false; //whether v[k][j][i] has been reset to 0
 
         //go over the neighboring nodes 
         for(int neighk = k-1; neighk <= k+1; neighk++)         
@@ -305,12 +360,22 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
               // add weighted s.v. at neighbor node
               if(weight>0) {
                 sum_weight += weight;
-                v[k][j][i] += weight*v[neighk][neighj][neighi];
+                if(reset)
+                  v[k][j][i] += weight*v[neighk][neighj][neighi];
+                else {
+                  v[k][j][i] = weight*v[neighk][neighj][neighi];
+                  reset = true;
+                }
               }
             }
 
-        v[k][j][i] /= sum_weight; 
+        if(sum_weight==0) {
+          fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) by extrapolation w/ upwinding.\n", i,j,k, x0[0],x0[1],x0[2]);
+          unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
+        } else
+          v[k][j][i] /= sum_weight; 
       }
+
 
   coordinates.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
@@ -318,6 +383,166 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
 
   V.RestoreDataPointerAndInsert(); //insert data & communicate with neighbor subd's
 
+  if(!unresolved.empty())
+    FixUnresolvedNodes(unresolved, IDn, ID, V); 
+
+}
+
+//-----------------------------------------------------
+
+void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID, 
+                                            SpaceVariable3D &V)
+{
+  // extract info
+  double*** idn = (double***)IDn.GetDataPointer();
+  double*** id  = (double***)ID.GetDataPointer();
+  Vec5D***  v   = (Vec5D***) V.GetDataPointer();
+
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  // loop through unresolved nodes
+  int i,j,k;
+  double weight, sum_weight; 
+  Vec3D v1, x1x0;
+  double v1norm;
+
+  bool reset = false; //whether v[k][j][i] has been reset
+
+  for(auto it = unresolved.begin(); it != unresolved.end(); it++) { 
+
+    k = (*it)[0];
+    j = (*it)[1];
+    i = (*it)[2];
+
+    Vec3D& x0(coords[k][j][i]);
+    sum_weight = 0.0;
+
+    //go over the neighboring nodes 
+    for(int neighk = k-1; neighk <= k+1; neighk++)         
+      for(int neighj = j-1; neighj <= j+1; neighj++)
+        for(int neighi = i-1; neighi <= i+1; neighi++) {
+
+          if(ID.OutsidePhysicalDomain(neighi, neighj, neighk))
+            continue; //this neighbor is outside the physical domain. Skip.
+
+          if(id[neighk][neighj][neighi] != id[k][j][i])
+            continue; //this neighbor has a different ID. Skip it.
+
+          if(neighk==k && neighj==j && neighi==i) 
+            continue; //the same node. Skip
+
+          bool neighbor_unresolved = false;
+          for(auto it2 = unresolved.begin(); it2 != unresolved.end(); it2++) {
+            if(neighk==(*it2)[0] && neighj==(*it2)[1] && neighi==(*it2)[2]) {
+              neighbor_unresolved = true; 
+              break; 
+            }
+          }
+          if(neighbor_unresolved)
+            continue; //this neighbor is also unresolved. Skip
+
+          // coordinates and velocity at the neighbor node
+          Vec3D& x1(coords[neighk][neighj][neighi]);
+          v1[0] = v[neighk][neighj][neighi][1];
+          v1[1] = v[neighk][neighj][neighi][2];
+          v1[2] = v[neighk][neighj][neighi][3];
+
+          // compute weight
+          v1norm = v1.norm();
+          if(v1norm != 0)
+            v1 /= v1norm;
+          x1x0 = x0 - x1; 
+          x1x0 /= x1x0.norm();
+
+          weight = max(0.0, x1x0*v1);
+
+          // add weighted s.v. at neighbor node
+          if(weight>0) {
+            sum_weight += weight;
+            if(reset)
+              v[k][j][i] += weight*v[neighk][neighj][neighi];
+            else {
+              v[k][j][i] = weight*v[neighk][neighj][neighi];
+              reset = true;
+            }
+          }
+        }
+
+
+    if(sum_weight>0) {
+      v[k][j][i] /= sum_weight; //Done!
+      fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. (2nd attempt)\n",
+                      i,j,k);
+      continue;
+    }
+
+
+    // Our last resort: keep the pressure and velocity (both normal & TANGENTIAL) at the current node, 
+    // find a valid density nearby. (In this case, the solution may be different for different domain
+    // partitions --- but this should rarely happen.)
+          
+    //go over the neighboring nodes & interpolate velocity and pressure
+    int max_layer = 10;
+    double density = 0.0;
+    for(int layer = 1; layer < max_layer; layer++) {
+
+      for(int neighk = k-layer; neighk <= k+layer; neighk++)         
+        for(int neighj = j-layer; neighj <= j+layer; neighj++)
+          for(int neighi = i-layer; neighi <= i+layer; neighi++) {
+
+            if(ID.OutsidePhysicalDomain(neighi, neighj, neighk))
+              continue; //this neighbor is outside the physical domain. Skip.
+  
+            if(!ID.IsHere(neighi,neighj,neighk,true/*include_ghost*/))
+              continue; //this neighbor is outside the current subdomain
+
+            if(id[neighk][neighj][neighi] != id[k][j][i])
+              continue; //this neighbor has a different ID. Skip it.
+
+            if(neighk==k && neighj==j && neighi==i) 
+              continue; //the same node. Skip
+
+            bool neighbor_unresolved = false;
+            for(auto it2 = unresolved.begin(); it2 != unresolved.end(); it2++) {
+              if(neighk==(*it2)[0] && neighj==(*it2)[1] && neighi==(*it2)[2]) {
+                neighbor_unresolved = true; 
+               break; 
+              }
+            }
+            if(neighbor_unresolved)
+              continue; //this neighbor is also unresolved. Skip
+
+
+            Vec3D& x1(coords[neighk][neighj][neighi]);
+            double dist = (x1-x0).norm();
+
+            sum_weight += dist;
+            density += dist*v[neighk][neighj][neighi][0];
+          }
+
+      if(sum_weight>0) {
+        v[k][j][i][0] = density/sum_weight;
+        fprintf(stderr,"*** (%d,%d,%d): Updated density (%e) by interpolation w/ stencil width = %d.\n",
+                       i,j,k, v[k][j][i][0], layer);
+        break; //done with this node
+      }
+    }
+
+    //FAILED! Very unlikely. This means there is no neighbors within max_layer that have the same ID!!
+    if(sum_weight==0) { 
+      fprintf(stderr,"*** Error: Unable to update phase change at (%d,%d,%d)(%e,%e,%e). No valid "
+                     "neighbors within %d layers.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
+                     coords[k][j][i][2], max_layer);
+      exit(-1);
+    }
+  }
+
+  coordinates.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+  IDn.RestoreDataPointerToLocalVector();
+
+  V.RestoreDataPointerAndInsert(); //insert data & communicate with neighbor subd's
+    
 }
 
 //-----------------------------------------------------

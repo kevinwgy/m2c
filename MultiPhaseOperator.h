@@ -17,7 +17,7 @@ class RiemannSolutions;
 class MultiPhaseOperator
 {
   MPI_Comm&       comm;
-  MultiPhaseData &iod_multiphase;
+  IoData& iod;
 
   //! Mesh info
   SpaceVariable3D& coordinates;
@@ -54,6 +54,9 @@ protected:
   int LocalUpdateByRiemannSolutions(int i, int j, int k, int id, Vec5D &vl, Vec5D &vr, Vec5D &vb, Vec5D &vt,
                                     Vec5D &vk, Vec5D &vf, RiemannSolutions &riemann_solutions, Vec5D &v,
                                     bool upwind = true);
+
+  void FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
+                          SpaceVariable3D &V);
 
 
 };
