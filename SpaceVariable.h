@@ -103,6 +103,17 @@ public:
 
   inline bool OutsidePhysicalDomain(int i, int j, int k) {return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
 
+  inline bool OutsidePhysicalDomainAndUnpopulated(int i, int j, int k)
+  {
+    int count = 0;
+    if(i<0 || j>=NX) count++;
+    if(j<0 || j>=NY) count++;
+    if(k<0 || k>=NZ) count++;
+    if(count>1)
+      return true;
+    return false;
+  } 
+
   inline int BoundaryType(int i, int j, int k) //0~interior, 1~boundary-face, 2~boundary-edge, 3~boundary-corner
   {return int(i<0) + int(i>=NX) + int(j<0) + int(j>=NY) + int(k<0) + int(k>=NZ);}
 
@@ -118,8 +129,8 @@ public:
   //! operators
   void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
   void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y
-  void AXPlusBY(double a, double b, SpaceVariable3D &y, std::vector<int> Xindices,
-                std::vector<int> Yindices, bool workOnGhost = false); //!< customized version
+  void AXPlusBY(double a, double b, SpaceVariable3D &y, std::vector<int>& Xindices,
+                std::vector<int>& Yindices, bool workOnGhost = false); //!< customized version
   void SetConstantValue(double a, bool workOnGhost = false); //!< set value to a
   
 };

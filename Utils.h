@@ -46,6 +46,13 @@ inline void copyarray(double* in, double* out, int dim)
       out[i] = in[i];
 }
 //--------------------------------------------------
+//! Add a double array of known dimension
+inline void addarray(double* in, double* out, int dim)
+{
+  for(int i=0; i<dim; i++)
+      out[i] += in[i];
+}
+//--------------------------------------------------
 //! Copy a double array of known dimension, flip the sign of one element
 inline void copyarray_flip(double* in, double* out, int dim, int flipdim)
 {

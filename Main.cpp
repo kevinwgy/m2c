@@ -191,12 +191,12 @@ int main(int argc, char* argv[])
           ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
     //----------------------------------------------------
-    // Move forward by one time-step: Update V and Phi
+    // Move forward by one time-step: Update V, Phi, and ID
     //----------------------------------------------------
-    integrator->AdvanceOneTimeStep(V, ID, Phi, dt); 
+    t += dt;
+    integrator->AdvanceOneTimeStep(V, ID, Phi, t, dt, time_step); 
     //----------------------------------------------------
 
-    t += dt;
 
     out.OutputSolutions(t, dt, time_step, V, ID, Phi, false/*force_write*/);
 

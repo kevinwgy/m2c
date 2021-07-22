@@ -273,8 +273,8 @@ void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, bool work
 
 //---------------------------------------------------------
 // takes in two vectors that identify the indices of X and Y that are involved in this operation
-void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, std::vector<int> Xindices,
-                               std::vector<int> Yindices, bool workOnGhost)
+void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, std::vector<int>& Xindices,
+                               std::vector<int>& Yindices, bool workOnGhost)
 {
   //check for common errors
   if(Xindices.size() != Yindices.size()) {

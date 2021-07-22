@@ -312,6 +312,26 @@ struct ReconstructionData {
 
 //------------------------------------------------------------------------------
 
+struct SmoothingData {
+
+  enum Type {NONE = 0, BOX = 1, GAUSSIAN = 2} type;
+
+  int iteration; //number of smoothing iterations applied each time
+
+  double sigma_factor; //coefficient for Gaussian smoothing filter (multipled by dx)
+
+  int frequency;
+  double frequency_dt;
+
+  SmoothingData();
+  ~SmoothingData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct SchemeData {
 
   enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, HLLC = 2, GODUNOV = 3} flux;
@@ -319,6 +339,8 @@ struct SchemeData {
   double delta; //! The coeffient in Harten's entropy fix.
 
   ReconstructionData rec;
+
+  SmoothingData smooth;
 
   SchemeData();
   ~SchemeData() {}

@@ -34,7 +34,8 @@ void TimeIntegratorFE::Destroy()
 //----------------------------------------------------------------------------
 
 void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                          vector<SpaceVariable3D*>& Phi, double dt)
+                                          vector<SpaceVariable3D*>& Phi, double time,
+                                          double dt, int time_step)
 {
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   spo.ComputeResidual(V, ID, Rn, &riemann_solutions); // compute Rn
@@ -59,6 +60,9 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }
+
+  // Apply smoothing to V (if specified by user)
+  spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
 }
 
@@ -100,7 +104,8 @@ void TimeIntegratorRK2::Destroy()
 
 //----------------------------------------------------------------------------
 
-void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, vector<SpaceVariable3D*>& Phi, double dt)
+void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                            vector<SpaceVariable3D*>& Phi, double time, double dt, int time_step)
 {
 
   //****************** STEP 1 FOR NS ******************
@@ -163,6 +168,9 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     spo.ApplyBoundaryConditions(V);
   }
 
+  // Apply smoothing to V (if specified by user)
+  spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
+
 }
 
 //----------------------------------------------------------------------------
@@ -204,7 +212,8 @@ void TimeIntegratorRK3::Destroy()
 //----------------------------------------------------------------------------
 
 void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                           vector<SpaceVariable3D*>& Phi, double dt)
+                                           vector<SpaceVariable3D*>& Phi, double time, 
+                                           double dt, int time_step)
 { 
 
   //****************** STEP 1 FOR NS ******************
@@ -317,6 +326,9 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }
+
+  // Apply smoothing to V (if specified by user)
+  spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
 }
 

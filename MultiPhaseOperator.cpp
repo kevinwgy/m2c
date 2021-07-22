@@ -260,9 +260,9 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   if(sum_weight > 0.0)
     v /= sum_weight;
   else if(upwind)
-    fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions w/ upwinding. Retrying.\n", i,j,k);
+    fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions w/ upwinding. Retrying.\n", i,j,k);
   else 
-    fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions. Retrying.\n", i,j,k);
+    fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions. Retrying.\n", i,j,k);
 
   return counter;
 }
@@ -344,7 +344,7 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
             }
 
         if(sum_weight==0) {
-          fprintf(stderr,"*** Warning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) by extrapolation w/ upwinding.\n", i,j,k, x0[0],x0[1],x0[2]);
+          fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) by extrapolation w/ upwinding.\n", i,j,k, x0[0],x0[1],x0[2]);
           unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
         } else
           v[k][j][i] /= sum_weight; 

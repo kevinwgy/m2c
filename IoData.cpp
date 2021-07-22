@@ -578,6 +578,39 @@ void ReconstructionData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+SmoothingData::SmoothingData()
+{
+  type = NONE;
+  iteration = 1;
+  sigma_factor = 1.0;
+
+  frequency = -100;
+  frequency_dt = -1.0;
+}
+
+//------------------------------------------------------------------------------
+
+void SmoothingData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 5, father); 
+
+  new ClassToken<SmoothingData>
+    (ca, "Type", this,
+     reinterpret_cast<int SmoothingData::*>(&SmoothingData::type), 3,
+     "None", 0, "Box", 1, "Gaussian", 2);
+
+  new ClassInt<SmoothingData>(ca, "NumberOfIterations", this, &SmoothingData::iteration);
+
+  new ClassDouble<SmoothingData>(ca, "SigmaFactor", this, &SmoothingData::sigma_factor);
+
+  new ClassInt<SmoothingData>(ca, "Frequency", this, &SmoothingData::frequency);
+
+  new ClassDouble<SmoothingData>(ca, "TimeInterval", this, &SmoothingData::frequency_dt);
+
+}
+
+//------------------------------------------------------------------------------
+
 SchemeData::SchemeData() 
 {
   flux = HLLC;
@@ -591,7 +624,7 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 {
 
   ClassAssigner* ca;
-  ca = new ClassAssigner(name, 3, father);
+  ca = new ClassAssigner(name, 4, father);
 
   new ClassToken<SchemeData>
     (ca, "Flux", this,
@@ -602,6 +635,7 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
 
   rec.setup("Reconstruction", ca);
 
+  smooth.setup("Smoothing", ca);
 }
 
 //------------------------------------------------------------------------------

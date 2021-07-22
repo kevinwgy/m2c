@@ -1,6 +1,4 @@
 #include<Reconstructor.h>
-#include<Vector3D.h>
-#include<Utils.h>
 using std::round;
 
 

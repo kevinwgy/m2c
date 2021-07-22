@@ -2,10 +2,10 @@
 #define _SPACEOPERATOR_H_
 #include <ExactRiemannSolverBase.h>
 #include <ViscosityOperator.h>
+#include <SmoothingOperator.h>
 #include <FluxFcnBase.h>
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
-#include <GhostPoint.h>
 
 /*******************************************
  * class SpaceOperator drives computations
@@ -40,6 +40,9 @@ class SpaceOperator
   //! Class for calculating spatial gradients of variables
   ViscosityOperator* visco;
 
+  //! Class for smoothing the solution
+  SmoothingOperator* smooth;
+
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;
 
@@ -63,6 +66,8 @@ public:
   void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID);
     
   void ApplyBoundaryConditions(SpaceVariable3D &V);
+
+  void ApplySmoothingFilter(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID);
 
   void FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVariable3D &ID,
                                         double *Vmin, double *Vmax, double &cmin, 

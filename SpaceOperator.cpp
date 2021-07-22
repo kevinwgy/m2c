@@ -34,7 +34,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vt(comm_, &(dm_all_.ghosted1_5dof)),
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
-    visco(NULL)
+    visco(NULL), smooth(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -46,13 +46,17 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
 
   rec.Setup(&ghost_nodes_inner, &ghost_nodes_outer); //this function requires mesh info (dxyz)
   
+  if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
+    smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz);
+    
 }
 
 //-----------------------------------------------------
 
 SpaceOperator::~SpaceOperator()
 {
-
+  if(visco) delete visco;
+  if(smooth) delete smooth;
 }
 
 //-----------------------------------------------------
@@ -61,6 +65,8 @@ void SpaceOperator::Destroy()
 {
   rec.Destroy();
   if(visco) visco->Destroy();
+
+  if(smooth) smooth->Destroy();
 
   coordinates.Destroy();
   delta_xyz.Destroy();
@@ -341,9 +347,9 @@ void SpaceOperator::CreateGhostNodeLists()
   int nOuter = ghost_nodes_outer.size();
   MPI_Allreduce(MPI_IN_PLACE, &nInner, 1, MPI_INT, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &nOuter, 1, MPI_INT, MPI_SUM, comm);
-  print("  Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
+  print("- Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
         nInner);
-  print("  Number of ghost nodes outside computational domain: %d\n",
+  print("- Number of ghost nodes outside computational domain: %d\n",
         nOuter);
   print("\n");
 
@@ -443,12 +449,13 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
   }
 
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
-  if(nClipped)
+  if(nClipped) {
     print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
-
+    V.RestoreDataPointerAndInsert();
+  } else
+    V.RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector(); //no changes made
-  V.RestoreDataPointerAndInsert();
 
   coordinates.RestoreDataPointerToLocalVector(); //no changes
 
@@ -1230,6 +1237,28 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 //-----------------------------------------------------
 
 void
+SpaceOperator::ApplySmoothingFilter(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID)
+{
+  if(!smooth)
+    return; //nothing to do
+
+  if(!isTimeToWrite(time, dt, time_step, iod.schemes.ns.smooth.frequency_dt, 
+                    iod.schemes.ns.smooth.frequency, 0.0, false))
+    return; //nothing to do (not the right time)
+  
+  print("- Applying a smoothing filter to the N-S state variables. (Iterations: %d)\n", 
+        iod.schemes.ns.smooth.iteration);
+
+  for(int iter = 0; iter < iod.schemes.ns.smooth.iteration; iter++) {
+    smooth->ApplySmoothingFilter(V,&ID);
+    ClipDensityAndPressure(V,ID);
+    ApplyBoundaryConditions(V);
+  } 
+}
+
+//-----------------------------------------------------
+
+void
 SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 {
 
@@ -1635,7 +1664,7 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
   FindExtremeValuesOfFlowVariables(V, ID, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
 
   if(iod.output.verbose == OutputData::ON)
-    print("  - Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
+    print("- Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
           Vmax[0], Vmax[4], cmax, Machmax, char_speed_max);
 
   if(iod.ts.timestep > 0) {
