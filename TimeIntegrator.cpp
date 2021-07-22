@@ -61,7 +61,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     spo.ApplyBoundaryConditions(V);
   }
 
-  // Apply smoothing to V (if specified by user)
+  // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
 }
@@ -168,7 +168,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     spo.ApplyBoundaryConditions(V);
   }
 
-  // Apply smoothing to V (if specified by user)
+  // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
 }
@@ -227,8 +227,8 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   spo.ConservativeToPrimitive(U1, ID, V1); //get V1
 
 
-  Vec5D*** v1 = (Vec5D***) V1.GetDataPointer();
-  V1.RestoreDataPointerToLocalVector();
+//  Vec5D*** v1 = (Vec5D***) V1.GetDataPointer();
+//  V1.RestoreDataPointerToLocalVector();
 
 
   int clipped = spo.ClipDensityAndPressure(V1, ID);
@@ -260,8 +260,8 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Check & clip the intermediate state (U2/V2)
   spo.ConservativeToPrimitive(U1, ID, V1); //get V2
 
-  v1 = (Vec5D***) V1.GetDataPointer();
-  V1.RestoreDataPointerToLocalVector();
+//  v1 = (Vec5D***) V1.GetDataPointer();
+//  V1.RestoreDataPointerToLocalVector();
 
   clipped = spo.ClipDensityAndPressure(V1, ID);
   if(clipped)
@@ -291,8 +291,8 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
 
-  Vec5D*** v = (Vec5D***) V.GetDataPointer();
-  V.RestoreDataPointerToLocalVector();
+//  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+//  V.RestoreDataPointerToLocalVector();
 
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
@@ -327,7 +327,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     spo.ApplyBoundaryConditions(V);
   }
 
-  // Apply smoothing to V (if specified by user)
+  // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
 }

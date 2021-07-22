@@ -323,6 +323,9 @@ struct SmoothingData {
   int frequency;
   double frequency_dt;
 
+  enum ONOFF {OFF = 0, ON = 1} conservation;
+  double conservation_tol;
+
   SmoothingData();
   ~SmoothingData() {}
 

@@ -586,13 +586,16 @@ SmoothingData::SmoothingData()
 
   frequency = -100;
   frequency_dt = -1.0;
+
+  conservation = OFF;
+  conservation_tol = 0.1;
 }
 
 //------------------------------------------------------------------------------
 
 void SmoothingData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 5, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 7, father); 
 
   new ClassToken<SmoothingData>
     (ca, "Type", this,
@@ -607,6 +610,12 @@ void SmoothingData::setup(const char *name, ClassAssigner *father)
 
   new ClassDouble<SmoothingData>(ca, "TimeInterval", this, &SmoothingData::frequency_dt);
 
+  new ClassToken<SmoothingData>
+    (ca, "EnforceConservation", this,
+     reinterpret_cast<int SmoothingData::*>(&SmoothingData::conservation), 2,
+     "Off", 0, "On", 1);
+
+  new ClassDouble<SmoothingData>(ca, "ConservationTolerance", this, &SmoothingData::conservation_tol);
 }
 
 //------------------------------------------------------------------------------

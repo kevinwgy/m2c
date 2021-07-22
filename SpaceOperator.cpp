@@ -34,6 +34,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vt(comm_, &(dm_all_.ghosted1_5dof)),
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
+    Utmp(comm_, &(dm_all_.ghosted1_5dof)),
     visco(NULL), smooth(NULL)
 {
   
@@ -47,7 +48,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   rec.Setup(&ghost_nodes_inner, &ghost_nodes_outer); //this function requires mesh info (dxyz)
   
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
-    smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz);
+    smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
     
 }
 
@@ -77,6 +78,7 @@ void SpaceOperator::Destroy()
   Vt.Destroy();
   Vk.Destroy();
   Vf.Destroy();
+  Utmp.Destroy();
 }
 
 //-----------------------------------------------------
@@ -1250,7 +1252,9 @@ SpaceOperator::ApplySmoothingFilter(double time, double dt, int time_step, Space
         iod.schemes.ns.smooth.iteration);
 
   for(int iter = 0; iter < iod.schemes.ns.smooth.iteration; iter++) {
-    smooth->ApplySmoothingFilter(V,&ID);
+    PrimitiveToConservative(V, ID, Utmp, false);
+    smooth->ApplySmoothingFilter(Utmp,&ID);
+    ConservativeToPrimitive(Utmp, ID, V, false);
     ClipDensityAndPressure(V,ID);
     ApplyBoundaryConditions(V);
   } 

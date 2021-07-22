@@ -46,6 +46,9 @@ class SpaceOperator
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;
 
+  //! For temporary variable
+  SpaceVariable3D Utmp;
+
 public:
   SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                 vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,

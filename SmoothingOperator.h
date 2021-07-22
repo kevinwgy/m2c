@@ -10,11 +10,14 @@
  *******************************************************************************/
 class SmoothingOperator
 {
+  MPI_Comm &comm;
+
   SmoothingData& iod_smooth;
 
   //! Mesh info
   SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;
+  SpaceVariable3D &volume;
 
   //! Interval variable to store data temporarily
   SpaceVariable3D V0;
@@ -22,7 +25,8 @@ class SmoothingOperator
 public:
 
   SmoothingOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, SmoothingData &iod_smooth_,
-                    SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_);
+                    SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
+                    SpaceVariable3D &volume_);
   ~SmoothingOperator();
 
   //apply a smoothing filter within the physical domain
@@ -36,6 +40,7 @@ private:
 
   void ApplyGausianFilter(SpaceVariable3D &V, SpaceVariable3D *ID); 
 
+  void EnforceLocalConservation(SpaceVariable3D &U0, SpaceVariable3D &U, SpaceVariable3D *ID);
 };
 
 #endif

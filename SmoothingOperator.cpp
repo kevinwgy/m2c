@@ -4,8 +4,9 @@
 //--------------------------------------------------------------------------
 
 SmoothingOperator::SmoothingOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, SmoothingData &iod_smooth_,
-                                     SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_)
-                  : iod_smooth(iod_smooth_), coordinates(coordinates_),
+                                     SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
+                                     SpaceVariable3D &volume_)
+                  : comm(comm_), iod_smooth(iod_smooth_), coordinates(coordinates_), volume(volume_),
                     delta_xyz(delta_xyz_),
                     V0(comm_, &(dm_all_.ghosted1_5dof))
 {
@@ -107,6 +108,9 @@ void SmoothingOperator::ApplyBoxFilter(SpaceVariable3D &V, SpaceVariable3D *ID)
 
   V.RestoreDataPointerAndInsert();
 
+  if(iod_smooth.conservation == SmoothingData::ON)
+    EnforceLocalConservation(V0, V, ID);
+
 }
 
 //--------------------------------------------------------------------------
@@ -190,6 +194,90 @@ void SmoothingOperator::ApplyGausianFilter(SpaceVariable3D &V, SpaceVariable3D *
   if(ID) ID->RestoreDataPointerToLocalVector();
 
   V.RestoreDataPointerAndInsert();
+
+  if(iod_smooth.conservation == SmoothingData::ON)
+    EnforceLocalConservation(V0, V, ID);
+}
+
+//--------------------------------------------------------------------------
+
+void SmoothingOperator::EnforceLocalConservation(SpaceVariable3D &U0, SpaceVariable3D &U, SpaceVariable3D *ID)
+{
+
+  int Udim = U.NumDOF(), U0dim = U0.NumDOF();
+
+  //get mesh info
+  int i0, j0, k0, imax, jmax, kmax;
+  coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  double*** vol = (double***)volume.GetDataPointer();
+ 
+  int myid;
+
+  double*** u  = (double***)U.GetDataPointer();
+  double*** u0 = (double***)U0.GetDataPointer();
+  double*** id = ID ? (double***)ID->GetDataPointer() : NULL;
+
+  double uold[Udim], unew[Udim];
+
+  
+  for(int iter=0;  iter<1;  iter++) {
+
+    double maxdiff = 0.0;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+              
+          myid = ID ? id[k][j][i] : 0;
+
+          // clear data
+          for(int p=0; p<Udim; p++) {
+            uold[p] = 0.0;
+            unew[p] = 0.0;
+          }
+
+          for(int neighk=k-1; neighk<=k+1; neighk++)
+            for(int neighj=j-1; neighj<=j+1; neighj++)
+              for(int neighi=i-1; neighi<=i+1; neighi++) {
+
+                if(ID && myid != id[neighk][neighj][neighi])
+                  continue;
+
+                //if(coordinates.OutsidePhysicalDomainAndUnpopulated(neighi,neighj,neighk))
+                if(coordinates.OutsidePhysicalDomain(neighi,neighj,neighk))
+                  continue; //no valid data here.
+
+                for(int p=0; p<Udim; p++) {
+                  uold[p] += vol[neighk][neighj][neighi]*u0[neighk][neighj][neighi*U0dim+p];
+                  unew[p] += vol[neighk][neighj][neighi]*u[neighk][neighj][neighi*Udim+p];
+                }
+
+              }
+
+          for(int p=0; p<Udim; p++) {
+            if(unew[p]!=0.0) {
+              double factor = uold[p]/unew[p];
+              //double maxdifftmp = std::max(maxdiff, std::fabs((unew[p]-uold[p])/unew[p]));
+              //fprintf(stderr,"(%d,%d,%d) p = %d, old = %e, new = %e, factor = %e, maxdiff = %e.\n", i,j,k, p, uold[p], unew[p], factor, maxdifftmp);
+              factor = std::min(1.05, factor);
+              factor = std::max(0.95, factor);
+              u[k][j][Udim*i+p] *= factor; 
+              maxdiff = std::max(maxdiff, std::fabs((unew[p]-uold[p])/unew[p]));
+            }
+          }
+        }
+
+    MPI_Allreduce(MPI_IN_PLACE, &maxdiff, 1, MPI_DOUBLE, MPI_MAX, comm);
+    print("Iteration %d: maxdiff = %e.\n", iter, maxdiff);
+    if(maxdiff<iod_smooth.conservation_tol)
+      break;
+  }
+
+  volume.RestoreDataPointerToLocalVector();
+  U0.RestoreDataPointerToLocalVector();
+  if(ID) ID->RestoreDataPointerToLocalVector();
+
+  U.RestoreDataPointerAndInsert();
 
 }
 
