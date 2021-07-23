@@ -15,7 +15,10 @@ protected:
 
   int maxIts_main, maxIts_shock;
   int numSteps_rarefaction;
-  double tol_main, tol_shock, tol_rarefaction;
+  double tol_main;
+  double tol_shock;
+  double tol_rarefaction; //has the dimension of pressure, should be specified as a "pressure tolerance"
+  double min_pressure, failure_threshold, pressure_at_failure;
 
 public:
   ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann);

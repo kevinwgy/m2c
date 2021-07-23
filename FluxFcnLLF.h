@@ -47,7 +47,7 @@ void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, dou
   if(c_m<0) {
     fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
             c_m, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], id);
-    exit_mpi();
+    exit(-1);
   } else
     c_m = sqrt(c_m);
 
@@ -56,7 +56,7 @@ void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, dou
   if(c_p<0) {
     fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
             c_p, Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], id);
-    exit_mpi();
+    exit(-1);
   } else
     c_p = sqrt(c_p);
 

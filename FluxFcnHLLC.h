@@ -118,7 +118,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   if(cm<0) {
     fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
             cm, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], id);
-    exit_mpi();
+    exit(-1);
   } else
     cm = sqrt(cm);
 
@@ -127,7 +127,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   if(cp<0) {
     fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
             cp, Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], id);
-    exit_mpi();
+    exit(-1);
   } else
     cp = sqrt(cp);
 
@@ -151,7 +151,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
       break;
     default:
       fprintf(stderr,"*** Error: Incorrect use of function FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage.\n");
-      exit_mpi();
+      exit(-1);
   }
 }
 
