@@ -15,6 +15,7 @@ using std::min;
 using std::map;
 using namespace GeoTools;
 
+extern int verbose;
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -451,7 +452,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
   }
 
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
-  if(nClipped) {
+  if(nClipped && verbose>0) {
     print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
     V.RestoreDataPointerAndInsert();
   } else
@@ -1667,7 +1668,7 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
   double Vmin[5], Vmax[5], cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min; 
   FindExtremeValuesOfFlowVariables(V, ID, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
 
-  if(iod.output.verbose == OutputData::ON)
+  if(verbose>1)
     print("- Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
           Vmax[0], Vmax[4], cmax, Machmax, char_speed_max);
 
@@ -1700,7 +1701,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Check reconstructed states (clip & check)
   //------------------------------------
-  //CheckReconstructedStates(V, Vl, Vr, Vb, Vt, Vk, Vf, ID); //KW(07/18/2021--Done in Reconstructor)
+  CheckReconstructedStates(V, Vl, Vr, Vb, Vt, Vk, Vf, ID); //already checked in Reconstructor::Reconstruct
+                                                           //but here we also do clipping
 
   //------------------------------------
   // Extract data
@@ -1767,6 +1769,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else//linear reconstruction w/ limitor
               riemann.ComputeRiemannSolution(0/*F*/, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
+            //Clip Riemann solution and check it
+            varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+            varFcn[neighborid]->CheckState(Vsm);
+            varFcn[myid]->ClipDensityAndPressure(Vsp);
+            varFcn[myid]->CheckState(Vsp);
 
             if(riemann_solutions) {//store Riemann solution for "phase-change update"
               ind[0] = k; ind[1] = j; ind[2] = i;
@@ -1819,6 +1826,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else
               riemann.ComputeRiemannSolution(1/*G*/, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
+            //Clip Riemann solution and check it
+            varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+            varFcn[neighborid]->CheckState(Vsm);
+            varFcn[myid]->ClipDensityAndPressure(Vsp);
+            varFcn[myid]->CheckState(Vsp);
+
 
             if(riemann_solutions) {//store Riemann solution for "phase-change update"
               ind[0] = k; ind[1] = j; ind[2] = i;
@@ -1869,6 +1882,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               riemann.ComputeRiemannSolution(2/*H*/, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else
               riemann.ComputeRiemannSolution(2/*H*/, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+            //Clip Riemann solution and check it
+            varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+            varFcn[neighborid]->CheckState(Vsm);
+            varFcn[myid]->ClipDensityAndPressure(Vsp);
+            varFcn[myid]->CheckState(Vsp);
 
 
             if(riemann_solutions) {//store Riemann solution for "phase-change update"
@@ -2012,7 +2031,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
-  if(nClipped)
+  if(nClipped && verbose>0)
     print("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
  
   Vl.RestoreDataPointerToLocalVector(); //no need to communicate

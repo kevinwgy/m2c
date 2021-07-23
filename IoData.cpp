@@ -440,6 +440,8 @@ MaterialModelData::MaterialModelData()
   rhomin = -1.0e-14; // By default, density cannot be zero or negative
   pmin = -DBL_MAX;   // By default, no clipping
 
+  failsafe_density = 0.0; //Giving it a nonphysical density by default (i.e. not used)
+
 }
 
 //------------------------------------------------------------------------------
@@ -447,7 +449,7 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 8, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
@@ -456,6 +458,8 @@ Assigner *MaterialModelData::getAssigner()
                                  "JonesWilkinsLee", MaterialModelData::JWL);
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
   new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
+
+  new ClassDouble<MaterialModelData>(ca, "DensityPrescribedAtFailure", this, &MaterialModelData::failsafe_density);
 
   sgModel.setup("StiffenedGasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
@@ -1610,7 +1614,7 @@ OutputData::OutputData()
 
   mesh_filename = "";
 
-  verbose = OFF;
+  verbose = MEDIUM;
 }
 
 //------------------------------------------------------------------------------
@@ -1663,8 +1667,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   new ClassStr<OutputData>(ca, "MeshInformation", this, &OutputData::mesh_filename);
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::verbose), 2,
-                               "Off", 0, "On", 1);
+                               reinterpret_cast<int OutputData::*>(&OutputData::verbose), 3,
+                               "Low", 0, "Medium", 1, "High");
 
   probes.setup("Probes", ca);
 

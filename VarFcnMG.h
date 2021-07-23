@@ -47,7 +47,7 @@ private:
   double Gamma0_rho0;   //!< Gamma0*rho0
 
 public:
-  VarFcnMG(MaterialModelData &data, bool verbose_ = true);
+  VarFcnMG(MaterialModelData &data);
   ~VarFcnMG() {}
 
   //! ----- EOS-Specific Functions -----
@@ -75,7 +75,7 @@ public:
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 inline
-VarFcnMG::VarFcnMG(MaterialModelData &data, bool verbose_) : VarFcnBase(data,verbose_) {
+VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::MIE_GRUNEISEN){
     fprintf(stderr, "*** Error: MaterialModelData is not of type Mie-Gruneisen.\n");

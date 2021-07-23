@@ -384,10 +384,11 @@ RETRY:
         //------------------------------------------------------------
         // Step 2.6. Check reconstructed values
         //------------------------------------------------------------
+        extern int verbose;
         if(ID && nDOF==5) { //reconstructing the fluid state variables
           int myid = (int)id[k][j][i];
           if((*varFcn)[myid]->CheckState(&vl[k][j][i*nDOF])) {
-            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], 5);
             else {
@@ -396,7 +397,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vr[k][j][i*nDOF])) {
-            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], 5);
             else {
@@ -405,7 +406,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vb[k][j][i*nDOF])) {
-            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], 5);
             else {
@@ -414,7 +415,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vt[k][j][i*nDOF])) {
-            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], 5);
             else {
@@ -423,7 +424,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vk[k][j][i*nDOF])) {
-            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], 5);
             else {
@@ -432,7 +433,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vf[k][j][i*nDOF])) {
-            fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], 5);
             else {
@@ -515,6 +516,7 @@ RETRY:
                 gp->bcType);
     }
   }
+  //NOTE: Should not communicate. Otherwise the ghost layer will be corrupated.
   Vl.RestoreDataPointerToLocalVector(); //no need to communicate
   Vr.RestoreDataPointerToLocalVector(); //no need to communicate
   Vb.RestoreDataPointerToLocalVector(); //no need to communicate
@@ -718,6 +720,8 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
                 gp->bcType);
     }
   }
+
+  //Should not communicate.
   Um.RestoreDataPointerToLocalVector(); //no need to communicate
   Up.RestoreDataPointerToLocalVector(); //no need to communicate
 

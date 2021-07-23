@@ -26,6 +26,8 @@
  *  - 4 -  EOS related functions
  ***************************************************************************/
 
+extern int verbose;
+
 class VarFcnBase {
 
 public:
@@ -34,12 +36,12 @@ public:
 
   double rhomin,pmin;
 
-  bool verbose;
+  double failsafe_density;
 
-  VarFcnBase(MaterialModelData &data, bool verbose_) {
+  VarFcnBase(MaterialModelData &data) {
     rhomin = data.rhomin;
     pmin = data.pmin;
-    verbose = verbose_;
+    failsafe_density = data.failsafe_density;
   }
   virtual ~VarFcnBase() {}
  
@@ -82,14 +84,14 @@ public:
       return true;
     }
     if(rho <= 0.0) {
-      if(verbose)
+      if(verbose>1)
         fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
       return true;
     }
     double e = GetInternalEnergyPerUnitMass(rho,p);
     double c2 = GetDpdrho(rho, e) + p/rho*GetBigGamma(rho, e);
     if(c2<=0){
-      if(verbose)
+      if(verbose>1)
         fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
       return true;
     }
@@ -214,15 +216,15 @@ bool VarFcnBase::ClipDensityAndPressure(double *V, double *U)
   bool clip = false;
 
   if(V[0]<rhomin){
-    if(verbose)
-      fprintf(stderr,"clip density from %e to %e.\n", V[0], rhomin);
+//    if(verbose)
+//      fprintf(stderr,"clip density from %e to %e.\n", V[0], rhomin);
     V[0] = rhomin;
     clip = true;
   }
 
   if(V[4]<pmin){
-    if(verbose)
-      fprintf(stdout, "clip pressure from %e to %e\n", V[4], pmin);
+//    if(verbose)
+//      fprintf(stdout, "clip pressure from %e to %e\n", V[4], pmin);
     V[4] = pmin;
     clip = true;
   }

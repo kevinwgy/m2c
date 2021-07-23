@@ -885,7 +885,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "  " << wavenumber << "-wave: rarefaction, solver did not converge (final sol.: rhos_1 = "
              << rhos_1 << ", ps_1 = " << ps_1 << "; inputs: rho = " << rho << ", p = " << p << ", ps = " << ps << ")" << endl;
 #endif
-        return true; 
+        return false; 
       }
     }
   }

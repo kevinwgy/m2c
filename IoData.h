@@ -262,6 +262,8 @@ struct MaterialModelData {
   double rhomin;
   double pmin;
 
+  double failsafe_density; //for updating phase change -- last resort
+
   StiffenedGasModelData    sgModel;
   MieGruneisenModelData    mgModel;
   JonesWilkinsLeeModelData jwlModel;
@@ -678,7 +680,7 @@ struct OutputData {
 
   enum Options {OFF = 0, ON = 1};
   Options density, velocity, pressure, materialid, internal_energy, temperature;
-  Options verbose;
+  enum VerbosityLevel {LOW = 0, MEDIUM = 1, HIGH = 2} verbose;
 
   const static int MAXLS = 5;
   Options levelset[MAXLS];

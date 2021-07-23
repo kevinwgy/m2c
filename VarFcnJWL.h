@@ -37,7 +37,7 @@ private:
   double omega_over_R1rho0, omega_over_R2rho0; //!< omega/(R1*rho0), omega/(R2*rho0)
 
 public:
-  VarFcnJWL(MaterialModelData &data, bool verbose_ = true);
+  VarFcnJWL(MaterialModelData &data);
   ~VarFcnJWL() {}
 
   //! ----- EOS-Specific Functions -----
@@ -75,7 +75,7 @@ protected:
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 inline
-VarFcnJWL::VarFcnJWL(MaterialModelData &data, bool verbose_) : VarFcnBase(data,verbose_) {
+VarFcnJWL::VarFcnJWL(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::JWL){
     fprintf(stderr, "*** Error: MaterialModelData is not of type JWL\n");

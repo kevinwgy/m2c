@@ -6,11 +6,12 @@
 #include<algorithm>//find
 using std::cout;
 using std::endl;
+extern int verbose;
 //-----------------------------------------------------
 
 MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                                       SpaceOperator &spo, vector<LevelSetOperator*> &lso)
-                  : comm(comm_), iod(iod_),
+                                       vector<VarFcnBase*> &varFcn_, SpaceOperator &spo, vector<LevelSetOperator*> &lso)
+                  : comm(comm_), iod(iod_), varFcn(varFcn_),
                     coordinates(spo.GetMeshCoordinates()),
                     delta_xyz(spo.GetMeshDeltaXYZ()),
                     Tag(comm_, &(dm_all_.ghosted1_1dof))
@@ -259,10 +260,13 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
 
   if(sum_weight > 0.0)
     v /= sum_weight;
-  else if(upwind)
-    fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions w/ upwinding. Retrying.\n", i,j,k);
-  else 
-    fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions. Retrying.\n", i,j,k);
+  else if(upwind) {
+    if(verbose>1) 
+      fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions w/ upwinding. Retrying.\n", i,j,k);
+  } else {
+    if(verbose>1) 
+      fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions. Retrying.\n", i,j,k);
+  }
 
   return counter;
 }
@@ -344,7 +348,9 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
             }
 
         if(sum_weight==0) {
-          fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) by extrapolation w/ upwinding.\n", i,j,k, x0[0],x0[1],x0[2]);
+          if(verbose>1) 
+            fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+                    "by extrapolation w/ upwinding.\n", i,j,k, x0[0],x0[1],x0[2]);
           unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
         } else
           v[k][j][i] /= sum_weight; 
@@ -449,8 +455,8 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
 
     if(sum_weight>0) {
       v[k][j][i] /= sum_weight; //Done!
-      fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. (2nd attempt)\n",
-                      i,j,k);
+      if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. (2nd attempt)\n",
+                          i,j,k);
       continue;
     }
 
@@ -500,19 +506,20 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
 
       if(sum_weight>0) {
         v[k][j][i][0] = density/sum_weight;
-        fprintf(stderr,"*** (%d,%d,%d): Updated density by interpolation w/ stencil width = %d: %e %e %e %e %e\n",
-                       i,j,k, layer, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+        if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated density by interpolation w/ stencil width = %d: %e %e %e %e %e\n",
+                            i,j,k, layer, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
         break; //done with this node
       }
 
     }
 
-    //FAILED! Very unlikely. This means there is no neighbors within max_layer that have the same ID!!
+    //Very unlikely. This means there is no neighbors within max_layer that have the same ID!!
     if(sum_weight==0) { 
-      fprintf(stderr,"\033[0;31m*** Error: Unable to update phase change at (%d,%d,%d)(%e,%e,%e). No valid "
-                     "neighbors within %d layers.\033[0m\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
-                     coords[k][j][i][2], max_layer);
-      exit(-1);
+      fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). No valid "
+                     "neighbors within %d layers.\033[0m\n", 
+                     i,j,k, coords[k][j][i][0], coords[k][j][i][1],
+                     coords[k][j][i][2], varFcn[id[k][j][i]]->failsafe_density, max_layer);
+      v[k][j][i][0] = varFcn[id[k][j][i]]->failsafe_density;
     }
   }
 

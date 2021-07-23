@@ -16,6 +16,8 @@
 #include <set>
 using std::cout;
 using std::endl;
+int verbose;
+
 /*************************************
  * Main Function
  ************************************/
@@ -35,6 +37,7 @@ int main(int argc, char* argv[])
 
   //! Read user's input file
   IoData iod(argc, argv);
+  verbose = iod.output.verbose;
 
   //! Calculate mesh coordinates
   vector<double> xcoords, dx, ycoords, dy, zcoords, dz;
@@ -57,11 +60,11 @@ int main(int argc, char* argv[])
       exit_mpi();
     }
     if(it->second->eos == MaterialModelData::STIFFENED_GAS)
-      vf[matid] = new VarFcnSG(*it->second, iod.output.verbose);
+      vf[matid] = new VarFcnSG(*it->second);
     else if(it->second->eos == MaterialModelData::MIE_GRUNEISEN)
-      vf[matid] = new VarFcnMG(*it->second, iod.output.verbose);
+      vf[matid] = new VarFcnMG(*it->second);
     else if(it->second->eos == MaterialModelData::JWL)
-      vf[matid] = new VarFcnJWL(*it->second, iod.output.verbose);
+      vf[matid] = new VarFcnJWL(*it->second);
     else {
       print_error("*** Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
       exit_mpi();
@@ -135,7 +138,7 @@ int main(int argc, char* argv[])
   }  
   
   //! Initialize multiphase operator (for updating "phase change")
-  MultiPhaseOperator mpo(comm, dms, iod, spo, lso);
+  MultiPhaseOperator mpo(comm, dms, iod, vf, spo, lso);
   mpo.UpdateMaterialID(Phi,ID); //populate the ghost layer of ID (outside domain boundary)
 
   //! Initialize output

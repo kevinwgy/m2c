@@ -1,5 +1,6 @@
 #ifndef _MULTIPHASE_OPERATOR_H_
 #define _MULTIPHASE_OPERATOR_H_
+#include<VarFcnBase.h>
 #include<IoData.h>
 #include<SpaceVariable.h>
 
@@ -19,6 +20,8 @@ class MultiPhaseOperator
   MPI_Comm&       comm;
   IoData& iod;
 
+  vector<VarFcnBase*> &varFcn;
+
   //! Mesh info
   SpaceVariable3D& coordinates;
   SpaceVariable3D& delta_xyz;
@@ -34,7 +37,7 @@ class MultiPhaseOperator
 
 public:
   MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                     SpaceOperator &spo, vector<LevelSetOperator*> &lso);
+                     vector<VarFcnBase*> &varFcn_, SpaceOperator &spo, vector<LevelSetOperator*> &lso);
   ~MultiPhaseOperator();
 
   //update material id including the ghost region
