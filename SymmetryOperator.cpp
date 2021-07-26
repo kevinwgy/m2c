@@ -115,7 +115,7 @@ SymmetryOperator::AddCylindricalSymmetryTerms(SpaceVariable3D &V, SpaceVariable3
         rho = v[k][j][i][0];
         H   = varFcn[id[k][j][i]]->ComputeTotalEnthalpyPerUnitMass(v[k][j][i]);
 
-        radial = coords[k][j][i][0];
+        radial = coords[k][j][i][1];
         assert(radial>0);
 
         coeff = vol[k][j][i]*rho*ur/radial;
