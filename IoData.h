@@ -158,7 +158,7 @@ struct MeshResolution1DPointData {
 
 struct MeshData {
 
-  enum Type {THREEDIMENSIONAL = 0, CYLINDRICAL = 1} type;
+  enum Type {THREEDIMENSIONAL = 0, SPHERICAL = 1, CYLINDRICAL = 2} type;
   double x0, xmax, y0, ymax, z0, zmax;
   int Nx, Ny, Nz;
 
@@ -174,6 +174,8 @@ struct MeshData {
   ~MeshData() {} 
 
   void setup(const char *, ClassAssigner * = 0);
+
+  void check(); //!< check input parameters (for spherical & cylindrical domains)
 };
 
 //------------------------------------------------------------------------------

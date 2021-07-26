@@ -123,6 +123,11 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
          *std::min_element(dz.begin(), dz.end()), *std::max_element(dz.begin(), dz.end()));
   print("  Total number of nodes/cells: %d.\n", x.size()*y.size()*z.size());
 
+  if(iod_mesh.type == MeshData::CYLINDRICAL) 
+    print("  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.\n");
+  else if(iod_mesh.type == MeshData::SPHERICAL)
+    print("  Imposing spherical symmetry: x ~ radial coordinate.\n");
+
 /*
   for(int i=0; i<x.size(); i++)
     print("x[%d] = %e.\n", i, x[i]);

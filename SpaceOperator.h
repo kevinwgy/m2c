@@ -1,6 +1,7 @@
 #ifndef _SPACEOPERATOR_H_
 #define _SPACEOPERATOR_H_
 #include <ExactRiemannSolverBase.h>
+#include <SymmetryOperator.h>
 #include <ViscosityOperator.h>
 #include <SmoothingOperator.h>
 #include <FluxFcnBase.h>
@@ -36,6 +37,9 @@ class SpaceOperator
 
   //! Class for spatial reconstruction
   Reconstructor rec;
+
+  //! Class for imposing spherical or cylindrical symmetry (sink terms placed on the left-hand-side!)
+  SymmetryOperator* symm;
 
   //! Class for calculating spatial gradients of variables
   ViscosityOperator* visco;

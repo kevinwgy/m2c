@@ -286,8 +286,8 @@ void MeshData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 20, father);
 
   new ClassToken<MeshData>(ca, "Type", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::type), 2,
-                               "ThreeDimensional", 0, "Cylindrical", 1);
+                               reinterpret_cast<int MeshData::*>(&MeshData::type), 3,
+                               "ThreeDimensional", 0, "Spherical", 1, "Cylindrical", 2);
   new ClassDouble<MeshData>(ca, "X0", this, &MeshData::x0);
   new ClassDouble<MeshData>(ca, "Xmax", this, &MeshData::xmax);
   new ClassDouble<MeshData>(ca, "Y0", this, &MeshData::y0);
@@ -321,6 +321,36 @@ void MeshData::setup(const char *name, ClassAssigner *father)
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 5,
                                "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
  } 
+
+//------------------------------------------------------------------------------
+
+void MeshData::check()
+{
+  if(type == SPHERICAL) {
+    if(Ny != 1 || Nz != 1) {
+      print_error("*** Error: For a domain w/ spherical symmetry, the mesh should "
+                  "have 1 cell in y- and z-dirs (%d, %d).\n", Ny, Nz); 
+      exit_mpi();
+    }
+    if(x0<0.0) {
+      print_error("*** Error: For a domain w/ spherical symmetry, x0 must be nonnegative (%e).\n",
+                  x0);
+      exit_mpi();
+    }
+  }
+  else if(type == CYLINDRICAL) {
+    if(Nz != 1) {
+      print_error("*** Error: For a domain w/ cylindrical symmetry, the mesh should "
+                  "have 1 cell in z-dir (%d).\n", Nz); 
+      exit_mpi();
+    }
+    if(y0<0.0) {
+      print_error("*** Error: For a domain w/ cylindrical symmetry, y0 must be nonnegative (%e).\n",
+                  y0);
+      exit_mpi();
+    }
+  }
+}
 
 //------------------------------------------------------------------------------
 
@@ -1824,6 +1854,9 @@ void IoData::readCmdFile()
     exit(error);
   }
   fclose(cmdFilePtr);
+
+  //Check spatial domain (for spherical and cylindrical)
+  mesh.check();
 
   //READ ADDITIONAL FILES
   if(strcmp(ic.user_specified_ic, ""))

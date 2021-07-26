@@ -67,6 +67,7 @@ IoData.cpp
 SpaceVariable.cpp
 ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp
+SymmetryOperator.cpp
 SmoothingOperator.cpp
 Interpolator.cpp
 GradientCalculator.cpp

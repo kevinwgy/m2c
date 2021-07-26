@@ -36,7 +36,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
-    visco(NULL), smooth(NULL)
+    symm(NULL), visco(NULL), smooth(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -48,6 +48,9 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
 
   rec.Setup(&ghost_nodes_inner, &ghost_nodes_outer); //this function requires mesh info (dxyz)
   
+  if(iod.mesh.type == MeshData::SPHERICAL || iod.mesh.type == MeshData::CYLINDRICAL)
+    symm = new SymmetryOperator(comm, dm_all, iod.mesh, varFcn, coordinates, delta_xyz, volume);
+
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
     smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
     
@@ -57,6 +60,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
 
 SpaceOperator::~SpaceOperator()
 {
+  if(symm) delete symm;
   if(visco) delete visco;
   if(smooth) delete smooth;
 }
@@ -66,6 +70,9 @@ SpaceOperator::~SpaceOperator()
 void SpaceOperator::Destroy()
 {
   rec.Destroy();
+
+  if(symm) symm->Destroy();
+
   if(visco) visco->Destroy();
 
   if(smooth) smooth->Destroy();
@@ -2055,6 +2062,9 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, R);
+
+  if(symm) //cylindrical or spherical symmetry
+    symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
 
   // -------------------------------------------------
   // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
