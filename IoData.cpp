@@ -302,24 +302,49 @@ void MeshData::setup(const char *name, ClassAssigner *father)
   ypoints_map.setup("ControlPointY", ca);
   zpoints_map.setup("ControlPointZ", ca);
 
+  // Inside the code: Farfield0 = Farfield = Inlet, Farfield1 = Outlet
   new ClassToken<MeshData>(ca, "BoundaryConditionX0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 5,
-                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 8,
+                               "None", 0, 
+                               "Inlet", 1, "Outlet", 2, //option 1
+                               "Farfield0", 1, "Farfield1", 2, //option 2,
+                               "Farfield", 1,//option 3
+                               "Wall", 3, "Symmetry", 4);
   new ClassToken<MeshData>(ca, "BoundaryConditionXmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 5,
-                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 8,
+                               "None", 0, 
+                               "Inlet", 1, "Outlet", 2, //option 1
+                               "Farfield0", 1, "Farfield1", 2, //option 2,
+                               "Farfield", 1,//option 3
+                               "Wall", 3, "Symmetry", 4);
   new ClassToken<MeshData>(ca, "BoundaryConditionY0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 5,
-                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 8,
+                               "None", 0, 
+                               "Inlet", 1, "Outlet", 2, //option 1
+                               "Farfield0", 1, "Farfield1", 2, //option 2,
+                               "Farfield", 1,//option 3
+                               "Wall", 3, "Symmetry", 4);
   new ClassToken<MeshData>(ca, "BoundaryConditionYmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 5,
-                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 8,
+                               "None", 0, 
+                               "Inlet", 1, "Outlet", 2, //option 1
+                               "Farfield0", 1, "Farfield1", 2, //option 2,
+                               "Farfield", 1,//option 3
+                               "Wall", 3, "Symmetry", 4);
   new ClassToken<MeshData>(ca, "BoundaryConditionZ0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 5,
-                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 8,
+                               "None", 0, 
+                               "Inlet", 1, "Outlet", 2, //option 1
+                               "Farfield0", 1, "Farfield1", 2, //option 2,
+                               "Farfield", 1,//option 3
+                               "Wall", 3, "Symmetry", 4);
   new ClassToken<MeshData>(ca, "BoundaryConditionZmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 5,
-                               "None", 0, "Inlet", 1, "Outlet", 2, "Wall", 3, "Symmetry", 4);
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 8,
+                               "None", 0, 
+                               "Inlet", 1, "Outlet", 2, //option 1
+                               "Farfield0", 1, "Farfield1", 2, //option 2,
+                               "Farfield", 1,//option 3
+                               "Wall", 3, "Symmetry", 4);
  } 
 
 //------------------------------------------------------------------------------
@@ -1016,7 +1041,11 @@ void BcsData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   inlet.setup("Inlet", ca);
+  //Inside the code, Farfield0 = Farfield = Inlet, Farfield1 = Outlet
+  inlet.setup("Farfield0", ca);
+  inlet.setup("Farfield", ca);
   outlet.setup("Outlet", ca);
+  outlet.setup("Farfield1", ca);
   wall.setup("Wall", ca);
 
   multiBoundaryConditions.setup("GeometricEntities2D");
