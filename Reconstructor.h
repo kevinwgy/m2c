@@ -27,6 +27,7 @@ class Reconstructor
   FluxFcnBase* fluxFcn;
 
   //! Mesh info
+  SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;
   
   //! Pointer to ghost node lists
@@ -39,6 +40,9 @@ class Reconstructor
   SpaceVariable3D CoeffA;  //!< constant coefficient for non-uniform meshes, dim=3 for 3D 
   SpaceVariable3D CoeffB;  //!< constant coefficient for non-uniform meshes, dim=3 for 3D 
   SpaceVariable3D CoeffK;  //!< the integer k in Zeng's 2016 paper for Van Albada (stored as real numbers)
+
+  /** Internal variable to tag fixed nodes (only for nodes inside physical domain) */
+  SpaceVariable3D* FixedByUser;
 
   /** Another internal variable for var. conversion*/
   SpaceVariable3D U;
@@ -71,6 +75,7 @@ private:
 
   int CalculateSlopeLimiterCoefficientK(double A, double B); //calculate k in Zeng's 2016 paper
 
+  void TagNodesFixedByUser();
   
   /** slope limiter functions
    * (frequently called; need to be as fast as possible)

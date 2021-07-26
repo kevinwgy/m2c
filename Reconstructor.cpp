@@ -1,4 +1,5 @@
 #include<Reconstructor.h>
+#include <DistancePointToSpheroid.h>
 using std::round;
 
 
@@ -7,28 +8,38 @@ using std::round;
 Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, ReconstructionData &iod_rec_, 
                              SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
                              vector<VarFcnBase*>* vf_, FluxFcnBase* ff_)
-                   : iod_rec(iod_rec_), delta_xyz(delta_xyz_), varFcn(vf_), fluxFcn(ff_),
+                   : iod_rec(iod_rec_), coordinates(coordinates_),
+                     delta_xyz(delta_xyz_), varFcn(vf_), fluxFcn(ff_),
                      CoeffA(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffB(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffK(comm_, &(dm_all_.ghosted1_3dof)),
                      U(comm_, &(dm_all_.ghosted1_5dof)),
-                     ghost_nodes_inner(NULL), ghost_nodes_outer(NULL)
+                     ghost_nodes_inner(NULL), ghost_nodes_outer(NULL),
+                     FixedByUser(NULL)
 {
   if(iod_rec.varType != ReconstructionData::PRIMITIVE && (!varFcn || !fluxFcn)) {
     print_error("*** Error: Reconstructor needs to know VarFcn and FluxFcn. (Software bug)\n");
     exit_mpi();
   }
+
+  if(iod_rec.fixes.sphereMap.dataMap.empty() &&
+     iod_rec.fixes.spheroidMap.dataMap.empty() &&
+     iod_rec.fixes.cylinderconeMap.dataMap.empty())
+    FixedByUser = NULL;
+  else
+    FixedByUser = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+
 }
 
 //--------------------------------------------------------------------------
 
 Reconstructor::~Reconstructor()
 {
-
+  if(FixedByUser) delete FixedByUser;
 }
 
 //--------------------------------------------------------------------------
-/** Compute AB and K */
+/** Compute AB and K, and Figure out which nodes are inside fixes */
 void Reconstructor::Setup(vector<GhostPoint> *inner, vector<GhostPoint> *outer)
 {
   //! Note: This function should be called after coordinates and delta_xyz have been computed
@@ -71,6 +82,10 @@ void Reconstructor::Setup(vector<GhostPoint> *inner, vector<GhostPoint> *outer)
   CoeffA.RestoreDataPointerAndInsert();
   CoeffB.RestoreDataPointerAndInsert();
   CoeffK.RestoreDataPointerAndInsert();
+
+  if(FixedByUser)
+    TagNodesFixedByUser();
+
 }
 
 //--------------------------------------------------------------------------
@@ -97,12 +112,112 @@ int Reconstructor::CalculateSlopeLimiterCoefficientK(double A, double B)
 
 //--------------------------------------------------------------------------
 
+void Reconstructor::TagNodesFixedByUser()
+{
+  if(!FixedByUser)
+    return;
+
+  FixedByUser->SetConstantValue(0.0, true); //default value: not fixed
+
+  // Get domain info
+  int i0, j0, k0, imax, jmax, kmax;
+  coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
+  // get data
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  double*** fixed = (double***)FixedByUser->GetDataPointer();
+
+  // spheres
+  for(auto it=iod_rec.fixes.sphereMap.dataMap.begin();
+          it!=iod_rec.fixes.sphereMap.dataMap.end(); it++) {
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+
+    print("- Applying constant reconstruction within sphere %d:\n", it->first);
+    print("  o center: %e %e %e;  radius: %e.\n", x0[0], x0[1], x0[2], it->second->radius);
+
+    double dist;
+    // loop through the subdomain interior (i.e. No tags applied to ghost nodes outside physical domain)
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
+          if (dist<0)
+            fixed[k][j][i] = 1;
+        } 
+  }
+
+  // spheroids
+  for(auto it=iod_rec.fixes.spheroidMap.dataMap.begin(); 
+          it!=iod_rec.fixes.spheroidMap.dataMap.end(); it++) {
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
+
+    print("- Applying constant reconstruction within spheroid %d:\n", it->first);
+    print("  o center: %e %e %e;  axis: %e %e %e.\n", x0[0], x0[1], x0[2], axis[0], axis[1], axis[2]);
+    print("  o length: %e;  diameter: %e.\n", it->second->length, it->second->diameter);
+
+    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
+
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          if (dist<0)
+            fixed[k][j][i] = 1;
+        }
+  }
+
+  // cylinder-cone
+  for(auto it=iod_rec.fixes.cylinderconeMap.dataMap.begin(); 
+          it!=iod_rec.fixes.cylinderconeMap.dataMap.end(); it++) {
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder radius
+    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
+    double Hmax = R/tan_alpha;
+    double H = min(it->second->cone_height, Hmax); //cone's height
+
+    print("- Applying constant reconstruction within cylinder-cone %d:\n", it->first);
+    print("  o base center: %e %e %e;  axis: %e %e %e.\n", 
+          x0[0], x0[1], x0[2], dir[0], dir[1], dir[2]);
+    print("  o cylinder height %e;  radius: %e;  openning angle: %e.\n", 
+          L, R, it->second->opening_angle_degrees);
+
+    double x, r;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) //inside
+            fixed[k][j][i] = 1;
+        }
+  }
+
+  coordinates.RestoreDataPointerToLocalVector();
+
+  FixedByUser->RestoreDataPointerAndInsert();
+
+}
+
+//--------------------------------------------------------------------------
+
 void Reconstructor::Destroy()
 {
   CoeffA.Destroy();
   CoeffB.Destroy();
   CoeffK.Destroy();
   U.Destroy();
+
+  if(FixedByUser)
+    FixedByUser->Destroy();
 }
 
 //--------------------------------------------------------------------------
@@ -158,6 +273,9 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
   Vec3D*** K    = (Vec3D***)CoeffK.GetDataPointer();
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
+  //user-specified "Fixes"
+  double*** fixed = FixedByUser ? FixedByUser->GetDataPointer() : NULL;
+
   //! Number of DOF per cell
   int nDOF = V.NumDOF();
 
@@ -190,6 +308,22 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
     for(int j=j0; j<jmax; j++) {
       for(int i=i0; i<imax; i++) {
         
+        //---------------------------
+        // If node is 'fixed', trivial
+        //---------------------------
+        if(fixed && fixed[k][j][i]) {
+          for(int dof=0; dof<nDOF; dof++) {
+            vl[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vr[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vb[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vt[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vk[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vf[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+          }
+          continue;
+        }
+
+        // Get variable type
         vType = iod_rec.varType;
 
 RETRY: 
@@ -530,6 +664,8 @@ RETRY:
   CoeffK.RestoreDataPointerToLocalVector(); //!< no changes to vector
   V.RestoreDataPointerToLocalVector(); //!< no changes to vector
   delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
+
+  if(FixedByUser) FixedByUser->RestoreDataPointerToLocalVector();
 
   if(ID) ID->RestoreDataPointerToLocalVector(); //!< no changes to vector
 

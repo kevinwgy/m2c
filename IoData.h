@@ -293,6 +293,21 @@ struct EquationsData {
 
 //------------------------------------------------------------------------------
 
+struct FixData {
+
+  ObjectMap<SphereData>   sphereMap;
+  ObjectMap<SpheroidData> spheroidMap;
+  ObjectMap<CylinderConeData> cylinderconeMap;
+
+  FixData();
+  ~FixData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ReconstructionData {
 
   enum Reconstruction {CONSTANT = 0, LINEAR = 1} type;
@@ -306,6 +321,9 @@ struct ReconstructionData {
   // can be different.
   enum VariableType {PRIMITIVE = 0, CONSERVATIVE = 1, PRIMITIVE_CHARACTERISTIC = 2,
                      CONSERVATIVE_CHARACTERISTIC = 3} varType;
+
+  //User-specified regions in which type is reset to CONSTANT
+  FixData fixes;
 
   ReconstructionData();
   ~ReconstructionData() {}

@@ -583,7 +583,7 @@ ReconstructionData::ReconstructionData()
 
 void ReconstructionData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 5, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 6, father); 
 
   new ClassToken<ReconstructionData>
     (ca, "Type", this,
@@ -608,6 +608,8 @@ void ReconstructionData::setup(const char *name, ClassAssigner *father)
      reinterpret_cast<int ReconstructionData::*>(&ReconstructionData::varType), 4,
      "Primitive", 0, "Conservative", 1, "PrimitiveCharacteristic", 2,
      "ConservativeCharacteristic", 3);
+
+  fixes.setup("Fixes", ca);
 }
 
 //------------------------------------------------------------------------------
@@ -654,6 +656,21 @@ void SmoothingData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+FixData::FixData()
+{ }
+
+//------------------------------------------------------------------------------
+
+void FixData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  sphereMap.setup("Sphere", ca);
+  spheroidMap.setup("Spheroid", ca);
+  cylinderconeMap.setup("CylinderAndCone", ca);
+}
+
+//------------------------------------------------------------------------------
+
 SchemeData::SchemeData() 
 {
   flux = HLLC;
@@ -679,6 +696,7 @@ void SchemeData::setup(const char *name, ClassAssigner *father)
   rec.setup("Reconstruction", ca);
 
   smooth.setup("Smoothing", ca);
+
 }
 
 //------------------------------------------------------------------------------
