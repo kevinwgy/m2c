@@ -139,8 +139,6 @@ int main(int argc, char* argv[])
 
 #ifdef LEVELSET_TEST
   if(!lso.empty()) {
-    lso[0]->PrescribeVelocityFieldForTesting(V);
-
     print("\n");
     print("\033[0;32m- Testing the Level Set Solver using a prescribed velocity field (%d). "
           "N-S solver not activated.\033[0m\n", (int)LEVELSET_TEST);

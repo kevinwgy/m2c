@@ -295,21 +295,38 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 {
   double*** phi = (double***) Phi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
   int NX, NY, NZ;
   Phi.GetGlobalSize(&NX, &NY, &NZ);
 
+  double r, r1, r2, f1, f2;
   //! Left boundary
   if(ii0==-1) { 
-    switch (iod.mesh.bc_x0) {
-      case MeshData::INLET :
-      case MeshData::OUTLET :
-      case MeshData::WALL :
-      case MeshData::SYMMETRY :
+    switch (iod_ls.bc_x0) {
+
+      case LevelSetSchemeData::ZERO_NEUMANN :
         for(int k=k0; k<kmax; k++)
           for(int j=j0; j<jmax; j++)
             phi[k][j][ii0] = phi[k][j][ii0+1];
         break;
+
+      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        for(int k=k0; k<kmax; k++)
+          for(int j=j0; j<jmax; j++) {
+            if(ii0+2<NX) { //ii0+2 is within physical domain
+              r  = coords[k][j][ii0][0];
+              r1 = coords[k][j][ii0+1][0];  f1 = phi[k][j][ii0+1];
+              r2 = coords[k][j][ii0+2][0];  f2 = phi[k][j][ii0+2];
+              phi[k][j][ii0] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+            } else
+              phi[k][j][ii0] = phi[k][j][ii0+1];
+          }
+        break;
+
+      case LevelSetSchemeData::NONE :
+        break;
+
       default :
         print_error("*** Error: Level set boundary condition at x=x0 cannot be specified!\n");
         exit_mpi();
@@ -318,15 +335,30 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 
   //! Right boundary
   if(iimax==NX+1) { 
-    switch (iod.mesh.bc_xmax) {
-      case MeshData::INLET :
-      case MeshData::OUTLET :
-      case MeshData::WALL :
-      case MeshData::SYMMETRY :
+    switch (iod_ls.bc_xmax) {
+
+      case LevelSetSchemeData::ZERO_NEUMANN :
         for(int k=k0; k<kmax; k++)
           for(int j=j0; j<jmax; j++)
             phi[k][j][iimax-1] = phi[k][j][iimax-2];
         break;
+
+      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        for(int k=k0; k<kmax; k++)
+          for(int j=j0; j<jmax; j++) {
+            if(iimax-3>=0) { //iimax-3 is within physical domain
+              r  = coords[k][j][iimax-1][0];
+              r1 = coords[k][j][iimax-2][0];  f1 = phi[k][j][iimax-2];
+              r2 = coords[k][j][iimax-3][0];  f2 = phi[k][j][iimax-3];
+              phi[k][j][iimax-1] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+            } else
+              phi[k][j][iimax-1] = phi[k][j][iimax-2];
+          }
+        break;
+ 
+      case LevelSetSchemeData::NONE :
+        break;
+
       default :
         print_error("*** Error: Level set boundary condition at x=xmax cannot be specified!\n");
         exit_mpi();
@@ -335,15 +367,30 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 
   //! Bottom boundary
   if(jj0==-1) { 
-    switch (iod.mesh.bc_y0) {
-      case MeshData::INLET :
-      case MeshData::OUTLET :
-      case MeshData::WALL :
-      case MeshData::SYMMETRY :
+    switch (iod_ls.bc_y0) {
+
+      case LevelSetSchemeData::ZERO_NEUMANN :
         for(int k=k0; k<kmax; k++)
           for(int i=i0; i<imax; i++)
             phi[k][jj0][i] = phi[k][jj0+1][i];
         break;
+
+      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        for(int k=k0; k<kmax; k++)
+          for(int i=i0; i<imax; i++) {
+            if(jj0+2<NY) { //jj0+2 is within physical domain
+              r  = coords[k][jj0][i][1];
+              r1 = coords[k][jj0+1][i][1];  f1 = phi[k][jj0+1][i];
+              r2 = coords[k][jj0+2][i][1];  f2 = phi[k][jj0+2][i];
+              phi[k][jj0][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+            } else
+              phi[k][jj0][i] = phi[k][jj0+1][i];
+          }
+        break;
+
+      case LevelSetSchemeData::NONE :
+        break;
+
       default :
         print_error("*** Error: Level set boundary condition at y=y0 cannot be specified!\n");
         exit_mpi();
@@ -352,15 +399,30 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 
   //! Top boundary
   if(jjmax==NY+1) { 
-    switch (iod.mesh.bc_ymax) {
-      case MeshData::INLET :
-      case MeshData::OUTLET :
-      case MeshData::WALL :
-      case MeshData::SYMMETRY :
+    switch (iod_ls.bc_ymax) {
+
+      case LevelSetSchemeData::ZERO_NEUMANN :
         for(int k=k0; k<kmax; k++)
           for(int i=i0; i<imax; i++)
             phi[k][jjmax-1][i] = phi[k][jjmax-2][i]; 
         break;
+
+      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        for(int k=k0; k<kmax; k++)
+          for(int i=i0; i<imax; i++) {
+            if(jjmax-3>=0) { //jjmax-3 is within physical domain
+              r  = coords[k][jjmax-1][i][1];
+              r1 = coords[k][jjmax-2][i][1];  f1 = phi[k][jjmax-2][i];
+              r2 = coords[k][jjmax-3][i][1];  f2 = phi[k][jjmax-3][i];
+              phi[k][jjmax-1][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+            } else
+              phi[k][jjmax-1][i] = phi[k][jjmax-2][i];
+          }
+        break;
+ 
+      case LevelSetSchemeData::NONE :
+        break;
+
       default :
         print_error("*** Error: Level set boundary condition at y=ymax cannot be specified!\n");
         exit_mpi();
@@ -369,15 +431,30 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 
   //! Back boundary (z min)
   if(kk0==-1) { 
-    switch (iod.mesh.bc_z0) {
-      case MeshData::INLET :
-      case MeshData::OUTLET :
-      case MeshData::WALL :
-      case MeshData::SYMMETRY :
+    switch (iod_ls.bc_z0) {
+
+      case LevelSetSchemeData::ZERO_NEUMANN :
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++)
             phi[kk0][j][i] = phi[kk0+1][j][i]; 
         break;
+
+      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            if(kk0+2<NZ) { //kk0+2 is within physical domain
+              r  = coords[kk0][j][i][2];
+              r1 = coords[kk0+1][j][i][2];  f1 = phi[kk0+1][j][i];
+              r2 = coords[kk0+2][j][i][2];  f2 = phi[kk0+2][j][i];
+              phi[kk0][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+            } else
+              phi[kk0][j][i] = phi[kk0+1][j][i]; 
+          }
+        break;
+
+      case LevelSetSchemeData::NONE :
+        break;
+
       default :
         print_error("*** Error: Level set boundary condition at z=z0 cannot be specified!\n");
         exit_mpi();
@@ -386,15 +463,30 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 
   //! Front boundary (z max)
   if(kkmax==NZ+1) { 
-    switch (iod.mesh.bc_zmax) {
-      case MeshData::INLET :
-      case MeshData::OUTLET :
-      case MeshData::WALL :
-      case MeshData::SYMMETRY :
+    switch (iod_ls.bc_zmax) {
+
+      case LevelSetSchemeData::ZERO_NEUMANN :
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++)
             phi[kkmax-1][j][i] = phi[kkmax-2][j][i];
         break;
+
+      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            if(kkmax-3>=0) { //kkmax-3 is within physical domain
+              r  = coords[kkmax-1][j][i][2];
+              r1 = coords[kkmax-2][j][i][2];  f1 = phi[kkmax-2][j][i];
+              r2 = coords[kkmax-3][j][i][2];  f2 = phi[kkmax-3][j][i];
+              phi[kkmax-1][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+            } else
+              phi[kkmax-1][j][i] = phi[kkmax-2][j][i];
+          }
+        break;
+
+      case LevelSetSchemeData::NONE :
+        break;
+
       default :
         print_error("*** Error: Boundary condition at z=zmax cannot be specified!\n");
         exit_mpi();
@@ -402,12 +494,19 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
   }
 
   Phi.RestoreDataPointerAndInsert();
+
+  coordinates.RestoreDataPointerToLocalVector();
 }
 
 //-----------------------------------------------------
 
 void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R)
 {
+
+#ifdef LEVELSET_TEST
+  PrescribeVelocityFieldForTesting(V);
+#endif
+
   Reconstruct(V, Phi); // => ul, ur, dudx, vb, vt, dvdy, wk, wf, dwdz, Phil, Phir, Phib, Phit, Phik, Phif
 
   ComputeAdvectionFlux(R);  //Advection flux, on the right-hand-side

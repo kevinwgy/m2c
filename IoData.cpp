@@ -753,6 +753,13 @@ LevelSetSchemeData::LevelSetSchemeData()
 
   flux = ROE;
 
+  bc_x0   = ZERO_NEUMANN;
+  bc_xmax = ZERO_NEUMANN;
+  bc_y0   = ZERO_NEUMANN;
+  bc_ymax = ZERO_NEUMANN;
+  bc_z0   = ZERO_NEUMANN;
+  bc_zmax = ZERO_NEUMANN;
+
   delta = 0.2; //the coefficient in Harten's entropy fix.
 
   reinitialization_freq = -1;
@@ -763,7 +770,7 @@ LevelSetSchemeData::LevelSetSchemeData()
 Assigner *LevelSetSchemeData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
 
   new ClassInt<LevelSetSchemeData>(ca, "MaterialID", this, 
     &LevelSetSchemeData::materialid);
@@ -774,6 +781,27 @@ Assigner *LevelSetSchemeData::getAssigner()
      "Roe", 0, "LocalLaxFriedrichs", 1, "Upwind", 2);
 
   new ClassDouble<LevelSetSchemeData>(ca, "EntropyFixCoefficient", this, &LevelSetSchemeData::delta);
+
+
+  new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionX0", this,
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_x0), 3,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+  new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionXmax", this,
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_xmax), 3,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+  new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionY0", this,
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_y0), 3,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+  new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionYmax", this,
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_ymax), 3,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+  new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionZ0", this,
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_z0), 3,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+  new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionZmax", this,
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_zmax), 3,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+
 
   new ClassInt<LevelSetSchemeData>(ca, "ReinitializationFrequency", this, 
     &LevelSetSchemeData::reinitialization_freq);

@@ -32,7 +32,7 @@ if(NOT DEFINED ENV{PETSC_DIR})
 endif()
 
 
-add_definitions(-DLEVELSET_TEST=1)
+#add_definitions(-DLEVELSET_TEST=1)
 
 
 # -----------------------------
