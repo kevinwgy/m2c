@@ -110,7 +110,7 @@ double VarFcnJWL::GetDensity(double p, double e) const
   //*******************************************************************
   // Calling boost function for root-finding
   // Warning: "maxit" is BOTH AN INPUT AND AN OUTPUT
-  double rho_low = 1e-12; //lowerbound
+  double rho_low = 1e-16; //lowerbound
   double f_low   = equation(rho_low); 
   double rho_hi  = rho0;  //upperbound
   double f_hi    = equation(rho_hi);

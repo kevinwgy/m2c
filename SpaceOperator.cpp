@@ -2055,6 +2055,11 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
                                     RiemannSolutions *riemann_solutions)
 {
+
+#ifdef LEVELSET_TEST
+  return; //testing the level set solver without solving the N-S / Euler equations
+#endif
+
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------

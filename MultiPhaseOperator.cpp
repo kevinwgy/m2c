@@ -41,6 +41,11 @@ MultiPhaseOperator::Destroy()
 void 
 MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID)
 {
+
+#ifdef LEVELSET_TEST
+  return; //testing the level set solver w/o solving the N-S / Euler equations
+#endif
+
   // reset tag to 0
   Tag.SetConstantValue(0, true/*workOnGhost*/);
   ID.SetConstantValue(0, true/*workOnGhost*/);

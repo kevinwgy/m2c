@@ -51,6 +51,9 @@ public:
 
   void Destroy();
 
+  //! for debugging/testing the level set solver (Euler / N-S solver not activated)
+  void PrescribeVelocityFieldForTesting(SpaceVariable3D &V);
+
 private:
   // functions for internal use within the class
   void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi);

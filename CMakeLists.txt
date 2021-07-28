@@ -31,6 +31,10 @@ if(NOT DEFINED ENV{PETSC_DIR})
   message(FATAL_ERROR "ERROR: Could not find Petsc...")
 endif()
 
+
+add_definitions(-DLEVELSET_TEST=1)
+
+
 # -----------------------------
 # for version control
 # Add a custom command that produces version.cpp, plus

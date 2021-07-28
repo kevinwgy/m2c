@@ -7,6 +7,10 @@
 #include <DistancePointToSpheroid.h>
 #include <map>
 
+#ifdef LEVELSET_TEST
+  #include <Vector2D.h>
+#endif
+
 using std::min;
 using std::max;
 //-----------------------------------------------------
@@ -216,6 +220,67 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
             phi[k][j][i] = dist; //>0 outside the spheroid
         }
   }
+
+
+#if LEVELSET_TEST == 1
+  // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
+  Vec2D x0(50.0,75.0); //center of disk
+  double r = 15.0; //radius of disk
+  double wid = 5.0, len = 25.0; //slot
+
+  // derivated params
+  Vec2D x1(x0[0]-0.5*wid, x0[1]-sqrt(r*r - pow(0.5*wid ,2))); //lowerleft corner of slot
+  Vec2D x2(x0[0]-0.5*wid, x0[1]+(len-r)); //upperleft corner of slot
+  Vec2D x3(x0[0]+0.5*wid, x0[1]+(len-r)); //upperright corner of slot
+  Vec2D x4(x0[0]+0.5*wid, x0[1]-sqrt(r*r - pow(0.5*wid ,2))); //lowerright corner of slot
+  double alpha = atan((x4[0]-x0[0])/(x0[1]-x4[1])); //half of the `opening angle'
+  //fprintf(stderr,"alpha = %e.\n",alpha);
+
+  double dist;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+
+        if(x[1]<=x1[1] && atan(fabs((x[0]-x0[0])/(x[1]-x0[1])))<=alpha) { //Zone 1: Outside-bottom
+          if(x[0]<=x0[0])
+            phi[k][j][i] = (x-x1).norm();
+          else
+            phi[k][j][i] = (x-x4).norm();
+        }
+
+        else if((x-x0).norm()>=r) { //Zone 2: Outside-rest
+          phi[k][j][i] = (x-x0).norm() - r;
+        }
+
+        else if(x[0]<=x4[0] && x[0]>=x1[0] && x[1]<=x2[1]) { //Zone 3: Slot
+          phi[k][j][i] = min(x4[0]-x[0], min(x[0]-x1[0], x2[1]-x[1]));
+        }
+
+        else if(x[0]<=x2[0] && x[1]<=x2[1]) { //Zone 4: Inside-left
+          phi[k][j][i] = -min(r-(x-x0).norm(), x2[0]-x[0]); 
+        }
+
+        else if(x[0]>=x3[0] && x[1]<=x3[1]) { //Zone 5: Inside-right
+          phi[k][j][i] = -min(r-(x-x0).norm(), x[0]-x3[0]);
+        }
+
+        else if(x[0]<=x2[0]) { //Zone 6: Inside-topleft
+          phi[k][j][i] = -min(r-(x-x0).norm(), (x-x2).norm());
+        }
+
+        else if(x[0]<=x3[0]) { //Zone 7: Inside-top
+          phi[k][j][i] = -min(r-(x-x0).norm(), x[1]-x2[1]);
+        }
+
+        else { //Zone 8: Inside-topright
+          phi[k][j][i] = -min(r-(x-x0).norm(), (x-x3).norm());
+        }
+
+      }
+
+#endif
 
 
   coordinates.RestoreDataPointerToLocalVector();
@@ -535,6 +600,35 @@ void LevelSetOperator::Reinitialize(SpaceVariable3D &Phi)
 {
   print_error("*** Error: Level set reinitialization has not been implemented yet.\n");
   exit_mpi();
+}
+
+//-----------------------------------------------------
+
+void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V)
+{
+  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+ 
+#if LEVELSET_TEST == 1
+        // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
+        double pi = 2.0*acos(0);
+        double v1 = fabs(coords[k][j][i][1]-50.0)<1.0e-10 ? 1.0e-10 : 50.0-coords[k][j][i][1];
+        double v2 = fabs(coords[k][j][i][0]-50.0)<1.0e-10 ? 1.0e-10 : coords[k][j][i][0]-50.0;
+        v[k][j][i][1] = pi/314.0*v1;
+        v[k][j][i][2] = pi/314.0*v2;
+        v[k][j][i][3] = 0.0;
+#endif
+
+      }
+
+  coordinates.RestoreDataPointerToLocalVector();
+
+  //no need to communicate as the same formula is used in all the subdomains
+  V.RestoreDataPointerToLocalVector(); 
 }
 
 //-----------------------------------------------------
