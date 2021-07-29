@@ -392,22 +392,42 @@ struct BoundarySchemeData {
 
 //------------------------------------------------------------------------------
 
+struct LevelSetReinitializationData {
+
+  int frequency; 
+  double frequency_dt;
+
+  int maxIts;
+
+  double convergence_tolerance;
+  
+  enum Switch {OFF = 0, ON = 1};
+
+  Switch updateFirstLayer; //do not change the value of phi in the first layer of cells (next to boundary)
+
+  LevelSetReinitializationData();
+  ~LevelSetReinitializationData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct LevelSetSchemeData {
 
   int materialid; //! The material in the phi<0 region ("inside")
 
   enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, UPWIND = 2} flux;
 
-
   enum BcType {NONE = 0, ZERO_NEUMANN = 1, LINEAR_EXTRAPOLATION = 2, SIZE = 3};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
-
 
   ReconstructionData rec;
   
   double delta; //! The coeffient in Harten's entropy fix.
 
-  int reinitialization_freq; 
+  LevelSetReinitializationData reinit;
 
   LevelSetSchemeData();
   ~LevelSetSchemeData() {}

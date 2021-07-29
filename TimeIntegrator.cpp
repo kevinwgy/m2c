@@ -52,6 +52,13 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
 
+
+  // Reinitialize level set (frequency specified by user)
+  for(int i=0; i<Phi.size(); i++) {
+    lso[i]->Reinitialize(time, dt, time_step, *Phi[i]);
+  }
+
+
   // Update ID and V (skipped for single-material simulations)
   if(lso.size()) {
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
@@ -158,6 +165,13 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
   //***************************************************
+
+
+  // Reinitialize level set (frequency specified by user)
+  for(int i=0; i<Phi.size(); i++) {
+    lso[i]->Reinitialize(time, dt, time_step, *Phi[i]);
+  }
+
 
   // Update ID and V (skipped for single-material simulations)
   if(lso.size()) {
@@ -310,19 +324,17 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //***************************************************
 
 
+  // Reinitialize level set (frequency specified by user)
+  for(int i=0; i<Phi.size(); i++) {
+    lso[i]->Reinitialize(time, dt, time_step, *Phi[i]);
+  }
+
+
   // Update ID and V (skipped for single-material simulations)
   if(lso.size()) {
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
     mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
     mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions); //update V
-
-    double*** idn = (double***) IDn.GetDataPointer();
-    double*** id  = (double***) ID.GetDataPointer();
-    Vec5D*** v = (Vec5D***) V.GetDataPointer();
-    IDn.RestoreDataPointerToLocalVector();
-    ID.RestoreDataPointerToLocalVector();
-    V.RestoreDataPointerToLocalVector();
-
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }

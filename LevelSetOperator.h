@@ -3,6 +3,7 @@
 
 #include <IoData.h>
 #include <Reconstructor.h>
+#include <LevelSetReinitializer.h>
 /*******************************************
  * class LevelSetOperator drives the solution
  * of the level set equation
@@ -29,6 +30,9 @@ class LevelSetOperator
   //! Class for spatial reconstruction
   Reconstructor rec;
 
+  //! Class for reinitialization
+  LevelSetReinitializer *reinit;
+
   //! Reconstructed velocity (u, v, w);
   SpaceVariable3D scalar, ul, ur, vb, vt, wk, wf;
   SpaceVariable3D dudx, dvdy, dwdz; //!< derivatives of velocity
@@ -45,7 +49,8 @@ public:
 
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
 
-  void Reinitialize(SpaceVariable3D &Phi);
+  bool Reinitialize(double time, double dt, int time_step,
+                    SpaceVariable3D &Phi); //true: reinitialization is done; false: not this time
 
   int GetMaterialID() {return materialid;}
 

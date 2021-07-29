@@ -747,6 +747,41 @@ void BoundarySchemeData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+LevelSetReinitializationData::LevelSetReinitializationData()
+{
+  frequency = -1;
+  frequency_dt = -1.0;
+  maxIts = 20;
+  convergence_tolerance = 1.0e-3;
+  updateFirstLayer = ON; 
+}
+
+//------------------------------------------------------------------------------
+
+void LevelSetReinitializationData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+
+  new ClassInt<LevelSetReinitializationData>(ca, "Frequency", this, 
+          &LevelSetReinitializationData::frequency);
+
+  new ClassDouble<LevelSetReinitializationData>(ca, "TimeInterval", this, 
+          &LevelSetReinitializationData::frequency_dt);
+
+  new ClassInt<LevelSetReinitializationData>(ca, "MaxIts", this, 
+          &LevelSetReinitializationData::maxIts);
+
+  new ClassDouble<LevelSetReinitializationData>(ca, "ConvergenceTolerance", this, 
+          &LevelSetReinitializationData::convergence_tolerance);
+
+  new ClassToken<LevelSetReinitializationData>(ca, "UpdateFirstLayer", this,
+     reinterpret_cast<int LevelSetReinitializationData::*>(&LevelSetReinitializationData::updateFirstLayer), 2,
+     "Off", 0, "On", 1);
+
+}
+
+//------------------------------------------------------------------------------
+
 LevelSetSchemeData::LevelSetSchemeData() 
 {
   materialid = -1;
@@ -762,7 +797,6 @@ LevelSetSchemeData::LevelSetSchemeData()
 
   delta = 0.2; //the coefficient in Harten's entropy fix.
 
-  reinitialization_freq = -1;
 }
 
 //------------------------------------------------------------------------------
@@ -802,11 +836,9 @@ Assigner *LevelSetSchemeData::getAssigner()
           reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_zmax), 3,
           "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
 
-
-  new ClassInt<LevelSetSchemeData>(ca, "ReinitializationFrequency", this, 
-    &LevelSetSchemeData::reinitialization_freq);
-
   rec.setup("Reconstruction", ca);
+
+  reinit.setup("Reinitialization", ca);
 
   return ca;
 }

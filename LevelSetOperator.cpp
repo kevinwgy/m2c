@@ -22,6 +22,7 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
     rec(comm_, dm_all_, iod_ls_.rec, coordinates, delta_xyz),
+    reinit(NULL),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
     ul(comm_, &(dm_all_.ghosted1_1dof)),
     ur(comm_, &(dm_all_.ghosted1_1dof)),
@@ -48,13 +49,16 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
   rec.Setup(spo.GetPointerToInnerGhostNodes(),
             spo.GetPointerToOuterGhostNodes()); //this function requires mesh info (dxyz)
 
+  if(iod_ls.reinit.frequency>0 || iod_ls.reinit.frequency_dt>0)
+    reinit = new LevelSetReinitializer(comm, dm_all_, iod_ls, coordinates, delta_xyz);
+
 }
 
 //-----------------------------------------------------
 
 LevelSetOperator::~LevelSetOperator()
 {
-
+  if(reinit) delete reinit;
 }
 
 //-----------------------------------------------------
@@ -62,6 +66,10 @@ LevelSetOperator::~LevelSetOperator()
 void LevelSetOperator::Destroy()
 {
   rec.Destroy();
+
+  if(reinit)
+    reinit->Destroy();
+
   scalar.Destroy();
   ul.Destroy();
   ur.Destroy();
@@ -695,10 +703,20 @@ void LevelSetOperator::AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R)
 
 //-----------------------------------------------------
 
-void LevelSetOperator::Reinitialize(SpaceVariable3D &Phi)
+bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi)
 {
-  print_error("*** Error: Level set reinitialization has not been implemented yet.\n");
-  exit_mpi();
+  if(!reinit)
+    return false; //nothing to do
+
+  if(!isTimeToWrite(time, dt, time_step, iod_ls.reinit.frequency_dt,
+                    iod_ls.reinit.frequency, 0.0, false))
+    return false; //nothing to do (not the right time)
+
+  print("- Reinitializing the level set function (material id: %d).\n", materialid);
+
+  reinit->Reinitialize(Phi);
+
+  return true;
 }
 
 //-----------------------------------------------------
