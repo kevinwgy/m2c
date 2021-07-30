@@ -28,11 +28,11 @@ class LevelSetReinitializer
   SpaceVariable3D Tag;
   SpaceVariable3D R;
   SpaceVariable3D Phi1;
-  SpaceVariable3D dPhidX;
-  SpaceVariable3D dPhidY;
-  SpaceVariable3D dPhidZ;
+  SpaceVariable3D Sign;
   vector<Int3> firstLayer;
  
+  SpaceVariable3D PhiG2; //this one has 2 ghosted layers
+
 public:
 
   LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm_all_, LevelSetSchemeData &iod_ls_,
@@ -48,15 +48,20 @@ private:
 
   void TagFirstLayerNodes(SpaceVariable3D &Phi);
 
+  void EvaluateSignFunction(SpaceVariable3D &Phi);
+
   void ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceVariable3D &Phi);
 
   double DifferentiateInFirstLayer(double x0, double x1, double x2,
                                    double tag0, double tag1, double tag2,
-                                   double phi0, double phi1, double phi2, double eps);
+                                   double phi0, double phi1, double phi2,
+                                   double phi00, double phi3, double eps);
 
   double ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R, double cfl);
 
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
+
+  void PopulatePhiG2(SpaceVariable3D &Phi);
 
 };
 

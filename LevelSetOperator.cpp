@@ -251,6 +251,12 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 
         Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
 
+/*
+        phi[k][j][i] = sqrt((x[0]-50)*(x[0]-50) + (x[1]-50)*(x[1]-50))-20.0;
+        continue;
+*/
+
+
         if(x[1]<=x1[1] && atan(fabs((x[0]-x0[0])/(x[1]-x0[1])))<=alpha) { //Zone 1: Outside-bottom
           if(x[0]<=x0[0])
             phi[k][j][i] = (x-x1).norm();

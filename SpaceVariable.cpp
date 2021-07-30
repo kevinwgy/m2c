@@ -11,6 +11,8 @@ DM DataManagers3D::ghosted1_2dof;
 DM DataManagers3D::ghosted1_3dof;
 DM DataManagers3D::ghosted1_5dof;
 
+DM DataManagers3D::ghosted2_1dof;
+
 //---------------------------------------------------------
 
 DataManagers3D::DataManagers3D()
@@ -85,6 +87,17 @@ int DataManagers3D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY, int NZ)
   DMSetFromOptions(ghosted1_5dof);
   DMSetUp(ghosted1_5dof);
 
+  ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                      DMDA_STENCIL_BOX,
+                      NX, NY, NZ,
+                      PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                      1/*dof*/, 2/*stencil width*/, 
+                      NULL, NULL, NULL,
+                      &ghosted2_1dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted2_1dof);
+  DMSetUp(ghosted2_1dof);
+
   return 0;
 }
 
@@ -96,6 +109,7 @@ void DataManagers3D::DestroyAllDataManagers()
   DMDestroy(&ghosted1_2dof);
   DMDestroy(&ghosted1_3dof);
   DMDestroy(&ghosted1_5dof);
+  DMDestroy(&ghosted2_1dof);
 }
 
 //---------------------------------------------------------

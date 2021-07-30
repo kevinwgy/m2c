@@ -427,6 +427,8 @@ struct LevelSetSchemeData {
   
   double delta; //! The coeffient in Harten's entropy fix.
 
+  int bandwidth; //number of layers of nodes on each side of interface
+
   LevelSetReinitializationData reinit;
 
   LevelSetSchemeData();

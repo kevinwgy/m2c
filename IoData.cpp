@@ -788,6 +788,8 @@ LevelSetSchemeData::LevelSetSchemeData()
 
   flux = ROE;
 
+  bandwidth = INT_MAX;
+
   bc_x0   = ZERO_NEUMANN;
   bc_xmax = ZERO_NEUMANN;
   bc_y0   = ZERO_NEUMANN;
@@ -804,7 +806,7 @@ LevelSetSchemeData::LevelSetSchemeData()
 Assigner *LevelSetSchemeData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
 
   new ClassInt<LevelSetSchemeData>(ca, "MaterialID", this, 
     &LevelSetSchemeData::materialid);
@@ -816,6 +818,7 @@ Assigner *LevelSetSchemeData::getAssigner()
 
   new ClassDouble<LevelSetSchemeData>(ca, "EntropyFixCoefficient", this, &LevelSetSchemeData::delta);
 
+  new ClassInt<LevelSetSchemeData>(ca, "BandWidth", this, &LevelSetSchemeData::bandwidth);
 
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionX0", this,
           reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_x0), 3,

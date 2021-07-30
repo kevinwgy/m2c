@@ -18,6 +18,8 @@ public:
   static DM ghosted1_3dof;  
   static DM ghosted1_5dof;  
 
+  static DM ghosted2_1dof;
+
 public:
   DataManagers3D();
   DataManagers3D(MPI_Comm comm, int NX, int NY, int NZ);
