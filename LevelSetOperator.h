@@ -24,11 +24,22 @@ class LevelSetOperator
   SpaceVariable3D& delta_xyz;
   SpaceVariable3D& volume; //!< volume of node-centered control volumes
 
+  vector<GhostPoint>& ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  vector<GhostPoint>& ghost_nodes_outer; //!< ghost nodes outside the physical domain
+
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
   //! Class for spatial reconstruction
   Reconstructor rec;
+
+  //! variables related to the narrow-band level set method
+  bool narrow_band; //whether the narrow-band lsm is used
+  SpaceVariable3D&  Level;  //band level of each node (-inf to inf, including ghost boundary)
+  SpaceVariable3D&  Useful; //all the nodes in the narrow-band (including ghost boundary)
+  SpaceVariable3D&  Active; //the nodes in the interior of the narrow-band (including ghost boundary)
+  vector<Int3> useful_nodes; //vector of useful nodes
+  vector<Int3> active_nodes; //vector of active nodes
 
   //! Class for reinitialization
   LevelSetReinitializer *reinit;
@@ -62,9 +73,12 @@ public:
 private:
   // functions for internal use within the class
   void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi);
+  void ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi); //the narrow-band version
   void ComputeAdvectionFlux(SpaceVariable3D &R);
+  void ComputeAdvectionFluxInBand(SpaceVariable3D &R); //the narrow-band version
   double ComputeLocalAdvectionFlux(double phim, double phip, double um, double up);
   void AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R);
+  void AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D &R); //the narrow-band version
 
 };
 

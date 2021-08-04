@@ -21,6 +21,8 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
+    ghost_nodes_inner(*spo.GetPointerToInnerGhostNodes()),
+    ghost_nodes_outer(*spo.GetPointerToOuterGhostNodes()),
     rec(comm_, dm_all_, iod_ls_.rec, coordinates, delta_xyz),
     reinit(NULL),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
@@ -38,7 +40,10 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     Phib(comm_, &(dm_all_.ghosted1_1dof)),
     Phit(comm_, &(dm_all_.ghosted1_1dof)),
     Phik(comm_, &(dm_all_.ghosted1_1dof)),
-    Phif(comm_, &(dm_all_.ghosted1_1dof))
+    Phif(comm_, &(dm_all_.ghosted1_1dof)),
+    Level(comm_, &(dm_all_.ghosted1_1dof)),
+    Useful(comm_, &(dm_all_.ghosted1_1dof)),
+    Active(comm_, &(dm_all_.ghosted1_1dof))
 {
 
   materialid = iod_ls.materialid;
@@ -49,8 +54,27 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
   rec.Setup(spo.GetPointerToInnerGhostNodes(),
             spo.GetPointerToOuterGhostNodes()); //this function requires mesh info (dxyz)
 
+
+  if(iod_ls.bandwidth < INT_MAX) {//user specified narrow-band level set method
+    narrow_band = true;
+    if(iod_ls.reinit.bandwidth <= 1) {
+      print_error("*** Error: In the narrow-band level set method, bandwidth should be at least 2 (current: %d)\n",
+                  iod_ls.reinit.bandwidth);
+      exit_mpi();
+    }
+    if(iod_ls.reinit.frequency <= 0 || iod_ls.reinit.frequency >= iod_ls.bandwidth) {
+      print_error("*** Error: In the narrow-band level set method, reinitialization "
+                  "Frequency (actually, time-step period) should be smaller than bandwidth (current: %d).\n",
+                  iod_ls.reinit.frequency);
+      exit_mpi();
+    }
+  }
+  else
+    narrow_band = false;
+
   if(iod_ls.reinit.frequency>0 || iod_ls.reinit.frequency_dt>0)
-    reinit = new LevelSetReinitializer(comm, dm_all_, iod_ls, coordinates, delta_xyz);
+    reinit = new LevelSetReinitializer(comm, dm_all_, iod_ls, coordinates, delta_xyz,
+                                       ghost_nodes_inner, ghost_nodes_outer);
 
 }
 
@@ -86,6 +110,9 @@ void LevelSetOperator::Destroy()
   Phit.Destroy();
   Phik.Destroy();
   Phif.Destroy();
+  Level.Destroy();
+  Useful.Destroy();
+  Active.Destroy();
 }
 
 //-----------------------------------------------------
@@ -301,6 +328,16 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
   Phi.RestoreDataPointerAndInsert();
 
   ApplyBoundaryConditions(Phi);
+
+  if(iod_ls.bandwidth < INT_MAX) {
+    if(reinit)
+      reinit->ConstructNarrowBand(Phi, Level, Useful, Active, useful_nodes, active_nodes);
+    else {
+      print_error("*** Error: LevelSetReinitialization is not constructed, but needed in order to construct narrow band.\n");
+      exit_mpi();
+    }
+  }
+
 }
 
 //-----------------------------------------------------
@@ -521,11 +558,24 @@ void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi,
   PrescribeVelocityFieldForTesting(V);
 #endif
 
-  Reconstruct(V, Phi); // => ul, ur, dudx, vb, vt, dvdy, wk, wf, dwdz, Phil, Phir, Phib, Phit, Phik, Phif
+  if(!narrow_band) {
 
-  ComputeAdvectionFlux(R);  //Advection flux, on the right-hand-side
+    Reconstruct(V, Phi); // => ul, ur, dudx, vb, vt, dvdy, wk, wf, dwdz, Phil, Phir, Phib, Phit, Phik, Phif
 
-  AddSourceTerm(Phi, R);
+    ComputeAdvectionFlux(R);  //Advection flux, on the right-hand-side
+
+    AddSourceTerm(Phi, R);
+  }
+  else {
+
+    ReconstructInBand(V, Phi);
+
+    ComputeAdvectionFluxInBand(R);
+
+    AddSourceTermInBand(Phi, R);
+
+  }
+
 }
 
 //-----------------------------------------------------
@@ -563,6 +613,45 @@ void LevelSetOperator::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi)
 
   // Reconstruction: Phi
   rec.Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif);
+
+  V.RestoreDataPointerToLocalVector(); //no changes made
+}
+
+//-----------------------------------------------------
+
+void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi)
+{
+  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+   
+  // Reconstruction: x-velocity
+  double*** s = (double***) scalar.GetDataPointer();
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    s[k][j][i] = v[k][j][i][1]; //x-velocity
+  }
+  scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
+  rec.ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx, &Useful);
+
+  // Reconstruction: y-velocity
+  s = (double***) scalar.GetDataPointer();
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    s[k][j][i] = v[k][j][i][2]; //y-velocity
+  }
+  scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
+  rec.ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy, &Useful);
+
+  // Reconstruction: z-velocity
+  s = (double***) scalar.GetDataPointer();
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    s[k][j][i] = v[k][j][i][3]; //z-velocity
+  }
+  scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
+  rec.ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz, &Useful);
+
+  // Reconstruction: Phi
+  rec.Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, &Useful);
 
   V.RestoreDataPointerToLocalVector(); //no changes made
 }
@@ -650,6 +739,96 @@ void LevelSetOperator::ComputeAdvectionFlux(SpaceVariable3D &R)
 
 //-----------------------------------------------------
 
+void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
+{
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+
+  double*** phil   = Phil.GetDataPointer();
+  double*** phir   = Phir.GetDataPointer();
+  double*** phib   = Phib.GetDataPointer();
+  double*** phit   = Phit.GetDataPointer();
+  double*** phik   = Phik.GetDataPointer();
+  double*** phif   = Phif.GetDataPointer();
+  double*** uldata = ul.GetDataPointer();
+  double*** urdata = ur.GetDataPointer();
+  double*** vbdata = vb.GetDataPointer();
+  double*** vtdata = vt.GetDataPointer();
+  double*** wkdata = wk.GetDataPointer();
+  double*** wfdata = wf.GetDataPointer();
+  double*** res    = R.GetDataPointer(); //residual, on the right-hand-side of the ODE
+  double*** active = Active.GetDataPointer();
+
+  //initialize R to 0
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+          res[k][j][i] = 0.0;
+
+  double localflux;
+
+  // Loop through the domain interior, and the right and top ghost layers. For each cell, calculate the
+  // numerical flux across the left and lower cell boundaries/interfaces
+  for(auto it = active_nodes.begin(); it != active_nodes.end(); it++) {
+
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+
+    if(i==ii0 || j==jj0 || k==kk0)
+      continue;
+
+    //calculate F_{i-1/2,jk}
+    if(k!=kkmax-1 && j!=jjmax-1) {
+      localflux = ComputeLocalAdvectionFlux(phir[k][j][i-1], phil[k][j][i], 
+                                            urdata[k][j][i-1], uldata[k][j][i]) / dxyz[k][j][i][0];
+      if(active[k][j][i-1]) 
+        res[k][j][i-1] -= localflux;
+
+      res[k][j][i]   += localflux;
+    }
+
+    //calculate G_{i,j-1/2,k}
+    if(k!=kkmax-1 && i!=iimax-1) {
+      localflux = ComputeLocalAdvectionFlux(phit[k][j-1][i], phib[k][j][i], 
+                                            vtdata[k][j-1][i], vbdata[k][j][i]) / dxyz[k][j][i][1];
+      if(active[k][j-1][i])
+        res[k][j-1][i] -= localflux;
+
+      res[k][j][i]   += localflux;
+    }
+
+    //calculate H_{ij,k-1/2}
+    if(j!=jjmax-1 && i!=iimax-1) {
+      localflux = ComputeLocalAdvectionFlux(phif[k-1][j][i], phik[k][j][i], 
+                                            wfdata[k-1][j][i], wkdata[k][j][i]) / dxyz[k][j][i][2];
+      if(active[k-1][j][i])
+        res[k-1][j][i] -= localflux;
+
+      res[k][j][i]   += localflux;
+    }
+
+  }
+
+  // Restore space variables
+  delta_xyz.RestoreDataPointerToLocalVector();
+
+  Phil.RestoreDataPointerToLocalVector();
+  Phir.RestoreDataPointerToLocalVector();
+  Phib.RestoreDataPointerToLocalVector();
+  Phit.RestoreDataPointerToLocalVector();
+  Phik.RestoreDataPointerToLocalVector();
+  Phif.RestoreDataPointerToLocalVector();
+  ul.RestoreDataPointerToLocalVector();
+  ur.RestoreDataPointerToLocalVector();
+  vb.RestoreDataPointerToLocalVector();
+  vt.RestoreDataPointerToLocalVector();
+  wk.RestoreDataPointerToLocalVector();
+  wf.RestoreDataPointerToLocalVector();
+  Active.RestoreDataPointerToLocalVector();
+
+  R.RestoreDataPointerAndInsert(); //insert
+}
+
+//-----------------------------------------------------
+
 double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, double um, double up)
 {
   double flux = 0.0;
@@ -706,6 +885,31 @@ void LevelSetOperator::AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R)
   dwdz.RestoreDataPointerToLocalVector();
   R.RestoreDataPointerAndInsert();
 }
+
+//-----------------------------------------------------
+
+void LevelSetOperator::AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D &R)
+{
+  double*** phi = (double***) Phi.GetDataPointer();
+  double*** u_x = (double***) dudx.GetDataPointer();
+  double*** v_y = (double***) dvdy.GetDataPointer();
+  double*** w_z = (double***) dwdz.GetDataPointer();
+  double*** res = (double***) R.GetDataPointer();
+
+  for(auto it = active_nodes.begin(); it != active_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    if(!Phi.IsHere(i,j,k,false)) //not in the interior of the subdomain
+      continue; 
+    res[k][j][i] += phi[k][j][i]*(u_x[k][j][i] + v_y[k][j][i] + w_z[k][j][i]);
+  }
+
+  Phi.RestoreDataPointerToLocalVector();
+  dudx.RestoreDataPointerToLocalVector();
+  dvdy.RestoreDataPointerToLocalVector();
+  dwdz.RestoreDataPointerToLocalVector();
+  R.RestoreDataPointerAndInsert();
+}
+
 
 //-----------------------------------------------------
 

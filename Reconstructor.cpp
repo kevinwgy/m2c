@@ -227,7 +227,7 @@ void Reconstructor::Destroy()
  *  performed within this function. */
 void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVariable3D &Vr,
            SpaceVariable3D &Vb, SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
-           SpaceVariable3D *ID)
+           SpaceVariable3D *ID, SpaceVariable3D *Selected)
 {
 
   //! Constant reconstruction is trivial.
@@ -276,6 +276,9 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
   //user-specified "Fixes"
   double*** fixed = FixedByUser ? FixedByUser->GetDataPointer() : NULL;
 
+  //selected cells specified
+  double*** sel = Selected ? Selected->GetDataPointer() : NULL;
+
   //! Number of DOF per cell
   int nDOF = V.NumDOF();
 
@@ -308,6 +311,12 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
     for(int j=j0; j<jmax; j++) {
       for(int i=i0; i<imax; i++) {
         
+        //---------------------------
+        // If node is not selected, skip
+        //---------------------------
+        if(sel && !sel[k][j][i])
+          continue;
+
         //---------------------------
         // If node is 'fixed', trivial
         //---------------------------
@@ -616,6 +625,9 @@ RETRY:
     jj = gp->image_ijk[1];
     kk = gp->image_ijk[2];
     
+    if(sel && !sel[k][j][i])
+      continue;
+
     // check boundary condition
     switch (gp->bcType) {
 
@@ -669,6 +681,8 @@ RETRY:
 
   if(ID) ID->RestoreDataPointerToLocalVector(); //!< no changes to vector
 
+  if(Selected) Selected->RestoreDataPointerToLocalVector(); //!< no changes to vector
+
   U.RestoreDataPointerToLocalVector(); //!< internal variable
 
 }
@@ -676,7 +690,8 @@ RETRY:
 //--------------------------------------------------------------------------
 
 void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U, 
-                                    SpaceVariable3D &Um, SpaceVariable3D &Up, SpaceVariable3D *Slope)
+                                    SpaceVariable3D &Um, SpaceVariable3D &Up, SpaceVariable3D *Slope,
+                                    SpaceVariable3D *Selected)
 {
   if(iod_rec.varType != ReconstructionData::PRIMITIVE) {
     print_error("*** Error: Calling Reconstructor::ReconstructIn1D to reconstruct a 'non-primitive' variable.\n");
@@ -699,6 +714,8 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   double***slope = (Slope) ? (double***)Slope->GetDataPointer() : NULL;
+
+  double***sel = (Selected) ? (double***)Selected->GetDataPointer() : NULL;
     
   //! Number of DOF per cell
   int nDOF = U.NumDOF();
@@ -722,6 +739,10 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
   for(int k=k0; k<kmax; k++) {
     for(int j=j0; j<jmax; j++) {
       for(int i=i0; i<imax; i++) {
+
+        //! if not selected, skip it
+        if(sel && !sel[k][j][i])
+          continue;
 
         //! In the real part of the subdomain 
         for(int dof=0; dof<nDOF; dof++) {
@@ -806,6 +827,10 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
     jj = gp->image_ijk[1];
     kk = gp->image_ijk[2];
     
+    // if not selected, skip it
+    if(sel && !sel[k][j][i])
+      continue;
+
     // check boundary condition
     switch (gp->bcType) {
 
@@ -860,7 +885,8 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
   //Should not communicate.
   Um.RestoreDataPointerToLocalVector(); //no need to communicate
   Up.RestoreDataPointerToLocalVector(); //no need to communicate
-
+  if(Slope)
+    Slope->RestoreDataPointerToLocalVector(); 
 
   //! Restore vectors
   CoeffA.RestoreDataPointerToLocalVector(); //!< no changes to vector
@@ -868,6 +894,9 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
   CoeffK.RestoreDataPointerToLocalVector(); //!< no changes to vector
   U.RestoreDataPointerToLocalVector(); //!< no changes to vector
   delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
+  if(Selected)
+    Selected->RestoreDataPointerToLocalVector();
+
 }
 
 //--------------------------------------------------------------------------

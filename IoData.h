@@ -401,9 +401,10 @@ struct LevelSetReinitializationData {
 
   double convergence_tolerance;
   
-  enum Switch {OFF = 0, ON = 1};
-
-  Switch updateFirstLayer; //do not change the value of phi in the first layer of cells (next to boundary)
+  enum FirstLayerTreatment {FIXED = 0, UNCONSTRAINED = 1, //Russo and Smereka, mod. by Hartmann (2008)
+                            CONSTRAINED1 = 2, CONSTRAINED2 = 3, //CR-1 and CR-2
+                            ITERATIVE_CONSTRAINED1 = 4, ITERATIVE_CONSTRAINED2 = 5} //HCR-1 and HCR-2}
+           firstLayerTreatment;
 
   LevelSetReinitializationData();
   ~LevelSetReinitializationData() {}

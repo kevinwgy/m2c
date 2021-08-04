@@ -6,9 +6,12 @@ extern int verbose;
 
 LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm_all_, 
                            LevelSetSchemeData &iod_ls_, SpaceVariable3D &coordinates_, 
-                           SpaceVariable3D &delta_xyz_)
+                           SpaceVariable3D &delta_xyz_, vector<GhostPoint> &ghost_nodes_inner_,
+                           vector<GhostPoint> &ghost_nodes_outer_)
                      : comm(comm_), iod_ls(iod_ls_), coordinates(coordinates_),
-                       delta_xyz(delta_xyz_), interp(NULL), grad(NULL),
+                       delta_xyz(delta_xyz_), ghost_nodes_inner(ghost_nodes_inner_),
+                       ghost_nodes_outer(ghost_nodes_outer_),
+                       interp(NULL), grad(NULL),
                        Tag(comm_, &(dm_all_.ghosted1_1dof)),
                        R(comm_, &(dm_all_.ghosted1_1dof)),
                        Phi1(comm_, &(dm_all_.ghosted1_1dof)),
@@ -57,18 +60,21 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
 {
 
   // Step 1: Prep: Tag first layer nodes & store the sign function
-  TagFirstLayerNodes(Phi); 
-  EvaluateSignFunction(Phi);
+  vector<FirstLayerNode> firstLayer; 
+  TagFirstLayerNodes(Phi, firstLayer); //also calculates the associated coefficients
+  EvaluateSignFunction(Phi, 1.0/*smoothing coefficient*/);
 
   // Step 2: Reinitialize first layer nodes (no iterations needed)
-  if(iod_ls.reinit.updateFirstLayer == LevelSetReinitializationData::ON) {
+  if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||
+     iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
+     iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
     Phi1.AXPlusBY(0.0, 1.0, Phi, true); //Phi1 = Phi
-    ReinitializeFirstLayerNodes(Phi1, Phi); //Phi is updated
+    ReinitializeFirstLayerNodes(Phi1, Phi, firstLayer); //Phi is updated
     ApplyBoundaryConditions(Phi);
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
-  double cfl = 0.9;
+  double cfl = 0.25;
   double residual = 0.0, residual0 = 0.0;
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
@@ -87,6 +93,7 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
     Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
     Phi1.AXPlusBY(1.0, 1.0, R);   //Phi1 = Phi + R(Phi)
     ApplyBoundaryConditions(Phi1);
+    ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
 
@@ -95,6 +102,7 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
     Phi1.AXPlusBY(0.25, 0.75, Phi);
     Phi1.AXPlusBY(1.0, 0.25, R);
     ApplyBoundaryConditions(Phi1);
+    ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
     //************** Step 3 of RK3 *****************
@@ -102,6 +110,7 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
     Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
     Phi.AXPlusBY(1.0, 2.0/3.0, R);
     ApplyBoundaryConditions(Phi);
+    ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
     
   }
@@ -114,9 +123,17 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::TagFirstLayerNodes(SpaceVariable3D &Phi)
+LevelSetReinitializer::TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer)
 {
-
+  //*****************************************************************************
+  // "Tag" is populated within both domain interior and the ghost boundary outside 
+  // the physical domain (except corners).
+  // "firstLayer" stores all the first-layer nodes within the physical domain (i.e.
+  // Gamma in Hartmann et al. (2010))
+  // For each node in Gamma, S is constructed to contain nodes on the opposite side
+  // of the interface (excluding nodes with phi == 0!). For each node on the opposite
+  // side, r_alpha, and \tilde{r} are computed.
+  //*****************************************************************************
   firstLayer.resize(0);
 
   double*** phi   = (double***)Phi.GetDataPointer();
@@ -134,79 +151,133 @@ LevelSetReinitializer::TagFirstLayerNodes(SpaceVariable3D &Phi)
         if(i-1>=ii0 && phi[k][j][i]*phi[k][j][i-1]<=0) {
           tag[k][j][i] = 1;
           if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
-            firstLayer.push_back(Int3(i,j,k));
+            firstLayer.push_back(FirstLayerNode(i,j,k));
           continue;
         }
 
         if(i+1<iimax && phi[k][j][i]*phi[k][j][i+1]<=0) {
           tag[k][j][i] = 1;
           if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
-            firstLayer.push_back(Int3(i,j,k));
+            firstLayer.push_back(FirstLayerNode(i,j,k));
           continue;
         }
 
         if(j-1>=jj0 && phi[k][j][i]*phi[k][j-1][i]<=0) {
           tag[k][j][i] = 1;
           if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
-            firstLayer.push_back(Int3(i,j,k));
+            firstLayer.push_back(FirstLayerNode(i,j,k));
           continue;
         }
 
         if(j+1<jjmax && phi[k][j][i]*phi[k][j+1][i]<=0) {
           tag[k][j][i] = 1;
           if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
-            firstLayer.push_back(Int3(i,j,k));
+            firstLayer.push_back(FirstLayerNode(i,j,k));
           continue;
         }
 
         if(k-1>=kk0 && phi[k][j][i]*phi[k-1][j][i]<=0) {
           tag[k][j][i] = 1;
           if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
-            firstLayer.push_back(Int3(i,j,k));
+            firstLayer.push_back(FirstLayerNode(i,j,k));
           continue;
         }
         
         if(k+1<kkmax && phi[k][j][i]*phi[k+1][j][i]<=0) {
           tag[k][j][i] = 1;
           if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
-            firstLayer.push_back(Int3(i,j,k));
+            firstLayer.push_back(FirstLayerNode(i,j,k));
           continue;
         }
       }
 
-  Tag.RestoreDataPointerAndInsert();
 
+  //Now, calculate s and r for each node in firstLayer (Gamma)
+  for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+
+    double sum(0.0);
+    int i(it->i), j(it->j), k(it->k);
+    if(phi[k][j][i]*phi[k][j][i-1]<0) { //left neighbor
+      it->s[0] = true;
+      it->r[0] = phi[k][j][i]/phi[k][j][i-1]; 
+      it->ns++;
+      sum += phi[k][j][i-1];
+    }
+    if(phi[k][j][i]*phi[k][j][i+1]<0) { //right neighbor
+      it->s[1] = true;
+      it->r[1] = phi[k][j][i]/phi[k][j][i+1]; 
+      it->ns++;
+      sum += phi[k][j][i+1];
+    }
+    if(phi[k][j][i]*phi[k][j-1][i]<0) { //bottom neighbor
+      it->s[2] = true;
+      it->r[2] = phi[k][j][i]/phi[k][j-1][i];
+      it->ns++;
+      sum += phi[k][j-1][i];
+    }
+    if(phi[k][j][i]*phi[k][j+1][i]<0) { //top neighbor
+      it->s[3] = true;
+      it->r[3] = phi[k][j][i]/phi[k][j+1][i];
+      it->ns++;
+      sum += phi[k][j+1][i];
+    }
+    if(phi[k][j][i]*phi[k-1][j][i]<0) { //back neighbor
+      it->s[4] = true;
+      it->r[4] = phi[k][j][i]/phi[k-1][j][i];
+      it->ns++;
+      sum += phi[k-1][j][i];
+    }
+    if(phi[k][j][i]*phi[k+1][j][i]<0) { //front neighbor
+      it->s[5] = true;
+      it->r[5] = phi[k][j][i]/phi[k+1][j][i];
+      it->ns++;
+      sum += phi[k+1][j][i];
+    }
+    it->r0 = (sum!=0) ? phi[k][j][i]/sum : 0.0;
+
+  }
+
+
+  Tag.RestoreDataPointerAndInsert();
   Phi.RestoreDataPointerToLocalVector(); //no changes made
 }
 
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::EvaluateSignFunction(SpaceVariable3D &Phi)
+LevelSetReinitializer::EvaluateSignFunction(SpaceVariable3D &Phi, double eps)
 {
   double*** phi   = (double***)Phi.GetDataPointer();
+  Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
   double*** sign  = (double***)Sign.GetDataPointer();
 
+  double factor;
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
-        if(phi[k][j][i]>0)
-          sign[k][j][i] = 1.0;
-        else if(phi[k][j][i]<0)
-          sign[k][j][i] = -1.0;
-        else
-          sign[k][j][i] = 0.0;
+
+        factor = eps*std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+
+        sign[k][j][i] = phi[k][j][i] / sqrt(phi[k][j][i]*phi[k][j][i] + factor*factor);
+
       }
 
   Phi.RestoreDataPointerToLocalVector();
+  delta_xyz.RestoreDataPointerToLocalVector();
+
   Sign.RestoreDataPointerAndInsert(); 
 }
 
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceVariable3D &Phi)
+LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceVariable3D &Phi, 
+                                                   vector<FirstLayerNode> &firstLayer)
 {
+  //****************************************
+  // Implementing the RSU, CR-1 and CR-2 algos
+  // in Hartmann et al. (2008)
+  //****************************************
 
   PopulatePhiG2(Phi0);
 
@@ -214,7 +285,6 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   Phi.GetGlobalSize(&NX, &NY, &NZ);
 
   double*** phi   = (double***)Phi.GetDataPointer();
-  double*** phi0  = (double***)Phi0.GetDataPointer();
   double*** phig  = (double***)PhiG2.GetDataPointer();
   double*** tag   = (double***)Tag.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
@@ -227,9 +297,9 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   for(int n=0; n<firstLayer.size(); n++) {
 
     // This must be a node in the interior of the subdomain (see how firstLayer is populated)
-    i = firstLayer[n][0]; 
-    j = firstLayer[n][1]; 
-    k = firstLayer[n][2]; 
+    i = firstLayer[n].i; 
+    j = firstLayer[n].j; 
+    k = firstLayer[n].k; 
 
     // set phi = phi / |grad(phi)|, using tagged nodes to calculate the derivatives 
     // ref: Hartmann et al. 2008, Eqs.(20)(21) (which cites another paper)
@@ -264,9 +334,70 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   }
 
 
+  // Applying the averaging algorithm (CR-1 or CR-2)
+  if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1) {
+
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+      i = it->i; 
+      j = it->j; 
+      k = it->k; 
+      it->f = 0.0; //reset to 0 
+      double sum(0.0);
+      if(it->s[0])  sum += phi[k][j][i-1]/phig[k][j][i-1];
+      if(it->s[1])  sum += phi[k][j][i+1]/phig[k][j][i+1];
+      if(it->s[2])  sum += phi[k][j-1][i]/phig[k][j-1][i];
+      if(it->s[3])  sum += phi[k][j+1][i]/phig[k][j+1][i];
+      if(it->s[4])  sum += phi[k-1][j][i]/phig[k-1][j][i];
+      if(it->s[5])  sum += phi[k+1][j][i]/phig[k+1][j][i];
+
+      if(it->ns != 0)
+        it->f = phig[k][j][i]*sum/(double)(it->ns);
+      else
+        it->f = 0.0;
+    }
+
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+      i = it->i; 
+      j = it->j; 
+      k = it->k;
+      phi[k][j][i] = it->f;
+      it->f = 0.0; //reset
+    }
+
+  }
+  else if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
+
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+      i = it->i; 
+      j = it->j; 
+      k = it->k; 
+      it->f = 0.0; //reset to 0 
+      double sum1(0.0), sum2(0.0);
+      if(it->s[0]) {sum1 += phi[k][j][i-1];  sum2 += phig[k][j][i-1];}
+      if(it->s[1]) {sum1 += phi[k][j][i+1];  sum2 += phig[k][j][i+1];}
+      if(it->s[2]) {sum1 += phi[k][j-1][i];  sum2 += phig[k][j-1][i];}
+      if(it->s[3]) {sum1 += phi[k][j+1][i];  sum2 += phig[k][j+1][i];}
+      if(it->s[4]) {sum1 += phi[k-1][j][i];  sum2 += phig[k-1][j][i];}
+      if(it->s[5]) {sum1 += phi[k+1][j][i];  sum2 += phig[k+1][j][i];}
+
+      if(sum2 != 0)
+        it->f = phig[k][j][i]*sum1/sum2;
+      else //this would happen only when s[0] = ... = s[5] = false, meaning phig[k][j][i]=0.
+        it->f = 0.0;
+    }
+
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+      i = it->i; 
+      j = it->j; 
+      k = it->k;
+      phi[k][j][i] = it->f;
+      it->f = 0.0; //reset
+    }
+  }
+
+
   Phi.RestoreDataPointerAndInsert();
 
-  Phi0.RestoreDataPointerToLocalVector();
   PhiG2.RestoreDataPointerToLocalVector();
   Tag.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
@@ -305,29 +436,30 @@ LevelSetReinitializer::DifferentiateInFirstLayer(double x0, double x1, double x2
 {
   bool phi0_useful = true, phi2_useful = true;
 
-
   //identify cases in which phi0 is not useful
   if(tag0==0) phi0_useful = false;
   if(tag2==0) phi2_useful = false;
   if(!phi0_useful && !phi2_useful)
     return 0.0;
 
-
   double dphi0 = phi1 - phi0;
   double dphi1 = phi2 - phi1;
 
-  bool condA0 = (phi0*phi2<0) && fabs(dphi0 + eps)<fabs(dphi1);
-  bool condA2 = (phi0*phi2<0) && fabs(dphi1 + eps)<fabs(dphi0);
   bool condB = dphi0*dphi1<0 || phi0*phi00<0 || phi2*phi3<0;
   
-  if(phi0_useful) {
-    if(condA0 && condB)
-      phi0_useful = false;
+  if(condB) {
+    if(phi0_useful) {
+      bool condA = (phi0*phi2<0) && fabs(dphi0 + eps)<fabs(dphi1);
+      if(condA)
+        phi0_useful = false;
+    }
+    if(phi2_useful) {
+      bool condA = (phi0*phi2<0) && fabs(dphi1 + eps)<fabs(dphi0);
+      if(condA)
+        phi2_useful = false;
+    }
   }
-  if(phi2_useful) {
-    if(condA2 && condB)
-      phi2_useful = false;
-  }
+
   if(!phi0_useful && !phi2_useful)
     return 0.0;
 
@@ -368,6 +500,12 @@ LevelSetReinitializer::ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R,
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
   double*** res    = (double***)R.GetDataPointer();
 
+  // fix first layer nodes?
+  bool fix_first_layer = (iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::FIXED ||
+                          iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||
+                          iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
+                          iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2);
+
   // loop through the interior of the subdomain
   double max_residual = 0.0, dt, dx, local_res;
   double a,b,c,d,e,f, ap,am, bp,bm, cp,cm, dp,dm, ep,em, fp,fm;
@@ -375,13 +513,14 @@ LevelSetReinitializer::ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R,
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
         
-        if(tag[k][j][i]!=0) {//fixed node (first layer)
-          res[k][j][i] = 0.0;
-          continue;
+        if(fix_first_layer) {
+          if(tag[k][j][i]!=0) {//fixed node (first layer)
+            res[k][j][i] = 0.0;
+            continue;
+          }
         }
 
-        dx = std::min(dxyz[k][j][i][0], dxyz[k][j][i][1]);
-        //dx = std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+        dx = std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
         dt = cfl*dx;
         
         a = (phi[k][j][i]-phi[k][j][i-1])/(coords[k][j][i][0]-coords[k][j][i-1][0]);
@@ -636,16 +775,344 @@ LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 
 //--------------------------------------------------------------------------
 
+void
+LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, 
+                                                        double cfl)
+{
+
+  if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::ITERATIVE_CONSTRAINED1 &&
+     iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::ITERATIVE_CONSTRAINED2)
+    return; //nothing to do
+  
+  //Step 1: Calculate correction F 
+  double*** phi = (double***) Phi.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***) delta_xyz.GetDataPointer();
+
+  if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::ITERATIVE_CONSTRAINED1) {//HCR-1
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+
+      int i(it->i), j(it->j), k(it->k);
+
+      it->f = 0.0;
+
+      if(phi[k][j][i]*phi[k][j][i-1]>=0 || phi[k][j][i]*phi[k][j][i+1]>=0 ||
+         phi[k][j][i]*phi[k][j-1][i]>=0 || phi[k][j][i]*phi[k][j+1][i]>=0 ||
+         phi[k][j][i]*phi[k-1][j][i]>=0 || phi[k][j][i]*phi[k+1][j][i]>=0) 
+        continue; //This node is in Gamma but not in C^{\nu}
+
+      double sum = 0.0;
+      if(it->s[0])  sum += it->r[0]*phi[k][j][i-1];
+      if(it->s[1])  sum += it->r[1]*phi[k][j][i+1];
+      if(it->s[2])  sum += it->r[2]*phi[k][j-1][i];
+      if(it->s[3])  sum += it->r[3]*phi[k][j+1][i];
+      if(it->s[4])  sum += it->r[4]*phi[k-1][j][i];
+      if(it->s[5])  sum += it->r[5]*phi[k+1][j][i];
+
+      if(it->ns!=0)
+        it->f = sum/(double)(it->ns) - phi[k][j][i];
+      else
+        it->f = 0.0 - phi[k][j][i];
+
+      it->f /= std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+
+    }
+  }
+  else if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::ITERATIVE_CONSTRAINED2) {
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+
+      int i(it->i), j(it->j), k(it->k);
+
+      it->f = 0.0;
+
+      if(phi[k][j][i]*phi[k][j][i-1]>=0 || phi[k][j][i]*phi[k][j][i+1]>=0 ||
+         phi[k][j][i]*phi[k][j-1][i]>=0 || phi[k][j][i]*phi[k][j+1][i]>=0 ||
+         phi[k][j][i]*phi[k-1][j][i]>=0 || phi[k][j][i]*phi[k+1][j][i]>=0) 
+        continue; //This node is in Gamma but not in C^{\nu}
+
+      double sum = 0.0;
+      if(it->s[0])  sum += phi[k][j][i-1];
+      if(it->s[1])  sum += phi[k][j][i+1];
+      if(it->s[2])  sum += phi[k][j-1][i];
+      if(it->s[3])  sum += phi[k][j+1][i];
+      if(it->s[4])  sum += phi[k-1][j][i];
+      if(it->s[5])  sum += phi[k+1][j][i];
+
+      it->f = it->r0*sum - phi[k][j][i];
+      it->f /= std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+
+    }
+  }
+
+
+  // Step 2: Add forcing term to phi
+  double beta = 0.5;
+  for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+    int i(it->i), j(it->j), k(it->k);
+    double dt = cfl*std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+    phi[k][j][i] += dt*beta*it->f;
+  }
+
+  // Restore
+  Phi.RestoreDataPointerAndInsert();
+  delta_xyz.RestoreDataPointerToLocalVector();
+
+  // Step 3: Apply Boundary conditions
+  ApplyBoundaryConditions(Phi);
+
+}
 
 //--------------------------------------------------------------------------
 
+void
+LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi, 
+                           SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
+{
+  //*****************************************************
+  // Useful/useful_nodes ~ all nodes in the narrow band
+  // Active/active_nodes ~ nodes in the interior of the narrow band
+  // Phi ~ a large constant (+/-) number will be specified outside band
+  //*****************************************************
+  double*** phi    = (double***)Phi.GetDataPointer();
+
+  useful_nodes.clear();
+  active_nodes.clear();
+
+  // -------------------------------------------------- 
+  // Step 1: find band level 0 (phi==0) and 1
+  // -------------------------------------------------- 
+  double*** level  = (double***)Level.GetDataPointer();
+  double*** useful = (double***)Useful.GetDataPointer();
+  double*** active = (double***)Active.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        // reset
+        level[k][j][i] = INT_MAX;
+        useful[k][j][i] = 0;
+
+        if(phi[k][j][i]==0) {
+          level[k][j][i] = 0;
+          useful[k][j][i] = 1;
+          active[k][j][i] = 1;
+          useful_nodes.push_back(Int3(i,j,k));
+          active_nodes.push_back(Int3(i,j,k));
+        } 
+        else if ( (i-1>=i0   && phi[k][j][i]*phi[k][j][i-1]<=0) ||
+                  (i+1<iimax && phi[k][j][i]*phi[k][j][i+1]<=0) ||
+                  (j-1>=j0   && phi[k][j][i]*phi[k][j-1][i]<=0) ||
+                  (j+1<jjmax && phi[k][j][i]*phi[k][j+1][i]<=0) ||
+                  (k-1>=k0   && phi[k][j][i]*phi[k-1][j][i]<=0) ||
+                  (k+1<kkmax && phi[k][j][i]*phi[k+1][j][i]<=0) ) {
+
+          level[k][j][i] = 1;
+          useful[k][j][i] = 1;
+          active[k][j][i] = 1;
+          useful_nodes.push_back(Int3(i,j,k));
+          active_nodes.push_back(Int3(i,j,k));
+        } 
+
+      }
+  Level.RestoreDataPointerAndMinimize();
+
+  // Update userful_nodes and active_nodes to get the changes at boundary
+  level = (double***)Level.GetDataPointer();
+  for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+      useful[k][j][i] = 1;
+      active[k][j][i] = 1;
+      useful_nodes.push_back(it->ijk);
+      active_nodes.push_back(it->ijk);
+    }
+  } 
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+      useful[k][j][i] = 1;
+      active[k][j][i] = 1;
+      useful_nodes.push_back(it->ijk);
+      active_nodes.push_back(it->ijk);
+    }
+  }
+  Level.RestoreDataPointerToLocalVector();
+
+  // -------------------------------------------------- 
+  // Step 2: find band level 2, 3, ..., bandwidth
+  // -------------------------------------------------- 
+  for(int band = 2; band <= bandwidth; band++) {
+    
+    level = (double***)Level.GetDataPointer();
+
+    for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+
+      int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+
+      //check its neighbors
+      if(Phi.IsHere(i-1,j,k,true)) { //left
+        if(level[k][j][i-1]==INT_MAX) {
+          level[k][j][i-1] = band;
+          useful[k][j][i-1] = 1;
+          useful_nodes.push_back(Int3(i-1,j,k));
+          if(band<bandwidth) {
+            active[k][j][i-1] = 1;
+            active_nodes.push_back(Int3(i-1,j,k));
+          } 
+        }
+      }
+
+      if(Phi.IsHere(i+1,j,k,true)) { //right
+        if(level[k][j][i+1]==INT_MAX) {
+          level[k][j][i+1] = band;
+          useful[k][j][i+1] = 1;
+          useful_nodes.push_back(Int3(i+1,j,k));
+          if(band<bandwidth) {
+            active[k][j][i+1] = 1;
+            active_nodes.push_back(Int3(i+1,j,k));
+          } 
+        }
+      }
+
+      if(Phi.IsHere(i,j-1,k,true)) { //bottom
+        if(level[k][j-1][i]==INT_MAX) {
+          level[k][j-1][i] = band;
+          useful[k][j-1][i] = 1;
+          useful_nodes.push_back(Int3(i,j-1,k));
+          if(band<bandwidth) {
+            active[k][j-1][i] = 1;
+            active_nodes.push_back(Int3(i,j-1,k));
+          } 
+        }
+      }
+
+      if(Phi.IsHere(i,j+1,k,true)) { //top
+        if(level[k][j+1][i]==INT_MAX) {
+          level[k][j+1][i] = band;
+          useful[k][j+1][i] = 1;
+          useful_nodes.push_back(Int3(i,j+1,k));
+          if(band<bandwidth) {
+            active[k][j+1][i] = 1;
+            active_nodes.push_back(Int3(i,j+1,k));
+          } 
+        }
+      }
+
+      if(Phi.IsHere(i,j,k-1,true)) { //back
+        if(level[k-1][j][i]==INT_MAX) {
+          level[k-1][j][i] = band;
+          useful[k-1][j][i] = 1;
+          useful_nodes.push_back(Int3(i,j,k-1));
+          if(band<bandwidth) {
+            active[k-1][j][i] = 1;
+            active_nodes.push_back(Int3(i,j,k-1));
+          } 
+        }
+      }
+
+      if(Phi.IsHere(i,j,k+1,true)) { //front
+        if(level[k+1][j][i]==INT_MAX) {
+          level[k+1][j][i] = band;
+          useful[k+1][j][i] = 1;
+          useful_nodes.push_back(Int3(i,j,k+1));
+          if(band<bandwidth) {
+            active[k+1][j][i] = 1;
+            active_nodes.push_back(Int3(i,j,k+1));
+          } 
+        }
+      }
+
+    }
+    Level.RestoreDataPointerAndMinimize();
+
+    // Update userful_nodes and active_nodes to get the changes at boundary
+    level = (double***)Level.GetDataPointer();
+    for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
+      int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+      if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+        useful[k][j][i] = 1;
+        useful_nodes.push_back(it->ijk);
+        if(band<bandwidth) {
+          active[k][j][i] = 1;
+          active_nodes.push_back(it->ijk);
+        }
+      }
+    } 
+    for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+      int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+      if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+        useful[k][j][i] = 1;
+        useful_nodes.push_back(it->ijk);
+        if(band<bandwidth) {
+          active[k][j][i] = 1;
+          active_nodes.push_back(it->ijk);
+        }
+      }
+    }
+    Level.RestoreDataPointerToLocalVector();
+
+  }
+
+  
+  // -------------------------------------------------- 
+  // Step 3: Cutoff Phi outside the band
+  // -------------------------------------------------- 
+  double phi_max = -DBL_MAX;
+  double phi_min = DBL_MAX; //negative
+  for (auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    phi_max = std::max(phi[k][j][i], phi_max);
+    phi_min = std::min(phi[k][j][i], phi_min);
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &phi_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &phi_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+        if(!useful[k][j][i])
+          phi[k][j][i] = phi[k][j][i]>=0 ? 5.0*phi_max : 5.0*phi_min;
 
 
 
+  // Restore variables
+  Active.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
+  Useful.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
 
+  Phi.RestoreDataPointerToLocalVector(); //no exchange needed
 
+}
 
+//--------------------------------------------------------------------------
 
+void
+LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer,
+                           SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
+{
+  //*******************************************************
+  // Assuming firstLayer (level = 0, 1) is already computed
+  //*******************************************************
+  double*** phi    = (double***)Phi.GetDataPointer();
+  double*** level  = (double***)Level.GetDataPointer();
+  double*** useful = (double***)Useful.GetDataPointer();
+  double*** active = (double***)Active.GetDataPointer();
+ 
+  //--------------------------------------------------
+  // Step 1: Clean up old data
+  //--------------------------------------------------
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    
+
+  }
+
+  for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+
+    int i(it->i), j(it->j), k(it->k);
+    if
+
+  }
 
 
 
