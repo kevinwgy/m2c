@@ -916,12 +916,13 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
                     iod_ls.reinit.frequency, 0.0, false))
     return false; //nothing to do (not the right time)
 
-  print("- Reinitializing the level set function (material id: %d).\n", materialid);
-
-  if(narrow_band)
+  if(narrow_band) {
+    print("- Reinitializing the level set function (material id: %d), bandwidth = %d.\n", materialid, iod_ls.bandwidth);
     reinit->ReinitializeInBand(Phi, Level, Useful, Active, useful_nodes, active_nodes);
-  else
+  } else {
+    print("- Reinitializing the level set function (material id: %d).\n", materialid);
     reinit->Reinitialize(Phi);
+  }
 
   return true;
 }

@@ -69,8 +69,6 @@ public:
    */
   void RestoreDataPointerAndInsert();
   void RestoreDataPointerAndAdd();
-  void RestoreDataPointerAndMinimize();
-  void RestoreDataPointerAndMaximize();
 
   void RestoreDataPointerToLocalVector(); //!< caution: does not update globalVec
   void Destroy(); //!< should be called before PetscFinalize!

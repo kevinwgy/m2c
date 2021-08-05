@@ -1252,9 +1252,9 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
         } 
 
       }
-  Level.RestoreDataPointerAndMinimize();
+  Level.RestoreDataPointerAndInsert();
 
-  // Update userful_nodes and active_nodes to get the changes at boundary
+  // Update useful_nodes and active_nodes to get the changes at boundary
   level = (double***)Level.GetDataPointer();
   for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
@@ -1319,9 +1319,10 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
     
     level = (double***)Level.GetDataPointer();
 
-    for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int size = useful_nodes.size();
+    for(int n = 0; n < size; n++) {
 
-      int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+      int i(useful_nodes[n][0]), j(useful_nodes[n][1]), k(useful_nodes[n][2]);
 
       //check its neighbors
       if(Useful.IsHere(i-1,j,k,true) && !Useful.OutsidePhysicalDomainAndUnpopulated(i-1,j,k)) { //left
@@ -1397,7 +1398,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
     }
-    Level.RestoreDataPointerAndMinimize();
+    Level.RestoreDataPointerAndInsert();
 
     // Update useful_nodes and active_nodes to get the changes at boundary
     level = (double***)Level.GetDataPointer();
@@ -1529,18 +1530,23 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   PropagateNarrowBand(Level, Useful, Active, useful_nodes, active_nodes);
 
   // -------------------------------------------------- 
-  // Step 4: Cutoff Phi outside the band (will not call
+  // Step 4: Cutoff Phi and Residual outside the band (will not call
   //         the CutOffPhiOutsideBand function, which
   //         goes over the entire domain)
   // -------------------------------------------------- 
   useful = (double***)Useful.GetDataPointer();
+  double*** res = (double***)R.GetDataPointer();
   for(auto it = useful_nodes_backup.begin(); it != useful_nodes_backup.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-    if(!useful[k][j][i])
+    if(!useful[k][j][i]) {
       phi[k][j][i] = (phi[k][j][i]>=0) ? phi_max : phi_min; 
- }
+      res[k][j][i] = 0.0;
+    }
+  }
+
   Useful.RestoreDataPointerToLocalVector(); 
   Phi.RestoreDataPointerToLocalVector();
+  R.RestoreDataPointerToLocalVector();
 
 }
 

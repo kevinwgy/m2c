@@ -819,7 +819,7 @@ Assigner *LevelSetSchemeData::getAssigner()
 
   new ClassDouble<LevelSetSchemeData>(ca, "EntropyFixCoefficient", this, &LevelSetSchemeData::delta);
 
-  new ClassInt<LevelSetSchemeData>(ca, "BandWidth", this, &LevelSetSchemeData::bandwidth);
+  new ClassInt<LevelSetSchemeData>(ca, "Bandwidth", this, &LevelSetSchemeData::bandwidth);
 
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionX0", this,
           reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_x0), 3,

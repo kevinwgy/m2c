@@ -201,32 +201,6 @@ void SpaceVariable3D::RestoreDataPointerAndAdd()
 
 //---------------------------------------------------------
 
-void SpaceVariable3D::RestoreDataPointerAndMinimize()
-{
-  RestoreDataPointerToLocalVector();
-  auto ierr = DMLocalToGlobal(*dm, localVec, MIN_VALUES, globalVec);
-  //CHKERRQ(ierr);
-
-  // sync local to global
-  DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
-  DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
-}
-
-//---------------------------------------------------------
-
-void SpaceVariable3D::RestoreDataPointerAndMaximize()
-{
-  RestoreDataPointerToLocalVector();
-  auto ierr = DMLocalToGlobal(*dm, localVec, MAX_VALUES, globalVec);
-  //CHKERRQ(ierr);
-
-  // sync local to global
-  DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
-  DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
-}
-
-//-------------------------------------------------
-
 void SpaceVariable3D::RestoreDataPointerToLocalVector()
 {
   auto ierr = DMDAVecRestoreArray(*dm, localVec, &array);  
