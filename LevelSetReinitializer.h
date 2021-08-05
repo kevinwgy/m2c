@@ -2,6 +2,7 @@
 #define _LEVELSET_REINITIALIZER_H_
 
 #include <GradientCalculator.h>
+#include <GhostPoint.h>
 
 /*****************************************************************************
  * Class LevelSetReinitializer handles the reinitialization of the level set
@@ -34,6 +35,8 @@ class LevelSetReinitializer
   SpaceVariable3D Sign;
  
   SpaceVariable3D PhiG2; //this one has 2 ghosted layers
+
+  double phi_max, phi_min; //pos and neg numbers specified outside narrow band
 
   //! a nested structure that stores information of a first-layer node & its neighbors across interface
   struct FirstLayerNode {
@@ -71,11 +74,15 @@ public:
 
   void Destroy();
 
-  void Reinitialize(SpaceVariable3D &Phi);
+  void Reinitialize(SpaceVariable3D &Phi); //reinitialize phi in the entire domain
 
-  void ConstructNarrowBand(SpaceVariable3D &Phi, //Outside band, phi will be set to a large const number 
-                           SpaceVariable3D &Useful, SpaceVariable3D &Active, 
-                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes); 
+  void ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, SpaceVariable3D &Useful,
+                          SpaceVariable3D &Active, vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
+
+  // For narrow-band level set method
+  void ConstructNarrowBand(SpaceVariable3D &Phi,
+                           SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
 
 private:
 
@@ -97,6 +104,24 @@ private:
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
 
   void PopulatePhiG2(SpaceVariable3D &Phi);
+
+  // For narrow-band level set method
+  void TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes,
+                                vector<FirstLayerNode> &firstLayer, vector<Int3> &firstLayerIncGhost);
+
+  void UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firstLayerIncGhost,
+                        SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                        vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
+
+  void PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable3D &Useful,
+                           SpaceVariable3D &Active, vector<Int3> &useful_nodes,
+                           vector<Int3> &active_nodes);
+
+  void CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3D &Useful, vector<Int3> &useful_nodes);
+
+  void EvaluateSignFunctionInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes, double eps/*smoothing factor*/);
+
+  double ComputeResidualInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes, SpaceVariable3D &R, double cfl);
 
 };
 

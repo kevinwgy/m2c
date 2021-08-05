@@ -28,6 +28,12 @@ struct Int3 {
     else if(v[2]<v2.v[2]) {return true;} else return false;
   }
 
+  bool operator==(const Int3& v2) const {
+    if     (v[0] != v2.v[0])   return false;
+    else if(v[1] != v2.v[1])   return false;
+    else if(v[2] != v2.v[2])   return false;
+    else                       return true;
+  }
 };
 
 //------------------------------------------------------------------------------

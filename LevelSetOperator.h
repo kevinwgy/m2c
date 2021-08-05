@@ -35,9 +35,9 @@ class LevelSetOperator
 
   //! variables related to the narrow-band level set method
   bool narrow_band; //whether the narrow-band lsm is used
-  SpaceVariable3D&  Level;  //band level of each node (-inf to inf, including ghost boundary)
-  SpaceVariable3D&  Useful; //all the nodes in the narrow-band (including ghost boundary)
-  SpaceVariable3D&  Active; //the nodes in the interior of the narrow-band (including ghost boundary)
+  SpaceVariable3D  Level;  //band level of each node (-inf to inf, including ghost boundary)
+  SpaceVariable3D  Useful; //all the nodes in the narrow-band (including ghost boundary)
+  SpaceVariable3D  Active; //the nodes in the interior of the narrow-band (including ghost boundary)
   vector<Int3> useful_nodes; //vector of useful nodes
   vector<Int3> active_nodes; //vector of active nodes
 

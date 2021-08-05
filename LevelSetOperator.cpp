@@ -57,14 +57,14 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
 
   if(iod_ls.bandwidth < INT_MAX) {//user specified narrow-band level set method
     narrow_band = true;
-    if(iod_ls.reinit.bandwidth <= 1) {
+    if(iod_ls.bandwidth <= 1) {
       print_error("*** Error: In the narrow-band level set method, bandwidth should be at least 2 (current: %d)\n",
-                  iod_ls.reinit.bandwidth);
+                  iod_ls.bandwidth);
       exit_mpi();
     }
     if(iod_ls.reinit.frequency <= 0 || iod_ls.reinit.frequency >= iod_ls.bandwidth) {
-      print_error("*** Error: In the narrow-band level set method, reinitialization "
-                  "Frequency (actually, time-step period) should be smaller than bandwidth (current: %d).\n",
+      print_error("*** Error: The level set reinitialization "
+                  "frequency (actually, time-step period) should be smaller than bandwidth (current: %d).\n",
                   iod_ls.reinit.frequency);
       exit_mpi();
     }
@@ -329,15 +329,10 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 
   ApplyBoundaryConditions(Phi);
 
-  if(iod_ls.bandwidth < INT_MAX) {
-    if(reinit)
-      reinit->ConstructNarrowBand(Phi, Level, Useful, Active, useful_nodes, active_nodes);
-    else {
-      print_error("*** Error: LevelSetReinitialization is not constructed, but needed in order to construct narrow band.\n");
-      exit_mpi();
-    }
+  if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
+    assert(reinit);
+    reinit->ConstructNarrowBand(Phi, Level, Useful, Active, useful_nodes, active_nodes);
   }
-
 }
 
 //-----------------------------------------------------
@@ -757,12 +752,11 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   double*** wfdata = wf.GetDataPointer();
   double*** res    = R.GetDataPointer(); //residual, on the right-hand-side of the ODE
   double*** active = Active.GetDataPointer();
+  double*** useful = Useful.GetDataPointer();
 
   //initialize R to 0
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++)
-          res[k][j][i] = 0.0;
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++)
+    res[(*it)[2]][(*it)[1]][(*it)[0]] = 0.0;
 
   double localflux;
 
@@ -823,6 +817,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   wk.RestoreDataPointerToLocalVector();
   wf.RestoreDataPointerToLocalVector();
   Active.RestoreDataPointerToLocalVector();
+  Useful.RestoreDataPointerToLocalVector();
 
   R.RestoreDataPointerAndInsert(); //insert
 }
@@ -862,8 +857,7 @@ double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, dou
       exit_mpi();      
   }
   return flux;
-}
-
+} 
 //-----------------------------------------------------
 
 void LevelSetOperator::AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R)
@@ -924,7 +918,10 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
 
   print("- Reinitializing the level set function (material id: %d).\n", materialid);
 
-  reinit->Reinitialize(Phi);
+  if(narrow_band)
+    reinit->ReinitializeInBand(Phi, Level, Useful, Active, useful_nodes, active_nodes);
+  else
+    reinit->Reinitialize(Phi);
 
   return true;
 }
