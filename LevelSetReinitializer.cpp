@@ -1,4 +1,5 @@
 #include <LevelSetReinitializer.h>
+#include <GradientCalculatorCentral.h>
 #include <cfloat> //DBL_MAX
 
 extern int verbose;

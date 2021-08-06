@@ -1,7 +1,8 @@
 #ifndef _VISCOSITY_OPERATOR_H_
 #define _VISCOSITY_OPERATOR_H_
 
-#include <GradientCalculator.h>
+#include <GradientCalculatorBase.h>
+#include <Interpolator.h>
 #include <ViscoFcn.h>
 
 /***************************************************

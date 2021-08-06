@@ -1,7 +1,8 @@
 #ifndef _LEVELSET_REINITIALIZER_H_
 #define _LEVELSET_REINITIALIZER_H_
 
-#include <GradientCalculator.h>
+#include <GradientCalculatorBase.h>
+#include <Interpolator.h>
 #include <GhostPoint.h>
 
 /*****************************************************************************

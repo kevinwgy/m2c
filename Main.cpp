@@ -12,7 +12,7 @@
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
 #include <MultiPhaseOperator.h>
-#include <GradientCalculator.h>
+#include <GradientCalculatorCentral.h>
 #include <set>
 using std::cout;
 using std::endl;

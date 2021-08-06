@@ -421,12 +421,16 @@ struct LevelSetSchemeData {
 
   int materialid; //! The material in the phi<0 region ("inside")
 
+  enum Solver {FINITE_VOLUME = 0, FINITE_DIFFERENCE = 1} solver;
+
+  enum FiniteDifferenceMethod {UPWIND_CENTRAL_3 = 0} fd;
+
   enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, UPWIND = 2} flux;
+  ReconstructionData rec;
 
   enum BcType {NONE = 0, ZERO_NEUMANN = 1, LINEAR_EXTRAPOLATION = 2, SIZE = 3};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
 
-  ReconstructionData rec;
   
   double delta; //! The coeffient in Harten's entropy fix.
 

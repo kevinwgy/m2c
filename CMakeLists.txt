@@ -74,7 +74,7 @@ MultiPhaseOperator.cpp
 SymmetryOperator.cpp
 SmoothingOperator.cpp
 Interpolator.cpp
-GradientCalculator.cpp
+GradientCalculatorCentral.cpp
 ViscosityOperator.cpp
 ProbeOutput.cpp
 MaterialVolumeOutput.cpp
