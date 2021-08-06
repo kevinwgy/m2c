@@ -752,6 +752,7 @@ LevelSetReinitializationData::LevelSetReinitializationData()
   frequency = -1;
   frequency_dt = -1.0;
   maxIts = 20;
+  cfl = 0.5;
   convergence_tolerance = 1.0e-3;
   firstLayerTreatment = ITERATIVE_CONSTRAINED2;
 }
@@ -760,7 +761,7 @@ LevelSetReinitializationData::LevelSetReinitializationData()
 
 void LevelSetReinitializationData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassInt<LevelSetReinitializationData>(ca, "Frequency", this, 
           &LevelSetReinitializationData::frequency);
@@ -770,6 +771,9 @@ void LevelSetReinitializationData::setup(const char *name, ClassAssigner *father
 
   new ClassInt<LevelSetReinitializationData>(ca, "MaxIts", this, 
           &LevelSetReinitializationData::maxIts);
+
+  new ClassDouble<LevelSetReinitializationData>(ca, "CFL", this, 
+          &LevelSetReinitializationData::cfl);
 
   new ClassDouble<LevelSetReinitializationData>(ca, "ConvergenceTolerance", this, 
           &LevelSetReinitializationData::convergence_tolerance);

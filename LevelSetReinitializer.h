@@ -36,7 +36,11 @@ class LevelSetReinitializer
  
   SpaceVariable3D PhiG2; //this one has 2 ghosted layers
 
-  double phi_max, phi_min; //pos and neg numbers specified outside narrow band
+  double phi_max, phi_min; //max pos and neg phi within band
+  double phi_out_pos, phi_out_neg; //applied to specify the constant phi outside band
+
+  //! cfl number for the ficitious time integrator
+  double cfl;
 
   //! a nested structure that stores information of a first-layer node & its neighbors across interface
   struct FirstLayerNode {
@@ -121,7 +125,10 @@ private:
 
   void EvaluateSignFunctionInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes, double eps/*smoothing factor*/);
 
-  double ComputeResidualInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes, SpaceVariable3D &R, double cfl);
+  double ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable3D &Useful,
+                               vector<Int3> &useful_nodes, SpaceVariable3D &R, double cfl);
+
+  void UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes);
 
 };
 

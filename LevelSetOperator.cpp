@@ -21,8 +21,6 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
-    ghost_nodes_inner(*spo.GetPointerToInnerGhostNodes()),
-    ghost_nodes_outer(*spo.GetPointerToOuterGhostNodes()),
     rec(comm_, dm_all_, iod_ls_.rec, coordinates, delta_xyz),
     reinit(NULL),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
@@ -51,6 +49,8 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
+  CreateGhostNodeLists(); //create ghost_nodes_inner and ghost_nodes_outer
+
   rec.Setup(spo.GetPointerToInnerGhostNodes(),
             spo.GetPointerToOuterGhostNodes()); //this function requires mesh info (dxyz)
 
@@ -58,7 +58,7 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
   if(iod_ls.bandwidth < INT_MAX) {//user specified narrow-band level set method
     narrow_band = true;
     if(iod_ls.bandwidth <= 1) {
-      print_error("*** Error: In the narrow-band level set method, bandwidth should be at least 2 (current: %d)\n",
+      print_error("*** Error: In the narrow-band level set method, bandwidth should be at least 3 (current: %d)\n",
                   iod_ls.bandwidth);
       exit_mpi();
     }
@@ -113,6 +113,98 @@ void LevelSetOperator::Destroy()
   Level.Destroy();
   Useful.Destroy();
   Active.Destroy();
+}
+
+//-----------------------------------------------------
+
+void LevelSetOperator::CreateGhostNodeLists()
+{
+  ghost_nodes_inner.clear();
+  ghost_nodes_outer.clear();
+
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  Int3 image;
+  Vec3D proj(0.0), out_normal(0.0);
+  LevelSetSchemeData::BcType bcType = LevelSetSchemeData::NONE;
+  GhostPoint::Side side = GhostPoint::UNDEFINED;
+  int counter;
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        if(k>=k0 && k<kmax && j>=j0 && j<jmax && i>=i0 && i<imax)
+          continue; //interior of the subdomain
+
+        if(coordinates.OutsidePhysicalDomain(i,j,k)) {//outside physical domain
+
+          //determine the image, the projection point and boundary condition
+          image      = 0;
+          proj       = 0.0;
+          out_normal = 0.0;
+          counter    = 0;
+          bcType     = LevelSetSchemeData::NONE;
+          side       = GhostPoint::UNDEFINED;
+
+          if(i<0)        {image[0] = -i-1;
+                          proj[0]  = iod.mesh.x0;      out_normal[0] = -1.0;
+                          bcType   = iod_ls.bc_x0;     side = GhostPoint::LEFT;     counter++;}
+          else if(i>=NX) {image[0] = NX+(i-NX)-1;
+                          proj[0]  = iod.mesh.xmax;    out_normal[0] =  1.0;
+                          bcType   = iod_ls.bc_xmax;   side = GhostPoint::RIGHT;    counter++;}
+          else           {image[0] = i;
+                          proj[0]  = coords[k][j][i][0];}
+
+
+          if(j<0)        {image[1] = -j-1;
+                          proj[1]  = iod.mesh.y0;      out_normal[1] = -1.0;
+                          bcType   = iod_ls.bc_y0;     side = GhostPoint::BOTTOM;   counter++;}
+          else if(j>=NY) {image[1] = NY+(j-NY)-1;
+                          proj[1]  = iod.mesh.ymax;    out_normal[1] =  1.0;
+                          bcType   = iod_ls.bc_ymax;   side = GhostPoint::TOP;      counter++;}
+          else           {image[1] = j;
+                          proj[1]  = coords[k][j][i][1];}
+
+
+          if(k<0)        {image[2] = -k-1;
+                          proj[2]  = iod.mesh.z0;      out_normal[2] = -1.0;
+                          bcType   = iod_ls.bc_z0;     side = GhostPoint::BACK;     counter++;}
+          else if(k>=NZ) {image[2] = NZ+(k-NZ)-1;
+                          proj[2]  = iod.mesh.zmax;    out_normal[2] =  1.0;
+                          bcType   = iod_ls.bc_zmax;   side = GhostPoint::FRONT;    counter++;}
+          else           {image[2] = k;
+                          proj[2]  = coords[k][j][i][2];}
+
+          out_normal /= out_normal.norm();
+
+          assert(counter<=3 && counter>0);
+
+          if(counter == 1)
+            ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::FACE,
+                                        proj, out_normal, (int)bcType, side));
+          else if(counter == 2)
+            ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::EDGE,
+                                        proj, out_normal, 0));
+          else
+            ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::VERTEX,
+                                        proj, out_normal, 0));
+
+        }
+        else //inside physical domain
+          ghost_nodes_inner.push_back(GhostPoint(i,j,k));
+
+      }
+
+  int nInner = ghost_nodes_inner.size();
+  int nOuter = ghost_nodes_outer.size();
+  MPI_Allreduce(MPI_IN_PLACE, &nInner, 1, MPI_INT, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &nOuter, 1, MPI_INT, MPI_SUM, comm);
+
+  coordinates.RestoreDataPointerToLocalVector();
+
 }
 
 //-----------------------------------------------------
@@ -340,6 +432,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 // Apply boundary conditions by populating ghost cells of Phi
 void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 {
+
   double*** phi = (double***) Phi.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
@@ -347,201 +440,86 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
   Phi.GetGlobalSize(&NX, &NY, &NZ);
 
   double r, r1, r2, f1, f2;
-  //! Left boundary
-  if(ii0==-1) { 
-    switch (iod_ls.bc_x0) {
 
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++)
-            phi[k][j][ii0] = phi[k][j][ii0+1];
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    switch (it->bcType) {
+
+      case (int)LevelSetSchemeData::ZERO_NEUMANN :
+        phi[k][j][i] = phi[im_k][im_j][im_i];
         break;
 
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            if(ii0+2<NX) { //ii0+2 is within physical domain
-              r  = coords[k][j][ii0][0];
-              r1 = coords[k][j][ii0+1][0];  f1 = phi[k][j][ii0+1];
-              r2 = coords[k][j][ii0+2][0];  f2 = phi[k][j][ii0+2];
-              phi[k][j][ii0] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][j][ii0] = phi[k][j][ii0+1];
-          }
+      case (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        //make sure the width of the subdomain is big enough for linear extrapolation
+        if(it->side == GhostPoint::LEFT) {
+          if(i+2<NX) {
+            r  = coords[k][j][i][0];
+            r1 = coords[k][j][i+1][0];  f1 = phi[k][j][i+1];
+            r2 = coords[k][j][i+2][0];  f2 = phi[k][j][i+2];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::RIGHT) {
+          if(i-2>=0) {
+            r  = coords[k][j][i][0];
+            r1 = coords[k][j][i-1][0];  f1 = phi[k][j][i-1];
+            r2 = coords[k][j][i-2][0];  f2 = phi[k][j][i-2];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::BOTTOM) {
+          if(j+2<NY) {
+            r  = coords[k][j][i][1];
+            r1 = coords[k][j+1][i][1];  f1 = phi[k][j+1][i];
+            r2 = coords[k][j+2][i][1];  f2 = phi[k][j+2][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::TOP) {
+          if(j-2>=0) {
+            r  = coords[k][j][i][1];
+            r1 = coords[k][j-1][i][1];  f1 = phi[k][j-1][i];
+            r2 = coords[k][j-2][i][1];  f2 = phi[k][j-2][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::BACK) {
+          if(k+2<NZ) { 
+            r  = coords[k][j][i][2];
+            r1 = coords[k+1][j][i][2];  f1 = phi[k+1][j][i];
+            r2 = coords[k+2][j][i][2];  f2 = phi[k+2][j][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::FRONT) {
+          if(k-2>=0) {
+            r  = coords[k][j][i][2];
+            r1 = coords[k-1][j][i][2];  f1 = phi[k-1][j][i];
+            r2 = coords[k-2][j][i][2];  f2 = phi[k-2][j][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
         break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at x=x0 cannot be specified!\n");
-        exit_mpi();
     }
-  }
 
-  //! Right boundary
-  if(iimax==NX+1) { 
-    switch (iod_ls.bc_xmax) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++)
-            phi[k][j][iimax-1] = phi[k][j][iimax-2];
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            if(iimax-3>=0) { //iimax-3 is within physical domain
-              r  = coords[k][j][iimax-1][0];
-              r1 = coords[k][j][iimax-2][0];  f1 = phi[k][j][iimax-2];
-              r2 = coords[k][j][iimax-3][0];  f2 = phi[k][j][iimax-3];
-              phi[k][j][iimax-1] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][j][iimax-1] = phi[k][j][iimax-2];
-          }
-        break;
- 
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at x=xmax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Bottom boundary
-  if(jj0==-1) { 
-    switch (iod_ls.bc_y0) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++)
-            phi[k][jj0][i] = phi[k][jj0+1][i];
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            if(jj0+2<NY) { //jj0+2 is within physical domain
-              r  = coords[k][jj0][i][1];
-              r1 = coords[k][jj0+1][i][1];  f1 = phi[k][jj0+1][i];
-              r2 = coords[k][jj0+2][i][1];  f2 = phi[k][jj0+2][i];
-              phi[k][jj0][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][jj0][i] = phi[k][jj0+1][i];
-          }
-        break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at y=y0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Top boundary
-  if(jjmax==NY+1) { 
-    switch (iod_ls.bc_ymax) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++)
-            phi[k][jjmax-1][i] = phi[k][jjmax-2][i]; 
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            if(jjmax-3>=0) { //jjmax-3 is within physical domain
-              r  = coords[k][jjmax-1][i][1];
-              r1 = coords[k][jjmax-2][i][1];  f1 = phi[k][jjmax-2][i];
-              r2 = coords[k][jjmax-3][i][1];  f2 = phi[k][jjmax-3][i];
-              phi[k][jjmax-1][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][jjmax-1][i] = phi[k][jjmax-2][i];
-          }
-        break;
- 
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at y=ymax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Back boundary (z min)
-  if(kk0==-1) { 
-    switch (iod_ls.bc_z0) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++)
-            phi[kk0][j][i] = phi[kk0+1][j][i]; 
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            if(kk0+2<NZ) { //kk0+2 is within physical domain
-              r  = coords[kk0][j][i][2];
-              r1 = coords[kk0+1][j][i][2];  f1 = phi[kk0+1][j][i];
-              r2 = coords[kk0+2][j][i][2];  f2 = phi[kk0+2][j][i];
-              phi[kk0][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[kk0][j][i] = phi[kk0+1][j][i]; 
-          }
-        break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at z=z0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Front boundary (z max)
-  if(kkmax==NZ+1) { 
-    switch (iod_ls.bc_zmax) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++)
-            phi[kkmax-1][j][i] = phi[kkmax-2][j][i];
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            if(kkmax-3>=0) { //kkmax-3 is within physical domain
-              r  = coords[kkmax-1][j][i][2];
-              r1 = coords[kkmax-2][j][i][2];  f1 = phi[kkmax-2][j][i];
-              r2 = coords[kkmax-3][j][i][2];  f2 = phi[kkmax-3][j][i];
-              phi[kkmax-1][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[kkmax-1][j][i] = phi[kkmax-2][j][i];
-          }
-        break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Boundary condition at z=zmax cannot be specified!\n");
-        exit_mpi();
-    }
   }
 
   Phi.RestoreDataPointerAndInsert();
 
   coordinates.RestoreDataPointerToLocalVector();
+
 }
 
 //-----------------------------------------------------

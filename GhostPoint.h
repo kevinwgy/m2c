@@ -21,44 +21,50 @@ struct GhostPoint {
   Vec3D outward_normal;
   enum ProjectionType {NONE = 0, FACE = 1, EDGE = 2, VERTEX = 3, SIZE = 4} type_projection; 
   
+  enum Side {UNDEFINED = 0, LEFT = 1, RIGHT = 2, BOTTOM = 3, TOP = 4, BACK = 5, FRONT = 6} side;
 
-  int bcType; //! type of b.c. of the projection point (following MeshData::BcType)
+  int bcType; //! type of b.c. of the projection point 
 
   //! Constructors
   GhostPoint() : 
       isNode(false), ijk(INT_MAX), xi(0.0), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE) {}
+      type_projection(NONE), side(UNDEFINED) {}
 
   GhostPoint(Int3 ijk_) : 
       isNode(true), ijk(ijk_), xi(0.0), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE) {}
+      type_projection(NONE), side(UNDEFINED) {}
 
   GhostPoint(int i, int j, int k) : 
       isNode(true), ijk(Int3(i,j,k)), xi(0.0), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE) {}
+      type_projection(NONE), side(UNDEFINED) {}
 
   GhostPoint(Int3 ijk_, Vec3D xi_) : 
       isNode(false), ijk(ijk_), xi(xi_), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE) {}
+      type_projection(NONE), side(UNDEFINED) {}
 
   GhostPoint(Int3 ijk_, Int3 image_ijk_) : 
       isNode(true), ijk(ijk_), xi(0.0), image_ijk(image_ijk_), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE) {}
+      type_projection(NONE), side(UNDEFINED) {}
 
   GhostPoint(Int3 ijk_, Int3 image_ijk_, ProjectionType projType_, Vec3D proj_, Vec3D normal_, int bcType_) : 
       isNode(true), ijk(ijk_), xi(0.0), image_ijk(image_ijk_), image_xi(0.0),
       boundary_projection(proj_), outward_normal(normal_), bcType(bcType_),
-      type_projection(projType_) {}
+      type_projection(projType_), side(UNDEFINED) {}
+
+  GhostPoint(Int3 ijk_, Int3 image_ijk_, ProjectionType projType_, Vec3D proj_, Vec3D normal_, int bcType_, Side side_) : 
+      isNode(true), ijk(ijk_), xi(0.0), image_ijk(image_ijk_), image_xi(0.0),
+      boundary_projection(proj_), outward_normal(normal_), bcType(bcType_),
+      type_projection(projType_), side(side_) {}
 
   GhostPoint(Int3 ijk_, Vec3D xi_, Int3 image_ijk_, Vec3D image_xi_) : 
       isNode(false), ijk(ijk_), xi(xi_), image_ijk(image_ijk_), image_xi(image_xi_),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE) {}
+      type_projection(NONE), side(UNDEFINED) {}
 
 
   ~GhostPoint() {}

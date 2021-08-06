@@ -287,6 +287,7 @@ void SpaceOperator::CreateGhostNodeLists()
   Int3 image;
   Vec3D proj(0.0), out_normal(0.0);
   MeshData::BcType bcType = MeshData::NONE;
+  GhostPoint::Side side = GhostPoint::UNDEFINED;
   int counter;
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
@@ -303,33 +304,34 @@ void SpaceOperator::CreateGhostNodeLists()
           out_normal = 0.0;
           counter    = 0; 
           bcType     = MeshData::NONE;
+          side       = GhostPoint::UNDEFINED;
 
           if(i<0)        {image[0] = -i-1;
                           proj[0]  = iod.mesh.x0;      out_normal[0] = -1.0; 
-                          bcType   = iod.mesh.bc_x0;   counter++;}
+                          bcType   = iod.mesh.bc_x0;   side = GhostPoint::LEFT;     counter++;}
           else if(i>=NX) {image[0] = NX+(i-NX)-1;
                           proj[0]  = iod.mesh.xmax;    out_normal[0] =  1.0; 
-                          bcType   = iod.mesh.bc_xmax; counter++;}
+                          bcType   = iod.mesh.bc_xmax; side = GhostPoint::RIGHT;    counter++;}
           else           {image[0] = i;
                           proj[0]  = coords[k][j][i][0];}
                      
 
           if(j<0)        {image[1] = -j-1;
                           proj[1]  = iod.mesh.y0;      out_normal[1] = -1.0; 
-                          bcType   = iod.mesh.bc_y0;   counter++;}
+                          bcType   = iod.mesh.bc_y0;   side = GhostPoint::BOTTOM;   counter++;}
           else if(j>=NY) {image[1] = NY+(j-NY)-1;
                           proj[1]  = iod.mesh.ymax;    out_normal[1] =  1.0; 
-                          bcType   = iod.mesh.bc_ymax; counter++;}
+                          bcType   = iod.mesh.bc_ymax; side = GhostPoint::TOP;      counter++;}
           else           {image[1] = j;
                           proj[1]  = coords[k][j][i][1];}
          
 
           if(k<0)        {image[2] = -k-1;
                           proj[2]  = iod.mesh.z0;      out_normal[2] = -1.0;
-                          bcType   = iod.mesh.bc_z0;   counter++;}
+                          bcType   = iod.mesh.bc_z0;   side = GhostPoint::BACK;     counter++;}
           else if(k>=NZ) {image[2] = NZ+(k-NZ)-1;
                           proj[2]  = iod.mesh.zmax;    out_normal[2] =  1.0; 
-                          bcType   = iod.mesh.bc_zmax; counter++;}
+                          bcType   = iod.mesh.bc_zmax; side = GhostPoint::FRONT;    counter++;}
           else           {image[2] = k;
                           proj[2]  = coords[k][j][i][2];}
          
@@ -339,7 +341,7 @@ void SpaceOperator::CreateGhostNodeLists()
 
           if(counter == 1)
             ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::FACE,
-                                        proj, out_normal, (int)bcType));
+                                        proj, out_normal, (int)bcType, side));
           else if(counter == 2)
             ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::EDGE,
                                         proj, out_normal, 0));

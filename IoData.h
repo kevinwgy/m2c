@@ -399,6 +399,8 @@ struct LevelSetReinitializationData {
 
   int maxIts;
 
+  double cfl;
+
   double convergence_tolerance;
   
   enum FirstLayerTreatment {FIXED = 0, UNCONSTRAINED = 1, //Russo and Smereka, mod. by Hartmann (2008)

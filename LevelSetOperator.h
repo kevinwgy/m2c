@@ -24,8 +24,9 @@ class LevelSetOperator
   SpaceVariable3D& delta_xyz;
   SpaceVariable3D& volume; //!< volume of node-centered control volumes
 
-  vector<GhostPoint>& ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
-  vector<GhostPoint>& ghost_nodes_outer; //!< ghost nodes outside the physical domain
+  //! The ghost node vectors are almost the same as those in SpaceOperator, except bcType
+  vector<GhostPoint> ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  vector<GhostPoint> ghost_nodes_outer; //!< ghost nodes outside the physical domain
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
@@ -72,6 +73,7 @@ public:
 
 private:
   // functions for internal use within the class
+  void CreateGhostNodeLists(); //almost the same as the function in SpaceOperator, except bcType
   void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi);
   void ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi); //the narrow-band version
   void ComputeAdvectionFlux(SpaceVariable3D &R);

@@ -29,6 +29,8 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
     interp = new InterpolatorLinear(comm_, dm_all_, coordinates_, delta_xyz_);
   if(true) //can add other differentiation methods later
     grad = new GradientCalculatorCentral(comm_, dm_all_, coordinates_, delta_xyz_, *interp);
+
+  cfl = iod_ls.reinit.cfl;
 }
 
 
@@ -78,20 +80,16 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
-  double cfl = 0.25;
-  double residual = 0.0, residual0 = 0.0;
+  double residual = 0.0;
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
 
     //************** Step 1 of RK3 *****************
     residual = ComputeResidual(Phi, R, cfl);  //R = R(Phi)
-    if(iter==0)
-      residual0 = residual;
     if(verbose>=1)
-      print("  o Iter. %d: Residual = %e, Rel. Residual = %e, Tol = %e.\n", iter, residual, residual/residual0, 
+      print("  o Iter. %d: Residual = %e, Tol = %e.\n", iter, residual, 
             iod_ls.reinit.convergence_tolerance);
-    if(residual/residual0 < iod_ls.reinit.convergence_tolerance ||
-       residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
+    if(residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
       break;
 
     Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
@@ -120,8 +118,8 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
   }
 
   if(iter==iod_ls.reinit.maxIts)
-    print("  o Warning: Failed to converge. Residual = %e, Rel. Residual = %e, Tol = %e.\n", 
-          residual, residual/residual0, iod_ls.reinit.convergence_tolerance);
+    print("  o Warning: Failed to converge. Residual = %e, Tol = %e.\n", 
+          residual, iod_ls.reinit.convergence_tolerance);
 }
 
 //--------------------------------------------------------------------------
@@ -131,6 +129,8 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
                            SpaceVariable3D &Useful,SpaceVariable3D &Active, 
                            vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
 {
+  // update phi_max and phi_min (only for use in updating new useful nodes)
+  UpdatePhiMaxAndPhiMinInBand(Phi, useful_nodes);
 
   // Step 1: Prep: Tag first layer nodes & store the sign function, and update the narrow band
   vector<FirstLayerNode> firstLayer;
@@ -149,20 +149,16 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
-  double cfl = 0.25;
-  double residual = 0.0, residual0 = 0.0;
+  double residual = 0.0;
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
 
     //************** Step 1 of RK3 *****************
-    residual = ComputeResidualInBand(Phi, useful_nodes, R, cfl);  //R = R(Phi)
-    if(iter==0)
-      residual0 = residual;
+    residual = ComputeResidualInBand(Phi, Useful, useful_nodes, R, cfl);  //R = R(Phi)
     if(verbose>=1)
-      print("  o Iter. %d: Residual = %e, Rel. Residual = %e, Tol = %e.\n", iter, residual, residual/residual0, 
+      print("  o Iter. %d: Residual = %e, Tol = %e.\n", iter, residual, 
             iod_ls.reinit.convergence_tolerance);
-    if(residual/residual0 < iod_ls.reinit.convergence_tolerance ||
-       residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
+    if(residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
       break;
 
     Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
@@ -173,7 +169,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
 
 
     //************** Step 2 of RK3 *****************
-    ComputeResidualInBand(Phi1, useful_nodes, R, cfl);
+    ComputeResidualInBand(Phi1, Useful, useful_nodes, R, cfl);
     Phi1.AXPlusBY(0.25, 0.75, Phi);
     Phi1.AXPlusBY(1.0, 0.25, R);
     ApplyBoundaryConditions(Phi1);
@@ -181,7 +177,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
     //*********************************************
 
     //************** Step 3 of RK3 *****************
-    ComputeResidualInBand(Phi1, useful_nodes, R, cfl);
+    ComputeResidualInBand(Phi1, Useful, useful_nodes, R, cfl);
     Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
     Phi.AXPlusBY(1.0, 2.0/3.0, R);
     ApplyBoundaryConditions(Phi);
@@ -191,12 +187,10 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
   }
 
   if(iter==iod_ls.reinit.maxIts)
-    print("  o Warning: Failed to converge. Residual = %e, Rel. Residual = %e, Tol = %e.\n", 
-          residual, residual/residual0, iod_ls.reinit.convergence_tolerance);
+    print("  o Warning: Failed to converge. Residual = %e, Tol = %e.\n", 
+          residual, iod_ls.reinit.convergence_tolerance);
+
 }
-
-//--------------------------------------------------------------------------
-
 
 //--------------------------------------------------------------------------
 
@@ -816,7 +810,7 @@ LevelSetReinitializer::ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R,
 //--------------------------------------------------------------------------
 
 double
-LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi,
+LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable3D &Useful,
                                              vector<Int3> &useful_nodes, SpaceVariable3D &R, double cfl)
 {
 
@@ -825,6 +819,7 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi,
 
   // get data
   double*** tag    = (double***)Tag.GetDataPointer();
+  double*** useful = (double***)Useful.GetDataPointer();
   double*** sign   = (double***)Sign.GetDataPointer();
   double*** phi    = (double***)Phi.GetDataPointer();
   Vec3D***  dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
@@ -856,13 +851,13 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi,
 
     dx = std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
     dt = cfl*dx;
-        
-    a = (phi[k][j][i]-phi[k][j][i-1])/(coords[k][j][i][0]-coords[k][j][i-1][0]);
-    b = (phi[k][j][i+1]-phi[k][j][i])/(coords[k][j][i+1][0]-coords[k][j][i][0]);
-    c = (phi[k][j][i]-phi[k][j-1][i])/(coords[k][j][i][1]-coords[k][j-1][i][1]);
-    d = (phi[k][j+1][i]-phi[k][j][i])/(coords[k][j+1][i][1]-coords[k][j][i][1]);
-    e = (phi[k][j][i]-phi[k-1][j][i])/(coords[k][j][i][2]-coords[k-1][j][i][2]);
-    f = (phi[k+1][j][i]-phi[k][j][i])/(coords[k+1][j][i][2]-coords[k][j][i][2]);
+
+    a = useful[k][j][i-1] ? (phi[k][j][i]-phi[k][j][i-1])/(coords[k][j][i][0]-coords[k][j][i-1][0]) : 0.0;
+    b = useful[k][j][i+1] ? (phi[k][j][i+1]-phi[k][j][i])/(coords[k][j][i+1][0]-coords[k][j][i][0]) : 0.0;
+    c = useful[k][j-1][i] ? (phi[k][j][i]-phi[k][j-1][i])/(coords[k][j][i][1]-coords[k][j-1][i][1]) : 0.0;
+    d = useful[k][j+1][i] ? (phi[k][j+1][i]-phi[k][j][i])/(coords[k][j+1][i][1]-coords[k][j][i][1]) : 0.0;
+    e = useful[k-1][j][i] ? (phi[k][j][i]-phi[k-1][j][i])/(coords[k][j][i][2]-coords[k-1][j][i][2]) : 0.0;
+    f = useful[k+1][j][i] ? (phi[k+1][j][i]-phi[k][j][i])/(coords[k+1][j][i][2]-coords[k][j][i][2]) : 0.0;
     ap = std::max(a,0.0), am = std::min(a,0.0);
     bp = std::max(b,0.0), bm = std::min(b,0.0);
     cp = std::max(c,0.0), cm = std::min(c,0.0);
@@ -899,7 +894,6 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi,
 //--------------------------------------------------------------------------
 
 // Apply boundary conditions by populating ghost cells of Phi
-// TODO:KW(07/2021) IDENTICAL TO THE FUNCTION IN LEVELSETOPERATOR!! (Should do it in a better way)
 void
 LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 {
@@ -910,203 +904,86 @@ LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi)
   Phi.GetGlobalSize(&NX, &NY, &NZ);
 
   double r, r1, r2, f1, f2;
-  //! Left boundary
-  if(ii0==-1) { 
-    switch (iod_ls.bc_x0) {
 
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++)
-            phi[k][j][ii0] = phi[k][j][ii0+1];
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    switch (it->bcType) {
+
+      case (int)LevelSetSchemeData::ZERO_NEUMANN :
+        phi[k][j][i] = phi[im_k][im_j][im_i];
         break;
 
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            if(ii0+2<NX) { //ii0+2 is within physical domain
-              r  = coords[k][j][ii0][0];
-              r1 = coords[k][j][ii0+1][0];  f1 = phi[k][j][ii0+1];
-              r2 = coords[k][j][ii0+2][0];  f2 = phi[k][j][ii0+2];
-              phi[k][j][ii0] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][j][ii0] = phi[k][j][ii0+1];
-          }
+      case (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION :
+        //make sure the width of the subdomain is big enough for linear extrapolation
+        if(it->side == GhostPoint::LEFT) {
+          if(i+2<NX) {
+            r  = coords[k][j][i][0];
+            r1 = coords[k][j][i+1][0];  f1 = phi[k][j][i+1];
+            r2 = coords[k][j][i+2][0];  f2 = phi[k][j][i+2];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::RIGHT) {
+          if(i-2>=0) {
+            r  = coords[k][j][i][0];
+            r1 = coords[k][j][i-1][0];  f1 = phi[k][j][i-1];
+            r2 = coords[k][j][i-2][0];  f2 = phi[k][j][i-2];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::BOTTOM) {
+          if(j+2<NY) {
+            r  = coords[k][j][i][1];
+            r1 = coords[k][j+1][i][1];  f1 = phi[k][j+1][i];
+            r2 = coords[k][j+2][i][1];  f2 = phi[k][j+2][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::TOP) {
+          if(j-2>=0) {
+            r  = coords[k][j][i][1];
+            r1 = coords[k][j-1][i][1];  f1 = phi[k][j-1][i];
+            r2 = coords[k][j-2][i][1];  f2 = phi[k][j-2][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::BACK) {
+          if(k+2<NZ) { 
+            r  = coords[k][j][i][2];
+            r1 = coords[k+1][j][i][2];  f1 = phi[k+1][j][i];
+            r2 = coords[k+2][j][i][2];  f2 = phi[k+2][j][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
+        else if(it->side == GhostPoint::FRONT) {
+          if(k-2>=0) {
+            r  = coords[k][j][i][2];
+            r1 = coords[k-1][j][i][2];  f1 = phi[k-1][j][i];
+            r2 = coords[k-2][j][i][2];  f2 = phi[k-2][j][i];
+            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } else
+            phi[k][j][i] = phi[im_k][im_j][im_i];
+        }
         break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at x=x0 cannot be specified!\n");
-        exit_mpi();
     }
-  }
 
-  //! Right boundary
-  if(iimax==NX+1) { 
-    switch (iod_ls.bc_xmax) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++)
-            phi[k][j][iimax-1] = phi[k][j][iimax-2];
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            if(iimax-3>=0) { //iimax-3 is within physical domain
-              r  = coords[k][j][iimax-1][0];
-              r1 = coords[k][j][iimax-2][0];  f1 = phi[k][j][iimax-2];
-              r2 = coords[k][j][iimax-3][0];  f2 = phi[k][j][iimax-3];
-              phi[k][j][iimax-1] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][j][iimax-1] = phi[k][j][iimax-2];
-          }
-        break;
- 
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at x=xmax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Bottom boundary
-  if(jj0==-1) { 
-    switch (iod_ls.bc_y0) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++)
-            phi[k][jj0][i] = phi[k][jj0+1][i];
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            if(jj0+2<NY) { //jj0+2 is within physical domain
-              r  = coords[k][jj0][i][1];
-              r1 = coords[k][jj0+1][i][1];  f1 = phi[k][jj0+1][i];
-              r2 = coords[k][jj0+2][i][1];  f2 = phi[k][jj0+2][i];
-              phi[k][jj0][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][jj0][i] = phi[k][jj0+1][i];
-          }
-        break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at y=y0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Top boundary
-  if(jjmax==NY+1) { 
-    switch (iod_ls.bc_ymax) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++)
-            phi[k][jjmax-1][i] = phi[k][jjmax-2][i]; 
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            if(jjmax-3>=0) { //jjmax-3 is within physical domain
-              r  = coords[k][jjmax-1][i][1];
-              r1 = coords[k][jjmax-2][i][1];  f1 = phi[k][jjmax-2][i];
-              r2 = coords[k][jjmax-3][i][1];  f2 = phi[k][jjmax-3][i];
-              phi[k][jjmax-1][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[k][jjmax-1][i] = phi[k][jjmax-2][i];
-          }
-        break;
- 
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at y=ymax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Back boundary (z min)
-  if(kk0==-1) { 
-    switch (iod_ls.bc_z0) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++)
-            phi[kk0][j][i] = phi[kk0+1][j][i]; 
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            if(kk0+2<NZ) { //kk0+2 is within physical domain
-              r  = coords[kk0][j][i][2];
-              r1 = coords[kk0+1][j][i][2];  f1 = phi[kk0+1][j][i];
-              r2 = coords[kk0+2][j][i][2];  f2 = phi[kk0+2][j][i];
-              phi[kk0][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[kk0][j][i] = phi[kk0+1][j][i]; 
-          }
-        break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Level set boundary condition at z=z0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Front boundary (z max)
-  if(kkmax==NZ+1) { 
-    switch (iod_ls.bc_zmax) {
-
-      case LevelSetSchemeData::ZERO_NEUMANN :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++)
-            phi[kkmax-1][j][i] = phi[kkmax-2][j][i];
-        break;
-
-      case LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            if(kkmax-3>=0) { //kkmax-3 is within physical domain
-              r  = coords[kkmax-1][j][i][2];
-              r1 = coords[kkmax-2][j][i][2];  f1 = phi[kkmax-2][j][i];
-              r2 = coords[kkmax-3][j][i][2];  f2 = phi[kkmax-3][j][i];
-              phi[kkmax-1][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-            } else
-              phi[kkmax-1][j][i] = phi[kkmax-2][j][i];
-          }
-        break;
-
-      case LevelSetSchemeData::NONE :
-        break;
-
-      default :
-        print_error("*** Error: Boundary condition at z=zmax cannot be specified!\n");
-        exit_mpi();
-    }
   }
 
   Phi.RestoreDataPointerAndInsert();
 
   coordinates.RestoreDataPointerToLocalVector();
 }
-
 //--------------------------------------------------------------------------
 
 void
@@ -1198,6 +1075,24 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
 //--------------------------------------------------------------------------
 
 void
+LevelSetReinitializer::UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes)
+{
+  double*** phi = (double***)Phi.GetDataPointer();
+
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    phi_max = std::max(phi_max, phi[k][j][i]);
+    phi_min = std::min(phi_min, phi[k][j][i]);
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &phi_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &phi_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  Phi.RestoreDataPointerToLocalVector();
+}
+
+//--------------------------------------------------------------------------
+
+void
 LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi, 
                            SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
                            vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
@@ -1244,11 +1139,13 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
                   (k-1>=k0   && phi[k][j][i]*phi[k-1][j][i]<=0) ||
                   (k+1<kkmax && phi[k][j][i]*phi[k+1][j][i]<=0) ) {
 
+
           level[k][j][i] = 1;
           useful[k][j][i] = 1;
           active[k][j][i] = 1;
           useful_nodes.push_back(Int3(i,j,k));
           active_nodes.push_back(Int3(i,j,k));
+
         } 
 
       }
@@ -1325,7 +1222,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       int i(useful_nodes[n][0]), j(useful_nodes[n][1]), k(useful_nodes[n][2]);
 
       //check its neighbors
-      if(Useful.IsHere(i-1,j,k,true) && !Useful.OutsidePhysicalDomainAndUnpopulated(i-1,j,k)) { //left
+      if(i-1>=ii0 && !Useful.OutsidePhysicalDomainAndUnpopulated(i-1,j,k)) { //left
         if(level[k][j][i-1]==INT_MAX) {
           level[k][j][i-1] = band;
           useful[k][j][i-1] = 1;
@@ -1337,7 +1234,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(Useful.IsHere(i+1,j,k,true) && !Useful.OutsidePhysicalDomainAndUnpopulated(i+1,j,k)) { //right
+      if(i+1<iimax && !Useful.OutsidePhysicalDomainAndUnpopulated(i+1,j,k)) { //right
         if(level[k][j][i+1]==INT_MAX) {
           level[k][j][i+1] = band;
           useful[k][j][i+1] = 1;
@@ -1349,7 +1246,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(Useful.IsHere(i,j-1,k,true) && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j-1,k)) { //bottom
+      if(j-1>=jj0 && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j-1,k)) { //bottom
         if(level[k][j-1][i]==INT_MAX) {
           level[k][j-1][i] = band;
           useful[k][j-1][i] = 1;
@@ -1361,7 +1258,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(Useful.IsHere(i,j+1,k,true) && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j+1,k)) { //top
+      if(j+1<jjmax && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j+1,k)) { //top
         if(level[k][j+1][i]==INT_MAX) {
           level[k][j+1][i] = band;
           useful[k][j+1][i] = 1;
@@ -1373,7 +1270,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(Useful.IsHere(i,j,k-1,true) && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j,k-1)) { //back
+      if(k-1>=kk0 && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j,k-1)) { //back
         if(level[k-1][j][i]==INT_MAX) {
           level[k-1][j][i] = band;
           useful[k-1][j][i] = 1;
@@ -1385,7 +1282,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(Useful.IsHere(i,j,k+1,true) && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j,k+1)) { //front
+      if(k+1<kkmax && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j,k+1)) { //front
         if(level[k+1][j][i]==INT_MAX) {
           level[k+1][j][i] = band;
           useful[k+1][j][i] = 1;
@@ -1396,8 +1293,8 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
           } 
         }
       }
-
     }
+
     Level.RestoreDataPointerAndInsert();
 
     // Update useful_nodes and active_nodes to get the changes at boundary
@@ -1427,7 +1324,6 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
     Level.RestoreDataPointerToLocalVector();
 
   }
-
   // Restore variables
   Active.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
   Useful.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
@@ -1457,20 +1353,20 @@ LevelSetReinitializer::CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3
   MPI_Allreduce(MPI_IN_PLACE, &phi_max, 1, MPI_DOUBLE, MPI_MAX, comm);
   MPI_Allreduce(MPI_IN_PLACE, &phi_min, 1, MPI_DOUBLE, MPI_MIN, comm);
 
-  phi_max *= 10.0;
-  phi_min *= 10.0;
+  phi_out_pos = phi_max*10.0;
+  phi_out_neg = phi_min*10.0;
 
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++)
+      for(int i=ii0; i<iimax; i++) {
         if(!useful[k][j][i])
-          phi[k][j][i] = phi[k][j][i]>=0 ? phi_max : phi_min;
-
+          phi[k][j][i] = phi[k][j][i]>=0 ? phi_out_pos : phi_out_neg;
+      }
 
   // Restore variables
   Useful.RestoreDataPointerToLocalVector(); //no changes made
 
-  Phi.RestoreDataPointerToLocalVector(); //no exchange needed
+  Phi.RestoreDataPointerAndInsert(); 
 
 }
 
@@ -1539,10 +1435,25 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   for(auto it = useful_nodes_backup.begin(); it != useful_nodes_backup.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
     if(!useful[k][j][i]) {
-      phi[k][j][i] = (phi[k][j][i]>=0) ? phi_max : phi_min; 
+      phi[k][j][i] = (phi[k][j][i]>=0) ? phi_out_pos : phi_out_neg;
       res[k][j][i] = 0.0;
     }
   }
+
+  // -------------------------------------------------- 
+  // Step 5: For nodes that just become useful, set their
+  //         phi to be phi_max or phi_min. (Otherwise they
+  //         carry a garbage phi that can slow down
+  //         convergence.)
+  // -------------------------------------------------- 
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    if(phi[k][j][i] > 0.9*phi_out_pos)
+      phi[k][j][i] = phi_max*1.1;
+    else if(phi[k][j][i] < 0.9*phi_out_neg)
+      phi[k][j][i] = phi_min*1.1;
+  }
+
 
   Useful.RestoreDataPointerToLocalVector(); 
   Phi.RestoreDataPointerToLocalVector();

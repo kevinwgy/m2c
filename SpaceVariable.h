@@ -122,7 +122,7 @@ public:
   inline bool IsHere(int i, int j, int k, bool include_ghost = false)
   {
     if(include_ghost) 
-      return i>=ghost_i0 && i<ghost_imax && j>=ghost_j0 && j<=ghost_jmax && k>=ghost_k0 && k<ghost_kmax;
+      return i>=ghost_i0 && i<ghost_imax && j>=ghost_j0 && j<ghost_jmax && k>=ghost_k0 && k<ghost_kmax;
     else
       return i>=i0 && i<imax && j>=j0 && j<jmax && k>=k0 && k<kmax;
     return false;
