@@ -64,7 +64,6 @@ LevelSetReinitializer::Destroy()
 void
 LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
 {
-
   // Step 1: Prep: Tag first layer nodes & store the sign function
   vector<FirstLayerNode> firstLayer;
   TagFirstLayerNodes(Phi, firstLayer); //also calculates the associated coefficients
@@ -129,6 +128,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
                            SpaceVariable3D &Useful,SpaceVariable3D &Active, 
                            vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
 {
+
   // update phi_max and phi_min (only for use in updating new useful nodes)
   UpdatePhiMaxAndPhiMinInBand(Phi, useful_nodes);
 
@@ -145,7 +145,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
     Phi1.AXPlusBY(0.0, 1.0, Phi, true); //Phi1 = Phi
     ReinitializeFirstLayerNodes(Phi1, Phi, firstLayer); //Phi is updated
-    ApplyBoundaryConditions(Phi);
+    ApplyBoundaryConditions(Phi, &Useful);
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
@@ -163,7 +163,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
 
     Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
     Phi1.AXPlusBY(1.0, 1.0, R);   //Phi1 = Phi + R(Phi)
-    ApplyBoundaryConditions(Phi1);
+    ApplyBoundaryConditions(Phi1, &Useful);
     ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
@@ -172,7 +172,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
     ComputeResidualInBand(Phi1, Useful, useful_nodes, R, cfl);
     Phi1.AXPlusBY(0.25, 0.75, Phi);
     Phi1.AXPlusBY(1.0, 0.25, R);
-    ApplyBoundaryConditions(Phi1);
+    ApplyBoundaryConditions(Phi1, &Useful);
     ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
@@ -180,7 +180,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
     ComputeResidualInBand(Phi1, Useful, useful_nodes, R, cfl);
     Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
     Phi.AXPlusBY(1.0, 2.0/3.0, R);
-    ApplyBoundaryConditions(Phi);
+    ApplyBoundaryConditions(Phi, &Useful);
     ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
     
@@ -858,6 +858,7 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
     d = useful[k][j+1][i] ? (phi[k][j+1][i]-phi[k][j][i])/(coords[k][j+1][i][1]-coords[k][j][i][1]) : 0.0;
     e = useful[k-1][j][i] ? (phi[k][j][i]-phi[k-1][j][i])/(coords[k][j][i][2]-coords[k-1][j][i][2]) : 0.0;
     f = useful[k+1][j][i] ? (phi[k+1][j][i]-phi[k][j][i])/(coords[k+1][j][i][2]-coords[k][j][i][2]) : 0.0;
+
     ap = std::max(a,0.0), am = std::min(a,0.0);
     bp = std::max(b,0.0), bm = std::min(b,0.0);
     cp = std::max(c,0.0), cm = std::min(c,0.0);
@@ -895,10 +896,13 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
 
 // Apply boundary conditions by populating ghost cells of Phi
 void
-LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi)
+LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *Useful)
 {
   double*** phi = (double***) Phi.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  double*** useful = Useful ? Useful->GetDataPointer() : NULL;
+
 
   int NX, NY, NZ;
   Phi.GetGlobalSize(&NX, &NY, &NZ);
@@ -911,6 +915,10 @@ LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi)
       continue; //corner (i.e. edge or vertex) nodes are not populated
 
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+
+    if(useful && !useful[k][j][i])
+      continue;
+
     int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
 
     switch (it->bcType) {

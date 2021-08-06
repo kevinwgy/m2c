@@ -105,7 +105,7 @@ private:
 
   void ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, double cfl);
 
-  void ApplyBoundaryConditions(SpaceVariable3D &Phi);
+  void ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *Useful = NULL);
 
   void PopulatePhiG2(SpaceVariable3D &Phi);
 

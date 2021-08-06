@@ -603,7 +603,9 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
     s[k][j][i] = v[k][j][i][1]; //x-velocity
   }
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx, &Useful);
+  rec.ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx, &Active);
+        //KW noticed that turning on linear reconstruction at the boundary (i.e. useful but not active)
+        //of the band would lead to oscillations. Consistent with what Hartmann et al. (2008) says
 
   // Reconstruction: y-velocity
   s = (double***) scalar.GetDataPointer();
@@ -612,7 +614,7 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
     s[k][j][i] = v[k][j][i][2]; //y-velocity
   }
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy, &Useful);
+  rec.ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy, &Active);
 
   // Reconstruction: z-velocity
   s = (double***) scalar.GetDataPointer();
@@ -621,10 +623,10 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
     s[k][j][i] = v[k][j][i][3]; //z-velocity
   }
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz, &Useful);
+  rec.ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz, &Active);
 
   // Reconstruction: Phi
-  rec.Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, &Useful);
+  rec.Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, &Active);
 
   V.RestoreDataPointerToLocalVector(); //no changes made
 }

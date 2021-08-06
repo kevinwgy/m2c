@@ -1,4 +1,4 @@
-#include <GradientCalculator.h>
+#include <GradientCalculatorCentral.h>
 
 //--------------------------------------------------------------------------
 
