@@ -31,13 +31,17 @@ class LevelSetOperator
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
-  //! Class for spatial reconstruction
-  Reconstructor rec;
+  //! Class for spatial reconstruction (FVM)
+  Reconstructor *rec;
 
+  //! Class for calculating spatial gradient (FDM)
+  GradientCalculatorBase *grad_minus; //left-biased FD
+  GradientCalculatorBase *grad_plus;  //right-biased FD
+  
   //! variables related to the narrow-band level set method
   bool narrow_band; //whether the narrow-band lsm is used
   SpaceVariable3D  Level;  //band level of each node (-inf to inf, including ghost boundary)
-  SpaceVariable3D  Useful; //all the nodes in the narrow-band (including ghost boundary)
+  SpaceVariable3D  UsefulG2; //all the nodes in the narrow-band (including ghost boundary)
   SpaceVariable3D  Active; //the nodes in the interior of the narrow-band (including ghost boundary)
   vector<Int3> useful_nodes; //vector of useful nodes
   vector<Int3> active_nodes; //vector of active nodes
@@ -46,7 +50,7 @@ class LevelSetOperator
   LevelSetReinitializer *reinit;
 
   //! Reconstructed velocity (u, v, w);
-  SpaceVariable3D scalar, ul, ur, vb, vt, wk, wf;
+  SpaceVariable3D scalar, scalarG2, ul, ur, vb, vt, wk, wf;
   SpaceVariable3D dudx, dvdy, dwdz; //!< derivatives of velocity
   //! Reconstructed signed distance function (Phi)
   SpaceVariable3D Phil, Phir, Phib, Phit, Phik, Phif;
@@ -73,6 +77,10 @@ public:
 
 private:
   // functions for internal use within the class
+  
+  void ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
+  void ComputeResidualFVM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
+
   void CreateGhostNodeLists(); //almost the same as the function in SpaceOperator, except bcType
   void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi);
   void ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi); //the narrow-band version

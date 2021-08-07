@@ -126,7 +126,7 @@ LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
 
 void
 LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, 
-                           SpaceVariable3D &Useful,SpaceVariable3D &Active, 
+                           SpaceVariable3D &UsefulG2,SpaceVariable3D &Active, 
                            vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
 {
 
@@ -137,7 +137,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
   vector<FirstLayerNode> firstLayer;
   vector<Int3> firstLayerIncGhost;
   TagFirstLayerNodesInBand(Phi, useful_nodes, firstLayer, firstLayerIncGhost);
-  UpdateNarrowBand(Phi, firstLayerIncGhost, Level, Useful, Active, useful_nodes, active_nodes);
+  UpdateNarrowBand(Phi, firstLayerIncGhost, Level, UsefulG2, Active, useful_nodes, active_nodes);
   EvaluateSignFunctionInBand(Phi, useful_nodes, 1.0/*smoothing coefficient*/);
 
   // Step 2: Reinitialize first layer nodes (no iterations needed)
@@ -146,7 +146,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
     Phi1.AXPlusBY(0.0, 1.0, Phi, true); //Phi1 = Phi
     ReinitializeFirstLayerNodes(Phi1, Phi, firstLayer); //Phi is updated
-    ApplyBoundaryConditions(Phi, &Useful);
+    ApplyBoundaryConditions(Phi, &UsefulG2);
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
@@ -155,7 +155,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
 
     //************** Step 1 of RK3 *****************
-    residual = ComputeResidualInBand(Phi, Useful, useful_nodes, R, cfl);  //R = R(Phi)
+    residual = ComputeResidualInBand(Phi, UsefulG2, useful_nodes, R, cfl);  //R = R(Phi)
     if(verbose>=1)
       print("  o Iter. %d: Residual = %e, Tol = %e.\n", iter, residual, 
             iod_ls.reinit.convergence_tolerance);
@@ -164,24 +164,24 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
 
     Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
     Phi1.AXPlusBY(1.0, 1.0, R);   //Phi1 = Phi + R(Phi)
-    ApplyBoundaryConditions(Phi1, &Useful);
+    ApplyBoundaryConditions(Phi1, &UsefulG2);
     ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
 
     //************** Step 2 of RK3 *****************
-    ComputeResidualInBand(Phi1, Useful, useful_nodes, R, cfl);
+    ComputeResidualInBand(Phi1, UsefulG2, useful_nodes, R, cfl);
     Phi1.AXPlusBY(0.25, 0.75, Phi);
     Phi1.AXPlusBY(1.0, 0.25, R);
-    ApplyBoundaryConditions(Phi1, &Useful);
+    ApplyBoundaryConditions(Phi1, &UsefulG2);
     ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
     //************** Step 3 of RK3 *****************
-    ComputeResidualInBand(Phi1, Useful, useful_nodes, R, cfl);
+    ComputeResidualInBand(Phi1, UsefulG2, useful_nodes, R, cfl);
     Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
     Phi.AXPlusBY(1.0, 2.0/3.0, R);
-    ApplyBoundaryConditions(Phi, &Useful);
+    ApplyBoundaryConditions(Phi, &UsefulG2);
     ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
     
@@ -209,8 +209,8 @@ LevelSetReinitializer::TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLaye
   //*****************************************************************************
   firstLayer.clear();
 
-  double*** phi   = (double***)Phi.GetDataPointer();
-  double*** tag   = (double***)Tag.GetDataPointer();
+  double*** phi   = Phi.GetDataPointer();
+  double*** tag   = Tag.GetDataPointer();
 
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
@@ -335,8 +335,8 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
   firstLayer.clear();
   firstLayerIncGhost.clear();
 
-  double*** phi   = (double***)Phi.GetDataPointer();
-  double*** tag   = (double***)Tag.GetDataPointer();
+  double*** phi   = Phi.GetDataPointer();
+  double*** tag   = Tag.GetDataPointer();
 
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
 
@@ -400,7 +400,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
 
 
   //Update firstLayerIncGhost to account for the exchange between subdomains
-  tag = (double***)Tag.GetDataPointer();
+  tag = Tag.GetDataPointer();
   for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
     if(tag[k][j][i]==1 && 
@@ -470,9 +470,9 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
 void
 LevelSetReinitializer::EvaluateSignFunction(SpaceVariable3D &Phi, double eps)
 {
-  double*** phi   = (double***)Phi.GetDataPointer();
+  double*** phi   = Phi.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
-  double*** sign  = (double***)Sign.GetDataPointer();
+  double*** sign  = Sign.GetDataPointer();
 
   double factor;
   for(int k=kk0; k<kkmax; k++)
@@ -497,9 +497,9 @@ void
 LevelSetReinitializer::EvaluateSignFunctionInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes,
                                                   double eps)
 {
-  double*** phi   = (double***)Phi.GetDataPointer();
+  double*** phi   = Phi.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
-  double*** sign  = (double***)Sign.GetDataPointer();
+  double*** sign  = Sign.GetDataPointer();
 
   double factor;
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
@@ -530,9 +530,9 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   int NX, NY, NZ;
   Phi.GetGlobalSize(&NX, &NY, &NZ);
 
-  double*** phi   = (double***)Phi.GetDataPointer();
-  double*** phig  = (double***)PhiG2.GetDataPointer();
-  double*** tag   = (double***)Tag.GetDataPointer();
+  double*** phi   = Phi.GetDataPointer();
+  double*** phig  = PhiG2.GetDataPointer();
+  double*** tag   = Tag.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
@@ -658,8 +658,8 @@ LevelSetReinitializer::PopulatePhiG2(SpaceVariable3D &Phi0)
 {
   PhiG2.SetConstantValue(0.0, true);
 
-  double*** phig2 = (double***)PhiG2.GetDataPointer();
-  double*** phi0  = (double***)Phi0.GetDataPointer();
+  double*** phig2 = PhiG2.GetDataPointer();
+  double*** phi0  = Phi0.GetDataPointer();
 
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
@@ -739,12 +739,12 @@ LevelSetReinitializer::ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R,
   Phi.GetGlobalSize(&NX, &NY, &NZ);
 
   // get data
-  double*** tag    = (double***)Tag.GetDataPointer();
-  double*** sign   = (double***)Sign.GetDataPointer();
-  double*** phi    = (double***)Phi.GetDataPointer();
+  double*** tag    = Tag.GetDataPointer();
+  double*** sign   = Sign.GetDataPointer();
+  double*** phi    = Phi.GetDataPointer();
   Vec3D***  dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
-  double*** res    = (double***)R.GetDataPointer();
+  double*** res    = R.GetDataPointer();
 
   // fix first layer nodes?
   bool fix_first_layer = (iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::FIXED ||
@@ -811,7 +811,7 @@ LevelSetReinitializer::ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R,
 //--------------------------------------------------------------------------
 
 double
-LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable3D &Useful,
+LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable3D &UsefulG2,
                                              vector<Int3> &useful_nodes, SpaceVariable3D &R, double cfl)
 {
 
@@ -819,13 +819,13 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
   Phi.GetGlobalSize(&NX, &NY, &NZ);
 
   // get data
-  double*** tag    = (double***)Tag.GetDataPointer();
-  double*** useful = (double***)Useful.GetDataPointer();
-  double*** sign   = (double***)Sign.GetDataPointer();
-  double*** phi    = (double***)Phi.GetDataPointer();
+  double*** tag    = Tag.GetDataPointer();
+  double*** useful = UsefulG2.GetDataPointer();
+  double*** sign   = Sign.GetDataPointer();
+  double*** phi    = Phi.GetDataPointer();
   Vec3D***  dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
-  double*** res    = (double***)R.GetDataPointer();
+  double*** res    = R.GetDataPointer();
 
   // fix first layer nodes?
   bool fix_first_layer = (iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::FIXED ||
@@ -897,12 +897,12 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
 
 // Apply boundary conditions by populating ghost cells of Phi
 void
-LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *Useful)
+LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *UsefulG2)
 {
-  double*** phi = (double***) Phi.GetDataPointer();
+  double*** phi = Phi.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
-  double*** useful = Useful ? Useful->GetDataPointer() : NULL;
+  double*** useful = UsefulG2 ? UsefulG2->GetDataPointer() : NULL;
 
 
   int NX, NY, NZ;
@@ -1005,7 +1005,7 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
     return; //nothing to do
   
   //Step 1: Calculate correction F 
-  double*** phi = (double***) Phi.GetDataPointer();
+  double*** phi =  Phi.GetDataPointer();
   Vec3D*** dxyz = (Vec3D***) delta_xyz.GetDataPointer();
 
   if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::ITERATIVE_CONSTRAINED1) {//HCR-1
@@ -1086,7 +1086,7 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
 void
 LevelSetReinitializer::UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes)
 {
-  double*** phi = (double***)Phi.GetDataPointer();
+  double*** phi = Phi.GetDataPointer();
 
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
@@ -1103,15 +1103,15 @@ LevelSetReinitializer::UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<
 
 void
 LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi, 
-                           SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                           SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, SpaceVariable3D &Active,
                            vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
 {
   //*****************************************************
-  // Useful/useful_nodes ~ all nodes in the narrow band
+  // UsefulG2/useful_nodes ~ all nodes in the narrow band
   // Active/active_nodes ~ nodes in the interior of the narrow band
   // Phi ~ a large constant (+/-) number will be specified outside band
   //*****************************************************
-  double*** phi = (double***)Phi.GetDataPointer();
+  double*** phi = Phi.GetDataPointer();
 
   useful_nodes.clear();
   active_nodes.clear();
@@ -1119,9 +1119,9 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   // -------------------------------------------------- 
   // Step 1: find band level 0 (phi==0) and 1
   // -------------------------------------------------- 
-  double*** level  = (double***)Level.GetDataPointer();
-  double*** useful = (double***)Useful.GetDataPointer();
-  double*** active = (double***)Active.GetDataPointer();
+  double*** level  = Level.GetDataPointer();
+  double*** useful = UsefulG2.GetDataPointer();
+  double*** active = Active.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
@@ -1161,7 +1161,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   Level.RestoreDataPointerAndInsert();
 
   // Update useful_nodes and active_nodes to get the changes at boundary
-  level = (double***)Level.GetDataPointer();
+  level = Level.GetDataPointer();
   for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
     if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
@@ -1185,7 +1185,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
 
   // Restore variables
   Active.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
-  Useful.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
+  UsefulG2.RestoreDataPointerAndInsert(); 
 
   Phi.RestoreDataPointerToLocalVector(); //no exchange needed
 
@@ -1194,19 +1194,19 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   // Step 2: find band level 2, 3, ..., bandwidth
   //         IMPORTANT: To be called after level 0 and 1 completed
   // -------------------------------------------------- 
-  PropagateNarrowBand(Level, Useful, Active, useful_nodes, active_nodes);
+  PropagateNarrowBand(Level, UsefulG2, Active, useful_nodes, active_nodes);
 
   // -------------------------------------------------- 
   // Step 3: Cutoff Phi outside the band
   // -------------------------------------------------- 
-  CutOffPhiOutsideBand(Phi, Useful, useful_nodes);
+  CutOffPhiOutsideBand(Phi, UsefulG2, useful_nodes);
 
 }
 
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable3D &Useful, 
+LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, 
                                            SpaceVariable3D &Active, vector<Int3> &useful_nodes, 
                                            vector<Int3> &active_nodes)
 { 
@@ -1215,15 +1215,15 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
   //  IMPORTANT: To be called after level 0 and 1 completed
   // -------------------------------------------------- 
   
-  double*** useful = (double***)Useful.GetDataPointer();
-  double*** active = (double***)Active.GetDataPointer();
+  double*** useful = UsefulG2.GetDataPointer();
+  double*** active = Active.GetDataPointer();
  
   int bandwidth = iod_ls.bandwidth;
   double*** level;
 
   for(int band = 2; band <= bandwidth; band++) {
     
-    level = (double***)Level.GetDataPointer();
+    level = Level.GetDataPointer();
 
     int size = useful_nodes.size();
     for(int n = 0; n < size; n++) {
@@ -1231,7 +1231,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       int i(useful_nodes[n][0]), j(useful_nodes[n][1]), k(useful_nodes[n][2]);
 
       //check its neighbors
-      if(i-1>=ii0 && !Useful.OutsidePhysicalDomainAndUnpopulated(i-1,j,k)) { //left
+      if(i-1>=ii0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i-1,j,k)) { //left
         if(level[k][j][i-1]==INT_MAX) {
           level[k][j][i-1] = band;
           useful[k][j][i-1] = 1;
@@ -1243,7 +1243,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(i+1<iimax && !Useful.OutsidePhysicalDomainAndUnpopulated(i+1,j,k)) { //right
+      if(i+1<iimax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i+1,j,k)) { //right
         if(level[k][j][i+1]==INT_MAX) {
           level[k][j][i+1] = band;
           useful[k][j][i+1] = 1;
@@ -1255,7 +1255,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(j-1>=jj0 && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j-1,k)) { //bottom
+      if(j-1>=jj0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j-1,k)) { //bottom
         if(level[k][j-1][i]==INT_MAX) {
           level[k][j-1][i] = band;
           useful[k][j-1][i] = 1;
@@ -1267,7 +1267,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(j+1<jjmax && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j+1,k)) { //top
+      if(j+1<jjmax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j+1,k)) { //top
         if(level[k][j+1][i]==INT_MAX) {
           level[k][j+1][i] = band;
           useful[k][j+1][i] = 1;
@@ -1279,7 +1279,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(k-1>=kk0 && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j,k-1)) { //back
+      if(k-1>=kk0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j,k-1)) { //back
         if(level[k-1][j][i]==INT_MAX) {
           level[k-1][j][i] = band;
           useful[k-1][j][i] = 1;
@@ -1291,7 +1291,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
         }
       }
 
-      if(k+1<kkmax && !Useful.OutsidePhysicalDomainAndUnpopulated(i,j,k+1)) { //front
+      if(k+1<kkmax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j,k+1)) { //front
         if(level[k+1][j][i]==INT_MAX) {
           level[k+1][j][i] = band;
           useful[k+1][j][i] = 1;
@@ -1307,7 +1307,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
     Level.RestoreDataPointerAndInsert();
 
     // Update useful_nodes and active_nodes to get the changes at boundary
-    level = (double***)Level.GetDataPointer();
+    level = Level.GetDataPointer();
     for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
       int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
       if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
@@ -1335,21 +1335,21 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
   }
   // Restore variables
   Active.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
-  Useful.RestoreDataPointerToLocalVector(); //should have already been updated w/ neighbors
+  UsefulG2.RestoreDataPointerAndInsert(); //need exchange to populate the second ghost layer
 
 }
 
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3D &Useful,
+LevelSetReinitializer::CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3D &UsefulG2,
                                             vector<Int3> &useful_nodes)
 {
   // -------------------------------------------------- 
   // Cutoff Phi outside the band
   // -------------------------------------------------- 
-  double*** phi = (double***)Phi.GetDataPointer();
-  double*** useful = (double***)Useful.GetDataPointer();
+  double*** phi = Phi.GetDataPointer();
+  double*** useful = UsefulG2.GetDataPointer();
 
   // calculate phi_max and phi_min
   phi_max = -DBL_MAX;
@@ -1373,7 +1373,7 @@ LevelSetReinitializer::CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3
       }
 
   // Restore variables
-  Useful.RestoreDataPointerToLocalVector(); //no changes made
+  UsefulG2.RestoreDataPointerToLocalVector(); //no changes made
 
   Phi.RestoreDataPointerAndInsert(); 
 
@@ -1383,16 +1383,16 @@ LevelSetReinitializer::CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3
 
 void
 LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firstLayerIncGhost,
-                           SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                           SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, SpaceVariable3D &Active,
                            vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
 {
   //*******************************************************
   // Assuming firstLayerIncGhost (level = 0, 1) is already computed
   //*******************************************************
-  double*** phi    = (double***)Phi.GetDataPointer();
-  double*** level  = (double***)Level.GetDataPointer();
-  double*** useful = (double***)Useful.GetDataPointer();
-  double*** active = (double***)Active.GetDataPointer();
+  double*** phi    = Phi.GetDataPointer();
+  double*** level  = Level.GetDataPointer();
+  double*** useful = UsefulG2.GetDataPointer();
+  double*** active = Active.GetDataPointer();
  
   //--------------------------------------------------
   // Step 1: Clean up old data
@@ -1424,7 +1424,7 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
 
   }
 
-  Useful.RestoreDataPointerToLocalVector(); 
+  UsefulG2.RestoreDataPointerAndInsert(); 
   Active.RestoreDataPointerToLocalVector();
   Level.RestoreDataPointerToLocalVector();
  
@@ -1432,15 +1432,15 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   // Step 3: find band level 2, 3, ..., bandwidth
   //         IMPORTANT: To be called after level 0 and 1 completed
   // -------------------------------------------------- 
-  PropagateNarrowBand(Level, Useful, Active, useful_nodes, active_nodes);
+  PropagateNarrowBand(Level, UsefulG2, Active, useful_nodes, active_nodes);
 
   // -------------------------------------------------- 
   // Step 4: Cutoff Phi and Residual outside the band (will not call
   //         the CutOffPhiOutsideBand function, which
   //         goes over the entire domain)
   // -------------------------------------------------- 
-  useful = (double***)Useful.GetDataPointer();
-  double*** res = (double***)R.GetDataPointer();
+  useful = UsefulG2.GetDataPointer();
+  double*** res = R.GetDataPointer();
   for(auto it = useful_nodes_backup.begin(); it != useful_nodes_backup.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
     if(!useful[k][j][i]) {
@@ -1464,7 +1464,7 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   }
 
 
-  Useful.RestoreDataPointerToLocalVector(); 
+  UsefulG2.RestoreDataPointerToLocalVector(); 
   Phi.RestoreDataPointerToLocalVector();
   R.RestoreDataPointerToLocalVector();
 

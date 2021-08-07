@@ -4,6 +4,8 @@
 #include <SpaceVariable.h>
 #include <Utils.h>
 
+struct Int3;
+
 /****************************************************
  * class GradientCalculatorBase is the base class
  * that handles the calculation of the spatial 
@@ -38,6 +40,14 @@ public:
                                              SpaceVariable3D &V, std::vector<int> &input_dof,
                                              SpaceVariable3D &DV, std::vector<int> &output_dof) {
     print_error("*** Error: CalculateFirstDerivativeAtNodes not defined\n");
+    exit_mpi();
+  }
+
+  //! calculates x-, y-, or j-derivative at nodes 
+  virtual void CalculateFirstDerivativeAtSelectedNodes(int dir/*0~d/dx,1~d/dy,2~d/dz*/, std::vector<Int3> &nodes,
+                                                       SpaceVariable3D &V, std::vector<int> &input_dof,
+                                                       SpaceVariable3D &DV, std::vector<int> &output_dof) {
+    print_error("*** Error: CalculateFirstDerivativeAtSelectedNodes not defined\n");
     exit_mpi();
   }
 

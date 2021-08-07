@@ -16,9 +16,11 @@ public:
   static DM ghosted1_1dof; //!< ghosted"1" --> stencil width is 1 
   static DM ghosted1_2dof;  
   static DM ghosted1_3dof;  
+  static DM ghosted1_4dof;  
   static DM ghosted1_5dof;  
 
   static DM ghosted2_1dof;
+  static DM ghosted2_3dof;
 
 public:
   DataManagers3D();

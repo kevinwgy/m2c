@@ -5,7 +5,6 @@
 #include <LevelSetOperator.h>
 #include <MultiPhaseOperator.h>
 #include <RiemannSolutions.h>
-#include <vector>
 using std::vector;
 
 /********************************************************************

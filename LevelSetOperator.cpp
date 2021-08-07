@@ -1,11 +1,8 @@
-#include <cfloat> //DBL_MAX
-#include <Utils.h>
 #include <LevelSetOperator.h>
 #include <SpaceOperator.h>
-#include <Vector5D.h>
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
-#include <map>
+#include <GradientCalculatorFD3.h>
 
 #ifdef LEVELSET_TEST
   #include <Vector2D.h>
@@ -21,9 +18,9 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
-    rec(comm_, dm_all_, iod_ls_.rec, coordinates, delta_xyz),
     reinit(NULL),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
+    scalarG2(comm_, &(dm_all_.ghosted2_1dof)),
     ul(comm_, &(dm_all_.ghosted1_1dof)),
     ur(comm_, &(dm_all_.ghosted1_1dof)),
     vb(comm_, &(dm_all_.ghosted1_1dof)),
@@ -40,7 +37,7 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     Phik(comm_, &(dm_all_.ghosted1_1dof)),
     Phif(comm_, &(dm_all_.ghosted1_1dof)),
     Level(comm_, &(dm_all_.ghosted1_1dof)),
-    Useful(comm_, &(dm_all_.ghosted1_1dof)),
+    UsefulG2(comm_, &(dm_all_.ghosted1_1dof)),
     Active(comm_, &(dm_all_.ghosted1_1dof))
 {
 
@@ -51,9 +48,22 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
 
   CreateGhostNodeLists(); //create ghost_nodes_inner and ghost_nodes_outer
 
-  rec.Setup(spo.GetPointerToInnerGhostNodes(),
-            spo.GetPointerToOuterGhostNodes()); //this function requires mesh info (dxyz)
-
+  // spatial discretization method
+  if(iod_ls.solver == LevelSetSchemeData::FINITE_VOLUME) {
+    rec = new Reconstructor(comm_, dm_all_, iod_ls_.rec, coordinates, delta_xyz);
+    //TODO: currently, passing the ghost nodes in SPO. rec uses MesData::BoundaryType (needs to be updated!)
+    rec->Setup(spo.GetPointerToInnerGhostNodes(),
+               spo.GetPointerToOuterGhostNodes()); //this function requires mesh info (dxyz)
+    grad_minus = NULL;
+    grad_plus = NULL;
+  }
+  else if(iod_ls.solver == LevelSetSchemeData::FINITE_DIFFERENCE) {
+    if(iod_ls.fd == LevelSetSchemeData::UPWIND_CENTRAL_3) { //currently this is the only option
+      grad_minus = new GradientCalculatorFD3(comm, dm_all_, coordinates, delta_xyz, -1);
+      grad_plus  = new GradientCalculatorFD3(comm, dm_all_, coordinates, delta_xyz,  1);
+    }
+    rec = NULL;
+  }
 
   if(iod_ls.bandwidth < INT_MAX) {//user specified narrow-band level set method
     narrow_band = true;
@@ -83,18 +93,23 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
 LevelSetOperator::~LevelSetOperator()
 {
   if(reinit) delete reinit;
+  if(rec) delete rec;
+  if(grad_minus) delete grad_minus;
+  if(grad_plus) delete grad_plus;
 }
 
 //-----------------------------------------------------
 
 void LevelSetOperator::Destroy()
 {
-  rec.Destroy();
+  if(rec)         rec->Destroy();
+  if(grad_minus)  grad_minus->Destroy();
+  if(grad_plus)   grad_plus->Destroy();
 
-  if(reinit)
-    reinit->Destroy();
+  if(reinit)      reinit->Destroy();
 
   scalar.Destroy();
+  scalarG2.Destroy();
   ul.Destroy();
   ur.Destroy();
   vb.Destroy();
@@ -111,7 +126,7 @@ void LevelSetOperator::Destroy()
   Phik.Destroy();
   Phif.Destroy();
   Level.Destroy();
-  Useful.Destroy();
+  UsefulG2.Destroy();
   Active.Destroy();
 }
 
@@ -423,7 +438,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 
   if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
     assert(reinit);
-    reinit->ConstructNarrowBand(Phi, Level, Useful, Active, useful_nodes, active_nodes);
+    reinit->ConstructNarrowBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
   }
 }
 
@@ -531,6 +546,114 @@ void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi,
   PrescribeVelocityFieldForTesting(V);
 #endif
 
+  if(iod_ls.solver == LevelSetSchemeData::FINITE_VOLUME)
+    ComputeResidualFVM(V,Phi,R);
+  else if(iod_ls.solver == LevelSetSchemeData::FINITE_DIFFERENCE)
+    ComputeResidualFDM(V,Phi,R);
+
+}
+
+//-----------------------------------------------------
+
+void LevelSetOperator::ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R)
+{
+
+  if(!narrow_band) {
+    print_error("*** Error: The Finite Difference Method is only implemented for the narrow-band level set method\n");
+    exit_mpi();
+  }
+
+  Vec5D***    v = (Vec5D***) V.GetDataPointer();
+  double*** phi = Phi.GetDataPointer();
+  double*** res = R.GetDataPointer(); //residual, on the right-hand-side of the ODE 
+
+  //***************************************************************
+  // Step 1: Calculate partial derivatives of phi
+  //***************************************************************
+  vector<int> ind0{0};
+   
+  double*** s = scalarG2.GetDataPointer();
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    s[k][j][i] = phi[k][j][i]; 
+  }
+  scalarG2.RestoreDataPointerAndInsert(); //need to exchange (scalarG2 has 2 ghost layers, but useful_nodes only has 1)
+
+  grad_minus->CalculateFirstDerivativeAtSelectedNodes(0/*x*/, active_nodes, scalarG2, ind0, Phil, ind0);
+  grad_plus->CalculateFirstDerivativeAtSelectedNodes(0/*x*/, active_nodes, scalarG2, ind0, Phir, ind0);
+  grad_minus->CalculateFirstDerivativeAtSelectedNodes(1/*y*/, active_nodes, scalarG2, ind0, Phib, ind0);
+  grad_plus->CalculateFirstDerivativeAtSelectedNodes(1/*y*/, active_nodes, scalarG2, ind0, Phit, ind0);
+  grad_minus->CalculateFirstDerivativeAtSelectedNodes(2/*z*/, active_nodes, scalarG2, ind0, Phik, ind0);
+  grad_plus->CalculateFirstDerivativeAtSelectedNodes(2/*z*/, active_nodes, scalarG2, ind0, Phif, ind0);
+
+
+  //***************************************************************
+  // Step 2: Clear residual at useful_nodes (so that if a useful
+  //         node becomes out-of-band next time-step, it does not
+  //         carry a non-zero residual)
+  //***************************************************************
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++)
+    res[(*it)[2]][(*it)[1]][(*it)[0]] = 0.0;
+
+
+  //***************************************************************
+  // Step 3: Loop through active nodes and compute residual
+  //***************************************************************
+  double*** phil = Phil.GetDataPointer(); //d(Phi)/dx, left-biased
+  double*** phir = Phir.GetDataPointer(); //d(Phi)/dx, right-biased
+  double*** phib = Phib.GetDataPointer();
+  double*** phit = Phit.GetDataPointer();
+  double*** phik = Phik.GetDataPointer();
+  double*** phif = Phif.GetDataPointer();
+  double*** useful = UsefulG2.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  double dm, dp; 
+  for(auto it = active_nodes.begin(); it != active_nodes.end(); it++) {
+
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+
+    dm = useful[k][j][i-2] ? phil[k][j][i] : (phi[k][j][i]-phi[k][j][i-1])/(coords[k][j][i][0]-coords[k][j][i-1][0]);
+    dp = useful[k][j][i+2] ? phir[k][j][i] : (phi[k][j][i+1]-phi[k][j][i])/(coords[k][j][i+1][0]-coords[k][j][i][0]);
+
+    res[k][j][i] = fabs(v[k][j][i][1])*(dm+dp) + v[k][j][i][1]*(dm-dp);
+
+    dm = useful[k][j-2][i] ? phib[k][j][i] : (phi[k][j][i]-phi[k][j-1][i])/(coords[k][j][i][1]-coords[k][j-1][i][1]);
+    dp = useful[k][j+2][i] ? phit[k][j][i] : (phi[k][j+1][i]-phi[k][j][i])/(coords[k][j+1][i][1]-coords[k][j][i][1]);
+
+    res[k][j][i] += fabs(v[k][j][i][2])*(dm+dp) + v[k][j][i][2]*(dm-dp);
+
+    dm = useful[k-2][j][i] ? phik[k][j][i] : (phi[k][j][i]-phi[k-1][j][i])/(coords[k][j][i][2]-coords[k-1][j][i][2]);
+    dp = useful[k+2][j][i] ? phif[k][j][i] : (phi[k+1][j][i]-phi[k][j][i])/(coords[k+1][j][i][2]-coords[k][j][i][2]);
+
+    res[k][j][i] += fabs(v[k][j][i][3])*(dm+dp) + v[k][j][i][3]*(dm-dp);
+
+    res[k][j][i] *= 0.5;
+
+  }
+
+
+  Phil.RestoreDataPointerToLocalVector();
+  Phir.RestoreDataPointerToLocalVector();
+  Phib.RestoreDataPointerToLocalVector();
+  Phit.RestoreDataPointerToLocalVector();
+  Phik.RestoreDataPointerToLocalVector();
+  Phif.RestoreDataPointerToLocalVector();
+  UsefulG2.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+
+  V.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerToLocalVector();
+
+  R.RestoreDataPointerAndInsert();
+
+}
+
+//-----------------------------------------------------
+
+void LevelSetOperator::ComputeResidualFVM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R)
+{
+
   if(!narrow_band) {
 
     Reconstruct(V, Phi); // => ul, ur, dudx, vb, vt, dvdy, wk, wf, dwdz, Phil, Phir, Phib, Phit, Phik, Phif
@@ -564,7 +687,7 @@ void LevelSetOperator::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi)
       for(int i=ii0; i<iimax; i++)
         s[k][j][i] = v[k][j][i][1]; //x-velocity
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx);
+  rec->ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx);
 
   // Reconstruction: y-velocity
   s = (double***) scalar.GetDataPointer();
@@ -573,7 +696,7 @@ void LevelSetOperator::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi)
       for(int i=ii0; i<iimax; i++)
         s[k][j][i] = v[k][j][i][2]; //y-velocity
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy);
+  rec->ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy);
 
   // Reconstruction: z-velocity
   s = (double***) scalar.GetDataPointer();
@@ -582,10 +705,10 @@ void LevelSetOperator::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi)
       for(int i=ii0; i<iimax; i++)
         s[k][j][i] = v[k][j][i][3]; //z-velocity
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz);
+  rec->ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz);
 
   // Reconstruction: Phi
-  rec.Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif);
+  rec->Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif);
 
   V.RestoreDataPointerToLocalVector(); //no changes made
 }
@@ -603,7 +726,7 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
     s[k][j][i] = v[k][j][i][1]; //x-velocity
   }
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx, &Active);
+  rec->ReconstructIn1D(0/*x-dir*/, scalar, ul, ur, &dudx, &Active);
         //KW noticed that turning on linear reconstruction at the boundary (i.e. useful but not active)
         //of the band would lead to oscillations. Consistent with what Hartmann et al. (2008) says
 
@@ -614,7 +737,7 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
     s[k][j][i] = v[k][j][i][2]; //y-velocity
   }
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy, &Active);
+  rec->ReconstructIn1D(1/*y-dir*/, scalar, vb, vt, &dvdy, &Active);
 
   // Reconstruction: z-velocity
   s = (double***) scalar.GetDataPointer();
@@ -623,10 +746,10 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
     s[k][j][i] = v[k][j][i][3]; //z-velocity
   }
   scalar.RestoreDataPointerToLocalVector(); //no need to communicate w/ neighbors
-  rec.ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz, &Active);
+  rec->ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz, &Active);
 
   // Reconstruction: Phi
-  rec.Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, &Active);
+  rec->Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, &Active);
 
   V.RestoreDataPointerToLocalVector(); //no changes made
 }
@@ -732,7 +855,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   double*** wfdata = wf.GetDataPointer();
   double*** res    = R.GetDataPointer(); //residual, on the right-hand-side of the ODE
   double*** active = Active.GetDataPointer();
-  double*** useful = Useful.GetDataPointer();
+  double*** useful = UsefulG2.GetDataPointer();
 
   //initialize R to 0
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++)
@@ -742,7 +865,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
 
   // Loop through the domain interior, and the right and top ghost layers. For each cell, calculate the
   // numerical flux across the left and lower cell boundaries/interfaces
-  for(auto it = active_nodes.begin(); it != active_nodes.end(); it++) {
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
 
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
 
@@ -756,7 +879,8 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
       if(active[k][j][i-1]) 
         res[k][j][i-1] -= localflux;
 
-      res[k][j][i]   += localflux;
+      if(active[k][j][i])
+        res[k][j][i]   += localflux;
     }
 
     //calculate G_{i,j-1/2,k}
@@ -766,7 +890,8 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
       if(active[k][j-1][i])
         res[k][j-1][i] -= localflux;
 
-      res[k][j][i]   += localflux;
+      if(active[k][j][i])
+        res[k][j][i]   += localflux;
     }
 
     //calculate H_{ij,k-1/2}
@@ -776,7 +901,8 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
       if(active[k-1][j][i])
         res[k-1][j][i] -= localflux;
 
-      res[k][j][i]   += localflux;
+      if(active[k][j][i])
+        res[k][j][i]   += localflux;
     }
 
   }
@@ -797,7 +923,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   wk.RestoreDataPointerToLocalVector();
   wf.RestoreDataPointerToLocalVector();
   Active.RestoreDataPointerToLocalVector();
-  Useful.RestoreDataPointerToLocalVector();
+  UsefulG2.RestoreDataPointerToLocalVector();
 
   R.RestoreDataPointerAndInsert(); //insert
 }
@@ -898,7 +1024,7 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
 
   if(narrow_band) {
     print("- Reinitializing the level set function (material id: %d), bandwidth = %d.\n", materialid, iod_ls.bandwidth);
-    reinit->ReinitializeInBand(Phi, Level, Useful, Active, useful_nodes, active_nodes);
+    reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
   } else {
     print("- Reinitializing the level set function (material id: %d).\n", materialid);
     reinit->Reinitialize(Phi);

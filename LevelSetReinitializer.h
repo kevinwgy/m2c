@@ -81,12 +81,12 @@ public:
 
   void Reinitialize(SpaceVariable3D &Phi); //reinitialize phi in the entire domain
 
-  void ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, SpaceVariable3D &Useful,
+  void ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, SpaceVariable3D &UsefulG2,
                           SpaceVariable3D &Active, vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
 
   // For narrow-band level set method
   void ConstructNarrowBand(SpaceVariable3D &Phi,
-                           SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                           SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, SpaceVariable3D &Active,
                            vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
 
 private:
@@ -106,7 +106,7 @@ private:
 
   void ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, double cfl);
 
-  void ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *Useful = NULL);
+  void ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *UsefulG2 = NULL);
 
   void PopulatePhiG2(SpaceVariable3D &Phi);
 
@@ -115,18 +115,18 @@ private:
                                 vector<FirstLayerNode> &firstLayer, vector<Int3> &firstLayerIncGhost);
 
   void UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firstLayerIncGhost,
-                        SpaceVariable3D &Level, SpaceVariable3D &Useful, SpaceVariable3D &Active,
+                        SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, SpaceVariable3D &Active,
                         vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
 
-  void PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable3D &Useful,
+  void PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable3D &UsefulG2,
                            SpaceVariable3D &Active, vector<Int3> &useful_nodes,
                            vector<Int3> &active_nodes);
 
-  void CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3D &Useful, vector<Int3> &useful_nodes);
+  void CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3D &UsefulG2, vector<Int3> &useful_nodes);
 
   void EvaluateSignFunctionInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes, double eps/*smoothing factor*/);
 
-  double ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable3D &Useful,
+  double ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable3D &UsefulG2,
                                vector<Int3> &useful_nodes, SpaceVariable3D &R, double cfl);
 
   void UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes);

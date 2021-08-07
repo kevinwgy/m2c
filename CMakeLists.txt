@@ -31,6 +31,7 @@ if(NOT DEFINED ENV{PETSC_DIR})
   message(FATAL_ERROR "ERROR: Could not find Petsc...")
 endif()
 
+find_package(Eigen3 3.3 REQUIRED)
 
 add_definitions(-DLEVELSET_TEST=1)
 
@@ -75,6 +76,7 @@ SymmetryOperator.cpp
 SmoothingOperator.cpp
 Interpolator.cpp
 GradientCalculatorCentral.cpp
+GradientCalculatorFD3.cpp
 ViscosityOperator.cpp
 ProbeOutput.cpp
 MaterialVolumeOutput.cpp

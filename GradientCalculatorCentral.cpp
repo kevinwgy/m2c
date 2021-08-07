@@ -249,13 +249,10 @@ void GradientCalculatorCentral::CalculateCoefficients()
   // calculating the derivative at cell centers using central differencing,
   // i.e. centered quadratic interpolation + differentiation
   // For example, the partial derivative du/dx at (i,j,k) should be computed as
-  // du/dx(i,j,k) = Cx0[k][j][i-1]*u[k][j][i-1] + Cx1[k][j][i]*u[k][j][i]
-  //              + Cx2[k][j][i+1]*u[k][j][i+1]
-  // In other words, Cx0[k][j][i] stores the coefficient when cell [k][j][i] is
-  // used as the left cell.
+  // du/dx(i,j,k) = Cx[k][j][i][0]*u[k][j][i-1] + Cx[k][j][i][1]*u[k][j][i]
+  //              + Cx[k][j][i][2]*u[k][j][i+1]
   
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
 
   Vec3D*** cx = (Vec3D***)Cx.GetDataPointer();
   Vec3D*** cy = (Vec3D***)Cy.GetDataPointer();
@@ -300,7 +297,6 @@ void GradientCalculatorCentral::CalculateCoefficients()
   Cz.RestoreDataPointerAndInsert();
 
   coordinates.RestoreDataPointerToLocalVector();
-  delta_xyz.RestoreDataPointerToLocalVector();
 
 }
 

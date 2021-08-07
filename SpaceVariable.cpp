@@ -9,9 +9,11 @@
 DM DataManagers3D::ghosted1_1dof; //ghosted"1" --> stencil width is 1
 DM DataManagers3D::ghosted1_2dof;
 DM DataManagers3D::ghosted1_3dof;
+DM DataManagers3D::ghosted1_4dof;
 DM DataManagers3D::ghosted1_5dof;
 
 DM DataManagers3D::ghosted2_1dof;
+DM DataManagers3D::ghosted2_3dof;
 
 //---------------------------------------------------------
 
@@ -80,6 +82,17 @@ int DataManagers3D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY, int NZ)
                       DMDA_STENCIL_BOX,
                       NX, NY, NZ,
                       PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                      4/*dof*/, 1/*stencil width*/, 
+                      NULL, NULL, NULL,
+                      &ghosted1_4dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted1_4dof);
+  DMSetUp(ghosted1_4dof);
+
+  ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                      DMDA_STENCIL_BOX,
+                      NX, NY, NZ,
+                      PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
                       5/*dof*/, 1/*stencil width*/, 
                       NULL, NULL, NULL,
                       &ghosted1_5dof);
@@ -98,6 +111,17 @@ int DataManagers3D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY, int NZ)
   DMSetFromOptions(ghosted2_1dof);
   DMSetUp(ghosted2_1dof);
 
+  ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                      DMDA_STENCIL_BOX,
+                      NX, NY, NZ,
+                      PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                      3/*dof*/, 2/*stencil width*/, 
+                      NULL, NULL, NULL,
+                      &ghosted2_3dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted2_3dof);
+  DMSetUp(ghosted2_3dof);
+
   return 0;
 }
 
@@ -108,8 +132,10 @@ void DataManagers3D::DestroyAllDataManagers()
   DMDestroy(&ghosted1_1dof);
   DMDestroy(&ghosted1_2dof);
   DMDestroy(&ghosted1_3dof);
+  DMDestroy(&ghosted1_4dof);
   DMDestroy(&ghosted1_5dof);
   DMDestroy(&ghosted2_1dof);
+  DMDestroy(&ghosted2_3dof);
 }
 
 //---------------------------------------------------------

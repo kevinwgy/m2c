@@ -795,6 +795,10 @@ LevelSetSchemeData::LevelSetSchemeData()
 
   bandwidth = INT_MAX;
 
+  solver = FINITE_VOLUME;
+
+  fd = UPWIND_CENTRAL_3;
+
   bc_x0   = ZERO_NEUMANN;
   bc_xmax = ZERO_NEUMANN;
   bc_y0   = ZERO_NEUMANN;
@@ -811,10 +815,15 @@ LevelSetSchemeData::LevelSetSchemeData()
 Assigner *LevelSetSchemeData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
 
   new ClassInt<LevelSetSchemeData>(ca, "MaterialID", this, 
     &LevelSetSchemeData::materialid);
+
+  new ClassToken<LevelSetSchemeData>
+    (ca, "Solver", this,
+     reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::solver), 2,
+     "FiniteVolume", 0, "FiniteDifference", 1);
 
   new ClassToken<LevelSetSchemeData>
     (ca, "Flux", this,
