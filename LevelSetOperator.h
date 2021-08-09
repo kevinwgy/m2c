@@ -78,17 +78,25 @@ public:
 private:
   // functions for internal use within the class
   
+  void CreateGhostNodeLists(); //almost the same as the function in SpaceOperator, except bcType
+
+  // Finite difference method
   void ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
+  void ComputeResidualFDM_FullDomain(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
+  void ComputeResidualFDM_NarrowBand(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
+
+  // Finite volume method
   void ComputeResidualFVM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
 
-  void CreateGhostNodeLists(); //almost the same as the function in SpaceOperator, except bcType
   void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi);
-  void ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi); //the narrow-band version
   void ComputeAdvectionFlux(SpaceVariable3D &R);
-  void ComputeAdvectionFluxInBand(SpaceVariable3D &R); //the narrow-band version
-  double ComputeLocalAdvectionFlux(double phim, double phip, double um, double up);
   void AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R);
+
+  void ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi); //the narrow-band version
+  void ComputeAdvectionFluxInBand(SpaceVariable3D &R); //the narrow-band version
   void AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D &R); //the narrow-band version
+
+  double ComputeLocalAdvectionFlux(double phim, double phip, double um, double up);
 
 };
 

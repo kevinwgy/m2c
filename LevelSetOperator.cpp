@@ -37,7 +37,7 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     Phik(comm_, &(dm_all_.ghosted1_1dof)),
     Phif(comm_, &(dm_all_.ghosted1_1dof)),
     Level(comm_, &(dm_all_.ghosted1_1dof)),
-    UsefulG2(comm_, &(dm_all_.ghosted1_1dof)),
+    UsefulG2(comm_, &(dm_all_.ghosted2_1dof)),
     Active(comm_, &(dm_all_.ghosted1_1dof))
 {
 
@@ -558,11 +558,83 @@ void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi,
 void LevelSetOperator::ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R)
 {
 
-  if(!narrow_band) {
-    print_error("*** Error: The Finite Difference Method is only implemented for the narrow-band level set method\n");
-    exit_mpi();
-  }
+  if(!narrow_band) 
+    ComputeResidualFDM_FullDomain(V,Phi,R);
+  else
+    ComputeResidualFDM_NarrowBand(V,Phi,R);
+}
 
+//-----------------------------------------------------
+
+void LevelSetOperator::ComputeResidualFDM_FullDomain(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R)
+{
+  Vec5D***    v = (Vec5D***) V.GetDataPointer();
+  double*** phi = Phi.GetDataPointer();
+  double*** res = R.GetDataPointer(); //residual, on the right-hand-side of the ODE 
+
+  //***************************************************************
+  // Step 1: Calculate partial derivatives of phi
+  //***************************************************************
+  vector<int> ind0{0};
+   
+  double*** s = scalarG2.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+        s[k][j][i] = phi[k][j][i]; 
+  scalarG2.RestoreDataPointerAndInsert(); //need to exchange 
+
+  grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, Phil, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, Phir, ind0);
+  grad_minus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, Phib, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, Phit, ind0);
+  grad_minus->CalculateFirstDerivativeAtNodes(2/*z*/, scalarG2, ind0, Phik, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(2/*z*/, scalarG2, ind0, Phif, ind0);
+
+
+  //***************************************************************
+  // Step 2: Loop through active nodes and compute residual
+  //***************************************************************
+  double*** phil = Phil.GetDataPointer(); //d(Phi)/dx, left-biased
+  double*** phir = Phir.GetDataPointer(); //d(Phi)/dx, right-biased
+  double*** phib = Phib.GetDataPointer();
+  double*** phit = Phit.GetDataPointer();
+  double*** phik = Phik.GetDataPointer();
+  double*** phif = Phif.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        res[k][j][i] = (v[k][j][i][1]>=0 ? phil[k][j][i]*v[k][j][i][1] : phir[k][j][i]*v[k][j][i][1])
+                     + (v[k][j][i][2]>=0 ? phib[k][j][i]*v[k][j][i][2] : phit[k][j][i]*v[k][j][i][2])
+                     + (v[k][j][i][3]>=0 ? phik[k][j][i]*v[k][j][i][3] : phif[k][j][i]*v[k][j][i][3]);
+
+        res[k][j][i] *= -1.0; //moves the residual to the RHS
+
+      }
+
+
+  Phil.RestoreDataPointerToLocalVector();
+  Phir.RestoreDataPointerToLocalVector();
+  Phib.RestoreDataPointerToLocalVector();
+  Phit.RestoreDataPointerToLocalVector();
+  Phik.RestoreDataPointerToLocalVector();
+  Phif.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+
+  V.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerToLocalVector();
+
+  R.RestoreDataPointerAndInsert();
+
+}
+
+//-----------------------------------------------------
+
+void LevelSetOperator::ComputeResidualFDM_NarrowBand(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R)
+{
   Vec5D***    v = (Vec5D***) V.GetDataPointer();
   double*** phi = Phi.GetDataPointer();
   double*** res = R.GetDataPointer(); //residual, on the right-hand-side of the ODE 
@@ -597,7 +669,7 @@ void LevelSetOperator::ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &P
 
 
   //***************************************************************
-  // Step 3: Loop through active nodes and compute residual
+  // Step 3: Loop through active nodes inside subdomain and compute residual
   //***************************************************************
   double*** phil = Phil.GetDataPointer(); //d(Phi)/dx, left-biased
   double*** phir = Phir.GetDataPointer(); //d(Phi)/dx, right-biased
@@ -613,22 +685,25 @@ void LevelSetOperator::ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &P
 
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
 
+    if(!coordinates.IsHere(i,j,k,false))
+      continue; // only work on nodes in the subdomain interior
+
     dm = useful[k][j][i-2] ? phil[k][j][i] : (phi[k][j][i]-phi[k][j][i-1])/(coords[k][j][i][0]-coords[k][j][i-1][0]);
     dp = useful[k][j][i+2] ? phir[k][j][i] : (phi[k][j][i+1]-phi[k][j][i])/(coords[k][j][i+1][0]-coords[k][j][i][0]);
 
-    res[k][j][i] = fabs(v[k][j][i][1])*(dm+dp) + v[k][j][i][1]*(dm-dp);
+    res[k][j][i] = v[k][j][i][1]>=0 ? dm*v[k][j][i][1] : dp*v[k][j][i][1]; 
 
     dm = useful[k][j-2][i] ? phib[k][j][i] : (phi[k][j][i]-phi[k][j-1][i])/(coords[k][j][i][1]-coords[k][j-1][i][1]);
     dp = useful[k][j+2][i] ? phit[k][j][i] : (phi[k][j+1][i]-phi[k][j][i])/(coords[k][j+1][i][1]-coords[k][j][i][1]);
 
-    res[k][j][i] += fabs(v[k][j][i][2])*(dm+dp) + v[k][j][i][2]*(dm-dp);
+    res[k][j][i] += v[k][j][i][2]>=0 ? dm*v[k][j][i][2] : dp*v[k][j][i][2]; 
 
     dm = useful[k-2][j][i] ? phik[k][j][i] : (phi[k][j][i]-phi[k-1][j][i])/(coords[k][j][i][2]-coords[k-1][j][i][2]);
     dp = useful[k+2][j][i] ? phif[k][j][i] : (phi[k+1][j][i]-phi[k][j][i])/(coords[k+1][j][i][2]-coords[k][j][i][2]);
 
-    res[k][j][i] += fabs(v[k][j][i][3])*(dm+dp) + v[k][j][i][3]*(dm-dp);
+    res[k][j][i] += v[k][j][i][3]>=0 ? dm*v[k][j][i][3] : dp*v[k][j][i][3];
 
-    res[k][j][i] *= 0.5;
+    res[k][j][i] *= -1.0; //moves the residual to the RHS
 
   }
 

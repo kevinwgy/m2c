@@ -11,6 +11,10 @@ struct Int3;
  * that handles the calculation of the spatial 
  * gradients of any variable at cell interfaces or
  * cell centers
+ * Note: The treatments of the ghost layer outside the
+ * physical domain, and of the first layer of cells
+ * inside of domain, are NOT unified among the
+ * derived classes.
  ***************************************************/
 
 class GradientCalculatorBase
