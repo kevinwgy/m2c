@@ -1102,7 +1102,7 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
     reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
   } else {
     print("- Reinitializing the level set function (material id: %d).\n", materialid);
-    reinit->Reinitialize(Phi);
+    reinit->ReinitializeFullDomain(Phi);
   }
 
   return true;

@@ -79,7 +79,7 @@ public:
 
   void Destroy();
 
-  void Reinitialize(SpaceVariable3D &Phi); //reinitialize phi in the entire domain
+  void ReinitializeFullDomain(SpaceVariable3D &Phi); //reinitialize phi in the entire domain
 
   void ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, SpaceVariable3D &UsefulG2,
                           SpaceVariable3D &Active, vector<Int3> &useful_nodes, vector<Int3> &active_nodes);

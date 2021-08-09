@@ -1,5 +1,6 @@
-The source code within this directory (excluding the subdirectories) 
-are under the GNU General Public License, Version 3 (GPLv3).
+The source code within this directory (excluding KDTree.h, and
+subdirectories parser and MathTools) are under the GNU General 
+Public License, Version 3 (GPLv3).
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of

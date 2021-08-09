@@ -63,7 +63,7 @@ LevelSetReinitializer::Destroy()
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::Reinitialize(SpaceVariable3D &Phi)
+LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
 {
   // Step 1: Prep: Tag first layer nodes & store the sign function
   vector<FirstLayerNode> firstLayer;
@@ -525,7 +525,7 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   // in Hartmann et al. (2008)
   //****************************************
 
-  PopulatePhiG2(Phi0);
+  PopulatePhiG2(Phi0); //TODO: can accelerate by popuating only useful nodes for narrow-band level set method
 
   int NX, NY, NZ;
   Phi.GetGlobalSize(&NX, &NY, &NZ);
@@ -579,75 +579,129 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
       phi[k][j][i] = phig[k][j][i]/gradphi_norm;
   }
 
+  Phi.RestoreDataPointerAndInsert(); //update Phi
+  Tag.RestoreDataPointerToLocalVector();
+  delta_xyz.RestoreDataPointerToLocalVector();
 
-  // Applying the averaging algorithm (CR-1 or CR-2)
-  if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1) {
 
-    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+  //**************************************************************************************************
+  // Applying the averaging algorithm to correct a subset of the first-layer nodes in (CR-1 or CR-2)
+  //**************************************************************************************************
+  if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
+     iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
+
+    // Step 1: Find nodes in the correction set (C)  --- Eq. (14) of Hartmann et al. (2010)
+    double curvature, h0, h1;
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) { //inside domain interior
       i = it->i; 
       j = it->j; 
       k = it->k; 
-      it->f = 0.0; //reset to 0 
-      double sum(0.0);
-      if(it->s[0])  sum += phi[k][j][i-1]/phig[k][j][i-1];
-      if(it->s[1])  sum += phi[k][j][i+1]/phig[k][j][i+1];
-      if(it->s[2])  sum += phi[k][j-1][i]/phig[k][j-1][i];
-      if(it->s[3])  sum += phi[k][j+1][i]/phig[k][j+1][i];
-      if(it->s[4])  sum += phi[k-1][j][i]/phig[k-1][j][i];
-      if(it->s[5])  sum += phi[k+1][j][i]/phig[k+1][j][i];
 
-      if(it->ns != 0)
-        it->f = phig[k][j][i]*sum/(double)(it->ns);
+      // calculate curvature
+      h0 = coords[k][j][i][0] - coords[k][j][i-1][0];
+      h1 = coords[k][j][i+1][0] - coords[k][j][i][0];
+      curvature = 2.0*(h1*phig[k][j][i-1] - (h0+h1)*phig[k][j][i] + h0*phig[k][j][i+1])/(h0*h1*(h0+h1));
+      h0 = coords[k][j][i][1] - coords[k][j-1][i][1];
+      h1 = coords[k][j+1][i][1] - coords[k][j][i][1];
+      curvature += 2.0*(h1*phig[k][j-1][i] - (h0+h1)*phig[k][j][i] + h0*phig[k][j+1][i])/(h0*h1*(h0+h1));
+      h0 = coords[k][j][i][2] - coords[k-1][j][i][2];
+      h1 = coords[k+1][j][i][2] - coords[k][j][i][2];
+      curvature += 2.0*(h1*phig[k-1][j][i] - (h0+h1)*phig[k][j][i] + h0*phig[k+1][j][i])/(h0*h1*(h0+h1));
+
+      if(curvature*phig[k][j][i]<0 || (curvature==0.0 && phig[k][j][i]<0))
+        it->f = 0.0;
       else
-        it->f = 0.0;
+        it->f = DBL_MAX;
     }
 
+
+    // Step 2: Calculate the correction
+    double*** phi   = Phi.GetDataPointer();
+    if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1) {
+      for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+
+        if(it->f != 0.0)
+          continue; //not in the correction set --- see above
+
+        i = it->i; 
+        j = it->j; 
+        k = it->k; 
+
+        double sum(0.0);
+        if(it->s[0])  sum += phi[k][j][i-1]/phig[k][j][i-1];
+        if(it->s[1])  sum += phi[k][j][i+1]/phig[k][j][i+1];
+        if(it->s[2])  sum += phi[k][j-1][i]/phig[k][j-1][i];
+        if(it->s[3])  sum += phi[k][j+1][i]/phig[k][j+1][i];
+        if(it->s[4])  sum += phi[k-1][j][i]/phig[k-1][j][i];
+        if(it->s[5])  sum += phi[k+1][j][i]/phig[k+1][j][i];
+
+        if(it->ns != 0)
+          it->f = phig[k][j][i]*sum/(double)(it->ns);
+        else
+          it->f = 0.0;
+      }
+    }
+    else if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
+      for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+
+        if(it->f != 0.0)
+          continue; //not in the correction set --- see above
+
+        i = it->i; 
+        j = it->j; 
+        k = it->k; 
+
+        double sum1(0.0), sum2(0.0);
+        if(it->s[0]) {sum1 += phi[k][j][i-1];  sum2 += phig[k][j][i-1];}
+        if(it->s[1]) {sum1 += phi[k][j][i+1];  sum2 += phig[k][j][i+1];}
+        if(it->s[2]) {sum1 += phi[k][j-1][i];  sum2 += phig[k][j-1][i];}
+        if(it->s[3]) {sum1 += phi[k][j+1][i];  sum2 += phig[k][j+1][i];}
+        if(it->s[4]) {sum1 += phi[k-1][j][i];  sum2 += phig[k-1][j][i];}
+        if(it->s[5]) {sum1 += phi[k+1][j][i];  sum2 += phig[k+1][j][i];}
+
+        if(sum2 != 0)
+          it->f = phig[k][j][i]*sum1/sum2;
+        else //this would happen only when s[0] = ... = s[5] = false, meaning phig[k][j][i]=0.
+          it->f = 0.0;
+      }
+    }
+
+    // Step 3: Apply the correction
     for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+      if(it->f == DBL_MAX)
+        continue;
+
       i = it->i; 
       j = it->j; 
       k = it->k;
+
       phi[k][j][i] = it->f;
       it->f = 0.0; //reset
     }
 
   }
-  else if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
 
-    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
-      i = it->i; 
-      j = it->j; 
-      k = it->k; 
-      it->f = 0.0; //reset to 0 
-      double sum1(0.0), sum2(0.0);
-      if(it->s[0]) {sum1 += phi[k][j][i-1];  sum2 += phig[k][j][i-1];}
-      if(it->s[1]) {sum1 += phi[k][j][i+1];  sum2 += phig[k][j][i+1];}
-      if(it->s[2]) {sum1 += phi[k][j-1][i];  sum2 += phig[k][j-1][i];}
-      if(it->s[3]) {sum1 += phi[k][j+1][i];  sum2 += phig[k][j+1][i];}
-      if(it->s[4]) {sum1 += phi[k-1][j][i];  sum2 += phig[k-1][j][i];}
-      if(it->s[5]) {sum1 += phi[k+1][j][i];  sum2 += phig[k+1][j][i];}
-
-      if(sum2 != 0)
-        it->f = phig[k][j][i]*sum1/sum2;
-      else //this would happen only when s[0] = ... = s[5] = false, meaning phig[k][j][i]=0.
-        it->f = 0.0;
-    }
-
-    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
-      i = it->i; 
-      j = it->j; 
-      k = it->k;
-      phi[k][j][i] = it->f;
-      it->f = 0.0; //reset
-    }
+/*
+  //DEBUG
+  Tag.SetConstantValue(0.0, true);
+  tag = Tag.GetDataPointer();
+  for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+    if(it->f == DBL_MAX)
+      continue;
+    i = it->i; 
+    j = it->j; 
+    k = it->k;
+    tag[k][j][i] = 1.0;
   }
-
+  Tag.RestoreDataPointerAndInsert();
+  Tag.WriteToVTRFile("tagged_nodes.vtr");
+  exit_mpi();
+*/
 
   Phi.RestoreDataPointerAndInsert();
 
   PhiG2.RestoreDataPointerToLocalVector();
-  Tag.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
-  delta_xyz.RestoreDataPointerToLocalVector();
   
 }
 
