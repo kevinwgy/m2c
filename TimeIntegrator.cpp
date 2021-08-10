@@ -47,7 +47,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
   // Forward Euler step for the level set equation(s): Phi(n+1) = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i]); //compute Rn_ls (level set)
+    lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i], time, dt); //compute Rn_ls (level set)
     Phi[i]->AXPlusBY(1.0, dt, *Rn_ls[i]);
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
@@ -136,7 +136,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 1 FOR LS ****************** 
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i]); //compute R(Phi(n))
+    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
     Phi1[i]->AXPlusBY(0.0, 1.0, *Phi[i]); //set Phi1 = Phi(n)
     Phi1[i]->AXPlusBY(1.0, dt, *Rls[i]); 
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
@@ -159,7 +159,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 2 FOR LS ******************
   // Step 2 for the level set equations: Phi(n+1) = 0.5*Phi(n) + 0.5*Phi1 + 0.5*dt*R(Phi1)
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i]);
+    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
     Phi[i]->AXPlusBY(0.5, 0.5, *Phi1[i]);
     Phi[i]->AXPlusBY(1.0, 0.5*dt, *Rls[i]);
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
@@ -257,7 +257,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 1 FOR LS ******************
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i]); //compute R(Phi(n))
+    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
     Phi1[i]->AXPlusBY(0.0, 1.0, *Phi[i]); //set Phi1 = Phi(n)
     Phi1[i]->AXPlusBY(1.0, dt, *Rls[i]); 
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
@@ -289,7 +289,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 2 FOR LS ******************
   // Step 2: Phi2 = 0.75*Phi(n) + 0.2*Phi1 + 0.25*dt*R(Phi1)
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i]);
+    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
     Phi1[i]->AXPlusBY(0.25, 0.75, *Phi[i]);
     Phi1[i]->AXPlusBY(1.0, 0.25*dt, *Rls[i]);
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
@@ -316,7 +316,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 3 FOR LS ******************
   // Step 3: Phi(n+1) = 1/3*Phi(n) + 2/3*Phi2 + 2/3*dt*R(Phi2)
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i]);
+    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
     Phi[i]->AXPlusBY(1.0/3.0, 2.0/3.0, *Phi1[i]);
     Phi[i]->AXPlusBY(1.0, 2.0/3.0*dt, *Rls[i]);
     lso[i]->ApplyBoundaryConditions(*Phi[i]);

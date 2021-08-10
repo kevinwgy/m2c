@@ -34,6 +34,8 @@ class LevelSetReinitializer
   SpaceVariable3D R;
   SpaceVariable3D Phi1;
   SpaceVariable3D Sign;
+
+  SpaceVariable3D NormalDir; //grad(phi)/|grad(phi)|
  
   SpaceVariable3D PhiG2; //this one has 2 ghosted layers
 
@@ -52,6 +54,8 @@ class LevelSetReinitializer
     double r0; //coefficient for HCR-2
 
     double f; //correction
+
+    Vec3D nphi0; //unit normal calculated using the original phi (grad(phi) / |grad(phi)|)
 
     FirstLayerNode() : i(0),j(0),k(0),ns(0),r0(0),f(0) {
       for(int ii=0; ii<6; ii++) {
@@ -91,24 +95,41 @@ public:
 
 private:
 
+  // Functions that work for both full-domain and narrow-band level set methods
+  //
   void TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer);
 
-  void EvaluateSignFunction(SpaceVariable3D &Phi, double eps/*smoothing factor*/);
-
-  void ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer);
+  void ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer,
+                                   SpaceVariable3D *UsefulG2 = NULL, vector<Int3> *useful_nodes = NULL);
 
   double DifferentiateInFirstLayer(double x0, double x1, double x2,
                                    double tag0, double tag1, double tag2,
                                    double phi0, double phi1, double phi2,
                                    double phi00, double phi3, double eps);
 
-  double ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R, double cfl);
-
-  void ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, double cfl);
-
   void ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *UsefulG2 = NULL);
 
-  void PopulatePhiG2(SpaceVariable3D &Phi);
+  void PopulatePhiG2(SpaceVariable3D &Phi, vector<Int3> *useful_nodes = NULL);
+
+  void ComputeNormalDirection(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, 
+                              SpaceVariable3D *UsefulG2 = NULL, vector<Int3> *useful_nodes = NULL);
+
+  inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {
+    double c0 = -(x2-x1)/((x1-x0)*(x2-x0));
+    double c1 = 1.0/(x1-x0) - 1.0/(x2-x1);
+    double c2 = (x1-x0)/((x2-x0)*(x2-x1));
+    return c0*phi0 + c1*phi1 + c2*phi2;
+  }
+
+
+  // For full-domain level set method
+  void ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, double cfl);
+
+  void EvaluateSignFunctionFullDomain(SpaceVariable3D &Phi, double eps/*smoothing factor*/);
+
+  double ComputeResidualFullDomain(SpaceVariable3D &Phi, SpaceVariable3D &R, double cfl);
+
+
 
   // For narrow-band level set method
   void TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes,

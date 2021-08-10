@@ -428,6 +428,42 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 
       }
 
+#elif LEVELSET_TEST == 2
+
+  double r = 0.15;
+  Vec2D x0(0.5, 0.75);
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+ 
+        phi[k][j][i] = (x-x0).norm() - r;
+
+      }
+
+#elif LEVELSET_TEST == 3
+
+  // merging and separation of two circles (4.2.3 of Hartmann et al. 2008)
+   
+  double a = 1.75, r = 1.5;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+        double phi1 = sqrt((x[0]-a)*(x[0]-a) + x[1]*x[1]) - r,
+        double phi2 = sqrt((x[0]+a)*(x[0]+a) + x[1]*x[1]) - r,
+
+        if(phi1<=0)
+          phi[k][j][i] = phi1;
+        else if(phi2<=0)
+          phi[k][j][i] = phi2;
+        else
+          phi[k][j][i] = min(phi1, phi2);
+
+      }
+
 #endif
 
 
@@ -539,11 +575,12 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 
 //-----------------------------------------------------
 
-void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R)
+void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R,
+                                       double time, double dt)
 {
 
 #ifdef LEVELSET_TEST
-  PrescribeVelocityFieldForTesting(V);
+  PrescribeVelocityFieldForTesting(V, time, dt);
 #endif
 
   if(iod_ls.solver == LevelSetSchemeData::FINITE_VOLUME)
@@ -1110,7 +1147,7 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
 
 //-----------------------------------------------------
 
-void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V)
+void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, double time, double dt)
 {
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
@@ -1120,6 +1157,7 @@ void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V)
       for(int i=ii0; i<iimax; i++) {
  
 #if LEVELSET_TEST == 1
+
         // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
         double pi = 2.0*acos(0);
         double v1 = fabs(coords[k][j][i][1]-50.0)<1.0e-10 ? 1.0e-10 : 50.0-coords[k][j][i][1];
@@ -1127,6 +1165,24 @@ void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V)
         v[k][j][i][1] = pi/314.0*v1;
         v[k][j][i][2] = pi/314.0*v2;
         v[k][j][i][3] = 0.0;
+
+#elif LEVELSET_TEST == 2
+
+        // vortex deformation of a circle (section 5.2 of Hartmann et al. 2010)
+        double T = 8.0;
+        double x = coords[k][j][i][0], y = coords[k][j][i][1];
+        double pi = 2.0*acos(0);
+        v[k][j][i][1] =  2.0*pow(sin(pi*x),2)*sin(pi*y)*cos(pi*y)*cos(pi*(time-0.5*dt)/T);
+        v[k][j][i][2] = -2.0*sin(pi*x)*cos(pi*x)*pow(sin(pi*y),2)*cos(pi*(time-0.5*dt)/T);
+        v[k][j][i][3] = 0.0; 
+
+#elif LEVELSET_TEST == 3
+
+        // merging and separation of two circles
+        double aa = 1.75, rr = 1.5;
+        double s = 1.0;
+        
+
 #endif
 
       }

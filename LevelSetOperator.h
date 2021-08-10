@@ -63,7 +63,7 @@ public:
   void SetInitialCondition(SpaceVariable3D &Phi);
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
 
-  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
+  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
 
   bool Reinitialize(double time, double dt, int time_step,
                     SpaceVariable3D &Phi); //true: reinitialization is done; false: not this time
@@ -73,7 +73,7 @@ public:
   void Destroy();
 
   //! for debugging/testing the level set solver (Euler / N-S solver not activated)
-  void PrescribeVelocityFieldForTesting(SpaceVariable3D &V);
+  void PrescribeVelocityFieldForTesting(SpaceVariable3D &V, double time, double dt);
 
 private:
   // functions for internal use within the class

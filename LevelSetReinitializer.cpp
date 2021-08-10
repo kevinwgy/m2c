@@ -15,6 +15,7 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
                        ghost_nodes_outer(ghost_nodes_outer_),
                        interp(NULL), grad(NULL),
                        Tag(comm_, &(dm_all_.ghosted1_1dof)),
+                       NormalDir(comm_, &(dm_all_.ghosted1_3dof)),
                        R(comm_, &(dm_all_.ghosted1_1dof)),
                        Phi1(comm_, &(dm_all_.ghosted1_1dof)),
                        Sign(comm_, &(dm_all_.ghosted1_1dof)),
@@ -54,6 +55,7 @@ LevelSetReinitializer::Destroy()
     grad->Destroy();
 
   Tag.Destroy();
+  NormalDir.Destroy();
   R.Destroy();
   Phi1.Destroy();
   Sign.Destroy();
@@ -68,7 +70,7 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   // Step 1: Prep: Tag first layer nodes & store the sign function
   vector<FirstLayerNode> firstLayer;
   TagFirstLayerNodes(Phi, firstLayer); //also calculates the associated coefficients
-  EvaluateSignFunction(Phi, 1.0/*smoothing coefficient*/);
+  EvaluateSignFunctionFullDomain(Phi, 1.0/*smoothing coefficient*/);
 
   // Step 2: Reinitialize first layer nodes (no iterations needed)
   if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||
@@ -85,7 +87,7 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
 
     //************** Step 1 of RK3 *****************
-    residual = ComputeResidual(Phi, R, cfl);  //R = R(Phi)
+    residual = ComputeResidualFullDomain(Phi, R, cfl);  //R = R(Phi)
     if(verbose>=1)
       print("  o Iter. %d: Residual = %e, Tol = %e.\n", iter, residual, 
             iod_ls.reinit.convergence_tolerance);
@@ -100,7 +102,7 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
 
 
     //************** Step 2 of RK3 *****************
-    ComputeResidual(Phi1, R, cfl);
+    ComputeResidualFullDomain(Phi1, R, cfl);
     Phi1.AXPlusBY(0.25, 0.75, Phi);
     Phi1.AXPlusBY(1.0, 0.25, R);
     ApplyBoundaryConditions(Phi1);
@@ -108,7 +110,7 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
     //*********************************************
 
     //************** Step 3 of RK3 *****************
-    ComputeResidual(Phi1, R, cfl);
+    ComputeResidualFullDomain(Phi1, R, cfl);
     Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
     Phi.AXPlusBY(1.0, 2.0/3.0, R);
     ApplyBoundaryConditions(Phi);
@@ -145,7 +147,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
     Phi1.AXPlusBY(0.0, 1.0, Phi, true); //Phi1 = Phi
-    ReinitializeFirstLayerNodes(Phi1, Phi, firstLayer); //Phi is updated
+    ReinitializeFirstLayerNodes(Phi1, Phi, firstLayer, &UsefulG2, &useful_nodes); //Phi is updated
     ApplyBoundaryConditions(Phi, &UsefulG2);
   }
 
@@ -468,7 +470,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::EvaluateSignFunction(SpaceVariable3D &Phi, double eps)
+LevelSetReinitializer::EvaluateSignFunctionFullDomain(SpaceVariable3D &Phi, double eps)
 {
   double*** phi   = Phi.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
@@ -518,14 +520,17 @@ LevelSetReinitializer::EvaluateSignFunctionInBand(SpaceVariable3D &Phi, vector<I
 
 void
 LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceVariable3D &Phi, 
-                                                   vector<FirstLayerNode> &firstLayer)
+                                                   vector<FirstLayerNode> &firstLayer, 
+                                                   SpaceVariable3D *UsefulG2, vector<Int3> *useful_nodes)
 {
+  //Note: This function is designed to work for both full-domain and narrow-band level set methods
+
   //****************************************
   // Implementing the RSU, CR-1 and CR-2 algos
   // in Hartmann et al. (2008)
   //****************************************
 
-  PopulatePhiG2(Phi0); //TODO: can accelerate by popuating only useful nodes for narrow-band level set method
+  PopulatePhiG2(Phi0, useful_nodes); 
 
   int NX, NY, NZ;
   Phi.GetGlobalSize(&NX, &NY, &NZ);
@@ -557,19 +562,22 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
     gradphi[0] = DifferentiateInFirstLayer(coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0],
                                               tag[k][j][i-1],       tag[k][j][i],       tag[k][j][i+1],
                                              phig[k][j][i-1],      phig[k][j][i],      phig[k][j][i+1], 
-                                           (i-2>-1) ? phig[k][j][i-2] : phig[k][j][i-1],
+                                           (i-2>=-1) ? phig[k][j][i-2] : phig[k][j][i-1],
                                            (i+2<=NX) ? phig[k][j][i+2] : phig[k][j][i+1], epsx);
     gradphi[1] = DifferentiateInFirstLayer(coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1],
                                               tag[k][j-1][i],       tag[k][j][i],       tag[k][j+1][i],
                                              phig[k][j-1][i],      phig[k][j][i],      phig[k][j+1][i],
-                                           (j-2>-1) ? phig[k][j-2][i] : phig[k][j-1][i],
+                                           (j-2>=-1) ? phig[k][j-2][i] : phig[k][j-1][i],
                                            (j+2<=NY) ? phig[k][j+2][i] : phig[k][j+2][i], epsy);
     gradphi[2] = DifferentiateInFirstLayer(coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2],
                                               tag[k-1][j][i],       tag[k][j][i],       tag[k+1][j][i],
                                              phig[k-1][j][i],      phig[k][j][i],      phig[k+1][j][i],
-                                           (k-2>-1) ? phig[k-2][j][i] : phig[k-1][j][i],
+                                           (k-2>=-1) ? phig[k-2][j][i] : phig[k-1][j][i],
                                            (k+2<=NZ) ? phig[k+2][j][i] : phig[k+1][j][i], epsz);
     gradphi_norm = gradphi.norm();
+
+    firstLayer[n].nphi0 = gradphi/gradphi.norm();
+    
 
     if(gradphi_norm == 0) {
       fprintf(stderr,"Warning: (%d,%d,%d)(%e,%e,%e): Updating first layer node led to zero gradient.\n",
@@ -582,6 +590,8 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   Phi.RestoreDataPointerAndInsert(); //update Phi
   Tag.RestoreDataPointerToLocalVector();
   delta_xyz.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  PhiG2.RestoreDataPointerToLocalVector();
 
 
   //**************************************************************************************************
@@ -590,23 +600,51 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
 
+    ComputeNormalDirection(Phi, firstLayer, UsefulG2, useful_nodes);
+
     // Step 1: Find nodes in the correction set (C)  --- Eq. (14) of Hartmann et al. (2010)
-    double curvature, h0, h1;
+    double curvature_x, curvature_y, curvature_z, curvature;
+    coords = (Vec3D***)coordinates.GetDataPointer();
+    phig  = PhiG2.GetDataPointer();
+    Vec3D*** normal = (Vec3D***)NormalDir.GetDataPointer();
     for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) { //inside domain interior
       i = it->i; 
       j = it->j; 
       k = it->k; 
 
-      // calculate curvature
-      h0 = coords[k][j][i][0] - coords[k][j][i-1][0];
-      h1 = coords[k][j][i+1][0] - coords[k][j][i][0];
-      curvature = 2.0*(h1*phig[k][j][i-1] - (h0+h1)*phig[k][j][i] + h0*phig[k][j][i+1])/(h0*h1*(h0+h1));
-      h0 = coords[k][j][i][1] - coords[k][j-1][i][1];
-      h1 = coords[k][j+1][i][1] - coords[k][j][i][1];
-      curvature += 2.0*(h1*phig[k][j-1][i] - (h0+h1)*phig[k][j][i] + h0*phig[k][j+1][i])/(h0*h1*(h0+h1));
-      h0 = coords[k][j][i][2] - coords[k-1][j][i][2];
-      h1 = coords[k+1][j][i][2] - coords[k][j][i][2];
-      curvature += 2.0*(h1*phig[k-1][j][i] - (h0+h1)*phig[k][j][i] + h0*phig[k+1][j][i])/(h0*h1*(h0+h1));
+      // calculate curvature (normal is calculated only within domain interior)
+      if(i-1>=0 && i+1<NX)
+        curvature_x = CentralDifferenceLocal(normal[k][j][i-1][0], normal[k][j][i][0], normal[k][j][i+1][0],
+                                             coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+      else if(i-1>=0)
+        curvature_x = (normal[k][j][i][0] - normal[k][j][i-1][0])/(coords[k][j][i][0] - coords[k][j][i-1][0]);
+      else if(i+1<NX)
+        curvature_x = (normal[k][j][i+1][0] - normal[k][j][i][0])/(coords[k][j][i+1][0] - coords[k][j][i][0]);
+      else
+        curvature_x = 0.0;
+
+      if(j-1>=0 && j+1<NY)
+        curvature_y = CentralDifferenceLocal(normal[k][j-1][i][1], normal[k][j][i][1], normal[k][j+1][i][1],
+                                             coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+      else if(j-1>=0)
+        curvature_y = (normal[k][j][i][1] - normal[k][j-1][i][1])/(coords[k][j][i][1] - coords[k][j-1][i][1]);
+      else if(j+1<NY)
+        curvature_y = (normal[k][j+1][i][1] - normal[k][j][i][1])/(coords[k][j+1][i][1] - coords[k][j][i][1]);
+      else
+        curvature_y = 0.0;
+
+      if(k-1>=0 && k+1<NZ)
+        curvature_z = CentralDifferenceLocal(normal[k-1][j][i][2], normal[k][j][i][2], normal[k+1][j][i][2],
+                                             coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+      else if(k-1>=0)
+        curvature_z = (normal[k][j][i][2] - normal[k-1][j][i][2])/(coords[k][j][i][2] - coords[k-1][j][i][2]);
+      else if(k+1<NZ)
+        curvature_z = (normal[k+1][j][i][2] - normal[k][j][i][2])/(coords[k+1][j][i][2] - coords[k][j][i][2]);
+      else
+        curvature_z = 0.0;
+
+
+      curvature = curvature_x + curvature_y + curvature_z;
 
       if(curvature*phig[k][j][i]<0 || (curvature==0.0 && phig[k][j][i]<0))
         it->f = 0.0;
@@ -679,47 +717,55 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
       it->f = 0.0; //reset
     }
 
-  }
-
 /*
-  //DEBUG
-  Tag.SetConstantValue(0.0, true);
-  tag = Tag.GetDataPointer();
-  for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
-    if(it->f == DBL_MAX)
-      continue;
-    i = it->i; 
-    j = it->j; 
-    k = it->k;
-    tag[k][j][i] = 1.0;
-  }
-  Tag.RestoreDataPointerAndInsert();
-  Tag.WriteToVTRFile("tagged_nodes.vtr");
-  exit_mpi();
+    //DEBUG
+    Tag.SetConstantValue(0.0, true);
+    tag = Tag.GetDataPointer();
+    for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+      if(it->f == DBL_MAX)
+        continue;
+      i = it->i; 
+      j = it->j; 
+      k = it->k;
+      tag[k][j][i] = 1.0;
+    }
+    Tag.RestoreDataPointerAndInsert();
+    Tag.WriteToVTRFile("tagged_nodes.vtr");
+    exit_mpi();
 */
+    Phi.RestoreDataPointerAndInsert();
 
-  Phi.RestoreDataPointerAndInsert();
+    PhiG2.RestoreDataPointerToLocalVector();
+    NormalDir.RestoreDataPointerToLocalVector();
+    coordinates.RestoreDataPointerToLocalVector();
 
-  PhiG2.RestoreDataPointerToLocalVector();
-  coordinates.RestoreDataPointerToLocalVector();
+  }
   
 }
 
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::PopulatePhiG2(SpaceVariable3D &Phi0)
+LevelSetReinitializer::PopulatePhiG2(SpaceVariable3D &Phi0, vector<Int3> *useful_nodes)
 {
-  PhiG2.SetConstantValue(0.0, true);
-
+  //This function is designed to work for both full-domain and narrow-band level set methods
+  //In the former case, useful_nodes is a NULL pointer.
+  
   double*** phig2 = PhiG2.GetDataPointer();
   double*** phi0  = Phi0.GetDataPointer();
 
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) {
-        phig2[k][j][i] = phi0[k][j][i]; 
-      }
+  if(!useful_nodes) {
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
+          phig2[k][j][i] = phi0[k][j][i]; 
+        }
+  } else {
+    for(auto it = useful_nodes->begin(); it != useful_nodes->end(); it++) {
+      int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+      phig2[k][j][i] = phi0[k][j][i];
+    }
+  }
 
   Phi0.RestoreDataPointerToLocalVector();
   PhiG2.RestoreDataPointerAndInsert();
@@ -766,10 +812,7 @@ LevelSetReinitializer::DifferentiateInFirstLayer(double x0, double x1, double x2
 
   if(phi0_useful) {
     if(phi2_useful) { //central differencing
-      double c0 = -(x2-x1)/((x1-x0)*(x2-x0));
-      double c1 = 1.0/(x1-x0) - 1.0/(x2-x1);
-      double c2 = (x1-x0)/((x2-x0)*(x2-x1));
-      return c0*phi0 + c1*phi1 + c2*phi2;
+      return CentralDifferenceLocal(phi0, phi1, phi2, x0, x1, x2);
     }
     else  //backward difference
       return (phi1-phi0)/(x1-x0);
@@ -786,7 +829,7 @@ LevelSetReinitializer::DifferentiateInFirstLayer(double x0, double x1, double x2
 //--------------------------------------------------------------------------
 
 double
-LevelSetReinitializer::ComputeResidual(SpaceVariable3D &Phi, SpaceVariable3D &R, double cfl)
+LevelSetReinitializer::ComputeResidualFullDomain(SpaceVariable3D &Phi, SpaceVariable3D &R, double cfl)
 {
 
   int NX, NY, NZ;
@@ -949,10 +992,125 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
 
 //--------------------------------------------------------------------------
 
+void
+LevelSetReinitializer::ComputeNormalDirection(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer,
+                                              SpaceVariable3D *UsefulG2, vector<Int3> *useful_nodes)
+{
+  //Note: This function is designed to work for both full-domain and narrow-band level set methods.
+  //In the former case, UsefulG2 and useful_nodes are NULL pointers.
+
+  int NX, NY, NZ;
+  Phi.GetGlobalSize(&NX, &NY, &NZ);
+
+  // get data
+  double*** tag    = Tag.GetDataPointer();
+  double*** phi    = Phi.GetDataPointer();
+  Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
+
+  Vec3D***  normal = (Vec3D***)NormalDir.GetDataPointer();
+
+  // first, take gradients at first layer nodes from "firstLayer"
+  for(auto it = firstLayer.begin(); it != firstLayer.end(); it++)
+    normal[it->k][it->j][it->i] = it->nphi0;
+
+  // loop through the interior of the subdomain
+  double a,b,c,d,e,f, ap,am, bp,bm, cp,cm, dp,dm, ep,em, fp,fm;
+
+
+  if(UsefulG2 && useful_nodes) { //narrow-band level set method
+
+    double*** useful = UsefulG2->GetDataPointer();
+    for(auto it = useful_nodes->begin(); it != useful_nodes->end(); it++) {
+        
+      int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+
+      if(!Phi.IsHere(i,j,k,false)) //only calculate normal within the subdomain interior
+        continue;
+
+      if(tag[k][j][i]!=0) //first layer -- already computed
+        continue;
+
+      // dphi/dx
+      if(useful[k][j][i+1] && useful[k][j][i-1])
+        normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+                                                 coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+      else if(useful[k][j][i+1])
+        normal[k][j][i][0] = (phi[k][j][i+1] - phi[k][j][i])/(coords[k][j][i+1][0] - coords[k][j][i][0]);
+      else if(useful[k][j][i-1])
+        normal[k][j][i][0] = (phi[k][j][i] - phi[k][j][i-1])/(coords[k][j][i][0] - coords[k][j][i-1][0]);
+      else
+        normal[k][j][i][0] = 0.0;
+
+      // dphi/dy
+      if(useful[k][j+1][i] && useful[k][j+1][i])
+        normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+                                                 coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+      else if(useful[k][j+1][i])
+        normal[k][j][i][1] = (phi[k][j+1][i] - phi[k][j][i])/(coords[k][j+1][i][1] - coords[k][j][i][1]);
+      else if(useful[k][j-1][i])
+        normal[k][j][i][1] = (phi[k][j][i] - phi[k][j-1][i])/(coords[k][j][i][1] - coords[k][j-1][i][1]);
+      else
+        normal[k][j][i][1] = 0.0;
+
+      // dphi/dz
+      if(useful[k+1][j][i] && useful[k-1][j][i])
+        normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+                                                 coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+      else if(useful[k+1][j][i])
+        normal[k][j][i][2] = (phi[k+1][j][i] - phi[k][j][i])/(coords[k+1][j][i][2] - coords[k][j][i][2]);
+      else if(useful[k-1][j][i])
+        normal[k][j][i][2] = (phi[k][j][i] - phi[k-1][j][i])/(coords[k][j][i][2] - coords[k-1][j][i][2]);
+      else
+        normal[k][j][i][2] = 0.0;
+
+
+      double mynorm = normal[k][j][i].norm();
+      if(mynorm != 0.0)
+        normal[k][j][i] /= mynorm;
+    }
+    UsefulG2->RestoreDataPointerToLocalVector();
+
+  }
+  else {
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+
+          if(tag[k][j][i]!=0) //first layer -- already computed
+            continue;
+
+          normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+                                                   coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+          normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+                                                   coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+          normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+                                                   coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+          double mynorm = normal[k][j][i].norm();
+          if(mynorm != 0.0)
+            normal[k][j][i] /= mynorm;
+
+        }
+  }
+
+  // restore data
+  Tag.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+
+  NormalDir.RestoreDataPointerAndInsert();
+
+}
+
+
+//--------------------------------------------------------------------------
+
 // Apply boundary conditions by populating ghost cells of Phi
 void
 LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariable3D *UsefulG2)
 {
+  // This function is designed to work for both full-domain and narrow-band level set methods
+  
   double*** phi = Phi.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
@@ -1523,4 +1681,7 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   R.RestoreDataPointerToLocalVector();
 
 }
+
+//--------------------------------------------------------------------------
+
 
