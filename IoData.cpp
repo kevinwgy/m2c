@@ -752,9 +752,9 @@ LevelSetReinitializationData::LevelSetReinitializationData()
   frequency = -1;
   frequency_dt = -1.0;
   maxIts = 20;
-  cfl = 0.5;
-  convergence_tolerance = 1.0e-3;
-  firstLayerTreatment = ITERATIVE_CONSTRAINED1;
+  cfl = 0.8;
+  convergence_tolerance = 2.0e-4;
+  firstLayerTreatment = FIXED;
 }
 
 //------------------------------------------------------------------------------
@@ -795,7 +795,7 @@ LevelSetSchemeData::LevelSetSchemeData()
 
   bandwidth = INT_MAX;
 
-  solver = FINITE_VOLUME;
+  solver = FINITE_DIFFERENCE;
 
   fd = UPWIND_CENTRAL_3;
 
