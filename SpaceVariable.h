@@ -107,6 +107,10 @@ public:
 
   inline bool OutsidePhysicalDomain(int i, int j, int k) {return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
 
+  double CalculateGlobalMin(int mydof = 0, bool workOnGhost = false);
+
+  double CalculateGlobalMax(int mydof = 0, bool workOnGhost = false);
+
   inline bool OutsidePhysicalDomainAndUnpopulated(int i, int j, int k)
   {
     int count = 0;

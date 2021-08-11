@@ -388,3 +388,63 @@ void SpaceVariable3D::SetConstantValue(double a, bool workOnGhost)
 
 //---------------------------------------------------------
 
+double
+SpaceVariable3D::CalculateGlobalMin(int mydof, bool workOnGhost)
+{
+  assert(mydof<dof && mydof>=0);
+
+  double global_min = DBL_MAX;
+
+  double*** v  = GetDataPointer();
+
+  int myi0, myj0, myk0, myimax, myjmax, mykmax;
+
+  if(workOnGhost)
+    GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+  else
+    GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+
+  for(int k=myk0; k<mykmax; k++)
+    for(int j=myj0; j<myjmax; j++)
+      for(int i=myi0; i<myimax; i++)
+        global_min = std::min(global_min, v[k][j][i*dof+mydof]); 
+
+  MPI_Allreduce(MPI_IN_PLACE, &global_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  RestoreDataPointerToLocalVector(); 
+
+  return global_min;  
+}
+
+//---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateGlobalMax(int mydof, bool workOnGhost)
+{
+  assert(mydof<dof && mydof>=0);
+
+  double global_max = -DBL_MAX;
+
+  double*** v  = GetDataPointer();
+
+  int myi0, myj0, myk0, myimax, myjmax, mykmax;
+
+  if(workOnGhost)
+    GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+  else
+    GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+
+  for(int k=myk0; k<mykmax; k++)
+    for(int j=myj0; j<myjmax; j++)
+      for(int i=myi0; i<myimax; i++)
+        global_max = std::max(global_max, v[k][j][i*dof+mydof]); 
+
+  MPI_Allreduce(MPI_IN_PLACE, &global_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+  RestoreDataPointerToLocalVector(); 
+
+  return global_max;  
+}
+
+//---------------------------------------------------------
+

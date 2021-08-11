@@ -18,6 +18,8 @@ class LevelSetReinitializer
   //! Mesh info
   SpaceVariable3D& coordinates;
   SpaceVariable3D& delta_xyz;
+  double min_dxyz;
+  double max_dxyz;
 
   vector<GhostPoint>& ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   vector<GhostPoint>& ghost_nodes_outer; //!< ghost nodes outside the physical domain

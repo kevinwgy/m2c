@@ -28,6 +28,14 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
   Tag.SetConstantValue(0, true);
 
   cfl = iod_ls.reinit.cfl;
+
+/*
+  min_dxyz = std::min(delta_xyz.CalculateGlobalMin(0,false), 
+                      std::min(delta_xyz.CalculateGlobalMin(1,false), delta_xyz.CalculateGlobalMin(2,false)));
+  max_dxyz = std::max(delta_xyz.CalculateGlobalMax(0,false), 
+                      std::max(delta_xyz.CalculateGlobalMax(1,false), delta_xyz.CalculateGlobalMax(2,false)));
+*/
+
 }
 
 
@@ -874,6 +882,7 @@ LevelSetReinitializer::ComputeResidualFullDomain(SpaceVariable3D &Phi, SpaceVari
           }
         }
 
+        //dx = min_dxyz;
         dx = std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
         dt = cfl*dx;
         
@@ -959,6 +968,7 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
       }
     }
 
+    //dx = min_dxyz;
     dx = std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
     dt = cfl*dx;
 
@@ -1307,6 +1317,7 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
   double beta = 0.5;
   for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
     int i(it->i), j(it->j), k(it->k);
+    //double dt = cfl*min_dxyz;
     double dt = cfl*std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
     phi[k][j][i] += dt*beta*it->f;
   }
