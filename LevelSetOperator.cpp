@@ -15,6 +15,9 @@ using std::max;
 LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo)
   : comm(comm_), iod(iod_), iod_ls(iod_ls_),
+#if LEVELSET_TEST == 3
+    dms(dm_all_),
+#endif
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
@@ -433,12 +436,6 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 
         Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
 
-/*
-        phi[k][j][i] = sqrt((x[0]-50)*(x[0]-50) + (x[1]-50)*(x[1]-50))-20.0;
-        continue;
-*/
-
-
         if(x[1]<=x1[1] && atan(fabs((x[0]-x0[0])/(x[1]-x0[1])))<=alpha) { //Zone 1: Outside-bottom
           if(x[0]<=x0[0])
             phi[k][j][i] = (x-x1).norm();
@@ -500,8 +497,8 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
       for(int i=i0; i<imax; i++) {
 
         Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
-        double phi1 = sqrt((x[0]-a)*(x[0]-a) + x[1]*x[1]) - r,
-        double phi2 = sqrt((x[0]+a)*(x[0]+a) + x[1]*x[1]) - r,
+        double phi1 = sqrt((x[0]-a)*(x[0]-a) + x[1]*x[1]) - r;
+        double phi2 = sqrt((x[0]+a)*(x[0]+a) + x[1]*x[1]) - r;
 
         if(phi1<=0)
           phi[k][j][i] = phi1;
@@ -628,7 +625,7 @@ void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi,
 {
 
 #ifdef LEVELSET_TEST
-  PrescribeVelocityFieldForTesting(V, time, dt);
+  PrescribeVelocityFieldForTesting(V, Phi, time, dt);
 #endif
 
   if(iod_ls.solver == LevelSetSchemeData::FINITE_VOLUME)
@@ -1195,18 +1192,18 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
 
 //-----------------------------------------------------
 
-void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, double time, double dt)
+void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, SpaceVariable3D &Phi,
+                                                        double time, double dt)
 {
+ 
+#if LEVELSET_TEST == 1
+  // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
  
-#if LEVELSET_TEST == 1
-
-        // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
         double pi = 2.0*acos(0);
         double v1 = fabs(coords[k][j][i][1]-50.0)<1.0e-10 ? 1.0e-10 : 50.0-coords[k][j][i][1];
         double v2 = fabs(coords[k][j][i][0]-50.0)<1.0e-10 ? 1.0e-10 : coords[k][j][i][0]-50.0;
@@ -1214,9 +1211,18 @@ void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, doub
         v[k][j][i][2] = pi/314.0*v2;
         v[k][j][i][3] = 0.0;
 
-#elif LEVELSET_TEST == 2
+      }
+  coordinates.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerAndInsert();
 
-        // vortex deformation of a circle (section 5.2 of Hartmann et al. 2010)
+#elif LEVELSET_TEST == 2
+  // vortex deformation of a circle (section 5.2 of Hartmann et al. 2010)
+  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
         double T = 8.0;
         double x = coords[k][j][i][0], y = coords[k][j][i][1];
         double pi = 2.0*acos(0);
@@ -1224,26 +1230,158 @@ void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, doub
         v[k][j][i][2] = -2.0*sin(pi*x)*cos(pi*x)*pow(sin(pi*y),2)*cos(pi*(time-0.5*dt)/T);
         v[k][j][i][3] = 0.0; 
 
+      }
+  coordinates.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerAndInsert();
+
 #elif LEVELSET_TEST == 3
 
-        // merging and separation of two circles
-        double aa = 1.75, rr = 1.5;
-        double s = 1.0;
+  // merging and separation of two circles
+  double aa = 1.75, rr = 1.5;
+  double s = (time-0.5*dt)<1.0 ? 1.0 : -1.0;
+  SpaceVariable3D NPhi(comm, &(dms.ghosted1_3dof)); //inefficient, but OK just for testing level set 
+
+  if(!narrow_band) {
+    ComputeNormalDirectionCentralDifferencing_FullDomain(Phi, NPhi);
+    Vec5D*** v = (Vec5D***) V.GetDataPointer();
+    Vec3D*** normal = (Vec3D***) NPhi.GetDataPointer();
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
+          if(!coordinates.IsHere(i,j,k,false)) {
+            v[k][j][i][1] = v[k][j][i][2] = v[k][j][i][3] = 0.0;
+            continue;
+          }
+          v[k][j][i][1] = s*normal[k][j][i][0];
+          v[k][j][i][2] = s*normal[k][j][i][1];
+          v[k][j][i][3] = 0.0;
+        }
+    V.RestoreDataPointerAndInsert();
+    NPhi.RestoreDataPointerToLocalVector();
+  } 
+  else {
+    ComputeNormalDirectionCentralDifferencing_NarrowBand(Phi, NPhi);
+    Vec5D*** v = (Vec5D***) V.GetDataPointer();
+    Vec3D*** normal = (Vec3D***) NPhi.GetDataPointer();
+    for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+      int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+      if(!coordinates.IsHere(i,j,k,false)) {
+        v[k][j][i][1] = v[k][j][i][2] = v[k][j][i][3] = 0.0;
+        continue;
+      }
+      v[k][j][i][1] = s*normal[k][j][i][0];
+      v[k][j][i][2] = s*normal[k][j][i][1];
+      v[k][j][i][3] = 0.0;
+    }
+    V.RestoreDataPointerAndInsert();
+    NPhi.RestoreDataPointerToLocalVector();
+  }
         
+/*
+  NPhi.WriteToVTRFile("NPhi.vtr");
+  exit_mpi();
+*/
+  NPhi.Destroy();
 
 #endif
 
-      }
 
-  coordinates.RestoreDataPointerToLocalVector();
-
-  //no need to communicate as the same formula is used in all the subdomains
-  V.RestoreDataPointerToLocalVector(); 
 }
 
 //-----------------------------------------------------
 
+void
+LevelSetOperator::ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVariable3D &Phi, SpaceVariable3D &NPhi)
+{
+  double*** phi   = Phi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
+
+  double mynorm;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+                                                 coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+        normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+                                                 coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+        normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+                                                 coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+
+        mynorm = normal[k][j][i].norm();
+        if(mynorm!=0.0)
+          normal[k][j][i] /= mynorm; 
+
+      }
+
+  Phi.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  NPhi.RestoreDataPointerAndInsert();
+}
+
+//-----------------------------------------------------
+
+void
+LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVariable3D &Phi, SpaceVariable3D &NPhi)
+{
+  double*** phi   = Phi.GetDataPointer();
+  double*** useful= UsefulG2.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
+
+  double mynorm;
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    if(!coordinates.IsHere(i,j,k,false))
+      continue; //only visit the interior of the subdomain
+
+    // dphi/dx
+    if(useful[k][j][i+1] && useful[k][j][i-1])
+      normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+                                               coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+    else if(useful[k][j][i+1])
+      normal[k][j][i][0] = (phi[k][j][i+1] - phi[k][j][i])/(coords[k][j][i+1][0] - coords[k][j][i][0]);
+    else if(useful[k][j][i-1])
+      normal[k][j][i][0] = (phi[k][j][i] - phi[k][j][i-1])/(coords[k][j][i][0] - coords[k][j][i-1][0]);
+    else
+      normal[k][j][i][0] = 0.0;
+
+    // dphi/dy
+    if(useful[k][j+1][i] && useful[k][j+1][i])
+      normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+                                               coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+    else if(useful[k][j+1][i])
+      normal[k][j][i][1] = (phi[k][j+1][i] - phi[k][j][i])/(coords[k][j+1][i][1] - coords[k][j][i][1]);
+    else if(useful[k][j-1][i])
+      normal[k][j][i][1] = (phi[k][j][i] - phi[k][j-1][i])/(coords[k][j][i][1] - coords[k][j-1][i][1]);
+    else
+      normal[k][j][i][1] = 0.0;
+
+    // dphi/dz
+    if(useful[k+1][j][i] && useful[k-1][j][i])
+      normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+                                               coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+    else if(useful[k+1][j][i])
+      normal[k][j][i][2] = (phi[k+1][j][i] - phi[k][j][i])/(coords[k+1][j][i][2] - coords[k][j][i][2]);
+    else if(useful[k-1][j][i])
+      normal[k][j][i][2] = (phi[k][j][i] - phi[k-1][j][i])/(coords[k][j][i][2] - coords[k-1][j][i][2]);
+    else
+      normal[k][j][i][2] = 0.0;
+
+    mynorm = normal[k][j][i].norm();
+    if(mynorm!=0.0)
+      normal[k][j][i] /= mynorm; 
+  }
 
 
+
+  Phi.RestoreDataPointerToLocalVector();
+  UsefulG2.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  NPhi.RestoreDataPointerAndInsert();
+}
+
+//-----------------------------------------------------
 
 

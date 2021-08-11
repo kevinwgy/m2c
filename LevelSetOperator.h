@@ -16,6 +16,10 @@ class LevelSetOperator
   IoData &iod;
   LevelSetSchemeData& iod_ls; //!< iod may have multiple levelsets, this is the relevant one.
 
+#if LEVELSET_TEST == 3
+  DataManagers3D &dms;
+#endif
+
   //! material in the phi<0 region (inside)
   int materialid;
  
@@ -72,10 +76,13 @@ public:
 
   void AXPlusBY(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
 
+  void ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
+  void ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
+
   void Destroy();
 
   //! for debugging/testing the level set solver (Euler / N-S solver not activated)
-  void PrescribeVelocityFieldForTesting(SpaceVariable3D &V, double time, double dt);
+  void PrescribeVelocityFieldForTesting(SpaceVariable3D &V, SpaceVariable3D &Phi, double time, double dt);
 
 private:
   // functions for internal use within the class
@@ -99,6 +106,14 @@ private:
   void AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D &R); //the narrow-band version
 
   double ComputeLocalAdvectionFlux(double phim, double phip, double um, double up);
+
+  // Utility
+  inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {
+    double c0 = -(x2-x1)/((x1-x0)*(x2-x0));
+    double c1 = 1.0/(x1-x0) - 1.0/(x2-x1);
+    double c2 = (x1-x0)/((x2-x0)*(x2-x1));
+    return c0*phi0 + c1*phi1 + c2*phi2;
+  }
 
 };
 

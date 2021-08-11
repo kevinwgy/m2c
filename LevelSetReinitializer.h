@@ -110,7 +110,7 @@ private:
 
   void PopulatePhiG2(SpaceVariable3D &Phi, vector<Int3> *useful_nodes = NULL);
 
-  void ComputeNormalDirection(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, 
+  void ComputeNormalDirectionBeyondFirstLayer(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, 
                               SpaceVariable3D *UsefulG2 = NULL, vector<Int3> *useful_nodes = NULL);
 
   inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {

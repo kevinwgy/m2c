@@ -611,7 +611,7 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
 
-    ComputeNormalDirection(Phi, firstLayer, UsefulG2, useful_nodes);
+    ComputeNormalDirectionBeyondFirstLayer(Phi, firstLayer, UsefulG2, useful_nodes);
 
     // Step 1: Find nodes in the correction set (C)  --- Eq. (14) of Hartmann et al. (2010)
     double curvature_x, curvature_y, curvature_z, curvature;
@@ -1014,8 +1014,8 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::ComputeNormalDirection(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer,
-                                              SpaceVariable3D *UsefulG2, vector<Int3> *useful_nodes)
+LevelSetReinitializer::ComputeNormalDirectionBeyondFirstLayer(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer,
+                                                              SpaceVariable3D *UsefulG2, vector<Int3> *useful_nodes)
 {
   //Note: This function is designed to work for both full-domain and narrow-band level set methods.
   //In the former case, UsefulG2 and useful_nodes are NULL pointers.
@@ -1882,6 +1882,9 @@ LevelSetReinitializer::CalculateMaximumRelativeErrorInBand(SpaceVariable3D &Phi0
   return err;
 
 }
+
+//--------------------------------------------------------------------------
+
 
 //--------------------------------------------------------------------------
 
