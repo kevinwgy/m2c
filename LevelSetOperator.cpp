@@ -132,6 +132,54 @@ void LevelSetOperator::Destroy()
 
 //-----------------------------------------------------
 
+void 
+LevelSetOperator::AXPlusBY(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost)
+{
+  if(X.NumDOF() != Y.NumDOF()) {
+    print_error("*** Error: Vector operation (AXPlusBY) failed due to inconsistent sizes (%d vs. %d)\n", 
+                 X.NumDOF(), Y.NumDOF());
+    exit_mpi();
+  }
+
+  int dof = X.NumDOF();
+
+  double*** x = X.GetDataPointer();
+  double*** y = Y.GetDataPointer();
+
+  if(!narrow_band) {
+
+    int myi0, myj0, myk0, myimax, myjmax, mykmax;
+
+    if(workOnGhost)
+      X.GetGhostedCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+    else
+      X.GetCornerIndices(&myi0, &myj0, &myk0, &myimax, &myjmax, &mykmax);
+
+    for(int k=myk0; k<mykmax; k++)
+      for(int j=myj0; j<myjmax; j++)
+        for(int i=myi0; i<myimax; i++)
+          for(int p=0; p<dof; p++)
+            x[k][j][i*dof+p] = a*x[k][j][i*dof+p] + b*y[k][j][i*dof+p];
+
+  }
+  else { //narrow-band
+
+    for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+      int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+      if(!workOnGhost && !X.IsHere(i,j,k,false)) 
+        continue;
+      for(int p=0; p<dof; p++)
+        x[k][j][i*dof+p] = a*x[k][j][i*dof+p] + b*y[k][j][i*dof+p];
+    }    
+
+  }
+
+  X.RestoreDataPointerAndInsert();
+  Y.RestoreDataPointerToLocalVector();
+}
+
+//-----------------------------------------------------
+
 void LevelSetOperator::CreateGhostNodeLists()
 {
   ghost_nodes_inner.clear();

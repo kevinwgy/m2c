@@ -403,9 +403,9 @@ struct LevelSetReinitializationData {
 
   double convergence_tolerance;
   
-  enum FirstLayerTreatment {FIXED = 0, UNCONSTRAINED = 1, //Russo and Smereka, mod. by Hartmann (2008)
-                            CONSTRAINED1 = 2, CONSTRAINED2 = 3, //CR-1 and CR-2
-                            ITERATIVE_CONSTRAINED1 = 4, ITERATIVE_CONSTRAINED2 = 5} //HCR-1 and HCR-2}
+  enum FirstLayerTreatment {FIXED = 0, 
+                            CONSTRAINED1 = 1, CONSTRAINED2 = 2, //CR-1 and CR-2,Hartmann (2008)
+                            ITERATIVE_CONSTRAINED1 = 3, ITERATIVE_CONSTRAINED2 = 4} //HCR-1&2,Hartmann 2010
            firstLayerTreatment;
 
   LevelSetReinitializationData();

@@ -48,7 +48,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   // Forward Euler step for the level set equation(s): Phi(n+1) = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i], time, dt); //compute Rn_ls (level set)
-    Phi[i]->AXPlusBY(1.0, dt, *Rn_ls[i]);
+    lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
 
@@ -137,12 +137,12 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
-    Phi1[i]->AXPlusBY(0.0, 1.0, *Phi[i]); //set Phi1 = Phi(n)
-    Phi1[i]->AXPlusBY(1.0, dt, *Rls[i]); 
+    lso[i]->AXPlusBY(0.0, *Phi1[i], 1.0, *Phi[i]); //in case of narrow-band, go over only useful nodes
+    lso[i]->AXPlusBY(1.0, *Phi1[i], dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
   }
   //***************************************************
- 
+
 
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
@@ -160,12 +160,11 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Step 2 for the level set equations: Phi(n+1) = 0.5*Phi(n) + 0.5*Phi1 + 0.5*dt*R(Phi1)
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
-    Phi[i]->AXPlusBY(0.5, 0.5, *Phi1[i]);
-    Phi[i]->AXPlusBY(1.0, 0.5*dt, *Rls[i]);
+    lso[i]->AXPlusBY(0.5, *Phi[i], 0.5, *Phi1[i]); //in case of narrow-band, go over only useful nodes
+    lso[i]->AXPlusBY(1.0, *Phi[i], 0.5*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
   //***************************************************
-
 
   // Reinitialize level set (frequency specified by user)
   for(int i=0; i<Phi.size(); i++) {
@@ -258,8 +257,8 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
-    Phi1[i]->AXPlusBY(0.0, 1.0, *Phi[i]); //set Phi1 = Phi(n)
-    Phi1[i]->AXPlusBY(1.0, dt, *Rls[i]); 
+    lso[i]->AXPlusBY(0.0, *Phi1[i], 1.0, *Phi[i]); //in case of narrow-band, go over only useful nodes
+    lso[i]->AXPlusBY(1.0, *Phi1[i], dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
   }
   //***************************************************
@@ -290,8 +289,8 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Step 2: Phi2 = 0.75*Phi(n) + 0.2*Phi1 + 0.25*dt*R(Phi1)
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
-    Phi1[i]->AXPlusBY(0.25, 0.75, *Phi[i]);
-    Phi1[i]->AXPlusBY(1.0, 0.25*dt, *Rls[i]);
+    lso[i]->AXPlusBY(0.25, *Phi1[i], 0.75, *Phi[i]); //in case of narrow-band, go over only useful nodes
+    lso[i]->AXPlusBY(1.0, *Phi1[i], 0.25*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
   }
   //***************************************************
@@ -317,8 +316,8 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Step 3: Phi(n+1) = 1/3*Phi(n) + 2/3*Phi2 + 2/3*dt*R(Phi2)
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
-    Phi[i]->AXPlusBY(1.0/3.0, 2.0/3.0, *Phi1[i]);
-    Phi[i]->AXPlusBY(1.0, 2.0/3.0*dt, *Rls[i]);
+    lso[i]->AXPlusBY(1.0/3.0, *Phi[i], 2.0/3.0, *Phi1[i]); //in case of narrow-band, go over only useful nodes
+    lso[i]->AXPlusBY(1.0, *Phi[i], 2.0/3.0*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
   //***************************************************

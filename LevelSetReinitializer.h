@@ -25,13 +25,10 @@ class LevelSetReinitializer
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
-  //! Default gradient calculator
-  InterpolatorBase *interp;
-  GradientCalculatorBase *grad;
-
   //! Internal variables
   SpaceVariable3D Tag;
   SpaceVariable3D R;
+  SpaceVariable3D Phi0;
   SpaceVariable3D Phi1;
   SpaceVariable3D Sign;
 
@@ -41,6 +38,8 @@ class LevelSetReinitializer
 
   double phi_max, phi_min; //max pos and neg phi within band
   double phi_out_pos, phi_out_neg; //applied to specify the constant phi outside band
+
+  vector<Int3> useful_nodes_plus1layer; //useful nodes plus one layer outside bandwidth
 
   //! cfl number for the ficitious time integrator
   double cfl;
@@ -129,6 +128,7 @@ private:
 
   double ComputeResidualFullDomain(SpaceVariable3D &Phi, SpaceVariable3D &R, double cfl);
 
+  double CalculateMaximumRelativeErrorFullDomain(SpaceVariable3D &Phi0, SpaceVariable3D &Phi);
 
 
   // For narrow-band level set method
@@ -151,6 +151,12 @@ private:
                                vector<Int3> &useful_nodes, SpaceVariable3D &R, double cfl);
 
   void UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes);
+
+  void CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes);
+
+  void AXPlusBYInBandPlusOne(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
+
+  double CalculateMaximumRelativeErrorInBand(SpaceVariable3D &Phi0, SpaceVariable3D &Phi, vector<Int3> &useful_nodes);
 
 };
 

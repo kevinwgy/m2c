@@ -13,10 +13,10 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
                      : comm(comm_), iod_ls(iod_ls_), coordinates(coordinates_),
                        delta_xyz(delta_xyz_), ghost_nodes_inner(ghost_nodes_inner_),
                        ghost_nodes_outer(ghost_nodes_outer_),
-                       interp(NULL), grad(NULL),
                        Tag(comm_, &(dm_all_.ghosted1_1dof)),
                        NormalDir(comm_, &(dm_all_.ghosted1_3dof)),
                        R(comm_, &(dm_all_.ghosted1_1dof)),
+                       Phi0(comm_, &(dm_all_.ghosted1_1dof)),
                        Phi1(comm_, &(dm_all_.ghosted1_1dof)),
                        Sign(comm_, &(dm_all_.ghosted1_1dof)),
                        PhiG2(comm_, &(dm_all_.ghosted2_1dof)),
@@ -27,11 +27,6 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
 
   Tag.SetConstantValue(0, true);
 
-  if(true) //can add other interpolation methods later
-    interp = new InterpolatorLinear(comm_, dm_all_, coordinates_, delta_xyz_);
-  if(true) //can add other differentiation methods later
-    grad = new GradientCalculatorCentral(comm_, dm_all_, coordinates_, delta_xyz_, *interp);
-
   cfl = iod_ls.reinit.cfl;
 }
 
@@ -40,8 +35,6 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
 
 LevelSetReinitializer::~LevelSetReinitializer()
 {
-  if(interp) delete interp;
-  if(grad)   delete grad;
 }
 
 //--------------------------------------------------------------------------
@@ -49,14 +42,11 @@ LevelSetReinitializer::~LevelSetReinitializer()
 void
 LevelSetReinitializer::Destroy()
 {
-  if(interp)
-    interp->Destroy();
-  if(grad)
-    grad->Destroy();
 
   Tag.Destroy();
   NormalDir.Destroy();
   R.Destroy();
+  Phi0.Destroy();
   Phi1.Destroy();
   Sign.Destroy();
   PhiG2.Destroy();
@@ -73,7 +63,7 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   EvaluateSignFunctionFullDomain(Phi, 1.0/*smoothing coefficient*/);
 
   // Step 2: Reinitialize first layer nodes (no iterations needed)
-  if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||
+  if(/*iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||*/
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
     Phi1.AXPlusBY(0.0, 1.0, Phi, true); //Phi1 = Phi
@@ -82,22 +72,21 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
-  double residual = 0.0;
+  double residual = 0.0, dphi_max = 0.0;
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
 
     //************** Step 1 of RK3 *****************
     residual = ComputeResidualFullDomain(Phi, R, cfl);  //R = R(Phi)
     if(verbose>=1)
-      print("  o Iter. %d: Residual = %e, Tol = %e.\n", iter, residual, 
-            iod_ls.reinit.convergence_tolerance);
+      print("  o Iter. %d: Residual = %e, Relative Error = %e, Tol = %e.\n", iter, residual, 
+            dphi_max, iod_ls.reinit.convergence_tolerance);
     if(residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
       break;
 
     Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
     Phi1.AXPlusBY(1.0, 1.0, R);   //Phi1 = Phi + R(Phi)
     ApplyBoundaryConditions(Phi1);
-    ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
 
@@ -106,7 +95,6 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
     Phi1.AXPlusBY(0.25, 0.75, Phi);
     Phi1.AXPlusBY(1.0, 0.25, R);
     ApplyBoundaryConditions(Phi1);
-    ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
     //************** Step 3 of RK3 *****************
@@ -114,14 +102,21 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
     Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
     Phi.AXPlusBY(1.0, 2.0/3.0, R);
     ApplyBoundaryConditions(Phi);
-    ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
     
+    //*********************************************
+    // Apply corrections to first layer nodes (HCR-1 or HCR-2)
+    ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
+    //*********************************************
+
+    dphi_max = CalculateMaximumRelativeErrorFullDomain(Phi0, Phi);    
+    if(dphi_max < iod_ls.reinit.convergence_tolerance) //converged (using the same tolerance)
+      break;
   }
 
   if(iter==iod_ls.reinit.maxIts)
-    print("  o Warning: Failed to converge. Residual = %e, Tol = %e.\n", 
-          residual, iod_ls.reinit.convergence_tolerance);
+    print("  o Warning: Failed to converge. Residual = %e, Relative Error = %e, Tol = %e.\n", 
+          residual, dphi_max, iod_ls.reinit.convergence_tolerance);
 }
 
 //--------------------------------------------------------------------------
@@ -143,55 +138,68 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
   EvaluateSignFunctionInBand(Phi, useful_nodes, 1.0/*smoothing coefficient*/);
 
   // Step 2: Reinitialize first layer nodes (no iterations needed)
-  if(iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||
+  if(/*iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||*/
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
      iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2) {
-    Phi1.AXPlusBY(0.0, 1.0, Phi, true); //Phi1 = Phi
+    AXPlusBYInBandPlusOne(0.0, Phi1, 1.0, Phi, true); //Phi1 = Phi
+    //Phi1.AXPlusBY(0.0, 1.0, Phi, true); //Phi1 = Phi
     ReinitializeFirstLayerNodes(Phi1, Phi, firstLayer, &UsefulG2, &useful_nodes); //Phi is updated
     ApplyBoundaryConditions(Phi, &UsefulG2);
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
-  double residual = 0.0;
+  double residual = 0.0, dphi_max = 0.0;
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
+
+    AXPlusBYInBandPlusOne(0.0, Phi0, 1.0, Phi);
 
     //************** Step 1 of RK3 *****************
     residual = ComputeResidualInBand(Phi, UsefulG2, useful_nodes, R, cfl);  //R = R(Phi)
     if(verbose>=1)
-      print("  o Iter. %d: Residual = %e, Tol = %e.\n", iter, residual, 
-            iod_ls.reinit.convergence_tolerance);
+      print("  o Iter. %d: Residual = %e, Relative Error = %e, Tol = %e.\n", iter, residual, 
+            dphi_max, iod_ls.reinit.convergence_tolerance);
     if(residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
       break;
 
-    Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
-    Phi1.AXPlusBY(1.0, 1.0, R);   //Phi1 = Phi + R(Phi)
+    AXPlusBYInBandPlusOne(0.0, Phi1, 1.0, Phi); //Phi1 = Phi
+    //Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
+    AXPlusBYInBandPlusOne(1.0, Phi1, 1.0, R); //Phi1 = Phi + R(Phi)
+    //Phi1.AXPlusBY(1.0, 1.0, R);   //Phi1 = Phi + R(Phi)
     ApplyBoundaryConditions(Phi1, &UsefulG2);
-    ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
 
     //************** Step 2 of RK3 *****************
     ComputeResidualInBand(Phi1, UsefulG2, useful_nodes, R, cfl);
-    Phi1.AXPlusBY(0.25, 0.75, Phi);
-    Phi1.AXPlusBY(1.0, 0.25, R);
+    AXPlusBYInBandPlusOne(0.25, Phi1, 0.75, Phi);
+    //Phi1.AXPlusBY(0.25, 0.75, Phi);
+    AXPlusBYInBandPlusOne(1.0, Phi1, 0.25, R);
+    //Phi1.AXPlusBY(1.0, 0.25, R);
     ApplyBoundaryConditions(Phi1, &UsefulG2);
-    ApplyCorrectionToFirstLayerNodes(Phi1, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
     //************** Step 3 of RK3 *****************
     ComputeResidualInBand(Phi1, UsefulG2, useful_nodes, R, cfl);
-    Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
-    Phi.AXPlusBY(1.0, 2.0/3.0, R);
-    ApplyBoundaryConditions(Phi, &UsefulG2);
-    ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
+    AXPlusBYInBandPlusOne(1.0/3.0, Phi, 2.0/3.0, Phi1);
+    //Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
+    AXPlusBYInBandPlusOne(1.0, Phi, 2.0/3.0, R);
+    //Phi.AXPlusBY(1.0, 2.0/3.0, R);
     //*********************************************
     
+    //*********************************************
+    // Apply corrections to first layer nodes (HCR-1 or HCR-2)
+    ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
+    //*********************************************
+
+    dphi_max = CalculateMaximumRelativeErrorInBand(Phi0, Phi, useful_nodes);    
+    if(dphi_max < iod_ls.reinit.convergence_tolerance) //converged (using the same tolerance)
+      break;
   }
 
   if(iter==iod_ls.reinit.maxIts)
-    print("  o Warning: Failed to converge. Residual = %e, Tol = %e.\n", 
-          residual, iod_ls.reinit.convergence_tolerance);
+    print("  o Warning: Failed to converge. Residual = %e, Relative Error = %e, Tol = %e.\n", 
+          residual, dphi_max, iod_ls.reinit.convergence_tolerance);
 
 }
 
@@ -845,7 +853,7 @@ LevelSetReinitializer::ComputeResidualFullDomain(SpaceVariable3D &Phi, SpaceVari
 
   // fix first layer nodes?
   bool fix_first_layer = (iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::FIXED ||
-                          iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||
+                          /*iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||*/
                           iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
                           iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2);
 
@@ -887,7 +895,8 @@ LevelSetReinitializer::ComputeResidualFullDomain(SpaceVariable3D &Phi, SpaceVari
 
         res[k][j][i] = -dt*sign[k][j][i]*local_res;
 
-        max_residual = std::max(max_residual, fabs(local_res));
+        if(tag[k][j][i]==0) //calculate max residual for nodes that are not on first layer
+          max_residual = std::max(max_residual, fabs(local_res));
       }
 
   // get max residual over all the processors
@@ -926,7 +935,7 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
 
   // fix first layer nodes?
   bool fix_first_layer = (iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::FIXED ||
-                          iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||
+                          /*iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::UNCONSTRAINED||*/
                           iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED1 ||
                           iod_ls.reinit.firstLayerTreatment == LevelSetReinitializationData::CONSTRAINED2);
 
@@ -970,9 +979,18 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
       local_res = sqrt(std::max(am*am, bp*bp) + std::max(cm*cm, dp*dp) + std::max(em*em, fp*fp)) - 1.0;
     }
 
+/*
+    if(local_res == -1.0)
+      fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): phi = %e, l(%d) = %e, r(%d) = %e, b(%d) = %e, t(%d) = %e, k(%d) = %e, f(%d) = %e.\n",
+              i,j,k,coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i],
+              (int)useful[k][j][i-1], phi[k][j][i-1], (int)useful[k][j][i+1], phi[k][j][i+1], 
+              (int)useful[k][j-1][i], phi[k][j-1][i], (int)useful[k][j+1][i], phi[k][j+1][i],
+              (int)useful[k-1][j][i], phi[k-1][j][i], (int)useful[k+1][j][i], phi[k+1][j][i]);
+*/
     res[k][j][i] = -dt*sign[k][j][i]*local_res;
 
-    max_residual = std::max(max_residual, fabs(local_res));
+    if(tag[k][j][i]==0) //calculate max residual for nodes that are not on first layer
+      max_residual = std::max(max_residual, fabs(local_res));
   }
 
   // get max residual over all the processors
@@ -1227,9 +1245,12 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
 
       it->f = 0.0;
 
-      if(phi[k][j][i]*phi[k][j][i-1]>=0 || phi[k][j][i]*phi[k][j][i+1]>=0 ||
-         phi[k][j][i]*phi[k][j-1][i]>=0 || phi[k][j][i]*phi[k][j+1][i]>=0 ||
-         phi[k][j][i]*phi[k-1][j][i]>=0 || phi[k][j][i]*phi[k+1][j][i]>=0) 
+      if((it->s[0] && phi[k][j][i]*phi[k][j][i-1]>=0) || 
+         (it->s[1] && phi[k][j][i]*phi[k][j][i+1]>=0) ||
+         (it->s[2] && phi[k][j][i]*phi[k][j-1][i]>=0) || 
+         (it->s[3] && phi[k][j][i]*phi[k][j+1][i]>=0) ||
+         (it->s[4] && phi[k][j][i]*phi[k-1][j][i]>=0) || 
+         (it->s[5] && phi[k][j][i]*phi[k+1][j][i]>=0))
         continue; //This node is in Gamma but not in C^{\nu}
 
       double sum = 0.0;
@@ -1245,7 +1266,7 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
       else
         it->f = 0.0 - phi[k][j][i];
 
-      it->f /= std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+      it->f /= std::max(dxyz[k][j][i][0], std::max(dxyz[k][j][i][1], dxyz[k][j][i][2]));
 
     }
   }
@@ -1256,9 +1277,12 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
 
       it->f = 0.0;
 
-      if(phi[k][j][i]*phi[k][j][i-1]>=0 || phi[k][j][i]*phi[k][j][i+1]>=0 ||
-         phi[k][j][i]*phi[k][j-1][i]>=0 || phi[k][j][i]*phi[k][j+1][i]>=0 ||
-         phi[k][j][i]*phi[k-1][j][i]>=0 || phi[k][j][i]*phi[k+1][j][i]>=0) 
+      if((it->s[0] && phi[k][j][i]*phi[k][j][i-1]>=0) || 
+         (it->s[1] && phi[k][j][i]*phi[k][j][i+1]>=0) ||
+         (it->s[2] && phi[k][j][i]*phi[k][j-1][i]>=0) || 
+         (it->s[3] && phi[k][j][i]*phi[k][j+1][i]>=0) ||
+         (it->s[4] && phi[k][j][i]*phi[k-1][j][i]>=0) || 
+         (it->s[5] && phi[k][j][i]*phi[k+1][j][i]>=0))
         continue; //This node is in Gamma but not in C^{\nu}
 
       double sum = 0.0;
@@ -1270,7 +1294,7 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
       if(it->s[5])  sum += phi[k+1][j][i];
 
       it->f = it->r0*sum - phi[k][j][i];
-      it->f /= std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+      it->f /= std::max(dxyz[k][j][i][0], std::max(dxyz[k][j][i][1], dxyz[k][j][i][2]));
 
     }
   }
@@ -1321,6 +1345,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   //*****************************************************
   // UsefulG2/useful_nodes ~ all nodes in the narrow band
   // Active/active_nodes ~ nodes in the interior of the narrow band
+  // useful_nodes_plus1layer ~ useful_nodes + one layer outside band
   // Phi ~ a large constant (+/-) number will be specified outside band
   //*****************************************************
   double*** phi = Phi.GetDataPointer();
@@ -1412,6 +1437,11 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   // Step 3: Cutoff Phi outside the band
   // -------------------------------------------------- 
   CutOffPhiOutsideBand(Phi, UsefulG2, useful_nodes);
+
+  // -------------------------------------------------- 
+  // Step 4: Build useful_nodes_plus1layer
+  // -------------------------------------------------- 
+  CreateUsefulNodesPlusOneLayer(useful_nodes);
 
 }
 
@@ -1679,6 +1709,174 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   UsefulG2.RestoreDataPointerToLocalVector(); 
   Phi.RestoreDataPointerToLocalVector();
   R.RestoreDataPointerToLocalVector();
+
+
+  // -------------------------------------------------- 
+  // Step 6: Build useful_nodes_plus1layer
+  // -------------------------------------------------- 
+  CreateUsefulNodesPlusOneLayer(useful_nodes);
+
+
+/* DEBUG
+  useful = UsefulG2.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+        Int3 ijk(i,j,k);
+        if(useful[k][j][i] && std::find(useful_nodes.begin(), useful_nodes.end(), ijk) == useful_nodes.end())
+          fprintf(stderr,"HORROR!\n");
+      }
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    if(!useful[k][j][i]) fprintf(stderr,"HORROR 2!\n");
+  }
+  UsefulG2.RestoreDataPointerToLocalVector();
+*/
+}
+
+//--------------------------------------------------------------------------
+
+void
+LevelSetReinitializer::CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes)
+{
+
+  useful_nodes_plus1layer = useful_nodes;
+
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+
+    if(i-1>=ii0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i-1,j,k))  //left
+      if(std::find(useful_nodes_plus1layer.begin(), 
+                   useful_nodes_plus1layer.end(), 
+                   Int3(i-1,j,k)) == useful_nodes_plus1layer.end())
+        useful_nodes_plus1layer.push_back(Int3(i-1,j,k));
+
+    if(i+1<iimax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i+1,j,k))  //right
+      if(std::find(useful_nodes_plus1layer.begin(), 
+                   useful_nodes_plus1layer.end(), 
+                   Int3(i+1,j,k)) == useful_nodes_plus1layer.end())
+        useful_nodes_plus1layer.push_back(Int3(i+1,j,k));
+
+    if(j-1>=jj0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j-1,k))  //bottom
+      if(std::find(useful_nodes_plus1layer.begin(), 
+                   useful_nodes_plus1layer.end(), 
+                   Int3(i,j-1,k)) == useful_nodes_plus1layer.end())
+        useful_nodes_plus1layer.push_back(Int3(i,j-1,k));
+
+    if(j+1<jjmax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j+1,k))  //top
+      if(std::find(useful_nodes_plus1layer.begin(), 
+                   useful_nodes_plus1layer.end(), 
+                   Int3(i,j+1,k)) == useful_nodes_plus1layer.end())
+        useful_nodes_plus1layer.push_back(Int3(i,j+1,k));
+
+    if(k-1>=kk0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k-1))  //back
+      if(std::find(useful_nodes_plus1layer.begin(), 
+                   useful_nodes_plus1layer.end(), 
+                   Int3(i,j,k-1)) == useful_nodes_plus1layer.end())
+        useful_nodes_plus1layer.push_back(Int3(i,j,k-1));
+
+    if(k+1<kkmax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k+1))  //front
+      if(std::find(useful_nodes_plus1layer.begin(), 
+                   useful_nodes_plus1layer.end(), 
+                   Int3(i,j,k+1)) == useful_nodes_plus1layer.end())
+        useful_nodes_plus1layer.push_back(Int3(i,j,k+1));
+
+  }
+}
+
+//--------------------------------------------------------------------------
+
+void 
+LevelSetReinitializer::AXPlusBYInBandPlusOne(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y,
+                                             bool workOnGhost)
+{
+  if(X.NumDOF() != Y.NumDOF()) {
+    print_error("*** Error: Vector operation (AXPlusBYInBandPlusOne) failed due to inconsistent sizes (%d vs. %d)\n",
+                 X.NumDOF(), Y.NumDOF());
+    exit_mpi();
+  }
+
+  int dof = X.NumDOF();
+
+  double*** x = X.GetDataPointer();
+  double*** y = Y.GetDataPointer();
+
+  for(auto it = useful_nodes_plus1layer.begin(); it != useful_nodes_plus1layer.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    if(!workOnGhost && !X.IsHere(i,j,k,false))
+      continue;
+    for(int p=0; p<dof; p++)
+      x[k][j][i*dof+p] = a*x[k][j][i*dof+p] + b*y[k][j][i*dof+p];
+  }
+
+  X.RestoreDataPointerAndInsert();
+  Y.RestoreDataPointerToLocalVector();
+}
+
+//--------------------------------------------------------------------------
+
+double
+LevelSetReinitializer::CalculateMaximumRelativeErrorFullDomain(SpaceVariable3D &Phi0, SpaceVariable3D &Phi)
+{
+  double err = 0.0;
+
+  double*** phi0 = Phi0.GetDataPointer();
+  double*** phi  = Phi.GetDataPointer();
+
+  double local_err;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+  
+        local_err = fabs(phi[k][j][i] - phi0[k][j][i]);
+        if(phi[k][j][i]!=0)
+          local_err /= fabs(phi[k][j][i]);
+
+        err = std::max(err, local_err);
+
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+  Phi0.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerToLocalVector();
+
+  return err;
+
+}
+
+//--------------------------------------------------------------------------
+
+double
+LevelSetReinitializer::CalculateMaximumRelativeErrorInBand(SpaceVariable3D &Phi0, SpaceVariable3D &Phi,
+                                                           vector<Int3> &useful_nodes)
+{
+  double err = 0.0;
+
+  double*** phi0 = Phi0.GetDataPointer();
+  double*** phi  = Phi.GetDataPointer();
+
+  double local_err;
+  for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    if(!coordinates.IsHere(i,j,k,false)) //only check nodes inside subdomain
+      continue;
+  
+    local_err = fabs(phi[k][j][i] - phi0[k][j][i]);
+    if(phi[k][j][i]!=0)
+      local_err /= fabs(phi[k][j][i]);
+
+    err = std::max(err, local_err);
+
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+  Phi0.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerToLocalVector();
+
+  return err;
 
 }
 

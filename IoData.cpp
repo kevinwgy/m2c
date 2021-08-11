@@ -754,7 +754,7 @@ LevelSetReinitializationData::LevelSetReinitializationData()
   maxIts = 20;
   cfl = 0.5;
   convergence_tolerance = 1.0e-3;
-  firstLayerTreatment = ITERATIVE_CONSTRAINED2;
+  firstLayerTreatment = ITERATIVE_CONSTRAINED1;
 }
 
 //------------------------------------------------------------------------------
@@ -779,9 +779,9 @@ void LevelSetReinitializationData::setup(const char *name, ClassAssigner *father
           &LevelSetReinitializationData::convergence_tolerance);
 
   new ClassToken<LevelSetReinitializationData>(ca, "FirstLayerTreatment", this,
-     reinterpret_cast<int LevelSetReinitializationData::*>(&LevelSetReinitializationData::firstLayerTreatment), 6,
-     "Fixed", 0, "Unconstrained", 1, "ConstrainedMethod1", 2, "ConstrainedMethod2", 3,
-     "IterativelyConstrainedMethod1", 4, "IterativelyConstrainedMethod2", 5);
+     reinterpret_cast<int LevelSetReinitializationData::*>(&LevelSetReinitializationData::firstLayerTreatment), 5,
+     "Fixed", 0, "ConstrainedMethod1", 1, "ConstrainedMethod2", 2,
+     "IterativelyConstrainedMethod1", 3, "IterativelyConstrainedMethod2", 4);
 
 }
 

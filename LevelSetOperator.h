@@ -43,8 +43,8 @@ class LevelSetOperator
   SpaceVariable3D  Level;  //band level of each node (-inf to inf, including ghost boundary)
   SpaceVariable3D  UsefulG2; //all the nodes in the narrow-band (including ghost boundary)
   SpaceVariable3D  Active; //the nodes in the interior of the narrow-band (including ghost boundary)
-  vector<Int3> useful_nodes; //vector of useful nodes
-  vector<Int3> active_nodes; //vector of active nodes
+  vector<Int3> useful_nodes; //vector of useful nodes (i.e. within bandwidth)
+  vector<Int3> active_nodes; //vector of active nodes (i.e. within bandwidth - 1)
 
   //! Class for reinitialization
   LevelSetReinitializer *reinit;
@@ -69,6 +69,8 @@ public:
                     SpaceVariable3D &Phi); //true: reinitialization is done; false: not this time
 
   int GetMaterialID() {return materialid;}
+
+  void AXPlusBY(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
 
   void Destroy();
 
