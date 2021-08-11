@@ -76,6 +76,8 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
 
+    Phi0.AXPlusBY(0.0, 1.0, Phi);
+
     //************** Step 1 of RK3 *****************
     residual = ComputeResidualFullDomain(Phi, R, cfl);  //R = R(Phi)
     if(verbose>=1)
@@ -185,6 +187,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
     //Phi.AXPlusBY(1.0/3.0, 2.0/3.0, Phi1);
     AXPlusBYInBandPlusOne(1.0, Phi, 2.0/3.0, R);
     //Phi.AXPlusBY(1.0, 2.0/3.0, R);
+    ApplyBoundaryConditions(Phi, &UsefulG2);
     //*********************************************
     
     //*********************************************
