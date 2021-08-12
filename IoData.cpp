@@ -835,23 +835,23 @@ Assigner *LevelSetSchemeData::getAssigner()
   new ClassInt<LevelSetSchemeData>(ca, "Bandwidth", this, &LevelSetSchemeData::bandwidth);
 
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionX0", this,
-          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_x0), 3,
-          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_x0), 4,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2, "NonNegative", 3);
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionXmax", this,
-          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_xmax), 3,
-          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_xmax), 4,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2, "NonNegative", 3);
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionY0", this,
-          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_y0), 3,
-          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_y0), 4,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2, "NonNegative", 3);
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionYmax", this,
-          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_ymax), 3,
-          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_ymax), 4,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2, "NonNegative", 3);
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionZ0", this,
-          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_z0), 3,
-          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_z0), 4,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2, "NonNegative", 3);
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionZmax", this,
-          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_zmax), 3,
-          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2);
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_zmax), 4,
+          "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2, "NonNegative", 3);
 
   rec.setup("Reconstruction", ca);
 

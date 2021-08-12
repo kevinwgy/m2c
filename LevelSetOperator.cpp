@@ -545,69 +545,79 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
     int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
 
-    switch (it->bcType) {
+    if(it->bcType == (int)LevelSetSchemeData::ZERO_NEUMANN) {
 
-      case (int)LevelSetSchemeData::ZERO_NEUMANN :
-        phi[k][j][i] = phi[im_k][im_j][im_i];
-        break;
+      phi[k][j][i] = phi[im_k][im_j][im_i];
 
-      case (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION :
-        //make sure the width of the subdomain is big enough for linear extrapolation
-        if(it->side == GhostPoint::LEFT) {
-          if(i+2<NX) {
-            r  = coords[k][j][i][0];
-            r1 = coords[k][j][i+1][0];  f1 = phi[k][j][i+1];
-            r2 = coords[k][j][i+2][0];  f2 = phi[k][j][i+2];
-            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-          } else
-            phi[k][j][i] = phi[im_k][im_j][im_i];
-        }
-        else if(it->side == GhostPoint::RIGHT) {
-          if(i-2>=0) {
-            r  = coords[k][j][i][0];
-            r1 = coords[k][j][i-1][0];  f1 = phi[k][j][i-1];
-            r2 = coords[k][j][i-2][0];  f2 = phi[k][j][i-2];
-            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-          } else
-            phi[k][j][i] = phi[im_k][im_j][im_i];
-        }
-        else if(it->side == GhostPoint::BOTTOM) {
-          if(j+2<NY) {
-            r  = coords[k][j][i][1];
-            r1 = coords[k][j+1][i][1];  f1 = phi[k][j+1][i];
-            r2 = coords[k][j+2][i][1];  f2 = phi[k][j+2][i];
-            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-          } else
-            phi[k][j][i] = phi[im_k][im_j][im_i];
-        }
-        else if(it->side == GhostPoint::TOP) {
-          if(j-2>=0) {
-            r  = coords[k][j][i][1];
-            r1 = coords[k][j-1][i][1];  f1 = phi[k][j-1][i];
-            r2 = coords[k][j-2][i][1];  f2 = phi[k][j-2][i];
-            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-          } else
-            phi[k][j][i] = phi[im_k][im_j][im_i];
-        }
-        else if(it->side == GhostPoint::BACK) {
-          if(k+2<NZ) { 
-            r  = coords[k][j][i][2];
-            r1 = coords[k+1][j][i][2];  f1 = phi[k+1][j][i];
-            r2 = coords[k+2][j][i][2];  f2 = phi[k+2][j][i];
-            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-          } else
-            phi[k][j][i] = phi[im_k][im_j][im_i];
-        }
-        else if(it->side == GhostPoint::FRONT) {
-          if(k-2>=0) {
-            r  = coords[k][j][i][2];
-            r1 = coords[k-1][j][i][2];  f1 = phi[k-1][j][i];
-            r2 = coords[k-2][j][i][2];  f2 = phi[k-2][j][i];
-            phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
-          } else
-            phi[k][j][i] = phi[im_k][im_j][im_i];
-        }
-        break;
+    }
+    else if ((it->bcType == (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION) ||
+             (it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE)) {
+
+      //make sure the width of the subdomain is big enough for linear extrapolation
+      if(it->side == GhostPoint::LEFT) {
+        if(i+2<NX) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i+1][0];  f1 = phi[k][j][i+1];
+          r2 = coords[k][j][i+2][0];  f2 = phi[k][j][i+2];
+          phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          phi[k][j][i] = phi[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::RIGHT) {
+        if(i-2>=0) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i-1][0];  f1 = phi[k][j][i-1];
+          r2 = coords[k][j][i-2][0];  f2 = phi[k][j][i-2];
+          phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          phi[k][j][i] = phi[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::BOTTOM) {
+        if(j+2<NY) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j+1][i][1];  f1 = phi[k][j+1][i];
+          r2 = coords[k][j+2][i][1];  f2 = phi[k][j+2][i];
+          phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          phi[k][j][i] = phi[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::TOP) {
+        if(j-2>=0) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j-1][i][1];  f1 = phi[k][j-1][i];
+          r2 = coords[k][j-2][i][1];  f2 = phi[k][j-2][i];
+          phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          phi[k][j][i] = phi[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::BACK) {
+        if(k+2<NZ) { 
+          r  = coords[k][j][i][2];
+          r1 = coords[k+1][j][i][2];  f1 = phi[k+1][j][i];
+          r2 = coords[k+2][j][i][2];  f2 = phi[k+2][j][i];
+          phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          phi[k][j][i] = phi[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::FRONT) {
+        if(k-2>=0) {
+          r  = coords[k][j][i][2];
+          r1 = coords[k-1][j][i][2];  f1 = phi[k-1][j][i];
+          r2 = coords[k-2][j][i][2];  f2 = phi[k-2][j][i];
+          phi[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          phi[k][j][i] = phi[im_k][im_j][im_i];
+      }
+
+      if(it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE) {
+        int ind(0);
+        if(it->side == GhostPoint::LEFT || it->side == GhostPoint::RIGHT)  ind = 0;
+        if(it->side == GhostPoint::BOTTOM || it->side == GhostPoint::TOP)  ind = 1;
+        if(it->side == GhostPoint::BACK || it->side == GhostPoint::FRONT)  ind = 2;
+        double d2wall = 0.5*fabs(coords[im_k][im_j][im_i][ind] - coords[k][j][i][ind]); //distance from this ghost node to the wall boundary
+        phi[k][j][i] = std::max(-d2wall, phi[k][j][i]);
+      }
+
     }
 
   }
