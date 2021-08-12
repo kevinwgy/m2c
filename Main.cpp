@@ -238,8 +238,15 @@ int main(int argc, char* argv[])
   integrator->Destroy();
   mpo.Destroy();
   spo.Destroy();
-  if(grad) grad->Destroy();
-  if(interp) interp->Destroy();
+  if(grad) {
+    grad->Destroy();
+    delete grad;
+  }
+  if(interp) {
+    interp->Destroy();
+    delete interp;
+  }
+
   dms.DestroyAllDataManagers();
   PetscFinalize();
 

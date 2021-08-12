@@ -1115,7 +1115,7 @@ BcsData::BcsData()
 void BcsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   inlet.setup("Inlet", ca);
   //Inside the code, Farfield0 = Farfield = Inlet, Farfield1 = Outlet
