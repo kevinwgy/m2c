@@ -368,7 +368,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
     if(Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k))
       continue;
 
-    if(i-1>=ii0 && phi[k][j][i]*phi[k][j][i-1]<=0) {
+    if(i-1>=ii0 && !Phi.OutsidePhysicalDomainAndUnpopulated(i-1,j,k) && phi[k][j][i]*phi[k][j][i-1]<=0) {
       tag[k][j][i] = 1;
       firstLayerIncGhost.push_back(Int3(i,j,k));
       if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
@@ -376,7 +376,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
       continue;
     }
 
-    if(i+1<iimax && phi[k][j][i]*phi[k][j][i+1]<=0) {
+    if(i+1<iimax && !Phi.OutsidePhysicalDomainAndUnpopulated(i+1,j,k) && phi[k][j][i]*phi[k][j][i+1]<=0) {
       tag[k][j][i] = 1;
       firstLayerIncGhost.push_back(Int3(i,j,k));
       if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
@@ -384,7 +384,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
       continue;
     }
 
-    if(j-1>=jj0 && phi[k][j][i]*phi[k][j-1][i]<=0) {
+    if(j-1>=jj0 && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j-1,k) && phi[k][j][i]*phi[k][j-1][i]<=0) {
       tag[k][j][i] = 1;
       firstLayerIncGhost.push_back(Int3(i,j,k));
       if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
@@ -392,7 +392,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
       continue;
     }
 
-    if(j+1<jjmax && phi[k][j][i]*phi[k][j+1][i]<=0) {
+    if(j+1<jjmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j+1,k) && phi[k][j][i]*phi[k][j+1][i]<=0) {
       tag[k][j][i] = 1;
       firstLayerIncGhost.push_back(Int3(i,j,k));
       if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
@@ -400,7 +400,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
       continue;
     }
 
-    if(k-1>=kk0 && phi[k][j][i]*phi[k-1][j][i]<=0) {
+    if(k-1>=kk0 && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k-1) && phi[k][j][i]*phi[k-1][j][i]<=0) {
       tag[k][j][i] = 1;
       firstLayerIncGhost.push_back(Int3(i,j,k));
       if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
@@ -408,7 +408,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
       continue;
     }
         
-    if(k+1<kkmax && phi[k][j][i]*phi[k+1][j][i]<=0) {
+    if(k+1<kkmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k+1) && phi[k][j][i]*phi[k+1][j][i]<=0) {
       tag[k][j][i] = 1;
       firstLayerIncGhost.push_back(Int3(i,j,k));
       if(Phi.IsHere(i,j,k,false)) //only push nodes in the subdomain interior into firstLayer
@@ -1373,6 +1373,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   double*** level  = Level.GetDataPointer();
   double*** useful = UsefulG2.GetDataPointer();
   double*** active = Active.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
@@ -1384,6 +1385,11 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
 
         if(Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k))
           continue;
+/*
+        if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
+          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
+
+*/
 
         if(phi[k][j][i]==0) {
           level[k][j][i] = 0;
@@ -1392,14 +1398,17 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
           useful_nodes.push_back(Int3(i,j,k));
           active_nodes.push_back(Int3(i,j,k));
         } 
-        else if ( (i-1>=i0   && phi[k][j][i]*phi[k][j][i-1]<=0) ||
-                  (i+1<iimax && phi[k][j][i]*phi[k][j][i+1]<=0) ||
-                  (j-1>=j0   && phi[k][j][i]*phi[k][j-1][i]<=0) ||
-                  (j+1<jjmax && phi[k][j][i]*phi[k][j+1][i]<=0) ||
-                  (k-1>=k0   && phi[k][j][i]*phi[k-1][j][i]<=0) ||
-                  (k+1<kkmax && phi[k][j][i]*phi[k+1][j][i]<=0) ) {
+        else if ( (i-1>=i0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i-1,j,k) && phi[k][j][i]*phi[k][j][i-1]<=0) ||
+                  (i+1<iimax && !Phi.OutsidePhysicalDomainAndUnpopulated(i+1,j,k) && phi[k][j][i]*phi[k][j][i+1]<=0) ||
+                  (j-1>=j0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j-1,k) && phi[k][j][i]*phi[k][j-1][i]<=0) ||
+                  (j+1<jjmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j+1,k) && phi[k][j][i]*phi[k][j+1][i]<=0) ||
+                  (k-1>=k0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k-1) && phi[k][j][i]*phi[k-1][j][i]<=0) ||
+                  (k+1<kkmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k+1) && phi[k][j][i]*phi[k+1][j][i]<=0) ) {
 
-
+/*
+          if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
+            fprintf(stderr,"adding ... (%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
+*/
           level[k][j][i] = 1;
           useful[k][j][i] = 1;
           active[k][j][i] = 1;
@@ -1410,6 +1419,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
 
       }
   Level.RestoreDataPointerAndInsert();
+  coordinates.RestoreDataPointerToLocalVector();
 
   // Update useful_nodes and active_nodes to get the changes at boundary
   level = Level.GetDataPointer();
@@ -1456,7 +1466,11 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   // Step 4: Build useful_nodes_plus1layer
   // -------------------------------------------------- 
   CreateUsefulNodesPlusOneLayer(useful_nodes);
-
+/*
+  UsefulG2.WriteToVTRFile("useful.vtr");
+  Level.WriteToVTRFile("level.vtr");
+  exit_mpi();
+*/
 }
 
 //--------------------------------------------------------------------------
