@@ -1015,6 +1015,7 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
   Phi.RestoreDataPointerToLocalVector();
   delta_xyz.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
+  UsefulG2.RestoreDataPointerToLocalVector();
 
   R.RestoreDataPointerAndInsert();
 
@@ -1245,6 +1246,10 @@ LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariab
   Phi.RestoreDataPointerAndInsert();
 
   coordinates.RestoreDataPointerToLocalVector();
+
+  if(UsefulG2)
+    UsefulG2->RestoreDataPointerToLocalVector();
+
 }
 //--------------------------------------------------------------------------
 

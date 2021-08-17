@@ -687,6 +687,9 @@ void LevelSetOperator::ComputeResidualFDM_FullDomain(SpaceVariable3D &V, SpaceVa
   //***************************************************************
   // Step 2: Loop through active nodes and compute residual
   //***************************************************************
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
   double*** phil = Phil.GetDataPointer(); //d(Phi)/dx, left-biased
   double*** phir = Phir.GetDataPointer(); //d(Phi)/dx, right-biased
   double*** phib = Phib.GetDataPointer();
@@ -695,13 +698,21 @@ void LevelSetOperator::ComputeResidualFDM_FullDomain(SpaceVariable3D &V, SpaceVa
   double*** phif = Phif.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
+  double a, b, c, d, e, f;
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
 
-        res[k][j][i] = (v[k][j][i][1]>=0 ? phil[k][j][i]*v[k][j][i][1] : phir[k][j][i]*v[k][j][i][1])
-                     + (v[k][j][i][2]>=0 ? phib[k][j][i]*v[k][j][i][2] : phit[k][j][i]*v[k][j][i][2])
-                     + (v[k][j][i][3]>=0 ? phik[k][j][i]*v[k][j][i][3] : phif[k][j][i]*v[k][j][i][3]);
+        a = (i-2>=-1) ? phil[k][j][i] : (phi[k][j][i]-phi[k][j][i-1])/(coords[k][j][i][0]-coords[k][j][i-1][0]);
+        b = (i+2<=NX) ? phir[k][j][i] : (phi[k][j][i+1]-phi[k][j][i])/(coords[k][j][i+1][0]-coords[k][j][i][0]);
+        c = (j-2>=-1) ? phib[k][j][i] : (phi[k][j][i]-phi[k][j-1][i])/(coords[k][j][i][1]-coords[k][j-1][i][1]);
+        d = (j+2<=NY) ? phit[k][j][i] : (phi[k][j+1][i]-phi[k][j][i])/(coords[k][j+1][i][1]-coords[k][j][i][1]);
+        e = (k-2>=-1) ? phik[k][j][i] : (phi[k][j][i]-phi[k-1][j][i])/(coords[k][j][i][2]-coords[k-1][j][i][2]);
+        f = (k+2<=NZ) ? phif[k][j][i] : (phi[k+1][j][i]-phi[k][j][i])/(coords[k+1][j][i][2]-coords[k][j][i][2]);
+
+        res[k][j][i] = (v[k][j][i][1]>=0 ? a*v[k][j][i][1] : b*v[k][j][i][1])
+                     + (v[k][j][i][2]>=0 ? c*v[k][j][i][2] : d*v[k][j][i][2])
+                     + (v[k][j][i][3]>=0 ? e*v[k][j][i][3] : f*v[k][j][i][3]);
 
         res[k][j][i] *= -1.0; //moves the residual to the RHS
 
