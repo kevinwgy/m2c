@@ -4,8 +4,12 @@
 #include<Vector5D.h>
 #include<RiemannSolutions.h>
 #include<algorithm>//find
+#include<set>
 using std::cout;
 using std::endl;
+using std::set;
+using std::tuple;
+using std::get;
 extern int verbose;
 //-----------------------------------------------------
 
@@ -16,11 +20,74 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                     delta_xyz(spo.GetMeshDeltaXYZ()),
                     Tag(comm_, &(dm_all_.ghosted1_1dof))
 {
+
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
   for(int i=0; i<lso.size(); i++)
     ls2matid[i] = lso[i]->GetMaterialID();
+
+  // Initialize phase/material transition functions (if specified by user)
+  if(iod.eqs.transitions.dataMap.size()) {
+
+    // start with creating an empty vector for each material ID
+    int numMaterials = varFcn.size();
+    trans.resize(numMaterials);
+
+    // fill in the user-specified transitions
+    for(auto it = iod.eqs.transitions.dataMap.begin(); it != iod.eqs.transitions.dataMap.end(); it++) {
+      int i = it->second->from_id;
+      int j = it->second->to_id;
+      if(i<0 || i>=varFcn.size() || j<0 || j>=varFcn.size() || i==j) {
+        print_error("*** Error: Detected input error in Material/Phase Transition [%d] (%d -> %d).\n", it->first,
+                    i, j); 
+        exit_mpi();
+      }
+      if(true) //no other choices at the moment
+        trans[i].push_back(new PhaseTransitionBase(*it->second, *varFcn[i], *varFcn[j]));
+      else {
+        print_error("*** Error: Unknown phase transition type (%d).\n");
+        exit_mpi();
+      }
+    }
+
+    // make sure the needed level set functions are available
+    for(auto it = iod.eqs.transitions.dataMap.begin(); it != iod.eqs.transitions.dataMap.end(); it++) {
+      int i = it->second->from_id;
+      int j = it->second->to_id;
+      if(i!=0) {
+        bool found = false;
+        for(int ls = 0; ls < lso.size(); ls++) {
+          if(ls2matid[ls] == i) {
+            found = true;
+            break;
+          }
+        }
+        if(!found) {
+          print_error("*** Error: Phase transitions involve material ID %d, but a level set solver is not specified.\n",
+                      i);
+          exit_mpi();
+        }
+      }
+      if(j!=0) {
+        bool found = false;
+        for(int ls = 0; ls < lso.size(); ls++) {
+          if(ls2matid[ls] == j) {
+            found = true;
+            break;
+          }
+        }
+        if(!found) {
+          print_error("*** Error: Phase transitions involve material ID %d, but a level set solver is not specified.\n",
+                      j);
+          exit_mpi();
+        }
+      }
+    }
+
+  } else
+    trans.resize(0);
+
 }
 
 //-----------------------------------------------------
@@ -34,6 +101,10 @@ void
 MultiPhaseOperator::Destroy()
 {
   Tag.Destroy();
+
+  for(int i=0; i<trans.size(); i++)
+    for(auto it = trans[i].begin(); it != trans[i].end(); it++)
+      delete *it;
 }
 
 //-----------------------------------------------------
@@ -533,6 +604,249 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
   ID.RestoreDataPointerToLocalVector();
   IDn.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
+
+}
+
+//-------------------------------------------------------------------------
+// This function checks for physical phase transitions based on varFcn. If
+// found, the levelset (phi), the material ID, and possibly also the state
+// variables V will be updated. The function returns the total number of
+// nodes undergoing phase transitions. If it is non-zero, all the level set
+// functions should be reinitialized (done outside of MultiPhaseOperator)
+int 
+MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
+                                           SpaceVariable3D &V, vector<bool> &phi_updated)
+{
+  if(trans.size()==0)
+    return 0; //nothing to do
+
+  //---------------------------------------------
+  // Step 1: Check for phase transitions; Update
+  //         ID and V
+  //---------------------------------------------
+  double*** id  = ID.GetDataPointer();
+  Vec5D***  v   = (Vec5D***) V.GetDataPointer();
+
+  int counter = 0;
+  vector<tuple<Int3,int,int> >  changed; //(i,j,k), old id, new id -- incl. ghosts inside physical domain
+
+  set<int> affected_ids;
+
+  int myid;
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+        myid = (int)id[k][j][i];
+        // skip nodes outside the physical domain
+        if(coordinates.OutsidePhysicalDomain(i,j,k))
+          continue;
+
+        for(auto it = trans[myid].begin(); it != trans[myid].end(); it++) {
+          if((*it)->Transition(v[k][j][i])) { //detected phase transition
+
+            // register the node
+            changed.push_back(std::make_tuple(Int3(i,j,k), myid, (*it)->toID));
+
+            // register the involved material ids
+            affected_ids.insert(myid);
+            affected_ids.insert((*it)->toID);
+
+            // update id
+            id[k][j][i] = (*it)->toID;
+
+            // update p (rho and e fixed)
+            double e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+            v[k][j][i][4] = varFcn[(*it)->toID]->GetPressure(v[k][j][i][0], e);
+
+            counter++;
+            break;
+          }
+        }
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
+
+  if(counter>0) {
+    ID.RestoreDataPointerAndInsert();
+    V.RestoreDataPointerAndInsert();
+  } else {
+    ID.RestoreDataPointerToLocalVector();
+    V.RestoreDataPointerToLocalVector();
+    return 0;
+  }
+
+
+  //---------------------------------------------
+  // Step 2: Figure out which level set functions
+  //         need to be updated
+  //---------------------------------------------
+  for(int ls = 0; ls < Phi.size(); ls++)
+    phi_updated[ls] = (affected_ids.find(ls2matid[ls]) != affected_ids.end());
+
+    
+  //---------------------------------------------
+  // Step 3: Update Phi
+  //---------------------------------------------
+  UpdatePhiAfterPhaseTransitions(Phi, ID, changed, phi_updated);
+
+
+  if(verbose>=1)
+    print("- Detected phase/material transitions at %d nodes.\n", counter);
+
+  return counter;
+
+}
+
+//-----------------------------------------------------
+
+void
+MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
+                                                   vector<tuple<Int3,int,int> > &changed, 
+                                                   vector<bool> &phi_updated)
+{
+  // This function will provide correct value of phi (up to dx error) ONLY for first layer nodes.
+  // Reinitialization is needed to find the value of phi elsewhere
+  // Note that "changed" should include ghost nodes inside the physical domain
+
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  double*** id  = ID.GetDataPointer();
+
+  for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
+  
+    if(phi_updated[ls] == false)
+      continue; //this level set function is not involved
+
+    double*** phi = Phi[ls]->GetDataPointer();
+    int matid = ls2matid[ls];
+
+    int i,j,k;
+    for(auto it = changed.begin(); it != changed.end(); it++) {
+
+      if(matid == get<1>(*it)) { //this node is moving outside of the subdomain
+        i = get<0>(*it)[0];
+        j = get<0>(*it)[1];
+        k = get<0>(*it)[2];
+
+        // update phi at this node
+        phi[k][j][i] = 0.5*std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1],dxyz[k][j][i][2]));        
+
+        // update phi at neighbors that are in the physical domain, and have opposite sign 
+        if(i-1>=ii0  && i-1>=0 && phi[k][j][i-1]<=0)
+          phi[k][j][i-1] = std::max(phi[k][j][i-1], -0.5*dxyz[k][j][i-1][0]);
+        if(i+1<iimax && i+1<NX && phi[k][j][i+1]<=0)
+          phi[k][j][i+1] = std::max(phi[k][j][i+1], -0.5*dxyz[k][j][i+1][0]);
+        if(j-1>=jj0  && j-1>=0 && phi[k][j-1][i]<=0) 
+          phi[k][j-1][i] = std::max(phi[k][j-1][i], -0.5*dxyz[k][j-1][i][1]);
+        if(j+1<jjmax && j+1<NY && phi[k][j+1][i]<=0)
+          phi[k][j+1][i] = std::max(phi[k][j+1][i], -0.5*dxyz[k][j+1][i][1]);
+        if(k-1>=kk0  && k-1>=0 && phi[k-1][j][i]<=0) 
+          phi[k-1][j][i] = std::max(phi[k-1][j][i], -0.5*dxyz[k-1][j][i][2]);
+        if(k+1<kkmax && k+1<NZ && phi[k+1][j][i]<=0)
+          phi[k+1][j][i] = std::max(phi[k+1][j][i], -0.5*dxyz[k+1][j][i][2]);
+      }
+      else if(matid == get<2>(*it)) { //this node is moving inside the subdomain
+        i = get<0>(*it)[0];
+        j = get<0>(*it)[1];
+        k = get<0>(*it)[2];
+
+        // update phi at this node
+        phi[k][j][i] = -0.5*std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1],dxyz[k][j][i][2]));        
+
+        // update phi at neighbors that are in the physical domain, and have opposite sign 
+        if(i-1>=ii0  && i-1>=0 && phi[k][j][i-1]>=0)
+          phi[k][j][i-1] = std::min(phi[k][j][i-1], 0.5*dxyz[k][j][i-1][0]);
+        if(i+1<iimax && i+1<NX && phi[k][j][i+1]>=0)
+          phi[k][j][i+1] = std::min(phi[k][j][i+1], 0.5*dxyz[k][j][i+1][0]);
+        if(j-1>=jj0  && j-1>=0 && phi[k][j-1][i]>=0) 
+          phi[k][j-1][i] = std::min(phi[k][j-1][i], 0.5*dxyz[k][j-1][i][1]);
+        if(j+1<jjmax && j+1<NY && phi[k][j+1][i]>=0)
+          phi[k][j+1][i] = std::min(phi[k][j+1][i], 0.5*dxyz[k][j+1][i][1]);
+        if(k-1>=kk0  && k-1>=0 && phi[k-1][j][i]>=0) 
+          phi[k-1][j][i] = std::min(phi[k-1][j][i], 0.5*dxyz[k-1][j][i][2]);
+        if(k+1<kkmax && k+1<NZ && phi[k+1][j][i]>=0)
+          phi[k+1][j][i] = std::min(phi[k+1][j][i], 0.5*dxyz[k+1][j][i][2]);
+      }
+
+    }
+
+    Phi[ls]->RestoreDataPointerAndInsert();
+  }
+
+
+  // For debug only
+  for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
+  
+    if(phi_updated[ls] == false)
+      continue; //this level set function is not involved
+
+    double*** phi = Phi[ls]->GetDataPointer();
+    int matid = ls2matid[ls];
+
+    int i,j,k;
+    for(auto it = changed.begin(); it != changed.end(); it++) {
+      if(matid == get<1>(*it) || matid == get<2>(*it)) { 
+ 
+        i = get<0>(*it)[0];
+        j = get<0>(*it)[1];
+        k = get<0>(*it)[2];
+
+        if(phi[k][j][i]<0)
+          assert(id[k][j][i] == matid);
+        else
+          assert(id[k][j][i] != matid);
+
+        if(i-1>=ii0 && i-1>=0) {
+          if(phi[k][j][i-1]<0)
+            assert(id[k][j][i-1] == matid);
+          else
+            assert(id[k][j][i-1] != matid);
+        }
+
+        if(i+1<iimax && i+1<NX) {
+          if(phi[k][j][i+1]<0)
+            assert(id[k][j][i+1] == matid);
+          else
+            assert(id[k][j][i+1] != matid);
+        }
+
+        if(j-1>=jj0 && j-1>=0) {
+          if(phi[k][j-1][i]<0)
+            assert(id[k][j-1][i] == matid);
+          else
+            assert(id[k][j-1][i] != matid);
+        }
+
+        if(j+1<jjmax && j+1<NY) {
+          if(phi[k][j+1][i]<0)
+            assert(id[k][j+1][i] == matid);
+          else
+            assert(id[k][j+1][i] != matid);
+        }
+
+        if(k-1>=kk0 && k-1>=0) {
+          if(phi[k-1][j][i]<0)
+            assert(id[k-1][j][i] == matid);
+          else
+            assert(id[k-1][j][i] != matid);
+        }
+
+        if(k+1<kkmax && k+1<NZ) {
+          if(phi[k+1][j][i]<0) 
+            assert(id[k+1][j][i] == matid);
+          else
+            assert(id[k+1][j][i] != matid);
+        }
+
+      }
+    }
+    Phi[ls]->RestoreDataPointerToLocalVector();
+  }
+
+  delta_xyz.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
 
 }
 

@@ -68,6 +68,19 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     spo.ApplyBoundaryConditions(V);
   }
 
+  // Check for phase transitions
+  if(lso.size()) {
+    vector<bool> phi_updated(lso.size(), false);
+    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated)>0) {//detected phase transitions
+      for(int i=0; i<Phi.size(); i++) {
+        if(phi_updated[i])
+          lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true/*must do*/);
+      }
+      spo.ClipDensityAndPressure(V, ID);
+      spo.ApplyBoundaryConditions(V);
+    }
+  }
+
   // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
@@ -181,6 +194,21 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     spo.ApplyBoundaryConditions(V);
   }
 
+
+  // Check for phase transitions
+  if(lso.size()) {
+    vector<bool> phi_updated(lso.size(), false);
+    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated)>0) {//detected phase transitions
+      for(int i=0; i<Phi.size(); i++) {
+        if(phi_updated[i])
+          lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true/*must do*/);
+      }
+      spo.ClipDensityAndPressure(V, ID);
+      spo.ApplyBoundaryConditions(V);
+    }
+  }
+
+
   // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
@@ -238,12 +266,6 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   // Check & clip the intermediate state (U1/V1)
   spo.ConservativeToPrimitive(U1, ID, V1); //get V1
-
-
-//  Vec5D*** v1 = (Vec5D***) V1.GetDataPointer();
-//  V1.RestoreDataPointerToLocalVector();
-
-
   int clipped = spo.ClipDensityAndPressure(V1, ID);
   if(clipped)
     spo.PrimitiveToConservative(V1, ID, U1); //update U1 after clipping
@@ -272,10 +294,6 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   
   // Check & clip the intermediate state (U2/V2)
   spo.ConservativeToPrimitive(U1, ID, V1); //get V2
-
-//  v1 = (Vec5D***) V1.GetDataPointer();
-//  V1.RestoreDataPointerToLocalVector();
-
   clipped = spo.ClipDensityAndPressure(V1, ID);
   if(clipped)
     spo.PrimitiveToConservative(V1, ID, U1); //update U2 after clipping
@@ -303,10 +321,6 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   U1.AXPlusBY(1.0, 2.0/3.0*dt, R); //U2 = U2 + 2/3*dt*R(V2)
 
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
-
-//  Vec5D*** v = (Vec5D***) V.GetDataPointer();
-//  V.RestoreDataPointerToLocalVector();
-
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
   //***************************************************
@@ -337,6 +351,21 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }
+
+
+  // Check for phase transitions
+  if(lso.size()) {
+    vector<bool> phi_updated(lso.size(), false);
+    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated)>0) {//detected phase transitions
+      for(int i=0; i<Phi.size(); i++) {
+        if(phi_updated[i])
+          lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true/*must do*/);
+      }
+      spo.ClipDensityAndPressure(V, ID);
+      spo.ApplyBoundaryConditions(V);
+    }
+  }
+
 
   // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);

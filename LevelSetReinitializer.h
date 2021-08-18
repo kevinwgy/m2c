@@ -124,7 +124,8 @@ private:
 
 
   // For full-domain level set method
-  void ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, double cfl);
+  void ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, double cfl,
+                                        SpaceVariable3D *UsefulG2 = NULL);
 
   void EvaluateSignFunctionFullDomain(SpaceVariable3D &Phi, double eps/*smoothing factor*/);
 

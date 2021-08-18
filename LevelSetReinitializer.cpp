@@ -200,7 +200,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
     
     //*********************************************
     // Apply corrections to first layer nodes (HCR-1 or HCR-2)
-    ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl); //HCR-1 or HCR-2 (also apply b.c.)
+    ApplyCorrectionToFirstLayerNodes(Phi, firstLayer, cfl, &UsefulG2); //HCR-1 or HCR-2 (also apply b.c.)
     //*********************************************
 
     dphi_max = CalculateMaximumRelativeErrorInBand(Phi0, Phi, useful_nodes);    
@@ -1255,7 +1255,7 @@ LevelSetReinitializer::ApplyBoundaryConditions(SpaceVariable3D &Phi, SpaceVariab
 
 void
 LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, 
-                                                        double cfl)
+                                                        double cfl, SpaceVariable3D *UsefulG2)
 {
 
   if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::ITERATIVE_CONSTRAINED1 &&
@@ -1342,7 +1342,7 @@ LevelSetReinitializer::ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, ve
   delta_xyz.RestoreDataPointerToLocalVector();
 
   // Step 3: Apply Boundary conditions
-  ApplyBoundaryConditions(Phi);
+  ApplyBoundaryConditions(Phi, UsefulG2);
 
 }
 

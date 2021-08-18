@@ -1,8 +1,8 @@
 #ifndef _MULTIPHASE_OPERATOR_H_
 #define _MULTIPHASE_OPERATOR_H_
-#include<VarFcnBase.h>
-#include<IoData.h>
 #include<SpaceVariable.h>
+#include<PhaseTransition.h>
+#include<tuple>
 
 class Vec5D;
 class SpaceOperator;
@@ -35,16 +35,23 @@ class MultiPhaseOperator
   //! the material id corresponding to each level set function
   map<int,int> ls2matid;
 
+  //! phase transition 
+  vector<vector<PhaseTransitionBase*> > trans;  //!< trans[i] contains all possible destinations of phase i
+
 public:
   MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                      vector<VarFcnBase*> &varFcn_, SpaceOperator &spo, vector<LevelSetOperator*> &lso);
   ~MultiPhaseOperator();
 
-  //update material id including the ghost region
+  //! update material id including the ghost region
   void UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
 
   void UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID,
                                                 SpaceVariable3D &V, RiemannSolutions &riemann_solutions);
+
+  //! detect phase transitions and update Phi, ID, and V
+  int UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,
+                             SpaceVariable3D &V, vector<bool> &phi_updated);
 
   void Destroy();
 
@@ -61,6 +68,9 @@ protected:
   void FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
                           SpaceVariable3D &V); 
 
+  //! internal function called by UpdatePhaseTransitions
+  void UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,
+                                      vector<std::tuple<Int3,int,int> > &changed, vector<bool> &phi_updated);
 
 };
 

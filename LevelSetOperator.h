@@ -70,7 +70,7 @@ public:
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
 
   bool Reinitialize(double time, double dt, int time_step,
-                    SpaceVariable3D &Phi); //true: reinitialization is done; false: not this time
+                    SpaceVariable3D &Phi, bool must_do = false); //true: reinitialization is done; false: not this time
 
   int GetMaterialID() {return materialid;}
 

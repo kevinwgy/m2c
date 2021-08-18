@@ -281,9 +281,29 @@ struct MaterialModelData {
 
 //------------------------------------------------------------------------------
 
+struct MaterialTransitionData {
+
+  int from_id, to_id;
+
+  double temperature_lowerbound; //!< transition occurs if temperature is lower than this value
+  double temperature_upperbound; //!< transition occurs if temperature is higher than this value
+  double pressure_lowerbound;
+  double pressure_upperbound;
+
+  MaterialTransitionData();
+  ~MaterialTransitionData() {}
+
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
 struct EquationsData {
 
   ObjectMap<MaterialModelData> materials;
+
+  ObjectMap<MaterialTransitionData> transitions;
 
   EquationsData();
   ~EquationsData() {}

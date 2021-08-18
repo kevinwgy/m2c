@@ -7,8 +7,8 @@
 #include <iostream>
 
 /****************************************************************************
- * This class is the base class for the VarFcnEOS classes where EOS can be
- * a stiffened gas, a Tait EOS or a JWL EOS.
+ * This class is the base class for the VarFcn classes where EOS can be
+ * an arbitrary convex equation of state.
  * Only elementary functions are declared and/or defined here.
  * All arguments must be pertinent to only a single grid node or a single
  * state, since it is assumed that the EOS that must be used at this point 
@@ -107,6 +107,11 @@ public:
     return CheckState(V[0], V[4]); 
   }
  
+  //check for phase transitions
+  virtual bool CheckPhaseTransition(int id/*id of the other phase*/) const{
+    return false; //by default, phase transition is not allowed/considered
+  }
+
   //----- Transformation Operators -----//
   inline void ConservativeToPrimitive(double *U, double *V); 
   inline void PrimitiveToConservative(double *V, double *U);

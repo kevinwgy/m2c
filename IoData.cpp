@@ -576,6 +576,47 @@ void ViscosityModelData::setup(const char *name, ClassAssigner *father) {
 
 //------------------------------------------------------------------------------
 
+MaterialTransitionData::MaterialTransitionData()
+{
+  from_id = -1;
+  to_id = -1;
+  temperature_lowerbound = -DBL_MAX;
+  temperature_upperbound = DBL_MAX;
+  pressure_lowerbound = -DBL_MAX;
+  pressure_upperbound = DBL_MAX;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *MaterialTransitionData::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
+
+  new ClassInt<MaterialTransitionData>(ca, "FromMaterialID", this, 
+          &MaterialTransitionData::from_id);
+
+  new ClassInt<MaterialTransitionData>(ca, "ToMaterialID", this, 
+          &MaterialTransitionData::to_id);
+
+  new ClassDouble<MaterialTransitionData>(ca, "TemperatureLowerbound", this, 
+          &MaterialTransitionData::temperature_lowerbound);
+
+  new ClassDouble<MaterialTransitionData>(ca, "TemperatureUpperbound", this, 
+          &MaterialTransitionData::temperature_upperbound);
+
+  new ClassDouble<MaterialTransitionData>(ca, "PressureLowerbound", this, 
+          &MaterialTransitionData::pressure_lowerbound);
+
+  new ClassDouble<MaterialTransitionData>(ca, "PressureUpperbound", this, 
+          &MaterialTransitionData::pressure_upperbound);
+
+  return ca;
+
+}
+
+//------------------------------------------------------------------------------
+
 EquationsData::EquationsData()
 {
 
@@ -585,9 +626,11 @@ EquationsData::EquationsData()
 
 void EquationsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 2, father); 
 
   materials.setup("Material", ca);
+
+  transitions.setup("MaterialTransition", ca);
 
 }
 

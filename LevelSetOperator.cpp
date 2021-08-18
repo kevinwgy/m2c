@@ -1191,13 +1191,19 @@ void LevelSetOperator::AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D
 
 //-----------------------------------------------------
 
-bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi)
+bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi, bool must_do)
 {
+  if(must_do && !reinit) {
+    print_error("*** Error: Reinitialization for level set (matid = %d) is requested, but not specified "
+                "in the input file.\n", materialid);
+    exit_mpi();
+  }
+
   if(!reinit)
     return false; //nothing to do
 
   if(!isTimeToWrite(time, dt, time_step, iod_ls.reinit.frequency_dt,
-                    iod_ls.reinit.frequency, 0.0, false))
+                    iod_ls.reinit.frequency, -100.0, must_do))
     return false; //nothing to do (not the right time)
 
   if(narrow_band) {
