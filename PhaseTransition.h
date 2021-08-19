@@ -28,28 +28,34 @@ public:
   VarFcnBase &vf2;
 
   double pmin, pmax, Tmin, Tmax;
+  double latent_heat;
+  double emax, emin; //internal energy that would trigger phase transition
 
   PhaseTransitionBase(MaterialTransitionData &data, VarFcnBase &vf1_, VarFcnBase &vf2_) 
      : fromID(data.from_id), toID(data.to_id),
        vf1(vf1_), vf2(vf2_),
        Tmin(data.temperature_lowerbound), Tmax(data.temperature_upperbound),
-       pmin(data.pressure_lowerbound), pmax(data.pressure_upperbound)
+       pmin(data.pressure_lowerbound), pmax(data.pressure_upperbound),
+       latent_heat(data.latent_heat)
   {
     type = BASE; //no other choices at the moment
+
+    emax = vf1.GetInternalEnergyPerUnitMassFromTemperature(0.0, Tmax) + latent_heat;
+    emin = vf1.GetInternalEnergyPerUnitMassFromTemperature(0.0, Tmin) - latent_heat;
   }
 
   virtual ~PhaseTransitionBase() {}
 
   virtual bool Transition(double *v) {
-    // check pressure
-    if(v[0]<=pmin || v[0]>pmax)
-      return true;
+
     // check temperature
     double e = vf1.GetInternalEnergyPerUnitMass(v[0], v[4]);
-    double T = vf1.GetTemperature(v[0], e);
-    if(T<=Tmin || T>Tmax)
+    if(e<=emin || e>emax)
       return true;
 
+    // check pressure
+    // TODO
+    
     return false;
   }
 

@@ -15,11 +15,11 @@
  *   e  : internal energy per unit mass.
  *   Pc : pressure constant. (named Pstiff below)
  *
- *   Note that the complete EOS is given by the above and h = cp * T
- *   where cp is constant. For a perfect gas, this leads to epsilon = cv * T
- *   but for a stiffened gas, epsilon = cv * T does not hold.
- *   For a stiffened gas, choosing epsilon = cv * T would lead to a non-constant cp...
- *
+ *   The temperature law is: de = cv*dT, where cv is assumed to be a constant
+ *   For a perfect gas, this leads to dh = cp*dT, where cp = gamma*cv is the
+ *   specific heat at constant pressure. For a general stiffened gas,
+ *   dh =/= cp*dT! See KW's notes. (One could have assumed dh = cp*dT, but then
+ *   de =/= cv*dT.)
  ********************************************************************************/
 class VarFcnSG : public VarFcnBase {
 
@@ -29,6 +29,11 @@ private:
 
   double gam1; //!< gamma-1
   double invgam1; //!< 1/(gamma-1)
+
+  double cv; //!< specific heat at constant volume
+  double invcv;
+  double T0; //!< ref. temperature
+  double e0; //!< ref. internal energy corresponding to T0
 
 public:
   VarFcnSG(MaterialModelData &data);
@@ -40,6 +45,10 @@ public:
   inline double GetDensity(double p, double e) const {return (p+gam*Pstiff)/(gam1*e);}
   inline double GetDpdrho(double rho, double e) const{return gam1*e;}
   inline double GetBigGamma(double rho, double e) const {return gam1;}
+
+  inline double GetTemperature(double rho, double e) const {return T0+invcv*(e-e0);}
+
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {return e0+cv*(T-T0);}
 
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + Pstiff < 0 (Not p + gamma*Pstiff). 
   inline bool CheckState(double rho, double p) const{
@@ -73,6 +82,11 @@ VarFcnSG::VarFcnSG(MaterialModelData &data) : VarFcnBase(data) {
   gam1 = gam -1.0;
   invgam1 = 1.0/gam1;
   Pstiff = data.sgModel.pressureConstant;
+
+  cv = data.sgModel.cv;
+  invcv = cv==0.0 ? 0.0 : 1.0/cv;
+  T0 = data.sgModel.T0;
+  e0 = data.sgModel.e0;
 
 }
 

@@ -383,9 +383,11 @@ StiffenedGasModelData::StiffenedGasModelData()
 {
 
   specificHeatRatio = 1.4;
-  idealGasConstant = 287.1;
-  specificHeatPressure = -1.0;
   pressureConstant = 0.0;
+
+  cv = 0.0;
+  T0 = 0.0;
+  e0 = 0.0;
 
 }
 
@@ -394,16 +396,19 @@ StiffenedGasModelData::StiffenedGasModelData()
 void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
 
   new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatRatio", this,
                                 &StiffenedGasModelData::specificHeatRatio);
-  new ClassDouble<StiffenedGasModelData>(ca, "IdealGasConstant", this,
-                                &StiffenedGasModelData::idealGasConstant);
-  new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatAtConstantPressure", this,
-                                &StiffenedGasModelData::specificHeatPressure);
   new ClassDouble<StiffenedGasModelData>(ca, "PressureConstant", this,
                                 &StiffenedGasModelData::pressureConstant);
+
+  new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatAtConstantVolume", this,
+                                &StiffenedGasModelData::cv);
+  new ClassDouble<StiffenedGasModelData>(ca, "ReferenceTemperature", this,
+                                &StiffenedGasModelData::T0);
+  new ClassDouble<StiffenedGasModelData>(ca, "ReferenceSpecificInternalEnergy", this,
+                                &StiffenedGasModelData::e0);
 
 }
 
@@ -584,6 +589,8 @@ MaterialTransitionData::MaterialTransitionData()
   temperature_upperbound = DBL_MAX;
   pressure_lowerbound = -DBL_MAX;
   pressure_upperbound = DBL_MAX;
+
+  latent_heat = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -591,7 +598,7 @@ MaterialTransitionData::MaterialTransitionData()
 Assigner *MaterialTransitionData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
 
   new ClassInt<MaterialTransitionData>(ca, "FromMaterialID", this, 
           &MaterialTransitionData::from_id);
@@ -610,6 +617,9 @@ Assigner *MaterialTransitionData::getAssigner()
 
   new ClassDouble<MaterialTransitionData>(ca, "PressureUpperbound", this, 
           &MaterialTransitionData::pressure_upperbound);
+
+  new ClassDouble<MaterialTransitionData>(ca, "LatentHeat", this, 
+          &MaterialTransitionData::latent_heat);
 
   return ca;
 

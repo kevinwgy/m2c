@@ -183,9 +183,12 @@ struct MeshData {
 struct StiffenedGasModelData {
 
   double specificHeatRatio;
-  double idealGasConstant;
   double pressureConstant;
-  double specificHeatPressure;
+
+  //! parameters related to temperature
+  double cv; //!< specific heat at constant volume
+  double T0;  //!< temperature is T0 when internal energy (per mass) is e0
+  double e0;
 
   StiffenedGasModelData();
   ~StiffenedGasModelData() {}
@@ -289,6 +292,8 @@ struct MaterialTransitionData {
   double temperature_upperbound; //!< transition occurs if temperature is higher than this value
   double pressure_lowerbound;
   double pressure_upperbound;
+
+  double latent_heat;
 
   MaterialTransitionData();
   ~MaterialTransitionData() {}
