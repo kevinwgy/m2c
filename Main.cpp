@@ -17,6 +17,7 @@
 using std::cout;
 using std::endl;
 int verbose;
+double domain_diagonal;
 
 /*************************************
  * Main Function
@@ -38,6 +39,9 @@ int main(int argc, char* argv[])
   //! Read user's input file
   IoData iod(argc, argv);
   verbose = iod.output.verbose;
+  domain_diagonal = sqrt(pow(iod.mesh.xmax - iod.mesh.x0, 2) +
+                         pow(iod.mesh.ymax - iod.mesh.y0, 2) +
+                         pow(iod.mesh.zmax - iod.mesh.z0, 2));
 
   //! Calculate mesh coordinates
   vector<double> xcoords, dx, ycoords, dy, zcoords, dz;

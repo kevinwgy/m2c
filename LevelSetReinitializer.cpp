@@ -3,6 +3,7 @@
 #include <cfloat> //DBL_MAX
 
 extern int verbose;
+extern double domain_diagonal;
 
 //--------------------------------------------------------------------------
 
@@ -20,7 +21,7 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
                        Phi1(comm_, &(dm_all_.ghosted1_1dof)),
                        Sign(comm_, &(dm_all_.ghosted1_1dof)),
                        PhiG2(comm_, &(dm_all_.ghosted2_1dof)),
-                       phi_max(-DBL_MAX), phi_min(DBL_MAX)
+                       phi_max(-domain_diagonal), phi_min(domain_diagonal)
 {
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
@@ -1637,8 +1638,8 @@ LevelSetReinitializer::CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3
   double*** useful = UsefulG2.GetDataPointer();
 
   // calculate phi_max and phi_min
-  phi_max = -DBL_MAX;
-  phi_min = DBL_MAX;
+  phi_max = -domain_diagonal;
+  phi_min = domain_diagonal;
   for (auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
     phi_max = std::max(phi[k][j][i], phi_max);
@@ -1649,6 +1650,11 @@ LevelSetReinitializer::CutOffPhiOutsideBand(SpaceVariable3D &Phi, SpaceVariable3
 
   phi_out_pos = phi_max*10.0;
   phi_out_neg = phi_min*10.0;
+
+  if(phi_out_pos<=0) //this means the interface does not exist (possible in some simulations)
+    phi_out_pos = domain_diagonal;
+  if(phi_out_neg>=0)
+    phi_out_neg = -domain_diagonal;
 
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)

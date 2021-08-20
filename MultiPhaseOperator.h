@@ -51,7 +51,7 @@ public:
 
   //! detect phase transitions and update Phi, ID, and V
   int UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,
-                             SpaceVariable3D &V, vector<bool> &phi_updated);
+                             SpaceVariable3D &V, vector<bool> &phi_updated, vector<Int3> *new_useful_nodes);
 
   void Destroy();
 
@@ -70,7 +70,8 @@ protected:
 
   //! internal function called by UpdatePhaseTransitions
   void UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,
-                                      vector<std::tuple<Int3,int,int> > &changed, vector<bool> &phi_updated);
+                                      vector<std::tuple<Int3,int,int> > &changed, vector<bool> &phi_updated,
+                                      vector<Int3> *new_useful_nodes);
 
 };
 

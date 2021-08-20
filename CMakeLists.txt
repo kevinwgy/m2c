@@ -33,8 +33,7 @@ endif()
 
 find_package(Eigen3 3.3 REQUIRED)
 
-add_definitions(-DLEVELSET_TEST=3)
-
+#add_definitions(-DLEVELSET_TEST=3)
 
 # -----------------------------
 # for version control

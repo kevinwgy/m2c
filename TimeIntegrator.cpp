@@ -71,10 +71,11 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   // Check for phase transitions
   if(lso.size()) {
     vector<bool> phi_updated(lso.size(), false);
-    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated)>0) {//detected phase transitions
+    vector<Int3> new_useful_nodes[lso.size()];
+    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
       for(int i=0; i<Phi.size(); i++) {
         if(phi_updated[i])
-          lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true/*must do*/);
+          lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);
       }
       spo.ClipDensityAndPressure(V, ID);
       spo.ApplyBoundaryConditions(V);
@@ -198,10 +199,11 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Check for phase transitions
   if(lso.size()) {
     vector<bool> phi_updated(lso.size(), false);
-    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated)>0) {//detected phase transitions
+    vector<Int3> new_useful_nodes[lso.size()];
+    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
       for(int i=0; i<Phi.size(); i++) {
         if(phi_updated[i])
-          lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true/*must do*/);
+          lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);
       }
       spo.ClipDensityAndPressure(V, ID);
       spo.ApplyBoundaryConditions(V);
@@ -356,10 +358,11 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Check for phase transitions
   if(lso.size()) {
     vector<bool> phi_updated(lso.size(), false);
-    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated)>0) {//detected phase transitions
+    vector<Int3> new_useful_nodes[lso.size()];
+    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
       for(int i=0; i<Phi.size(); i++) {
         if(phi_updated[i])
-          lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true/*must do*/);
+          lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);
       }
       spo.ClipDensityAndPressure(V, ID);
       spo.ApplyBoundaryConditions(V);

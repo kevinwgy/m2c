@@ -10,6 +10,8 @@
 
 using std::min;
 using std::max;
+
+extern double domain_diagonal;
 //-----------------------------------------------------
 
 LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -281,11 +283,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
   double*** phi    = (double***)Phi.GetDataPointer();
 
-  //first, set phi to be +inf everywhere
+  //first, set phi to be a large number everywhere
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
-        phi[k][j][i] = DBL_MAX;
+        phi[k][j][i] = domain_diagonal;
 
 
   //TODO: Add this feature later
@@ -1215,6 +1217,31 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
   }
 
   return true;
+}
+
+//-----------------------------------------------------
+
+void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, vector<Int3> &new_nodes)
+{
+  if(!reinit) {
+    print_error("*** Error: Reinitialization for level set (matid = %d) is requested, but not specified "
+                "in the input file.\n", materialid);
+    exit_mpi();
+  }
+
+  if(narrow_band) {
+    print("- Reinitializing the level set function (material id: %d), bandwidth = %d.\n", materialid, iod_ls.bandwidth);
+
+    for(auto it = new_nodes.begin(); it != new_nodes.end(); it++)
+      if(std::find(useful_nodes.begin(), useful_nodes.end(), *it) == useful_nodes.end())
+        useful_nodes.push_back(*it);
+
+    reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+  } else {
+    print("- Reinitializing the level set function (material id: %d).\n", materialid);
+    reinit->ReinitializeFullDomain(Phi);
+  }
+
 }
 
 //-----------------------------------------------------

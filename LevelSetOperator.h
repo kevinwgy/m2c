@@ -72,6 +72,8 @@ public:
   bool Reinitialize(double time, double dt, int time_step,
                     SpaceVariable3D &Phi, bool must_do = false); //true: reinitialization is done; false: not this time
 
+  void ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, vector<Int3> &new_nodes);
+
   int GetMaterialID() {return materialid;}
 
   void AXPlusBY(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);

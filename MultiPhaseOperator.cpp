@@ -615,7 +615,8 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
 // functions should be reinitialized (done outside of MultiPhaseOperator)
 int 
 MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
-                                           SpaceVariable3D &V, vector<bool> &phi_updated)
+                                           SpaceVariable3D &V, vector<bool> &phi_updated, 
+                                           vector<Int3> *new_useful_nodes)
 {
   if(trans.size()==0)
     return 0; //nothing to do
@@ -687,7 +688,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   //---------------------------------------------
   // Step 3: Update Phi
   //---------------------------------------------
-  UpdatePhiAfterPhaseTransitions(Phi, ID, changed, phi_updated);
+  UpdatePhiAfterPhaseTransitions(Phi, ID, changed, phi_updated, new_useful_nodes);
 
 
   if(verbose>=1)
@@ -702,7 +703,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 void
 MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
                                                    vector<tuple<Int3,int,int> > &changed, 
-                                                   vector<bool> &phi_updated)
+                                                   vector<bool> &phi_updated, vector<Int3> *new_useful_nodes)
 {
   // This function will provide correct value of phi (up to dx error) ONLY for first layer nodes.
   // Reinitialization is needed to find the value of phi elsewhere
@@ -724,11 +725,25 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
 
     int i,j,k;
     for(auto it = changed.begin(); it != changed.end(); it++) {
+ 
+      if(matid != get<1>(*it) && matid != get<2>(*it))
+        continue;
+
+      i = get<0>(*it)[0];
+      j = get<0>(*it)[1];
+      k = get<0>(*it)[2];
+
+      //first, push new nodes into the vector of new_useful_nodes
+      new_useful_nodes[ls].push_back(get<0>(*it));
+      if(i-1>=ii0)  new_useful_nodes[ls].push_back(Int3(i-1,j,k));
+      if(i+1<iimax) new_useful_nodes[ls].push_back(Int3(i+1,j,k));
+      if(j-1>=jj0)  new_useful_nodes[ls].push_back(Int3(i,j-1,k));
+      if(j+1<jjmax) new_useful_nodes[ls].push_back(Int3(i,j+1,k));
+      if(k-1>=kk0)  new_useful_nodes[ls].push_back(Int3(i,j,k-1));
+      if(k+1<kkmax) new_useful_nodes[ls].push_back(Int3(i,j,k+1));
+
 
       if(matid == get<1>(*it)) { //this node is moving outside of the subdomain
-        i = get<0>(*it)[0];
-        j = get<0>(*it)[1];
-        k = get<0>(*it)[2];
 
         // update phi at this node
         phi[k][j][i] = 0.5*std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1],dxyz[k][j][i][2]));        
@@ -748,9 +763,6 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
           phi[k+1][j][i] = std::max(phi[k+1][j][i], -0.5*dxyz[k+1][j][i][2]);
       }
       else if(matid == get<2>(*it)) { //this node is moving inside the subdomain
-        i = get<0>(*it)[0];
-        j = get<0>(*it)[1];
-        k = get<0>(*it)[2];
 
         // update phi at this node
         phi[k][j][i] = -0.5*std::min(dxyz[k][j][i][0], std::min(dxyz[k][j][i][1],dxyz[k][j][i][2]));        
