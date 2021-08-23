@@ -8,10 +8,9 @@ using std::endl;
 
 TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                       SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_)
-                : TimeIntegratorBase(comm_, iod_, spo_, lso_, mpo_),
+                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_),
                   Un(comm_, &(dms_.ghosted1_5dof)),
-                  Rn(comm_, &(dms_.ghosted1_5dof)),
-                  IDn(comm_, &(dms_.ghosted1_1dof))
+                  Rn(comm_, &(dms_.ghosted1_5dof))
 {
   for(int i=0; i<lso.size(); i++) {
     Rn_ls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
@@ -24,11 +23,12 @@ void TimeIntegratorFE::Destroy()
 {
   Un.Destroy();
   Rn.Destroy();
-  IDn.Destroy();
 
   for(int i=0; i<Rn_ls.size(); i++) {
     Rn_ls[i]->Destroy(); delete Rn_ls[i];
   }
+
+  TimeIntegratorBase::Destroy();
 }
 
 //----------------------------------------------------------------------------
@@ -52,39 +52,8 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
 
-
-  // Reinitialize level set (frequency specified by user)
-  for(int i=0; i<Phi.size(); i++) {
-    lso[i]->Reinitialize(time, dt, time_step, *Phi[i]);
-  }
-
-
-  // Update ID and V (skipped for single-material simulations)
-  if(lso.size()) {
-    IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
-    mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
-    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions); //update V
-    spo.ClipDensityAndPressure(V, ID);
-    spo.ApplyBoundaryConditions(V);
-  }
-
-  // Check for phase transitions
-  if(lso.size()) {
-    vector<bool> phi_updated(lso.size(), false);
-    vector<Int3> new_useful_nodes[lso.size()];
-    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
-      for(int i=0; i<Phi.size(); i++) {
-        if(phi_updated[i])
-          lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);
-      }
-      spo.ClipDensityAndPressure(V, ID);
-      spo.ApplyBoundaryConditions(V);
-    }
-  }
-
-  // Apply smoothing to U (if specified by user)
-  spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
-
+  // End-of-step tasks
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, time, dt, time_step);
 }
 
 //----------------------------------------------------------------------------
@@ -94,12 +63,11 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                                      SpaceOperator& spo_ ,vector<LevelSetOperator*>& lso_,
                                      MultiPhaseOperator& mpo_)
-                 : TimeIntegratorBase(comm_, iod_, spo_, lso_, mpo_),
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
-                   R(comm_, &(dms_.ghosted1_5dof)),
-                   IDn(comm_, &(dms_.ghosted1_1dof))
+                   R(comm_, &(dms_.ghosted1_5dof))
 {
   for(int i=0; i<lso.size(); i++) {
     Phi1.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
@@ -115,12 +83,13 @@ void TimeIntegratorRK2::Destroy()
   U1.Destroy(); 
   V1.Destroy(); 
   R.Destroy();
-  IDn.Destroy();
 
   for(int i=0; i<Rls.size(); i++) {
     Phi1[i]->Destroy(); delete Phi1[i];
     Rls[i]->Destroy(); delete Rls[i];
   }
+
+  TimeIntegratorBase::Destroy();
 }
 
 //----------------------------------------------------------------------------
@@ -180,40 +149,8 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   }
   //***************************************************
 
-  // Reinitialize level set (frequency specified by user)
-  for(int i=0; i<Phi.size(); i++) {
-    lso[i]->Reinitialize(time, dt, time_step, *Phi[i]);
-  }
-
-
-  // Update ID and V (skipped for single-material simulations)
-  if(lso.size()) {
-    IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
-    mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
-    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions); //update V
-    spo.ClipDensityAndPressure(V, ID);
-    spo.ApplyBoundaryConditions(V);
-  }
-
-
-  // Check for phase transitions
-  if(lso.size()) {
-    vector<bool> phi_updated(lso.size(), false);
-    vector<Int3> new_useful_nodes[lso.size()];
-    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
-      for(int i=0; i<Phi.size(); i++) {
-        if(phi_updated[i])
-          lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);
-      }
-      spo.ClipDensityAndPressure(V, ID);
-      spo.ApplyBoundaryConditions(V);
-    }
-  }
-
-
-  // Apply smoothing to U (if specified by user)
-  spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
-
+  // End-of-step tasks
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, time, dt, time_step);
 }
 
 //----------------------------------------------------------------------------
@@ -222,12 +159,11 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_,
                                      MultiPhaseOperator &mpo_)
-                 : TimeIntegratorBase(comm_, iod_, spo_, lso_, mpo_),
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
-                   R(comm_, &(dms_.ghosted1_5dof)),
-                   IDn(comm_, &(dms_.ghosted1_1dof))
+                   R(comm_, &(dms_.ghosted1_5dof))
                 
 {
   for(int i=0; i<lso.size(); i++) {
@@ -244,12 +180,13 @@ void TimeIntegratorRK3::Destroy()
   U1.Destroy();
   V1.Destroy();
   R.Destroy();
-  IDn.Destroy();
 
   for(int i=0; i<Rls.size(); i++) {
     Phi1[i]->Destroy(); delete Phi1[i];
     Rls[i]->Destroy(); delete Rls[i];
   }
+
+  TimeIntegratorBase::Destroy();
 }
 
 //----------------------------------------------------------------------------
@@ -339,6 +276,18 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //***************************************************
 
 
+  // End-of-step tasks
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, time, dt, time_step);
+}
+
+//----------------------------------------------------------------------------
+
+void
+TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                                    vector<SpaceVariable3D*> &Phi, double time,
+                                                    double dt, int time_step)
+{
+
   // Reinitialize level set (frequency specified by user)
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->Reinitialize(time, dt, time_step, *Phi[i]);
@@ -354,21 +303,19 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
     spo.ApplyBoundaryConditions(V);
   }
 
-
   // Check for phase transitions
   if(lso.size()) {
-    vector<bool> phi_updated(lso.size(), false);
+    vector<int> phi_updated(lso.size(), 0); //0 or 1
     vector<Int3> new_useful_nodes[lso.size()];
     if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
       for(int i=0; i<Phi.size(); i++) {
-        if(phi_updated[i])
+        if(phi_updated[i] != 0)
           lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);
       }
       spo.ClipDensityAndPressure(V, ID);
       spo.ApplyBoundaryConditions(V);
     }
   }
-
 
   // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);

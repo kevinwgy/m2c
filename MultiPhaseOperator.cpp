@@ -615,7 +615,7 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
 // functions should be reinitialized (done outside of MultiPhaseOperator)
 int 
 MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
-                                           SpaceVariable3D &V, vector<bool> &phi_updated, 
+                                           SpaceVariable3D &V, vector<int> &phi_updated, 
                                            vector<Int3> *new_useful_nodes)
 {
   if(trans.size()==0)
@@ -632,6 +632,30 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   vector<tuple<Int3,int,int> >  changed; //(i,j,k), old id, new id -- incl. ghosts inside physical domain
 
   set<int> affected_ids;
+
+  //DEBUG!!
+/*
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        //if(coords[k][j][i].norm()<0.02) {
+        if(fabs(coords[k][j][i][0]-0.01)<0.005 && fabs(coords[k][j][i][1]-0.01)<0.005) {
+          fprintf(stderr,"Changing state at (%d,%d,%d) (%e, %e, %e).\n", i,j,k, 
+                  coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2]);
+          v[k][j][i][0] = 8.9e-4;
+          v[k][j][i][4] = 1.2e10;
+          int myid = id[k][j][i]; 
+          double e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+          double T = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
+          double h = varFcn[myid]->ComputeEnthalpyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+          fprintf(stderr," ...  e = %e, h = %e, T = %e.\n", e, h, T);
+        }
+      }
+  coordinates.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerAndInsert();
+  v = (Vec5D***) V.GetDataPointer();
+*/
 
   int myid;
   for(int k=kk0; k<kkmax; k++)
@@ -683,6 +707,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   //---------------------------------------------
   for(int ls = 0; ls < Phi.size(); ls++)
     phi_updated[ls] = (affected_ids.find(ls2matid[ls]) != affected_ids.end());
+  MPI_Allreduce(MPI_IN_PLACE, (int*)phi_updated.data(), Phi.size(), MPI_INT, MPI_MAX, comm);
 
     
   //---------------------------------------------
@@ -692,7 +717,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 
 
   if(verbose>=1)
-    print("- Detected phase/material transitions at %d nodes.\n", counter);
+    print("- Detected phase/material transitions at %d node(s).\n", counter);
 
   return counter;
 
@@ -703,7 +728,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 void
 MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
                                                    vector<tuple<Int3,int,int> > &changed, 
-                                                   vector<bool> &phi_updated, vector<Int3> *new_useful_nodes)
+                                                   vector<int> &phi_updated, vector<Int3> *new_useful_nodes)
 {
   // This function will provide correct value of phi (up to dx error) ONLY for first layer nodes.
   // Reinitialization is needed to find the value of phi elsewhere
@@ -717,7 +742,7 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
 
   for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
   
-    if(phi_updated[ls] == false)
+    if(phi_updated[ls] == 0)
       continue; //this level set function is not involved
 
     double*** phi = Phi[ls]->GetDataPointer();
@@ -787,11 +812,10 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
     Phi[ls]->RestoreDataPointerAndInsert();
   }
 
-
   // For debug only
   for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
   
-    if(phi_updated[ls] == false)
+    if(phi_updated[ls] == 0)
       continue; //this level set function is not involved
 
     double*** phi = Phi[ls]->GetDataPointer();

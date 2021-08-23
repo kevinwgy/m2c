@@ -127,6 +127,7 @@ public:
   inline double ComputeSoundSpeed(double rho, double e);
   inline double ComputeSoundSpeedSquare(double rho, double e); //!< this one does not crash on negative c^2
   inline double ComputeMachNumber(double *V);
+  inline double ComputeEnthalpyPerUnitMass(double rho, double p); //!< h = e + p/rho
   inline double ComputeTotalEnthalpyPerUnitMass(double *V); //!< H = 1/rho*(E + p)
 
   // Clipping
@@ -204,6 +205,14 @@ double VarFcnBase::ComputeMachNumber(double *V)
     c = sqrt(c);
 
   return sqrt(V[1]*V[1]+V[2]*V[2]+V[3]*V[3])/c;
+}
+
+//------------------------------------------------------------------------------
+
+inline
+double VarFcnBase::ComputeEnthalpyPerUnitMass(double rho, double p)
+{
+  return GetInternalEnergyPerUnitMass(rho,p) + p/rho;
 }
 
 //------------------------------------------------------------------------------

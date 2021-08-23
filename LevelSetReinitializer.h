@@ -98,8 +98,6 @@ private:
 
   // Functions that work for both full-domain and narrow-band level set methods
   //
-  void TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer);
-
   void ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer,
                                    SpaceVariable3D *UsefulG2 = NULL, vector<Int3> *useful_nodes = NULL);
 
@@ -124,6 +122,8 @@ private:
 
 
   // For full-domain level set method
+  bool TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer);
+
   void ApplyCorrectionToFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer, double cfl,
                                         SpaceVariable3D *UsefulG2 = NULL);
 
@@ -135,7 +135,7 @@ private:
 
 
   // For narrow-band level set method
-  void TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes,
+  bool TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes,
                                 vector<FirstLayerNode> &firstLayer, vector<Int3> &firstLayerIncGhost);
 
   void UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firstLayerIncGhost,

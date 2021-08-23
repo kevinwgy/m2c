@@ -68,7 +68,8 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
 {
   // Step 1: Prep: Tag first layer nodes & store the sign function
   vector<FirstLayerNode> firstLayer;
-  TagFirstLayerNodes(Phi, firstLayer); //also calculates the associated coefficients
+  bool detected = TagFirstLayerNodes(Phi, firstLayer); //also calculates the associated coefficients
+  if(!detected) return; //possible, especially in sims w/ phase transition
   EvaluateSignFunctionFullDomain(Phi, 1.0/*smoothing coefficient*/);
 
   // Step 2: Reinitialize first layer nodes (no iterations needed)
@@ -128,6 +129,7 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   if(iter==iod_ls.reinit.maxIts)
     print("  o Warning: Failed to converge. Residual = %e, Relative Error = %e, Tol = %e.\n", 
           residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+
 }
 
 //--------------------------------------------------------------------------
@@ -144,7 +146,8 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
   // Step 1: Prep: Tag first layer nodes & store the sign function, and update the narrow band
   vector<FirstLayerNode> firstLayer;
   vector<Int3> firstLayerIncGhost;
-  TagFirstLayerNodesInBand(Phi, useful_nodes, firstLayer, firstLayerIncGhost);
+  bool detected = TagFirstLayerNodesInBand(Phi, useful_nodes, firstLayer, firstLayerIncGhost);
+  if(!detected) return; //possible, especially in sims w/ phase transition
   UpdateNarrowBand(Phi, firstLayerIncGhost, Level, UsefulG2, Active, useful_nodes, active_nodes);
   EvaluateSignFunctionInBand(Phi, useful_nodes, 1.0/*smoothing coefficient*/);
 
@@ -217,7 +220,7 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
 
 //--------------------------------------------------------------------------
 
-void
+bool
 LevelSetReinitializer::TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLayerNode> &firstLayer)
 {
   //*****************************************************************************
@@ -228,6 +231,7 @@ LevelSetReinitializer::TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLaye
   // For each node in Gamma, S is constructed to contain nodes on the opposite side
   // of the interface (excluding nodes with phi == 0!). For each node on the opposite
   // side, r_alpha, and \tilde{r} are computed.
+  // Return value: true if an interface is detected in the entire domain. false if not.
   //*****************************************************************************
   firstLayer.clear();
 
@@ -336,11 +340,23 @@ LevelSetReinitializer::TagFirstLayerNodes(SpaceVariable3D &Phi, vector<FirstLaye
   Tag.RestoreDataPointerAndInsert();
 
   Phi.RestoreDataPointerToLocalVector(); //no changes made
+
+
+  // Finally, figure out whether the interface exists. (It may not exist at some time steps, 
+  // especially in a simulation w/ phase transition.)
+  int interface_exists = firstLayer.size()>0 ? 1 : 0;
+  MPI_Allreduce(MPI_IN_PLACE, &interface_exists, 1, MPI_INT, MPI_MAX, comm);
+
+  if(interface_exists>0)
+    return true;
+
+  return false;
+
 }
 
 //--------------------------------------------------------------------------
 
-void
+bool
 LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes,
                                                 vector<FirstLayerNode> &firstLayer,
                                                 vector<Int3> &firstLayerIncGhost)
@@ -353,6 +369,7 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
   // For each node in Gamma, S is constructed to contain nodes on the opposite side
   // of the interface (excluding nodes with phi == 0!). For each node on the opposite
   // side, r_alpha, and \tilde{r} are computed.
+  // Return value: true if an interface is detected in the entire domain. false if not.
   //*****************************************************************************
   firstLayer.clear();
   firstLayerIncGhost.clear();
@@ -485,6 +502,17 @@ LevelSetReinitializer::TagFirstLayerNodesInBand(SpaceVariable3D &Phi, vector<Int
 
 
   Phi.RestoreDataPointerToLocalVector(); //no changes made
+
+
+  // Finally, figure out whether the interface exists. (It may not exist at some time steps, 
+  // especially in a simulation w/ phase transition.)
+  int interface_exists = firstLayer.size()>0 ? 1 : 0;
+  MPI_Allreduce(MPI_IN_PLACE, &interface_exists, 1, MPI_INT, MPI_MAX, comm);
+
+  if(interface_exists>0)
+    return true;
+
+  return false;
 }
 
 //--------------------------------------------------------------------------
@@ -906,10 +934,14 @@ LevelSetReinitializer::ComputeResidualFullDomain(SpaceVariable3D &Phi, SpaceVari
           local_res = sqrt(std::max(am*am, bp*bp) + std::max(cm*cm, dp*dp) + std::max(em*em, fp*fp)) - 1.0;
         }
 
-        res[k][j][i] = -dt*sign[k][j][i]*local_res;
+        if(fabs(local_res)<=1.0)
+          res[k][j][i] = -dt*sign[k][j][i]*local_res;
+        else // equiva. to reducing dt -- dt calculated above does not account for the value of local_res. 
+          res[k][j][i] = -dt*sign[k][j][i]*local_res/fabs(local_res);
 
         if(tag[k][j][i]==0) //calculate max residual for nodes that are not on first layer
           max_residual = std::max(max_residual, fabs(local_res));
+         
       }
 
   // get max residual over all the processors
@@ -993,15 +1025,10 @@ LevelSetReinitializer::ComputeResidualInBand(SpaceVariable3D &Phi, SpaceVariable
       local_res = sqrt(std::max(am*am, bp*bp) + std::max(cm*cm, dp*dp) + std::max(em*em, fp*fp)) - 1.0;
     }
 
-/*
-    if(local_res == -1.0)
-      fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): phi = %e, l(%d) = %e, r(%d) = %e, b(%d) = %e, t(%d) = %e, k(%d) = %e, f(%d) = %e.\n",
-              i,j,k,coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i],
-              (int)useful[k][j][i-1], phi[k][j][i-1], (int)useful[k][j][i+1], phi[k][j][i+1], 
-              (int)useful[k][j-1][i], phi[k][j-1][i], (int)useful[k][j+1][i], phi[k][j+1][i],
-              (int)useful[k-1][j][i], phi[k-1][j][i], (int)useful[k+1][j][i], phi[k+1][j][i]);
-*/
-    res[k][j][i] = -dt*sign[k][j][i]*local_res;
+    if(fabs(local_res)<=1.0)
+      res[k][j][i] = -dt*sign[k][j][i]*local_res;
+    else // equiva. to reducing dt -- dt calculated above does not account for the value of local_res. 
+      res[k][j][i] = -dt*sign[k][j][i]*local_res/fabs(local_res);
 
     if(tag[k][j][i]==0) //calculate max residual for nodes that are not on first layer
       max_residual = std::max(max_residual, fabs(local_res));
@@ -1356,6 +1383,8 @@ LevelSetReinitializer::UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<
 
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+    if(coordinates.OutsidePhysicalDomain(i,j,k))
+      continue;
     phi_max = std::max(phi_max, phi[k][j][i]);
     phi_min = std::min(phi_min, phi[k][j][i]);
   }

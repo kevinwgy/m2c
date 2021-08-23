@@ -20,13 +20,17 @@ protected:
   vector<LevelSetOperator*>& lso;
   MultiPhaseOperator& mpo;  
 
+  //internal variable to temporarily store old ID
+  SpaceVariable3D IDn;
+
   //Solutions of exact Riemann problems
   RiemannSolutions riemann_solutions;
 
 public:
-  TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, SpaceOperator& spo_, 
+  TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
                      vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_) : 
-      comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_) { }
+      comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_),
+      IDn(comm_, &(dms_.ghosted1_1dof)) { }
 
   virtual ~TimeIntegratorBase() {}
 
@@ -38,9 +42,15 @@ public:
     exit_mpi();}
 
   virtual void Destroy() {
-    print_error("*** Error: TimeIntegratorBase::Destroy() is not defined.\n");
-    exit_mpi();}
+    IDn.Destroy();
+  }
 
+  // all the tasks that are done at the end of a time-step, independent of 
+  // time integrator
+  void UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                       vector<SpaceVariable3D*> &Phi, double time,
+                                       double dt, int time_step);
+                                        
 };
 
 /********************************************************************
@@ -50,9 +60,6 @@ class TimeIntegratorFE : public TimeIntegratorBase
 {
   //! conservative state variable at time n
   SpaceVariable3D Un;
-
-  //! material id at time n
-  SpaceVariable3D IDn;
 
   //! "residual", i.e. the right-hand-side of the ODE
   SpaceVariable3D Rn;  
@@ -88,9 +95,6 @@ class TimeIntegratorRK2 : public TimeIntegratorBase
   vector<SpaceVariable3D*> Phi1; 
   vector<SpaceVariable3D*> Rls; 
 
-  //! material id at time n
-  SpaceVariable3D IDn;
-
 public:
   TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_);
@@ -120,9 +124,6 @@ class TimeIntegratorRK3 : public TimeIntegratorBase
   //!level set variables
   vector<SpaceVariable3D*> Phi1;
   vector<SpaceVariable3D*> Rls;
-
-  //! material id at time n
-  SpaceVariable3D IDn;
 
 public:
   TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
