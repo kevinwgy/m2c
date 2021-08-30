@@ -36,7 +36,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
-    symm(NULL), visco(NULL), smooth(NULL)
+    symm(NULL), visco(NULL), smooth(NULL), laser(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -54,6 +54,10 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
     smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
     
+  if(iod.laser.source_power>0.0 || iod.laser.source_intensity>0.0 || 
+     strcmp(iod.laser.source_power_timehistory_file, "") != 0)
+    laser = new LaserAbsorptionSolver(comm, dm_all, iod, varFcn, coordinates, delta_xyz, volume,
+                                      ghost_nodes_inner, ghost_nodes_outer);
 }
 
 //-----------------------------------------------------
@@ -63,6 +67,7 @@ SpaceOperator::~SpaceOperator()
   if(symm) delete symm;
   if(visco) delete visco;
   if(smooth) delete smooth;
+  if(laser) delete laser;
 }
 
 //-----------------------------------------------------

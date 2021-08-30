@@ -672,6 +672,50 @@ struct IcData {
 
 //------------------------------------------------------------------------------
 
+struct LaserAbsorptionCoefficient {
+
+  double slope;
+  double alpha0;
+
+  LaserAbsorptionCoefficient();
+  ~LaserAbsorptionCoefficient() {}
+
+  Assigner *getAssigner();
+};
+
+//------------------------------------------------------------------------------
+
+struct LaserData {
+
+  // physical parameters
+  double source_intensity;
+  enum SourceDistribution {CONSTANT = 0, GAUSSIAN = 1} source_distribution;
+  double source_power;
+  const char *source_power_timehistory_file;
+  double source_center_x, source_center_y, source_center_z;
+  double source_dir_x, source_dir_y, source_dir_z;
+  double source_radius;
+  double source_beam_waist;
+  double focusing_angle_degrees; //!< divering if <0
+  double range;
+  ObjectMap<LaserAbsorptionCoefficient> abs; //!< absorption coefficients
+
+  // numerical parameters
+  double source_depth;
+  double alpha;
+  double convergence_tol;
+  double max_iter;
+  double relax_coeff;
+  int oneWay;
+
+  LaserData();
+  ~LaserData() {}
+
+  void setup(const char *);
+
+};
+//------------------------------------------------------------------------------
+
 struct ProbeNode {
 
   double locationX;
@@ -758,7 +802,7 @@ struct OutputData {
   const char *solution_filename_base; //!< filename without path
 
   enum Options {OFF = 0, ON = 1};
-  Options density, velocity, pressure, materialid, internal_energy, temperature;
+  Options density, velocity, pressure, materialid, internal_energy, temperature, laser_radiance;
   enum VerbosityLevel {LOW = 0, MEDIUM = 1, HIGH = 2} verbose;
 
   const static int MAXLS = 5;
@@ -808,6 +852,8 @@ public:
   ExactRiemannSolverData exact_riemann;
 
   MultiPhaseData multiphase;
+
+  LaserData laser;
 
   TsData ts;
 

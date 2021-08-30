@@ -1774,6 +1774,88 @@ void IcData::readUserSpecifiedIC_Spherical(std::fstream &input)
 
 //------------------------------------------------------------------------------
 
+LaserAbsorptionCoefficient::LaserAbsorptionCoefficient()
+{
+  slope  = 0.0;
+  alpha0 = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner* LaserAbsorptionCoefficient::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 2, nullAssigner);
+  new ClassDouble<LaserAbsorptionCoefficient>(ca, "Slope", this, &LaserAbsorptionCoefficient::slope);
+  new ClassDouble<LaserAbsorptionCoefficient>(ca, "Coefficient", this, &LaserAbsorptionCoefficient::alpha0);
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+
+LaserData::LaserData() {
+
+  //Rule for laser source: user-specified power time-history overrides (fixed) power, 
+  // which overrides (fixed) intensity
+  source_intensity = -1.0; //a negative number means not specified
+  source_power = -1.0; //a negative number means not specified
+  source_power_timehistory_file = "";
+
+  source_distribution = CONSTANT;
+  source_radius = 0.0;
+  source_beam_waist=0.0;
+  source_center_x = source_center_y = source_center_z = 0.0;
+  source_dir_x = source_dir_y = source_dir_z = 0.0;
+  focusing_angle_degrees = 0.0;
+  range = DBL_MAX;
+
+  source_depth = 0.0;
+  alpha = 1.0;
+  convergence_tol = 1.0e-4;
+  max_iter = 100;
+  relax_coeff = 1.0;
+  oneWay = 0;
+
+}
+
+//------------------------------------------------------------------------------
+
+
+void LaserData::setup(const char *name) {
+
+  ClassAssigner *ca = new ClassAssigner(name, 21, NULL); 
+
+  //Physical Parameters
+  new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
+  new ClassToken<LaserData> (ca, "SourceDistribution", this,
+        reinterpret_cast<int LaserData::*>(&LaserData::source_distribution), 2, "Constant", 0, "Gaussian", 1);
+  new ClassDouble<LaserData>(ca, "SourcePower", this, &LaserData::source_power);
+  new ClassStr<LaserData>(ca, "SourcePowerTimeHistory", this, &LaserData::source_power_timehistory_file);
+  new ClassDouble<LaserData>(ca, "SourceCenterX", this, &LaserData::source_center_x);
+  new ClassDouble<LaserData>(ca, "SourceCenterY", this, &LaserData::source_center_y);
+  new ClassDouble<LaserData>(ca, "SourceCenterZ", this, &LaserData::source_center_z);
+  new ClassDouble<LaserData>(ca, "SourceRadius", this, &LaserData::source_radius);
+  new ClassDouble<LaserData>(ca, "SourceBeamWaist", this, &LaserData::source_beam_waist);
+  new ClassDouble<LaserData>(ca, "DirectionX", this, &LaserData::source_dir_x);
+  new ClassDouble<LaserData>(ca, "DirectionY", this, &LaserData::source_dir_y);
+  new ClassDouble<LaserData>(ca, "DirectionZ", this, &LaserData::source_dir_z);
+  new ClassDouble<LaserData>(ca, "FocusingAngle", this, &LaserData::focusing_angle_degrees);
+  new ClassDouble<LaserData>(ca, "Range", this, &LaserData::range);
+
+  abs.setup("AbsorptionCoefficientForFluid", ca);
+
+  //Numerical Parameters
+  new ClassDouble<LaserData>(ca, "SourceDepth", this, &LaserData::source_depth);
+  new ClassDouble<LaserData>(ca, "Alpha", this, &LaserData::alpha);
+  new ClassDouble<LaserData>(ca, "ConvergenceTolerance", this, &LaserData::convergence_tol);
+  new ClassDouble<LaserData>(ca, "MaxIts", this, &LaserData::max_iter);
+  new ClassDouble<LaserData>(ca, "RelaxationCoefficient", this, &LaserData::relax_coeff);
+  new ClassInt<LaserData>(ca, "OneWayCoupling", this, &LaserData::oneWay);
+
+}
+
+//------------------------------------------------------------------------------
+
 MaterialVolumes::MaterialVolumes()
 {
   filename = "";
@@ -1810,6 +1892,7 @@ OutputData::OutputData()
   materialid = OFF;
   temperature = OFF;
   internal_energy = OFF;
+  laser_radiance = OFF;
   levelset0 = OFF;
   levelset1 = OFF;
   levelset2 = OFF;
@@ -1828,7 +1911,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 15+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 16+MAXLS, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -1853,6 +1936,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "InternalEnergyPerUnitMass", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::internal_energy), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "LaserRadiance", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,
                                "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "LevelSet0", this,
@@ -2060,6 +2146,8 @@ void IoData::setupCmdFileVariables()
   schemes.setup("Space");
 
   exact_riemann.setup("ExactRiemannSolution");
+
+  laser.setup("Laser");
 
   ts.setup("Time");
 
