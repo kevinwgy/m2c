@@ -98,6 +98,8 @@ private:
 
   void BuildCustomizedCommunicators();
 
+  void VerifyCustomizedCommunicators();
+
   void ResetTag();
 
 };

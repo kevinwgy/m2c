@@ -1,6 +1,10 @@
 #include<LaserAbsorptionSolver.h>
 #include<GeoTools.h>
 #include<algorithm> //std::sort
+
+//#include<chrono> //for timing only
+//using namespace std::chrono;
+
 using std::vector;
 using std::pair;
 
@@ -54,7 +58,9 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
   // Create a custom communicator for each level
   BuildCustomizedCommunicators();
+  //VerifyCustomizedCommunicators(); //for debug purpose
 
+  
   exit_mpi();
 }
 
@@ -397,27 +403,68 @@ LaserAbsorptionSolver::BuildCustomizedCommunicators()
     //print("Good! Created comm level %d.\n", lvl);
   }
 
-/*
+}
+
+void
+LaserAbsorptionSolver::VerifyCustomizedCommunicators()
+{
   //---------------------------------------------------
   // Verification
   double*** l0 = L0.GetDataPointer();
-  level = Level.GetDataPointer();
+  double*** level = Level.GetDataPointer();
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++)
         l0[k][j][i] = level[k][j][i];
   L0.RestoreDataPointerToLocalVector();
 
+  l0 = L0.GetDataPointer();
   for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
-    levelcomm[lvl]->ExchangeAndInsert(L0);
-    l0 = L0.GetDataPointer();
+    levelcomm[lvl]->ExchangeAndInsert(l0);
     for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
       int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
       if(level[k][j][i]==lvl) 
         assert(l0[k][j][i] == lvl);
     }
-    L0.RestoreDataPointerToLocalVector();
   }
+  L0.RestoreDataPointerToLocalVector();
+
+  L0.SetConstantValue(0.0,true);
+  //---------------------------------------------------
+
+
+/*
+  //---------------------------------------------------
+  // Timing 
+  MPI_Barrier(comm);
+  auto start = high_resolution_clock::now();
+  l0 = L0.GetDataPointer();
+  for(int counter = 0; counter < 100; counter++) {
+    for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
+      levelcomm[lvl]->ExchangeAndInsert(l0);
+    }
+  }
+  L0.RestoreDataPointerToLocalVector();
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  double cost = duration.count();
+  MPI_Allreduce(MPI_IN_PLACE, &cost, 1, MPI_DOUBLE, MPI_MAX, comm);
+  print(stderr,"cost is %e.\n", cost); 
+
+
+  MPI_Barrier(comm);
+  start = high_resolution_clock::now();
+  for(int counter = 0; counter < 100; counter++) {
+    for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
+      l0 = L0.GetDataPointer();
+      L0.RestoreDataPointerAndInsert();
+    }
+  }
+  stop = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(stop - start);
+  cost = duration.count();
+  MPI_Allreduce(MPI_IN_PLACE, &cost, 1, MPI_DOUBLE, MPI_MAX, comm);
+  print(stderr,"cost is %e.\n", cost); 
   //---------------------------------------------------
 */
 
