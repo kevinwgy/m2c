@@ -1776,6 +1776,7 @@ void IcData::readUserSpecifiedIC_Spherical(std::fstream &input)
 
 LaserAbsorptionCoefficient::LaserAbsorptionCoefficient()
 {
+  materialid = 0;
   slope  = 0.0;
   alpha0 = 0.0;
 }
@@ -1784,7 +1785,8 @@ LaserAbsorptionCoefficient::LaserAbsorptionCoefficient()
 
 Assigner* LaserAbsorptionCoefficient::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 2, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
+  new ClassInt<LaserAbsorptionCoefficient>(ca, "MaterialID", this, &LaserAbsorptionCoefficient::materialid);
   new ClassDouble<LaserAbsorptionCoefficient>(ca, "Slope", this, &LaserAbsorptionCoefficient::slope);
   new ClassDouble<LaserAbsorptionCoefficient>(ca, "Coefficient", this, &LaserAbsorptionCoefficient::alpha0);
   return ca;
@@ -1828,7 +1830,7 @@ void LaserData::setup(const char *name) {
   //Physical Parameters
   new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
   new ClassToken<LaserData> (ca, "SourceDistribution", this,
-        reinterpret_cast<int LaserData::*>(&LaserData::source_distribution), 2, "Constant", 0, "Gaussian", 1);
+        reinterpret_cast<int LaserData::*>(&LaserData::source_distribution), 2, "Uniform", 0, "Gaussian", 1);
   new ClassDouble<LaserData>(ca, "SourcePower", this, &LaserData::source_power);
   new ClassStr<LaserData>(ca, "SourcePowerTimeHistory", this, &LaserData::source_power_timehistory_file);
   new ClassDouble<LaserData>(ca, "SourceCenterX", this, &LaserData::source_center_x);
@@ -1842,7 +1844,7 @@ void LaserData::setup(const char *name) {
   new ClassDouble<LaserData>(ca, "FocusingAngle", this, &LaserData::focusing_angle_degrees);
   new ClassDouble<LaserData>(ca, "Range", this, &LaserData::range);
 
-  abs.setup("AbsorptionCoefficientForFluid", ca);
+  abs.setup("AbsorptionCoefficient", ca);
 
   //Numerical Parameters
   new ClassDouble<LaserData>(ca, "SourceDepth", this, &LaserData::source_depth);

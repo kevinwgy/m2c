@@ -674,6 +674,7 @@ struct IcData {
 
 struct LaserAbsorptionCoefficient {
 
+  int materialid;
   double slope;
   double alpha0;
 

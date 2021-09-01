@@ -85,6 +85,7 @@ SpaceOperator.cpp
 MeshGenerator.cpp
 LevelSetOperator.cpp
 LevelSetReinitializer.cpp
+LaserAbsorptionSolver.cpp
 TimeIntegrator.cpp
 Utils.cpp)
 

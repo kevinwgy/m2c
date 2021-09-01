@@ -6,7 +6,26 @@
 #include<VarFcnBase.h>
 #include<tuple>
 
+//------------------------------------------------------------
+// Class LaserAbsorptionSolver is responsible for solving the
+// laser radiation equation and coupling it with the Navier-
+// Stokes equations.
+//------------------------------------------------------------
+
+//! Structure of nodal status
+struct NodalLaserInfo {
+  int i,j,k;
+  double phi;
+  int level;
+  NodalLaserInfo(int i_, int j_, int k_, double phi_, int ql_)
+    : i(i_),j(j_),k(k_),phi(phi_),level(ql_) {}
+  ~NodalLaserInfo() {}
+};
+
+
 class LaserAbsorptionSolver {
+
+  MPI_Comm& comm;
 
   //! Variable fcn
   vector<VarFcnBase*>& varFcn;
@@ -31,12 +50,16 @@ class LaserAbsorptionSolver {
   SpaceVariable3D FluxIn;
   SpaceVariable3D FluxOut;
   SpaceVariable3D Phi; //!< distance from each node to source plane; -1 if node is out of scope
+  SpaceVariable3D Level; //!< -1 if out of scope
   SpaceVariable3D Tag;
+  //Phi, Level, and Tag are undefined in the ghost layer outside the physical domain
 
   //! Ordering of nodes
-  std::vector<std::tuple<Int3,double,int> > sortedNodes;  //!< node ind, phi, queue-level, order-on-the-level
+  std::vector<NodalLaserInfo> sortedNodes;
   std::vector<int> queueCounter;  //!< number of nodes on each level of the queue
-
+  
+  //! Nodes/cells in laser domain 
+  int numNodesInScope; //!< within the subdomain interior
 
   //! Absorption coefficients
   std::vector<std::pair<double,double> > abs;   // !< pair<slope,alpha0> for each fluid model
@@ -56,6 +79,20 @@ public:
   void Destroy();
 
   void ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L);
+
+private:
+
+  void CheckForInputErrors();
+
+  void ReadUserSpecifiedPowerFile(const char *source_power_timehistory_file);
+
+  void CalculateDistanceToSource(SpaceVariable3D &Phi);
+
+  static bool LaserDistCompare(NodalLaserInfo& node1, NodalLaserInfo& node2); 
+
+  void BuildSortedNodeList();
+
+  void ResetTag();
 
 };
 
