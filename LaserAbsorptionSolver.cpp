@@ -52,6 +52,9 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   // Sort nodes in scope (Not all the nodes) by queue-level (primary) and dist-to-source (secondary)
   BuildSortedNodeList();
 
+  // Create a custom communicator for each level
+  BuildCustomizedCommunicators();
+
   exit_mpi();
 }
 
@@ -59,7 +62,9 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
 LaserAbsorptionSolver::~LaserAbsorptionSolver()
 {
-
+  for(int i=0; i<levelcomm.size(); i++)
+    if(levelcomm[i])
+      delete levelcomm[i];
 }
 
 //--------------------------------------------------------------------------
@@ -326,6 +331,7 @@ LaserAbsorptionSolver::BuildSortedNodeList()
   Phi.RestoreDataPointerToLocalVector();
 
   //Populate Level
+  Level.SetConstantValue(-1, true);
   double*** lev = Level.GetDataPointer();
   int previous_node_level = 0; //for code verification
   for(auto it = sortedNodes.begin();  it != sortedNodes.end();  it++) {
@@ -366,4 +372,62 @@ LaserAbsorptionSolver::ResetTag()
 }
 
 //--------------------------------------------------------------------------
+
+void
+LaserAbsorptionSolver::BuildCustomizedCommunicators()
+{
+
+  // Build one custom communicator per level  
+  vector<vector<Int3> > nodes_on_level(queueCounter.size());
+
+  double*** level = Level.GetDataPointer();
+  for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) { 
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]); 
+    if(level[k][j][i]<0)
+      continue;
+    assert(level[k][j][i]<queueCounter.size());
+    nodes_on_level[level[k][j][i]].push_back(Int3(i,j,k));
+  }
+  Level.RestoreDataPointerToLocalVector();
+
+  levelcomm.clear();
+  for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
+    //fprintf(stderr,"Level[%d]: number of ghost nodes = %d.\n", lvl, (int)nodes_on_level[lvl].size());
+    levelcomm.push_back(new CustomCommunicator(comm, L0, nodes_on_level[lvl]));
+    //print("Good! Created comm level %d.\n", lvl);
+  }
+
+/*
+  //---------------------------------------------------
+  // Verification
+  double*** l0 = L0.GetDataPointer();
+  level = Level.GetDataPointer();
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        l0[k][j][i] = level[k][j][i];
+  L0.RestoreDataPointerToLocalVector();
+
+  for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
+    levelcomm[lvl]->ExchangeAndInsert(L0);
+    l0 = L0.GetDataPointer();
+    for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
+      int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+      if(level[k][j][i]==lvl) 
+        assert(l0[k][j][i] == lvl);
+    }
+    L0.RestoreDataPointerToLocalVector();
+  }
+  //---------------------------------------------------
+*/
+
+}
+
+//--------------------------------------------------------------------------
+
+
+
+
+
+
 

@@ -1,4 +1,5 @@
 #include<CustomCommunicator.h>
+#include<cassert>
 using std::vector;
 
 //------------------------------------------------------------------------------------
@@ -14,18 +15,18 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
   //-------------------------------------
   // Create the communication channels
   //-------------------------------------
-  // This routine does not rely on a
+  // This routine does NOT rely on a
   // certain way of mesh partitioning (e.g.,
   // cutting along x, y, z axes as done by
   // PETSc)
   //-------------------------------------
   
   //----------------------------------------------------------------------------------------
-  //Step 0: Verify the ghost_nodes are indeed ghost nodes.
+  //Step 0: Verify that the ghost_nodes are indeed ghost nodes.
   //----------------------------------------------------------------------------------------
   for(auto it = ghost_nodes.begin(); it != ghost_nodes.end(); it ++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-    if(V.IsHere(i,j,k,true) && !V.IsHere(i,j,k,false)) {
+    if(V.IsHere(i,j,k,true) && !V.IsHere(i,j,k,false) && !V.OutsidePhysicalDomain(i,j,k)) {
       continue; //good
     } else {
       fprintf(stderr,"*** Error: [Proc %d] Passing an interior node (%d,%d,%d) to CustomCommunicator.\n",
@@ -59,7 +60,9 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
 
   for(int proc = 0; proc < size; proc++) {
 
+    //----------------------------------------------------------------------------------------
     //Creating the send/receive channel to populate (selected) ghost nodes in Subdomain #proc
+    //----------------------------------------------------------------------------------------
 
     //2.1. proc sends ghost nodes to everyone else   
     int local_size = 0;
@@ -67,31 +70,38 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
       local_size = ghost_nodes.size();
     MPI_Bcast(&local_size, 1, MPI_INT, proc, comm);
 
+    if(local_size == 0) //proc does not have any ghost nodes involved in the communication
+      continue;
+
     int* nodes = new int[3*local_size];
     if(proc == rank)
       for(int i = 0; i < ghost_nodes.size(); i++) {
         nodes[i*3]   = ghost_nodes[i][0];
         nodes[i*3+1] = ghost_nodes[i][1];
         nodes[i*3+2] = ghost_nodes[i][2];
+        //fprintf(stderr,"rank %d(%d)(%d->%d, %d->%d): nodes[%d] = %d, nodes[%d] = %d, nodes[%d] = %d.\n", rank, size, ii0+1, iimax-1, jj0+1, jjmax-1, i*3, nodes[i*3], i*3+1, nodes[i*3+1], i*3+2, nodes[i*3+2]);
       }
-    MPI_Bcast(&nodes, 3*local_size, MPI_INT, proc, comm);
+    MPI_Bcast(nodes, 3*local_size, MPI_INT, proc, comm);
 
     //2.2. non-procs figure out if any of the ghost nodes are owned by them. If yes, create
     //     a "send package", and tag V
     v = V.GetDataPointer();
     int package_id = -1;
     if(proc != rank) {
+      //fprintf(stderr,"rank %d(%d), local size = %d\n", rank, size, local_size);
       for(int n = 0; n < local_size; n++) {
         int i(nodes[n*3]), j(nodes[n*3+1]), k(nodes[n*3+2]);
 
+   //     fprintf(stderr,"rank %d(%d): (%d,%d,%d), IsHere = %d.\n", rank,size,i,j,k, (int)V.IsHere(i,j,k,false));
+
         if(V.IsHere(i,j,k,false)) {
           if(package_id==-1) {
-            send_pack.push_back(Package(SEND, proc));
+            send_pack.push_back(Package(Package::SEND, proc));
             package_id = send_pack.size() - 1;
           }
           send_pack[package_id].index.push_back(Int3(i,j,k));
 
-          v[k][j][i] = rank + 1; //have to add 1, so that the first proc appears to be 1 (instead of 0)
+          v[k][j][dof*i] = rank + 1; //have to add 1, so that the first proc appears to be 1 (instead of 0)
         }
       }
     }
@@ -106,26 +116,32 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
 
       for(auto it = ghost_nodes.begin(); it != ghost_nodes.end(); it++) {
         int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-        assert(v[k][j][i]>0 && v[k][j][i]<=size); //each ghost node must have one (and only one) owner
-        int owner = v[k][j][i] - 1;        
+/*
+        if(v[k][j][dof*i]<=0 || v[k][j][dof*i]>size) {
+          fprintf(stderr,"rank %d(%d): (%d,%d,%d), dof(%d), v = %e.\n", rank, size, i,j,k, dof, v[k][j][dof*i]);
+        }
+*/
+        assert(v[k][j][dof*i]>0 && v[k][j][dof*i]<=size); //each ghost node must have one (and only one) owner
+        int owner = v[k][j][dof*i] - 1;        
         if(recv_package_id[owner] == -1) {
-          recv_pack.push_back(Package(RECEIVE, owner)); 
+          recv_pack.push_back(Package(Package::RECEIVE, owner)); 
           recv_package_id[owner] = recv_pack.size() - 1;
         } 
         recv_pack[recv_package_id[owner]].index.push_back(Int3(i,j,k));
 
-        v[k][j][i] = 0; //restore for next proc
+        v[k][j][dof*i] = 0; //restore for next proc
       }
     }
     else {//restore V for next proc
       if(package_id != -1)
         for(auto it = send_pack[package_id].index.begin(); it != send_pack[package_id].index.end(); it++){
           int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-          v[k][j][i] = 0;
+          v[k][j][dof*i] = 0;
         }
     }
 
     V.RestoreDataPointerToLocalVector();
+
   }
 
 
@@ -164,9 +180,24 @@ CustomCommunicator::ExchangeAndInsert(SpaceVariable3D &V)
 
   double*** v = V.GetDataPointer();
 
+  ExchangeAndInsert(v);
+
+  V.RestoreDataPointerToLocalVector();
+
+}
+
+//------------------------------------------------------------------------------------
+
+void
+CustomCommunicator::ExchangeAndInsert(double ***v)
+{
+
   // non-blocking send
   vector<MPI_Request> send_requests;
   for(auto it = send_pack.begin(); it != send_pack.end(); it++) {
+
+    if(it->buffer.size()==0)
+      continue;
 
     int receiver = it->rank;
     vector<double> &buffer(it->buffer);
@@ -181,18 +212,20 @@ CustomCommunicator::ExchangeAndInsert(SpaceVariable3D &V)
         buffer[n*dof+p] = v[k][j][i*dof+p];
     }
 
-    send_requests.push_back();
+    send_requests.push_back(MPI_Request());
     MPI_Isend(buffer.data(), buffer.size(), MPI_DOUBLE, receiver, rank, comm, 
-              send_requests[send_requests.size()-1]);
+              &(send_requests[send_requests.size()-1]));
   }
 
   // non-blocking receive
   vector<MPI_Request> recv_requests;
   for(auto it = recv_pack.begin(); it != recv_pack.end(); it ++) {
+    if(it->buffer.size()==0)
+      continue;
     int sender = it->rank;
-    recv_requests.push_back();
+    recv_requests.push_back(MPI_Request());
     MPI_Irecv(it->buffer.data(), it->buffer.size(), MPI_DOUBLE, sender, sender, comm,
-              recv_requests[recv_requests.size()-1]);
+              &(recv_requests[recv_requests.size()-1]));
   }
 
   // wait
@@ -215,11 +248,7 @@ CustomCommunicator::ExchangeAndInsert(SpaceVariable3D &V)
     }
   }
 
-  // Restore w/o additional MPI comm.
-  V.RestoreDataPointerToLocalVector();
-
 }
 
 //------------------------------------------------------------------------------------
-
 

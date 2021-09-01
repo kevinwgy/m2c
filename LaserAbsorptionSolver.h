@@ -2,6 +2,7 @@
 #define _LASER_ABSORPTION_SOLVER_H_
 
 #include<SpaceVariable.h>
+#include<CustomCommunicator.h>
 #include<GhostPoint.h>
 #include<VarFcnBase.h>
 #include<tuple>
@@ -26,6 +27,9 @@ struct NodalLaserInfo {
 class LaserAbsorptionSolver {
 
   MPI_Comm& comm;
+
+  //! Communication operator for each level
+  vector<CustomCommunicator*> levelcomm;
 
   //! Variable fcn
   vector<VarFcnBase*>& varFcn;
@@ -91,6 +95,8 @@ private:
   static bool LaserDistCompare(NodalLaserInfo& node1, NodalLaserInfo& node2); 
 
   void BuildSortedNodeList();
+
+  void BuildCustomizedCommunicators();
 
   void ResetTag();
 

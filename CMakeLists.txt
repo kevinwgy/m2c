@@ -69,6 +69,7 @@ add_executable(m2c
 Main.cpp
 IoData.cpp
 SpaceVariable.cpp
+CustomCommunicator.cpp
 ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp
 SymmetryOperator.cpp

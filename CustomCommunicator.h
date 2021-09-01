@@ -36,8 +36,8 @@ class CustomCommunicator {
     ~Package() {}
   };
 
-  vector<Package> send_pack;
-  vector<Package> recv_pack;
+  std::vector<Package> send_pack;
+  std::vector<Package> recv_pack;
 
 public:
 
@@ -46,6 +46,7 @@ public:
 
   //! Perform the communication
   void ExchangeAndInsert(SpaceVariable3D &V);
+  void ExchangeAndInsert(double*** v); //note: this function does not verify compatibility
 
   //! Can easily add other types of communication (e.g., add, max, etc.)
 
