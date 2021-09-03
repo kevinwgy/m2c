@@ -172,6 +172,34 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
 
 //------------------------------------------------------------------------------------
 
+CustomCommunicator::CustomCommunicator(const CustomCommunicator &cc, int dof_, int ghost_width_)
+                  : comm(cc.comm), rank(cc.rank), size(cc.size), 
+                    dof(dof_), ghost_width(ghost_width_)
+{
+
+  assert(ghost_width >= cc.ghost_width); //Violating this may (not always) lead to accessing memory out of range
+
+  for(int i=0; i<send_pack.size(); i++) {
+    send_pack.push_back(Package(cc.send_pack[i].type, cc.send_pack[i].rank));
+    send_pack[i].index = cc.send_pack[i].index;
+    send_pack[i].buffer.resize(dof*send_pack[i].index.size());
+  }
+
+  for(int i=0; i<recv_pack.size(); i++) {
+    recv_pack.push_back(Package(cc.recv_pack[i].type, cc.recv_pack[i].rank));
+    recv_pack[i].index = cc.recv_pack[i].index;
+    recv_pack[i].buffer.resize(dof*recv_pack[i].index.size());
+  }
+
+}
+
+//------------------------------------------------------------------------------------
+
+CustomCommunicator::~CustomCommunicator()
+{}
+
+//------------------------------------------------------------------------------------
+
 void
 CustomCommunicator::ExchangeAndInsert(SpaceVariable3D &V)
 {

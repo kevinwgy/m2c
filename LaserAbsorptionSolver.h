@@ -53,7 +53,7 @@ class LaserAbsorptionSolver {
   SpaceVariable3D L0; //!< ``old'' L
   SpaceVariable3D FluxIn;
   SpaceVariable3D FluxOut;
-  SpaceVariable3D Phi; //!< distance from each node to source plane; -1 if node is out of scope
+  SpaceVariable3D Phi; //!< distance from each node to source; -1 if node is out of scope
   SpaceVariable3D Level; //!< -1 if out of scope
   SpaceVariable3D Tag;
   //Phi, Level, and Tag are undefined in the ghost layer outside the physical domain
@@ -82,6 +82,8 @@ public:
 
   void Destroy();
 
+  void SetSourceRadiance(SpaceVariable3D &L, double t);
+
   void ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L);
 
 private:
@@ -98,7 +100,8 @@ private:
 
   void BuildCustomizedCommunicators();
 
-  void VerifyCustomizedCommunicators();
+  //! for debug purpose only
+  void VerifySortedNodesAndCommunicators();
 
   void ResetTag();
 

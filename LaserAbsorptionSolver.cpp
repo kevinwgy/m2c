@@ -58,8 +58,10 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
   // Create a custom communicator for each level
   BuildCustomizedCommunicators();
-  //VerifyCustomizedCommunicators(); //for debug purpose
+  //VerifySortedNodesAndCommunicators(); //for debug purpose
 
+  // Find ghost nodes outside laser boundary (These include nodes inside and outside the physical domain!)
+  SetupLaserGhostNodes();
   
   exit_mpi();
 }
@@ -406,10 +408,10 @@ LaserAbsorptionSolver::BuildCustomizedCommunicators()
 }
 
 void
-LaserAbsorptionSolver::VerifyCustomizedCommunicators()
+LaserAbsorptionSolver::VerifySortedNodesAndCommunicators()
 {
   //---------------------------------------------------
-  // Verification
+  // Verify communicators
   double*** l0 = L0.GetDataPointer();
   double*** level = Level.GetDataPointer();
   for(int k=k0; k<kmax; k++)
@@ -428,8 +430,38 @@ LaserAbsorptionSolver::VerifyCustomizedCommunicators()
     }
   }
   L0.RestoreDataPointerToLocalVector();
+  Level.RestoreDataPointerToLocalVector();
+
+
+  //---------------------------------------------------
+  // Verify sorted nodes
+  double*** phi = Phi.GetDataPointer();
+  level = Level.GetDataPointer();
+  auto it = sortedNodes.begin();
+  int level_previous = 0;
+  double phi_previous = -1;
+  int counter = 0;
+  for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
+    for(int n = 0; n < queueCounter[lvl]; n++) {
+      int i(it->i),j(it->j),k(it->k);
+      assert(it->level == level[k][j][i]);
+      assert(it->level == lvl);
+      assert(it->phi == phi[k][j][i]);
+      assert(it->level >= level_previous);
+      if(it->level == level_previous)
+        assert(it->phi >= phi_previous);
+      counter++;
+      it++;
+      level_previous = it->level;
+      phi_previous = it->phi;
+    }
+  }
+  assert(counter == numNodesInScope);
 
   L0.SetConstantValue(0.0,true);
+  Level.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerToLocalVector();
+
   //---------------------------------------------------
 
 
@@ -472,7 +504,139 @@ LaserAbsorptionSolver::VerifyCustomizedCommunicators()
 
 //--------------------------------------------------------------------------
 
+void
+LaserAbsorptionSolver::SetupLaserGhostNodes()
+{
 
+  //----------------------------------------------------------------
+  // Step 1: Find ghost nodes (inside and outside physical domain)
+  //----------------------------------------------------------------
+  Tag.SetConstantValue(0, true);
+  double*** level = Level.GetDataPointer(); //level only tags nodes inside subdomain
+  double*** tag   = Tag.GetDataPointer(); 
+  //loop through sorted nodes on level 1, 2, 3, ...
+  for(int n = queueCounter[0]; n < sortedNodes.size(); n++) {
+    int i(sortedNodes[n].i), j(sortedNodes[n].j), k(sortedNodes[n].k); //all sorted nodes are inside subdomain
+    if(level[k][j][i-1]<0 && tag[k][j][i-1]==0)  tag[k][j][i-1] = 1;
+    if(level[k][j][i+1]<0 && tag[k][j][i+1]==0)  tag[k][j][i+1] = 1;
+    if(level[k][j-1][i]<0 && tag[k][j-1][i]==0)  tag[k][j-1][i] = 1;
+    if(level[k][j+1][i]<0 && tag[k][j+1][i]==0)  tag[k][j+1][i] = 1;
+    if(level[k-1][j][i]<0 && tag[k-1][j][i]==0)  tag[k-1][j][i] = 1;
+    if(level[k+1][j][i]<0 && tag[k+1][j][i]==0)  tag[k+1][j][i] = 1;
+  }  
+  Tag.RestoreDataPointerAndInsert();
+  Level.RestoreDataPointerToLocalVector();
+
+  vector<Int3> ghosts;
+
+  tag = Tag.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+        if(tag[k][j][i] == 1)
+          ghosts.push_back(Int3(i,j,k));
+
+
+  //----------------------------------------------------------------
+  // Step 2: Find the location (coordinates) of the image of each ghost node
+  //----------------------------------------------------------------
+  vector<Vec3D> images;
+  for(auto it = ghosts.begin(); it != ghosts.end(); it++) {
+    int i((*it)[0]), j((*it)[1]), k((*it)[2]);
+
+    //Case 1: (i,j,k) is inside the physical domain. It must be next to the embedded
+    //        laser domain boundary.
+    if(!coordinates.OutsidePhysicalDomain()) {
+
+
+
+
+
+
+
+
+
+    }
+
+  }
+
+
+}
+
+//--------------------------------------------------------------------------
+
+void
+LaserAbsorptionSolver::SetSourceRadiance(SpaceVariable3D &L, double t)
+{
+  // User-specified power time-history overrides (fixed) power, which then overrides (fixed) intensity.
+  // If user-specified power time-history is available, find the current power by linear interpolation
+
+  double power = -1.0, dt;
+  if(!source_power_timehistory.empty()) {//user-specified power time-history is available
+    for(auto it=source_power_timehistory.begin(); it!=source_power_timehistory.end(); it++) {
+      auto next = it + 1;
+      if(next==source_power_timehistory.end()) //reached the end
+        power = it->second;
+      else if(t>=it->first && t<next->first) {
+        dt = next->first - it->first;
+        power = (next->first - t)/dt*it->second + (t - it->first)/dt*next->second;
+        break;
+      }
+    }
+    if(power <0.0) {
+      print_error("*** Error: Found negative laser source power %e at t = %e.\n", power, t);
+      exit_mpi();
+    }
+  } else
+    power = iod.laser.source_power;
+
+  if(iod.laser.source_distribution == LaserData::CONSTANT){ //The Laser source is uniform
+
+    double l0;
+    if(power > 0.0) {//power (if specified) overrides source_intensity
+      double PI = 2.0*acos(0.0);
+      l0 = power/(PI*iod.laser.source_radius*iod.laser.source_radius);
+    } else
+      l0 = iod.laser.source_intensity;
+
+    double*** l = L.GetDataPointer();
+    for(int n=0; n<queueCounter[0]; n++) //level 0
+      l[sortedNodes[n].k][sortedNodes[n].j][sortedNodes[n].i] = l0;
+    levelcomm[0]->ExchangeAndInsert(l);
+    L.RestoreDataPointerToLocalVector();
+
+  }
+  else if(iod.laser.source_distribution == LaserData::GAUSSIAN){ //The Laser source is Gaussia
+
+    //give the direction of X
+    Vec3D dirx(iod.laser.source_dir_x, iod.laser.source_dir_y, iod.laser.source_dir_z);
+    dirx /= dirx.norm();
+
+    Vec3D x0(iod.laser.source_center_x, iod.laser.source_center_y, iod.laser.source_center_z);
+
+    double beamwaist = iod.laser.source_beam_waist;
+    double PI = 2.0*acos(0.0);
+
+    double*** l = L.GetDataPointer();
+    Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+    for(int n=0; n<queueCounter[0]; n++) {//level 0
+      Vec3D& x(coords[sortedNodes[n].k][sortedNodes[n].j][sortedNodes[n].i]);
+      double d2p = (x-x0)*dirx;
+      Vec3D xp = (x-x0) - d2p*dirx; //projection of x on the plane of the source
+      double r = xp.norm();
+      l[sortedNodes[n].k][sortedNodes[n].j][sortedNodes[n].i] 
+        = (2*power/(PI*beamwaist*beamwaist))*exp(-2*(r*r)/(beamwaist*beamwaist));
+    }
+    levelcomm[0]->ExchangeAndInsert(l);
+
+    L.RestoreDataPointerToLocalVector();
+    coordinates.RestoreDataPointerToLocalVector();
+
+  }
+
+}
+
+//--------------------------------------------------------------------------
 
 
 
