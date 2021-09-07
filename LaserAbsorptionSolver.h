@@ -5,6 +5,7 @@
 #include<CustomCommunicator.h>
 #include<GhostPoint.h>
 #include<VarFcnBase.h>
+#include<EmbeddedBoundaryFormula.h>
 #include<tuple>
 
 //------------------------------------------------------------
@@ -23,7 +24,17 @@ struct NodalLaserInfo {
   ~NodalLaserInfo() {}
 };
 
+//! Laser source info
+struct SourceGeometry {
+  double radius;//!< radius on the source "plane" (user-specified)
+  double angle; //!< radians
+  Vec3D  x0;    //!< center of source "plane"
+  Vec3D  dir;   //!< central axis 
+  double R;     //!< radius of curvature (infinite for parallel laser)
+  Vec3D  O;     //!< origin of the sector (relevant only for angle != 0)
+};
 
+//! Laser absorption solver
 class LaserAbsorptionSolver {
 
   MPI_Comm& comm;
@@ -37,6 +48,10 @@ class LaserAbsorptionSolver {
   //! IoData
   IoData &iod;
 
+  //! Laser info
+  SourceGeometry source;
+  double laser_range; //!< range
+
   //! Mesh info
   SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;
@@ -44,6 +59,10 @@ class LaserAbsorptionSolver {
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
+
+  Vec3D dxmin_glob;
+  Vec3D xmin_glob, xmax_glob; //coords of the first and last nodes inside the physical domain
+  Vec3D xmin_glob_ghost, xmax_glob_ghost; //coords of the first and last nodes in the ghost boundary layer
 
   //! Pointer to ghost node lists (outside domain boundary)
   vector<GhostPoint> &ghost_nodes_inner;
@@ -71,6 +90,8 @@ class LaserAbsorptionSolver {
   //! stores time history of source power (if provided by user)
   std::vector<std::pair<double,double> > source_power_timehistory;
 
+  //! embedded boundary method (for applying embedded and non-embedded boundary conditions)
+  std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > sortedGhostNodes;
 
 public:
 
@@ -90,7 +111,15 @@ private:
 
   void CheckForInputErrors();
 
+  void CalculateGlobalMeshInfo();
+
   void ReadUserSpecifiedPowerFile(const char *source_power_timehistory_file);
+
+  void CalculateLaserInfo();
+
+  double DistanceToSource(Vec3D &x, int &loc, double *image = NULL);
+
+  bool FindImagePoint(Vec3D &x, Vec3D &image);
 
   void CalculateDistanceToSource(SpaceVariable3D &Phi);
 
