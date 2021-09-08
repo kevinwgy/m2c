@@ -1,12 +1,10 @@
 #ifndef _LASER_ABSORPTION_SOLVER_H_
 #define _LASER_ABSORPTION_SOLVER_H_
 
-#include<SpaceVariable.h>
 #include<CustomCommunicator.h>
 #include<GhostPoint.h>
 #include<VarFcnBase.h>
 #include<EmbeddedBoundaryFormula.h>
-#include<tuple>
 
 //------------------------------------------------------------
 // Class LaserAbsorptionSolver is responsible for solving the
@@ -34,10 +32,26 @@ struct SourceGeometry {
   Vec3D  O;     //!< origin of the sector (relevant only for angle != 0)
 };
 
+//! Embedded boundary method
+struct LaserEBM{
+
+  std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > ghostNodes1; //ghost nodes whose image is inside this subdomain
+
+  std::vector<std::vector<Int3> > ghostNodes2; //ghost nodes whose image is inside another subdomain
+  std::vector<int> ghostNodes2_sender;
+  
+  std::vector<std::vector<EmbeddedBoundaryFormula> > friendsGhostNodes;
+  std::vector<int> friendsGhostNodes_receiver;
+
+};
+
+
 //! Laser absorption solver
 class LaserAbsorptionSolver {
 
   MPI_Comm& comm;
+  int mpi_rank;
+  int mpi_size;
 
   //! Communication operator for each level
   vector<CustomCommunicator*> levelcomm;
@@ -91,7 +105,7 @@ class LaserAbsorptionSolver {
   std::vector<std::pair<double,double> > source_power_timehistory;
 
   //! embedded boundary method (for applying embedded and non-embedded boundary conditions)
-  std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > sortedGhostNodes;
+  LaserEBM ebm;
 
 public:
 
@@ -119,7 +133,7 @@ private:
 
   double DistanceToSource(Vec3D &x, int &loc, double *image = NULL);
 
-  bool FindImagePoint(Vec3D &x, Vec3D &image);
+  int FindImagePoint(Vec3D &x, Vec3D &image);
 
   void CalculateDistanceToSource(SpaceVariable3D &Phi);
 
@@ -128,9 +142,12 @@ private:
   void BuildSortedNodeList();
 
   void BuildCustomizedCommunicators();
-
   //! for debug purpose only
   void VerifySortedNodesAndCommunicators();
+
+  void SetupLaserGhostNodes();
+
+  void UpdateGhostNodes(double ***l);
 
   void ResetTag();
 

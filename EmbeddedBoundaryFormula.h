@@ -20,17 +20,23 @@
 
 class EmbeddedBoundaryFormula {
 
-  double eps; //geometry tolerance (length)
+public:
 
-  enum Operation {MIRRORING = 0, SIZE = 1} operation;
+  enum Operation {MIRRORING = 0};
 
   enum ImageScenario {NODE = 0, EDGE_SHARED = 1, EDGE_REMOTE = 2,
                       FACE_SHARED = 3, FACE_REMOTE = 4, 
-                      ELEMENT_SHARED = 5, ELEMENT_REMOTE = 6, SIZE = 7};
+                      ELEMENT_SHARED = 5, ELEMENT_REMOTE = 6};
+
+private: 
+
+  double eps; //geometry tolerance (length)
+
+  Operation operation;
   ImageScenario scenario;
 
   std::vector<Int3> node;
-  std::vector<double> coeff; //!< Note: sizes of node and coeff are usually NOT the same
+  std::vector<double> coeff; //!< Note: sizes of node and coeff are the same
   double constant; //!< constant term in the affine function (often 0).
   
 public:
@@ -48,18 +54,16 @@ public:
   //! Get Info
   Operation            GetOperationType() {return operation;}
   ImageScenario        GetImageScenario() {return scenario;}
-  int                  GetSize()          {return N;}
+  int                  GetSize()          {return node.size();}
   std::vector<Int3>&   GetNodes()         {return node;}
   std::vector<double>& GetCoefficients()  {return coeff;}
   double               GetConstant()      {return constant;}
 
   //! Apply the formula
   double Evaluate(double*** v); //!< the 3D data structure (stored in SpaceVariable3D)
-  void Evaluate(double*** vin, double* vout, int dof);
 
   //! Apply the formula
-  template <typename T>
-  T Evaluate(std::vector<T>& v); //!< v must have size N, and the correct order.
+  double Evaluate(std::vector<double>& v); //!< v must have the same size as "node", and the correct order.
 
 private:
 

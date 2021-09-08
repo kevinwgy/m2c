@@ -1,6 +1,8 @@
 #include<EmbeddedBoundaryFormula.h>
-#include<trilinear_interpolation.h>
 #include<cassert>
+
+//for debug, turn following line on
+#include<trilinear_interpolation.h>
 
 //-----------------------------------------------------------------------------
 
@@ -20,7 +22,7 @@ void
 EmbeddedBoundaryFormula::SpecifyFormula(Operation op, ImageScenario sc, std::vector<Int3> &node_, 
                                         std::vector<double> &coeff_, double constant_)
 {
-  assert(nodes_.size() == coeff_.size());
+  assert(node_.size() == coeff_.size());
 
   operation = op;
   scenario  = sc;
@@ -113,9 +115,9 @@ EmbeddedBoundaryFormula::BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& 
 //-----------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryFormula::FinalizeMirroringFormulaEdge(Int3 &ghost, std::vector<Int3> &node_tmp, std::vector<double>& xi)
+EmbeddedBoundaryFormula::FinalizeMirroringFormulaEdge(Int3 &ghost, std::vector<Int3> &node_tmp, 
+                                                      std::vector<double>& xi)
 {
-  
   if(ghost != node_tmp[0] && ghost != node_tmp[1]) {
     scenario = EDGE_REMOTE;
     node = node_tmp;
@@ -129,13 +131,116 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaEdge(Int3 &ghost, std::vector<I
       node.push_back(node_tmp[1]);        
     else
       node.push_back(node_tmp[0]);
-    coeff.push_back(xi[0]);
-    //Formula: v(ghost) = coeff[0]*
+    coeff.push_back(1.0);
+    //Formula: v(ghost) = coeff[0]*v(node[0])   (where coeff[0] = 1.0)
   }
 }
 
 //-----------------------------------------------------------------------------
 
+void
+EmbeddedBoundaryFormula::FinalizeMirroringFormulaFace(Int3 &ghost, std::vector<Int3> &node_tmp, 
+                                                      std::vector<double>& xi)
+{
+  std::vector<double> coeff_tmp;
+  coeff_tmp.push_back((1-xi[1])*(1-xi[0]));
+  coeff_tmp.push_back((1-xi[1])*xi[0]);
+  coeff_tmp.push_back(xi[1]*(1-xi[0]));
+  coeff_tmp.push_back(xi[1]*xi[0]);
+
+  scenario = FACE_REMOTE;
+  double denom = 0;
+  for(int i=0; i<node_tmp.size(); i++) {
+    if(node_tmp[i] != ghost) {
+      node.push_back(node_tmp[i]);
+      coeff.push_back(coeff_tmp[i]);
+    } else {
+      denom = 1.0 - coeff_tmp[i];
+      scenario = FACE_SHARED;
+    }
+  }
+  if(scenario == FACE_SHARED) {
+    assert(denom != 0.0);
+    for(int i=0; i<coeff.size(); i++)
+      coeff[i] /= denom; 
+  }
+  //Formula: v(ghost) = sum ( coeff[i]*v(node[i]) )
+}
+
+//-----------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryFormula::FinalizeMirroringFormulaElem(Int3 &ghost, std::vector<Int3> &node_tmp, 
+                                                      std::vector<double>& xi)
+{
+  std::vector<double> coeff_tmp(8, 0.0);
+  coeff_tmp[0] = (1-xi[0])*(1-xi[1])*(1-xi[2]);
+  coeff_tmp[1] = xi[0]*(1-xi[1])*(1-xi[2]);
+  coeff_tmp[2] = (1-xi[0])*xi[1]*(1-xi[2]);
+  coeff_tmp[3] = xi[0]*xi[1]*(1-xi[2]);
+  coeff_tmp[4] = (1-xi[0])*(1-xi[1])*xi[2];
+  coeff_tmp[5] = xi[0]*(1-xi[1])*xi[2];
+  coeff_tmp[6] = (1-xi[0])*xi[1]*xi[2];
+  coeff_tmp[7] = xi[0]*xi[1]*xi[2];
+
+  scenario = ELEMENT_REMOTE;
+  double denom = 0;
+  for(int i=0; i<node_tmp.size(); i++) {
+    if(node_tmp[i] != ghost) {
+      node.push_back(node_tmp[i]);
+      coeff.push_back(coeff_tmp[i]);
+    } else {
+      denom = 1.0 - coeff_tmp[i];
+      scenario = ELEMENT_SHARED;
+    }
+  }
+  if(scenario == ELEMENT_SHARED) {
+    assert(denom != 0.0);
+    for(int i=0; i<coeff.size(); i++)
+      coeff[i] /= denom; 
+  }
+  //Formula: v(ghost) = sum ( coeff[i]*v(node[i]) )
+
+  //verification
+  std::vector<double> coeff2(8, 0.0);
+  coeff2[0] = MathTools::trilinear_interpolation<double>(1,0,0,0,0,0,0,0,xi.data()); 
+  coeff2[1] = MathTools::trilinear_interpolation<double>(0,1,0,0,0,0,0,0,xi.data()); 
+  coeff2[2] = MathTools::trilinear_interpolation<double>(0,0,1,0,0,0,0,0,xi.data()); 
+  coeff2[3] = MathTools::trilinear_interpolation<double>(0,0,0,1,0,0,0,0,xi.data()); 
+  coeff2[4] = MathTools::trilinear_interpolation<double>(0,0,0,0,1,0,0,0,xi.data()); 
+  coeff2[5] = MathTools::trilinear_interpolation<double>(0,0,0,0,0,1,0,0,xi.data()); 
+  coeff2[6] = MathTools::trilinear_interpolation<double>(0,0,0,0,0,0,1,0,xi.data()); 
+  coeff2[7] = MathTools::trilinear_interpolation<double>(0,0,0,0,0,0,0,1,xi.data());
+  for(int i=0; i<8; i++)
+    assert(fabs(coeff2[i]-coeff_tmp[i])<1.0e-14);
+}
+
+//-----------------------------------------------------------------------------
+
+double
+EmbeddedBoundaryFormula::Evaluate(double*** v)
+{
+  double res = constant;
+  for(int i=0; i<node.size(); i++)   
+    res += coeff[i]*v[node[i][2]/*k*/][node[i][1]/*j*/][node[i][0]/*i*/];
+
+  return res;
+}
+
+//-----------------------------------------------------------------------------
+
+double
+EmbeddedBoundaryFormula::Evaluate(std::vector<double>& v)
+{
+  assert(v.size() == node.size());
+  double res = constant;
+  for(int i=0; i<v.size(); i++)   
+    res += coeff[i]*v[i];
+
+  return res;
+}
+
+//-----------------------------------------------------------------------------
 
 
 

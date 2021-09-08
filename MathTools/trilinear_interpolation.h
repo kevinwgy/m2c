@@ -1,5 +1,4 @@
 #pragma once
-# include <cmath>
 
 namespace MathTools {
 
@@ -20,7 +19,7 @@ T trilinear_interpolation(T c000, T c001, T c010, T c011,
 
 template<typename T>
 T trilinear_interpolation(T c000, T c001, T c010, T c011, 
-                          T c100, T c101, T c110, T c111, double *x0, double *dx, double x)
+                          T c100, T c101, T c110, T c111, double *x0, double *dx, double *x)
 {
   double xi[3];
   for(int i=0; i<3; i++)
