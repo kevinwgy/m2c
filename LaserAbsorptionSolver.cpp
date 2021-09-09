@@ -66,9 +66,10 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   // Sort nodes in scope (Not all the nodes) by queue-level (primary) and dist-to-source (secondary)
   BuildSortedNodeList();
 
+  // Sort nodes in scope (Not all the nodes) by queue-level (primary) and dist-to-source (secondary)
   // Create a custom communicator for each level
   BuildCustomizedCommunicators();
-  VerifySortedNodesAndCommunicators(); //for debug purpose
+  //VerifySortedNodesAndCommunicators(); //for debug purpose
 
   // Find ghost nodes outside laser boundary (These include nodes inside and outside the physical domain!)
   SetupLaserGhostNodes();
@@ -157,9 +158,9 @@ LaserAbsorptionSolver::CalculateGlobalMeshInfo()
   MPI_Allreduce(MPI_IN_PLACE, dxmin_glob, 3, MPI_DOUBLE, MPI_MIN, comm);
 
   xmin_glob       = coords[k0][j0][i0];
-  xmax_glob       = coords[kmax][jmax][imax];
+  xmax_glob       = coords[kmax-1][jmax-1][imax-1];
   xmin_glob_ghost = coords[kk0][jj0][ii0];
-  xmax_glob_ghost = coords[kkmax][jjmax][iimax];
+  xmax_glob_ghost = coords[kkmax-1][jjmax-1][iimax-1];
  
   MPI_Allreduce(MPI_IN_PLACE, xmin_glob, 3, MPI_DOUBLE, MPI_MIN, comm);
   MPI_Allreduce(MPI_IN_PLACE, xmax_glob, 3, MPI_DOUBLE, MPI_MAX, comm);
@@ -229,7 +230,8 @@ LaserAbsorptionSolver::CalculateLaserInfo()
     source.R = source.radius/sin(source.angle); //radius of curvature
     double eps = std::max(dxmin_glob[0], std::max(dxmin_glob[1], dxmin_glob[2]));
     if(laser_range > source.R - 2.0*eps) {
-      print_error("*** Error: Laser range must not include the focal point. (Stay away by at least 2 cells.)\n");
+      print_error("*** Error: Laser range must not include the focal point. range = %e, R = %e, hmin = %e. (Stay away by at least 2 cells.)\n",
+                   laser_range, source.R, eps);
       exit_mpi();
     }
     source.O = source.x0 + source.R*cos(source.angle)*source.dir; //origin of the circle/curve 
@@ -240,7 +242,7 @@ LaserAbsorptionSolver::CalculateLaserInfo()
     source.O = source.x0 - source.R*cos(theta)*source.dir; //origin
   }
 
-  print("- Laser absorption solver activated. Focusing angle: %f degrees; Source radius: %f; Range: %f\n",
+  print("- Laser radiation solver activated. Focusing angle: %f degrees; Source radius: %f; Range: %f\n",
         laser.focusing_angle_degrees, laser.source_radius, laser_range);
 
 }
@@ -268,6 +270,9 @@ LaserAbsorptionSolver::CalculateDistanceToSource(SpaceVariable3D &Phi)
   coordinates.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerAndInsert(); 
 
+/*
+  Phi.WriteToVTRFile("phi.vtr");
+*/
 }
 
 //--------------------------------------------------------------------------
@@ -345,7 +350,7 @@ LaserAbsorptionSolver::DistanceToSource(Vec3D &x, int &loc, double *image)
         double theta = acos(fabs(Oxim*source.dir)/d2Oxim);
         assert(theta>source.angle);
         theta = 2.0*source.angle - theta;
-        Vec3D ximp = source.O + d2Oxim*cos(theta)*source.dir;
+        Vec3D ximp = source.O - d2Oxim*cos(theta)*source.dir;
         Vec3D vert_dir = (x-xp)/((x-xp).norm());
         xim = ximp + d2Oxim*sin(theta)*vert_dir;
       }
@@ -545,6 +550,19 @@ LaserAbsorptionSolver::BuildSortedNodeList()
     lev[k][j][i] = it->level;
   }
   Level.RestoreDataPointerAndInsert();
+
+
+/*
+  //DEBUG
+  Level.WriteToVTRFile("Level.vtr");
+  tag = Tag.GetDataPointer();
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        tag[k][j][i] = mpi_rank;
+  Tag.RestoreDataPointerAndInsert();
+  Tag.WriteToVTRFile("Partition.vtr");
+*/ 
 }
 
 //--------------------------------------------------------------------------
@@ -580,6 +598,9 @@ void
 LaserAbsorptionSolver::BuildCustomizedCommunicators()
 {
 
+  if(mpi_size>1)
+    print("- Creating a customized communicator for the laser radiation solver.\n");
+
   // Build one custom communicator per level  
   vector<vector<Int3> > nodes_on_level(queueCounter.size());
 
@@ -612,9 +633,7 @@ LaserAbsorptionSolver::VerifySortedNodesAndCommunicators()
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++)
         l0[k][j][i] = level[k][j][i];
-  L0.RestoreDataPointerToLocalVector();
 
-  l0 = L0.GetDataPointer();
   for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
     levelcomm[lvl]->ExchangeAndInsert(l0);
     for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
@@ -703,7 +722,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 {
   //geometry tolerance
   double eps = std::min(dxmin_glob[0], std::min(dxmin_glob[1], dxmin_glob[2]));
-  eps /= 1.0e-10;
+  eps /= 1.0e10;
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
@@ -713,7 +732,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   Tag.SetConstantValue(0, true);
   double*** level = Level.GetDataPointer(); //level only tags nodes inside subdomain
   double*** tag   = Tag.GetDataPointer(); 
-  //loop through sorted nodes on level 1, 2, 3, ...
+  //loop through sorted nodes on level 1, 2, 3, ... (Skipping level 0 as it does not need to be calculated)
   for(int n = queueCounter[0]; n < sortedNodes.size(); n++) {
     int i(sortedNodes[n].i), j(sortedNodes[n].j), k(sortedNodes[n].k); //all sorted nodes are inside subdomain
     // Note: because of the Cartesian grid and the assumption that laser boundaries are straight lines, we only
@@ -744,7 +763,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   //----------------------------------------------------------------
   vector<Vec3D> image;
   vector<int>   status;
-  vector<double> image_phi;
+  vector<double> ghost_phi;
   // status: 
   // (1) If the ghost node is outside laser domain,
   //     let Q be the closest point on the boundary of the laser domain
@@ -770,7 +789,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
     int location_info;
     Vec3D im;
     double dist = DistanceToSource(x, location_info, im);
-    image_phi.push_back(dist);
+    ghost_phi.push_back(dist);
 
     if(location_info) {//Category (1)
       image.push_back(im); //inserting the coordinates
@@ -801,40 +820,56 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
       assert(found);
     }
   }
-
+/*
+  for(int i=0; i<ghost_tmp.size(); i++) {
+    Vec3D& x(coords[ghost_tmp[i][2]][ghost_tmp[i][1]][ghost_tmp[i][0]]);
+    int tmp;
+    double dtmp = DistanceToSource(image[i], tmp);
+    fprintf(stderr,"[%d] (%d,%d,%d)(%e,%e,%e)(%e) --> status = %d, (%e,%e,%e)(%e).\n", mpi_rank, ghost_tmp[i][0], ghost_tmp[i][1],
+            ghost_tmp[i][2], x[0], x[1], x[2], ghost_phi[i], status[i], image[i][0], image[i][1], image[i][2], dtmp);
+  }
+*/
   //----------------------------------------------------------------
   // Step 3: Setup trilinear interpolation coeffs for each mirror image
   //----------------------------------------------------------------
+  double tol = eps/5.0; //needed at least for 2D sims, where z-direction has only 1 node
   vector<Int3> image_ijk(image.size(), Int3(INT_MAX)); //lower-left corner of the interpolation box
   vector<Vec3D> image_xi(image.size(), Vec3D(0.0));
   vector<int> prob_nodes; //nodes whose image is outside of the computational domain
   vector<int> far_nodes; //nodes whose image is inside a different subdomain
+  level = Level.GetDataPointer(); //level only tags nodes inside subdomain
   for(int n=0; n<image.size(); n++) {
     if(status[n] == -1) {
       image_ijk[n] = Int3((int)image[n][0], (int)image[n][1], (int)image[n][2]);
+      assert(level[image_ijk[n][2]][image_ijk[n][1]][image_ijk[n][0]] >= 0);
     }
     else {
-      // the image can be located (1) inside the current subdomain, (2) inside another subdomain, (3) outside the mesh
+      // Here, we try to find the location of the image w.r.t. the primal mesh (defined by nodes and edges). Note that
+      // the subdomains have gaps in between, which are covered by the (internal) ghost layer.
+      // The image can be located (1) inside the current subdomain or its internal ghost layer, (2) inside another subdomain, 
+      // (3) outside the domain (defined by the primal mesh)
+      //
+      if(image[n][0]<xmin_glob[0]-tol || image[n][0]>=xmax_glob[0]+tol ||
+         image[n][1]<xmin_glob[1]-tol || image[n][1]>=xmax_glob[1]+tol ||
+         image[n][2]<xmin_glob[2]-tol || image[n][2]>=xmax_glob[2]+tol) { // case (3)
+        status[n] = -99; //change its status to -99
+        prob_nodes.push_back(n);
+        continue; //deal with all the problematic nodes later
+      }
+
       int ihere(INT_MAX), jhere(INT_MAX), khere(INT_MAX);
-      for(int i=i0; i<imax-1; i++) 
-        if(image[n][0]>=coords[kk0][jj0][i][0] && image[n][0]<coords[kk0][jj0][i+1][0]) {ihere = i; break;} 
-      for(int j=j0; j<jmax-1; j++) 
-        if(image[n][1]>=coords[kk0][j][ii0][1] && image[n][1]<coords[kk0][j+1][ii0][1]) {jhere = j; break;} 
-      for(int k=k0; k<kmax-1; k++) 
-        if(image[n][2]>=coords[k][jj0][ii0][2] && image[n][2]<coords[k+1][jj0][ii0][2]) {khere = k; break;} 
+      for(int i=ii0; i<iimax-1; i++) 
+        if(image[n][0]>=coords[kk0][jj0][i][0]-tol && image[n][0]<coords[kk0][jj0][i+1][0]+tol) {ihere = i; break;} 
+      for(int j=jj0; j<jjmax-1; j++) 
+        if(image[n][1]>=coords[kk0][j][ii0][1]-tol && image[n][1]<coords[kk0][j+1][ii0][1]+tol) {jhere = j; break;} 
+      for(int k=kk0; k<kkmax-1; k++) 
+        if(image[n][2]>=coords[k][jj0][ii0][2]-tol && image[n][2]<coords[k+1][jj0][ii0][2]+tol) {khere = k; break;} 
 
-      if(ihere==INT_MAX || jhere==INT_MAX || khere==INT_MAX) {//not found inside the subdomain
-        if(image[n][0]<xmin_glob[0] || image[n][0]>=xmax_glob[0] ||
-           image[n][1]<xmin_glob[1] || image[n][1]>=xmax_glob[1] ||
-           image[n][2]<xmin_glob[2] || image[n][2]>=xmax_glob[2]) { // case (3)
-          status[n] = -99; //change its status to -99
-          prob_nodes.push_back(n);
-        }
-        else {// case (2)
-          status[n] = -98; //change its status to -98
-          far_nodes.push_back(n);
-        }
-
+      if(ihere==INT_MAX || jhere==INT_MAX || khere==INT_MAX) {//not found inside the subdomain or its ghost layer, case (2)
+        status[n] = -98; //change its status to -98
+        far_nodes.push_back(n);
+//        fprintf(stderr,"[%d] Found a far-node. (%d,%d,%d). image(%e,%e,%e). (%d,%d,%d).\n", mpi_rank, 
+//                ghost_tmp[n][0], ghost_tmp[n][1], ghost_tmp[n][2], image[n][0], image[n][1], image[n][2], ihere, jhere, khere);
         continue;  //deal with all the problematic and "far" nodes later
       }
 
@@ -845,6 +880,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
                        / (coords[khere+1][jhere+1][ihere+1][i] - coords[khere][jhere][ihere][i]);
     }
   }
+  Level.RestoreDataPointerToLocalVector();
 
   // Now, work on the "far" nodes (image is inside another subdomain)
   int total_far_nodes = far_nodes.size();
@@ -875,45 +911,51 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
       MPI_Bcast(img, 3*local_size, MPI_DOUBLE, proc, comm);
        
       // 2. everyone else figures out if it owns some of these nodes, and inform proc
-      vector<int> far_nodes_owner_tmp(local_size, INT_MAX);
+      vector<int> far_nodes_owner(local_size, INT_MAX);
+      vector<Int3> far_nodes_image_ijk(local_size, INT_MAX);
       if(mpi_rank != proc) {
-        int id = -1;
         for(int n=0; n<local_size; n++) {
 
-          int ihere(INT_MAX), jhere(INT_MAX), khere(INT_MAX);
-          for(int i=i0; i<imax-1; i++) 
-            if(img[3*n]>=coords[kk0][jj0][i][0] && img[3*n]<coords[kk0][jj0][i+1][0]) {ihere = i; break;} 
-          for(int j=j0; j<jmax-1; j++) 
-            if(img[3*n+1]>=coords[kk0][j][ii0][1] && img[3*n+1]<coords[kk0][j+1][ii0][1]) {jhere = j; break;} 
-          for(int k=k0; k<kmax-1; k++) 
-            if(img[3*n+2]>=coords[k][jj0][ii0][2] && img[3*n+2]<coords[k+1][jj0][ii0][2]) {khere = k; break;} 
-
-          if(ihere<INT_MAX && jhere<INT_MAX && khere<INT_MAX) {  //inside this subdomain
-            far_nodes_owner_tmp[n] = mpi_rank;
-            if(id==-1) {
-              ebm.friendsGhostNodes.push_back(vector<EmbeddedBoundaryFormula>());  
-              ebm.friendsGhostNodes_receiver.push_back(proc);
-              id = ebm.friendsGhostNodes.size() - 1;
-            }
-            Int3 nod_int3(nod[3*n],nod[3*n+1],nod[3*n+2]);
-            Int3 here(ihere,jhere,khere);
-            ebm.friendsGhostNodes[id].push_back(EmbeddedBoundaryFormula(eps));
-            Vec3D xi;
-            for(int i=0; i<3; i++)
-              xi[i] = (img[3*n+i] - coords[khere][jhere][ihere][i])
-                    / (coords[khere+1][jhere+1][ihere+1][i] - coords[khere][jhere][ihere][i]);
-            ebm.friendsGhostNodes[id].back().BuildMirroringFormula(nod_int3, here, xi);
+/*
+          if(proc==17 && nod[3*n]==51 && nod[3*n+1]==88 && nod[3*n+2]==0) {
+            fprintf(stderr,"[%d] Working on (51,88,0) from proc 17... Image(%e,%e,%e)\n", mpi_rank,
+                    img[3*n],img[3*n+1],img[3*n+2]);
           }
+*/
+          int ihere(INT_MAX), jhere(INT_MAX), khere(INT_MAX);
+          for(int i=ii0; i<iimax-1; i++) 
+            if(img[3*n]>=coords[kk0][jj0][i][0]-tol && img[3*n]<coords[kk0][jj0][i+1][0]+tol) {ihere = i; break;} 
+          for(int j=jj0; j<jjmax-1; j++) 
+            if(img[3*n+1]>=coords[kk0][j][ii0][1]-tol && img[3*n+1]<coords[kk0][j+1][ii0][1]+tol) {jhere = j; break;} 
+          for(int k=kk0; k<kkmax-1; k++) 
+            if(img[3*n+2]>=coords[k][jj0][ii0][2]-tol && img[3*n+2]<coords[k+1][jj0][ii0][2]+tol) {khere = k; break;} 
+
+/*
+          if(proc==17 && nod[3*n]==51 && nod[3*n+1]==88 && nod[3*n+2]==0) {
+            fprintf(stderr,"[%d] Working on (51,88,0) from proc 17... (%d,%d,%d)\n", mpi_rank, ihere, jhere, khere);
+          }
+*/
+
+          if(ihere<INT_MAX && jhere<INT_MAX && khere<INT_MAX) {//inside this subdomain
+            far_nodes_owner[n] = mpi_rank;
+            far_nodes_image_ijk[n] = Int3(ihere,jhere,khere);
+          } 
         }
       }
 
-      vector<int> far_nodes_owner(local_size, INT_MAX); //only relevant on mpi_rank == proc
-      MPI_Reduce(far_nodes_owner_tmp.data(), far_nodes_owner.data(), local_size, MPI_INT, MPI_MIN, proc, comm);
+      MPI_Allreduce(MPI_IN_PLACE, far_nodes_owner.data(), far_nodes_owner.size(), MPI_INT, MPI_MIN, comm);
 
-      if(mpi_rank == proc) { //digest the received data
+      // 3. proc digests the received data
+      if(mpi_rank == proc) { 
         std::map<int,int> rank_to_id;
         for(int n=0; n<far_nodes_owner.size(); n++) {
           int owner_rank = far_nodes_owner[n];
+/*
+          if(owner_rank<0 || owner_rank>=mpi_size) {
+            fprintf(stderr,"[%d] Can't find an owner of far-node (%d,%d,%d)\n", mpi_rank, 
+                    ghost_tmp[far_nodes[n]][0], ghost_tmp[far_nodes[n]][1], ghost_tmp[far_nodes[n]][2]);
+          }
+*/
           assert(owner_rank>=0 && owner_rank<mpi_size);
           if(rank_to_id.find(owner_rank) == rank_to_id.end()) {
             ebm.ghostNodes2.push_back(vector<Int3>());
@@ -922,6 +964,30 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
           }
           int id = rank_to_id[owner_rank];
           ebm.ghostNodes2[id].push_back(ghost_tmp[far_nodes[n]]);
+        }
+      }
+
+      // 4. others build friendsGhostNodes
+      if(mpi_rank != proc) {
+        int id = -1;
+        for(int n=0; n<far_nodes_owner.size(); n++) {
+          if(far_nodes_owner[n] == mpi_rank) {//mine!
+            if(id==-1) {
+              ebm.friendsGhostNodes.push_back(vector<std::pair<Int3, EmbeddedBoundaryFormula> >() );  
+              ebm.friendsGhostNodes_receiver.push_back(proc);
+              id = ebm.friendsGhostNodes.size() - 1;
+            }
+            Int3 nod_int3(nod[3*n],nod[3*n+1],nod[3*n+2]);
+            ebm.friendsGhostNodes[id].push_back(std::make_pair(nod_int3, EmbeddedBoundaryFormula(eps)));
+            Vec3D xi;
+            int ihere = far_nodes_image_ijk[n][0];
+            int jhere = far_nodes_image_ijk[n][1];
+            int khere = far_nodes_image_ijk[n][2];
+            for(int i=0; i<3; i++)
+              xi[i] = (img[3*n+i] - coords[khere][jhere][ihere][i])
+                    / (coords[khere+1][jhere+1][ihere+1][i] - coords[khere][jhere][ihere][i]);
+            ebm.friendsGhostNodes[id].back().second.BuildMirroringFormula(nod_int3, far_nodes_image_ijk[n], xi);
+          } 
         }
       }
 
@@ -938,8 +1004,21 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   }
 
 
+/*
+  for(int i=0; i<ebm.ghostNodes2.size(); i++)
+    for(int j=0; j<ebm.ghostNodes2[i].size(); j++)
+      fprintf(stderr,"[%d] GN2 (%d, %d, %d) owner = %d.\n", mpi_rank, ebm.ghostNodes2[i][j][0], ebm.ghostNodes2[i][j][1],
+              ebm.ghostNodes2[i][j][2], ebm.ghostNodes2_sender[i]);
+
+  for(int i=0; i<ebm.friendsGhostNodes.size(); i++)
+    for(int j=0; j<ebm.friendsGhostNodes[i].size(); j++)
+      fprintf(stderr,"[%d] FG (%d, %d, %d), friend = %d.\n", mpi_rank, ebm.friendsGhostNodes[i][j].first[0],
+              ebm.friendsGhostNodes[i][j].first[1], ebm.friendsGhostNodes[i][j].first[2], ebm.friendsGhostNodes_receiver[i]);
+*/
+
+
   // Now, work on the problematic nodes (KW believes this should rarely happen, and if it does, it must
-  // be a 2D (or 2D-cylindrical) simulation, and near the far-field boundary of the laser domain. Therefore,
+  // be a 2D (or 2D-cylindrical) simulation. 
   // We only try to find the closest valid point within the SAME subdomain, instead of doing another round of MPI
   // communications like what we did for "far_nodes". This means we may get slightly different results when running
   // the same case using different mesh partitions --- but the difference should be minimal.
@@ -960,17 +1039,22 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
     for(int p=0; p<prob_nodes.size(); p++) {
       int n = prob_nodes[p];
       if(closest[p].second == DBL_MAX) {
-        fprintf(stderr,"*** Error: Cannot find a valid image for ghost node (%d,%d,%d)(%e,%e,%e). "
-                       "Original image: (%e,%e,%e).\n", ghost_tmp[n][0], ghost_tmp[n][1], ghost_tmp[n][2],
+        fprintf(stderr,"*** Error: [%d] Cannot find a valid image for ghost node (%d,%d,%d)(%e,%e,%e). "
+                       "Original image: (%e,%e,%e).\n", mpi_rank, ghost_tmp[n][0], ghost_tmp[n][1], ghost_tmp[n][2],
                        coords[ghost_tmp[n][2]][ghost_tmp[n][1]][ghost_tmp[n][0]][0],
                        coords[ghost_tmp[n][2]][ghost_tmp[n][1]][ghost_tmp[n][0]][1],
                        coords[ghost_tmp[n][2]][ghost_tmp[n][1]][ghost_tmp[n][0]][2],
                        image[n][0], image[n][1], image[n][2]);
         exit(-1);
       }
-      image_ijk[n] = closest[n].first;
+      image_ijk[n] = closest[p].first;
       image_xi[n]  = Vec3D(0,0,0);
-      image_phi[n] = phi[(closest[p].first)[2]][(closest[p].first)[1]][(closest[p].first)[0]];
+
+/*
+      fprintf(stderr,"[%d] Prob node (%d %d %d), image(%e,%e,%e), closest (%d %d %d).\n", mpi_rank, ghost_tmp[n][0], 
+              ghost_tmp[n][1], ghost_tmp[n][2], image[n][0], image[n][1], image[n][2], image_ijk[n][0], image_ijk[n][1],
+              image_ijk[n][2]);
+*/
     }
     Phi.RestoreDataPointerToLocalVector();
 
@@ -978,14 +1062,15 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
   coordinates.RestoreDataPointerToLocalVector();
   
+
   //----------------------------------------------------------------
   // Step 4: Sort the list of ghost nodes based on distance to source
-  //         (image_phi).
+  //         (ghost_phi).
   //----------------------------------------------------------------
-  vector<int> ordered(image_phi.size());
+  vector<int> ordered(ghost_phi.size());
   std::iota(std::begin(ordered), std::end(ordered), 0); //ordered = {0, 1, 2, 3, ...}
   std::sort(std::begin(ordered), std::end(ordered), 
-            [&image_phi](int lhs, int rhs) {return image_phi[lhs]<image_phi[rhs];} );  
+            [&ghost_phi](int lhs, int rhs) {return ghost_phi[lhs]<ghost_phi[rhs];} );  
 
   //----------------------------------------------------------------
   // Step 5: Figure out formula for ghost node update
@@ -1010,7 +1095,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
     counter++;
   }
   assert(counter == ordered.size() - far_nodes.size());
-  
+
 }
 
 //--------------------------------------------------------------------------
@@ -1112,7 +1197,7 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l)
     int receiver = ebm.friendsGhostNodes_receiver[p]; 
     vector<double> buffer(ebm.friendsGhostNodes[p].size());
     for(int i=0; i<ebm.friendsGhostNodes[p].size(); i++)
-      buffer[i] = ebm.friendsGhostNodes[p][i].Evaluate(l);
+      buffer[i] = ebm.friendsGhostNodes[p][i].second.Evaluate(l);
     MPI_Isend(buffer.data(), buffer.size(), MPI_DOUBLE, receiver, mpi_rank, comm, &(send_requests[p]));
   }
 

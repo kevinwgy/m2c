@@ -40,7 +40,7 @@ struct LaserEBM{
   std::vector<std::vector<Int3> > ghostNodes2; //ghost nodes whose image is inside another subdomain
   std::vector<int> ghostNodes2_sender;
   
-  std::vector<std::vector<EmbeddedBoundaryFormula> > friendsGhostNodes;
+  std::vector<std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > > friendsGhostNodes;
   std::vector<int> friendsGhostNodes_receiver;
 
 };

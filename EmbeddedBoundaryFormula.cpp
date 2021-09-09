@@ -201,6 +201,7 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaElem(Int3 &ghost, std::vector<I
   }
   //Formula: v(ghost) = sum ( coeff[i]*v(node[i]) )
 
+/*
   //verification
   std::vector<double> coeff2(8, 0.0);
   coeff2[0] = MathTools::trilinear_interpolation<double>(1,0,0,0,0,0,0,0,xi.data()); 
@@ -213,6 +214,7 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaElem(Int3 &ghost, std::vector<I
   coeff2[7] = MathTools::trilinear_interpolation<double>(0,0,0,0,0,0,0,1,xi.data());
   for(int i=0; i<8; i++)
     assert(fabs(coeff2[i]-coeff_tmp[i])<1.0e-14);
+*/
 }
 
 //-----------------------------------------------------------------------------
