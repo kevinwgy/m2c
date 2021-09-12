@@ -3,8 +3,10 @@
 
 #include<CustomCommunicator.h>
 #include<GhostPoint.h>
+#include<Vector5D.h>
 #include<VarFcnBase.h>
 #include<EmbeddedBoundaryFormula.h>
+#include<tuple>
 
 //------------------------------------------------------------
 // Class LaserAbsorptionSolver is responsible for solving the
@@ -17,6 +19,7 @@ struct NodalLaserInfo {
   int i,j,k;
   double phi;
   int level;
+  double fin, fout; //fluxes
   NodalLaserInfo(int i_, int j_, int k_, double phi_, int ql_)
     : i(i_),j(j_),k(k_),phi(phi_),level(ql_) {}
   ~NodalLaserInfo() {}
@@ -30,6 +33,11 @@ struct SourceGeometry {
   Vec3D  dir;   //!< central axis 
   double R;     //!< radius of curvature (infinite for parallel laser)
   Vec3D  O;     //!< origin of the sector (relevant only for angle != 0)
+  inline void GetDirection(Vec3D& x, Vec3D& d) { //!< calc. laser dir at x (assuming x is inside/near laser domain)
+    if(angle==0) {d = dir; return;}
+    if(angle>0)  {d = O - x; d /= d.norm(); return;}
+    if(angle<0)  {d = x - O; d /= d.norm(); return;}
+  }
 };
 
 //! Embedded boundary method
@@ -52,6 +60,9 @@ class LaserAbsorptionSolver {
   MPI_Comm& comm;
   int mpi_rank;
   int mpi_size;
+
+  //! Cutoff radiance (L must be non-negative)
+  double cutoff_radiance;
 
   //! Communication operator for each level
   vector<CustomCommunicator*> levelcomm;
@@ -83,9 +94,8 @@ class LaserAbsorptionSolver {
   vector<GhostPoint> &ghost_nodes_outer;
 
   //! Internal variables
+  SpaceVariable3D Temperature;
   SpaceVariable3D L0; //!< ``old'' L
-  SpaceVariable3D FluxIn;
-  SpaceVariable3D FluxOut;
   SpaceVariable3D Phi; //!< distance from each node to source; -1 if node is out of scope
   SpaceVariable3D Level; //!< -1 if out of scope
   SpaceVariable3D Tag;
@@ -99,7 +109,7 @@ class LaserAbsorptionSolver {
   int numNodesInScope; //!< within the subdomain interior
 
   //! Absorption coefficients
-  std::vector<std::pair<double,double> > abs;   // !< pair<slope,alpha0> for each fluid model
+  std::vector<std::tuple<double,double,double> > absorption;   // !< <slope,T0(Kelvin),eta0> for each fluid model
 
   //! stores time history of source power (if provided by user)
   std::vector<std::pair<double,double> > source_power_timehistory;
@@ -117,10 +127,15 @@ public:
 
   void Destroy();
 
-  void SetSourceRadiance(SpaceVariable3D &L, double t);
+  //!< Compute raser radiance L and heat S = eta*L
+  void ComputeLaserRadianceAndHeat(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
+                                   SpaceVariable3D &S, //heat (eta*L), NOT multiplied by cell vol.
+                                   const double t, bool initialized = false); 
+                                   //initialized: whether L already has some values (e.g., from last time-step)
 
-  void ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L);
-
+  //!< Add S to the 5th entry of R. Assuming R is the residual placed on the RHS, and has been divided by cell vol.
+  void AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &S);
+  
 private:
 
   void CheckForInputErrors();
@@ -147,10 +162,35 @@ private:
 
   void SetupLaserGhostNodes();
 
-  void UpdateGhostNodes(double ***l);
-
   void ResetTag();
 
+
+  void ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
+                                          SpaceVariable3D &S, const double t, bool initialized); 
+
+  //-------------------------------------------------------------
+  // functions called by ComputeLaserRadianceMeanFluxMethod
+  void ComputeTemperatureInLaserDomain(Vec5D*** v, double*** id, double*** T);
+
+  void UpdateGhostNodes(double ***l, int custom_max_iter = 0);
+
+  void UpdateGhostNodesOneIteration(double ***l);
+
+  void SetSourceRadiance(double*** l, Vec3D*** coords, double t);
+
+  void InitializeLaserDomainAndGhostNodes(double*** l, double*** level);
+
+  void ComputeErrorsInLaserDomain(double*** lold, double*** lnew, double &max_error, double &avg_error)
+
+  void RunMeanFluxMethodOneIteration(double*** l, double*** T, Vec3D*** coords, Vec3D*** 
+                                     dxyz, double*** vol, double*** id, double*** level, double*** phi,
+                                     double alpha, double relax)
+
+  void ComputeLaserHeating(double*** l, double*** T, double*** id, double*** s);
+  //-------------------------------------------------------------
+
+  inline double GetAbsorptionCoefficient(double T, int id) { //T: Kelvin
+    return std::get<0>(absorption[id])*(T - std::get<1>(absorption[id])) + std::get<2>(absorption[id]);}
 };
 
 #endif

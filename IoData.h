@@ -676,6 +676,7 @@ struct LaserAbsorptionCoefficient {
 
   int materialid;
   double slope;
+  double T0;
   double alpha0;
 
   LaserAbsorptionCoefficient();
@@ -689,7 +690,7 @@ struct LaserAbsorptionCoefficient {
 struct LaserData {
 
   // physical parameters
-  double source_intensity;
+  double source_intensity; //!< radiance
   enum SourceDistribution {CONSTANT = 0, GAUSSIAN = 1} source_distribution;
   double source_power;
   const char *source_power_timehistory_file;
@@ -699,6 +700,7 @@ struct LaserData {
   double source_beam_waist;
   double focusing_angle_degrees; //!< divering if <0
   double range;
+  double lmin; //!< inside the laser domain (and ghosts), L>=lmin. (should be a tiny pos number.)
   ObjectMap<LaserAbsorptionCoefficient> abs; //!< absorption coefficients
 
   // numerical parameters

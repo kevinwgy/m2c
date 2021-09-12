@@ -1778,6 +1778,7 @@ LaserAbsorptionCoefficient::LaserAbsorptionCoefficient()
 {
   materialid = 0;
   slope  = 0.0;
+  T0     = 0.0;
   alpha0 = 0.0;
 }
 
@@ -1785,10 +1786,11 @@ LaserAbsorptionCoefficient::LaserAbsorptionCoefficient()
 
 Assigner* LaserAbsorptionCoefficient::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 4, nullAssigner);
   new ClassInt<LaserAbsorptionCoefficient>(ca, "MaterialID", this, &LaserAbsorptionCoefficient::materialid);
   new ClassDouble<LaserAbsorptionCoefficient>(ca, "Slope", this, &LaserAbsorptionCoefficient::slope);
-  new ClassDouble<LaserAbsorptionCoefficient>(ca, "Coefficient", this, &LaserAbsorptionCoefficient::alpha0);
+  new ClassDouble<LaserAbsorptionCoefficient>(ca, "ReferenceTemperature", this, &LaserAbsorptionCoefficient::T0);
+  new ClassDouble<LaserAbsorptionCoefficient>(ca, "RefedrenceCoefficient", this, &LaserAbsorptionCoefficient::alpha0);
   return ca;
 }
 
@@ -1811,6 +1813,8 @@ LaserData::LaserData() {
   focusing_angle_degrees = 0.0;
   range = DBL_MAX;
 
+  lmin = 1.0e-12;
+
   source_depth = 0.0;
   alpha = 1.0;
   convergence_tol = 1.0e-4;
@@ -1825,7 +1829,7 @@ LaserData::LaserData() {
 
 void LaserData::setup(const char *name) {
 
-  ClassAssigner *ca = new ClassAssigner(name, 21, NULL); 
+  ClassAssigner *ca = new ClassAssigner(name, 22, NULL); 
 
   //Physical Parameters
   new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
@@ -1843,6 +1847,7 @@ void LaserData::setup(const char *name) {
   new ClassDouble<LaserData>(ca, "DirectionZ", this, &LaserData::source_dir_z);
   new ClassDouble<LaserData>(ca, "FocusingAngle", this, &LaserData::focusing_angle_degrees);
   new ClassDouble<LaserData>(ca, "Range", this, &LaserData::range);
+  new ClassDouble<LaserData>(ca, "RadianceCutOff", this, &LaserData::lmin);
 
   abs.setup("AbsorptionCoefficient", ca);
 
@@ -1963,7 +1968,7 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::verbose), 3,
-                               "Low", 0, "Medium", 1, "High");
+                               "Low", 0, "Medium", 1, "High", 2);
 
   probes.setup("Probes", ca);
 

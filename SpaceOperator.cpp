@@ -2106,10 +2106,3 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
 //-----------------------------------------------------
 
 
-
-
-
-
-
-
-
