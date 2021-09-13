@@ -62,7 +62,7 @@ class LaserAbsorptionSolver {
   int mpi_size;
 
   //! Cutoff radiance (L must be non-negative)
-  double cutoff_radiance;
+  double lmin;
 
   //! Communication operator for each level
   vector<CustomCommunicator*> levelcomm;
@@ -164,6 +164,7 @@ private:
 
   void ResetTag();
 
+  void CopyValues(double*** from, double*** to);
 
   void ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
                                           SpaceVariable3D &S, const double t, bool initialized); 
@@ -180,16 +181,16 @@ private:
 
   void InitializeLaserDomainAndGhostNodes(double*** l, double*** level);
 
-  void ComputeErrorsInLaserDomain(double*** lold, double*** lnew, double &max_error, double &avg_error)
+  void ComputeErrorsInLaserDomain(double*** lold, double*** lnew, double &max_error, double &avg_error);
 
   void RunMeanFluxMethodOneIteration(double*** l, double*** T, Vec3D*** coords, Vec3D*** 
                                      dxyz, double*** vol, double*** id, double*** level, double*** phi,
-                                     double alpha, double relax)
+                                     double alpha, double relax);
 
   void ComputeLaserHeating(double*** l, double*** T, double*** id, double*** s);
   //-------------------------------------------------------------
 
-  inline double GetAbsorptionCoefficient(double T, int id) { //T: Kelvin
+  inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin
     return std::get<0>(absorption[id])*(T - std::get<1>(absorption[id])) + std::get<2>(absorption[id]);}
 };
 

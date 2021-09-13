@@ -40,6 +40,9 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
   CalculateGlobalMeshInfo();
 
+  // cut-off radiance (L must be positive inside the laser domain)
+  lmin = iod.laser.lmin;
+
   // Get absorption coefficient for each material
   int numMaterials = iod.eqs.materials.dataMap.size();
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
@@ -1173,8 +1176,8 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
         if(verbose >= OutputData::MEDIUM)
-          fprintf("Warning: [%d] source radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
-                  i,j,k, l[k][j][i], lmin);
+          fprintf(stderr,"Warning: [%d] source radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+                  mpi_rank, i,j,k, l[k][j][i], lmin);
       }
 
     }
@@ -1212,7 +1215,7 @@ LaserAbsorptionSolver::InitializeLaserDomainAndGhostNodes(double*** l, double***
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
         if(verbose >= OutputData::MEDIUM)
-          fprintf("Warning: [%d] Initial radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+          fprintf(stderr,"Warning: [%d] Initial radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
 
@@ -1245,7 +1248,7 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l, int custom_max_iter)
   }
   vector<vector<double> > l2(ebm.ghostNodes2.size());
   for(int n1=0; n1<ebm.ghostNodes2.size(); n1++) {
-    l2[n1].resize(ghostNodes2[n1].size(), 0.0);
+    l2[n1].resize(ebm.ghostNodes2[n1].size(), 0.0);
     for(int n=0; n<ebm.ghostNodes2[n1].size(); n++) {
       int i(ebm.ghostNodes2[n1][n][0]), j(ebm.ghostNodes2[n1][n][1]), k(ebm.ghostNodes2[n1][n][2]);
       l2[n1][n] = l[k][j][i];
@@ -1306,7 +1309,7 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
     if(l[k][j][i]<lmin) {
       l[k][j][i] = lmin;
       if(verbose >= OutputData::MEDIUM)
-        fprintf("Warning: [%d] Radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+        fprintf(stderr,"Warning: [%d] Radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                 mpi_rank, i,j,k, l[k][j][i], lmin);
     }
   }
@@ -1323,8 +1326,9 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
       if(buffer[i]<lmin) {
         buffer[i] = lmin;
         if(verbose >= OutputData::MEDIUM)
-          fprintf("Warning: [%d] Radiance at friend's ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
-                  mpi_rank, i,j,k, l[k][j][i], lmin);
+          fprintf(stderr,"Warning: [%d] Radiance at friend's ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+                  mpi_rank, ebm.friendsGhostNodes[p][i].first[0], ebm.friendsGhostNodes[p][i].first[1],
+                  ebm.friendsGhostNodes[p][i].first[2], buffer[i], lmin);
       }
     }
     MPI_Isend(buffer.data(), buffer.size(), MPI_DOUBLE, receiver, mpi_rank, comm, &(send_requests[p]));
@@ -1352,7 +1356,7 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
         if(verbose >= OutputData::MEDIUM)
-          fprintf("Warning: [%d] Received radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+          fprintf(stderr,"Warning: [%d] Received radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
     }
@@ -1388,13 +1392,14 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   double*** id    = ID.GetDataPointer();
   double*** level = Level.GetDataPointer();
   double*** phi   = Phi.GetDataPointer();
+  Vec5D*** v      = (Vec5D***)V.GetDataPointer();
 
 
   ComputeTemperatureInLaserDomain(v, id, T);
 
   //If not initialized or source_power changes, set source radiance; initialize laser if needed
   if(!initialized || !source_power_timehistory.empty()) {
-    SetSourceRadiance(l, coords, t) 
+    SetSourceRadiance(l, coords, t);
     if(!initialized)
       InitializeLaserDomainAndGhostNodes(l, level);
   }
@@ -1442,6 +1447,7 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   ID.RestoreDataPointerToLocalVector();
   Level.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerToLocalVector();
 }
 
 
@@ -1465,9 +1471,11 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       // go over the 6 direct neighbors to compute flux across cell boundaries
       Vec3D dir; //laser direction at cell interface
       double proj; //projection of dir to the direction from [k][j][i] to neighbor
+      Vec3D xinter;
 
       //1. left
-      source.GetDirection(coords[k][j][i] - Vec3D(0.5*dxyz[k][j][i][0],0,0), dir);
+      xinter = coords[k][j][i] - Vec3D(0.5*dxyz[k][j][i][0],0,0);
+      source.GetDirection(xinter, dir);
       proj = -dir[0]; //dir*(-1,0,0)
       proj *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
       if(proj<0) {
@@ -1478,7 +1486,8 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
         node.fout += alpha*proj;
       }
       //2. right
-      source.GetDirection(coords[k][j][i] + Vec3D(0.5*dxyz[k][j][i][0],0,0), dir);
+      xinter = coords[k][j][i] + Vec3D(0.5*dxyz[k][j][i][0],0,0);
+      source.GetDirection(xinter, dir);
       proj = dir[0]; //dir*(1,0,0)
       proj *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
       if(proj<0) {
@@ -1489,7 +1498,8 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
         node.fout += alpha*proj;
       }
       //3. bottom 
-      source.GetDirection(coords[k][j][i] - Vec3D(0,0.5*dxyz[k][j][i][1],0), dir);
+      xinter = coords[k][j][i] - Vec3D(0,0.5*dxyz[k][j][i][1],0);
+      source.GetDirection(xinter, dir);
       proj = -dir[1]; //dir*(0,-1,0)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
       if(proj<0) {
@@ -1500,7 +1510,8 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
         node.fout += alpha*proj;
       }
       //4. top 
-      source.GetDirection(coords[k][j][i] + Vec3D(0,0.5*dxyz[k][j][i][1],0), dir);
+      xinter = coords[k][j][i] + Vec3D(0,0.5*dxyz[k][j][i][1],0);
+      source.GetDirection(xinter, dir);
       proj = dir[1]; //dir*(0,1,0)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
       if(proj<0) {
@@ -1511,7 +1522,8 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
         node.fout += alpha*proj;
       }
       //5. back 
-      source.GetDirection(coords[k][j][i] - Vec3D(0,0,0.5*dxyz[k][j][i][2]), dir);
+      xinter = coords[k][j][i] - Vec3D(0,0,0.5*dxyz[k][j][i][2]);
+      source.GetDirection(xinter, dir);
       proj = -dir[2]; //dir*(0,0,-1)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
       if(proj<0) {
@@ -1522,7 +1534,8 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
         node.fout += alpha*proj;
       }
       //6. front 
-      source.GetDirection(coords[k][j][i] + Vec3D(0,0,0.5*dxyz[k][j][i][2]), dir);
+      xinter = coords[k][j][i] + Vec3D(0,0,0.5*dxyz[k][j][i][2]);
+      source.GetDirection(xinter, dir);
       proj = dir[2]; //dir*(0,0,1)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
       if(proj<0) {
@@ -1536,7 +1549,7 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       //update l[k][j][i]
       double eta = GetAbsorptionCoefficient(T[k][j][i], id[k][j][i]); //absorption coeff.
       l[k][j][i] = (1.0-relax)*l[k][j][i] 
-                 + relax*(-node.fin/(vol[k][j][i]*eta + node.out));
+                 + relax*(-node.fin/(vol[k][j][i]*eta + node.fout));
 
     }
 
@@ -1549,7 +1562,7 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
 //--------------------------------------------------------------------------
 
 void
-LaserAbsorptionSolver::ComputeTemperatureInLaserDomain(Vec5D*** v, double*** id, double*** T);
+LaserAbsorptionSolver::ComputeTemperatureInLaserDomain(Vec5D*** v, double*** id, double*** T)
 {
 
   auto it = sortedNodes.begin();
