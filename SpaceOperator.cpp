@@ -54,7 +54,6 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
     smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
     
-  print("I AM HERE!\n");
   if(iod.laser.source_power>0.0 || iod.laser.source_intensity>0.0 || 
      strcmp(iod.laser.source_power_timehistory_file, "") != 0)
     laser = new LaserAbsorptionSolver(comm, dm_all, iod, varFcn, coordinates, delta_xyz, volume,
@@ -926,6 +925,38 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
           x = (coords[k][j][i]-x0)*dir;
           r = (coords[k][j][i] - x0 - x*dir).norm();
           if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) {//inside
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  // cylinder-hemisphere
+  for(auto it=ic.cylinderhemisphereMap.dataMap.begin(); it!=ic.cylinderhemisphereMap.dataMap.end(); it++) {
+
+    print("- Applying initial condition within a cylinder-hemisphere (material id: %d).\n",
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder & hemisphere radius
+
+    Vec3D x1 = x0 + L*dir;
+    double x, r, r1;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          r1= (coords[k][j][i] - x1).norm(); 
+          if( (x>0 && x<L && r<R) || (x>=L && r1<R) ) {//inside
             v[k][j][i][0] = it->second->initialConditions.density;
             v[k][j][i][1] = it->second->initialConditions.velocity_x;
             v[k][j][i][2] = it->second->initialConditions.velocity_y;

@@ -24,6 +24,7 @@ Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, Reconstru
 
   if(iod_rec.fixes.sphereMap.dataMap.empty() &&
      iod_rec.fixes.spheroidMap.dataMap.empty() &&
+     iod_rec.fixes.cylinderhemisphereMap.dataMap.empty() &&
      iod_rec.fixes.cylinderconeMap.dataMap.empty())
     FixedByUser = NULL;
   else
@@ -200,6 +201,37 @@ void Reconstructor::TagNodesFixedByUser()
             fixed[k][j][i] = 1;
         }
   }
+
+
+  // cylinder-hemisphere
+  for(auto it=iod_rec.fixes.cylinderhemisphereMap.dataMap.begin(); 
+          it!=iod_rec.fixes.cylinderhemisphereMap.dataMap.end(); it++) {
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder and hemisphere radius
+
+    print("- Applying constant reconstruction within cylinder-hemisphere %d:\n", it->first);
+    print("  o base center: %e %e %e;  axis: %e %e %e.\n", 
+          x0[0], x0[1], x0[2], dir[0], dir[1], dir[2]);
+    print("  o cylinder height %e;  radius: %e.\n", L, R);
+
+    Vec3D x1 = x0 + L*dir;
+    double x, r, r1;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          r1= (coords[k][j][i] - x1).norm();
+          if( (x>0 && x<L && r<R) || (x>=L && r1<R) ) //inside
+            fixed[k][j][i] = 1;
+        }
+  }
+
 
   coordinates.RestoreDataPointerToLocalVector();
 

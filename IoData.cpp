@@ -223,14 +223,50 @@ Assigner *CylinderConeData::getAssigner()
 
 //------------------------------------------------------------------------------
 
+CylinderHemisphereData::CylinderHemisphereData() {
+
+  cen_x  = 0.0;
+  cen_y  = 0.0;
+  cen_z  = 0.0;
+  nx     = 0.0;
+  ny     = 0.0;
+  nz     = 1.0;
+
+  r = 1.0;
+  L = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *CylinderHemisphereData::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+
+  new ClassDouble<CylinderHemisphereData> (ca, "Axis_x", this, &CylinderHemisphereData::nx);
+  new ClassDouble<CylinderHemisphereData> (ca, "Axis_y", this, &CylinderHemisphereData::ny);
+  new ClassDouble<CylinderHemisphereData> (ca, "Axis_z", this, &CylinderHemisphereData::nz);
+  new ClassDouble<CylinderHemisphereData> (ca, "BaseCenter_x", this, &CylinderHemisphereData::cen_x);
+  new ClassDouble<CylinderHemisphereData> (ca, "BaseCenter_y", this, &CylinderHemisphereData::cen_y);
+  new ClassDouble<CylinderHemisphereData> (ca, "BaseCenter_z", this, &CylinderHemisphereData::cen_z);
+  new ClassDouble<CylinderHemisphereData> (ca, "CylinderRadius", this, &CylinderHemisphereData::r);
+  new ClassDouble<CylinderHemisphereData> (ca, "CylinderHeight", this, &CylinderHemisphereData::L);
+
+  initialConditions.setup("InitialState", ca);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
 void MultiInitialConditionsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
   pointMap.setup("Point", ca);
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);
   spheroidMap.setup("Spheroid", ca);
   cylinderconeMap.setup("CylinderAndCone", ca);
+  cylinderhemisphereMap.setup("CylinderAndHemisphere", ca);
 }
 
 //------------------------------------------------------------------------------
@@ -741,10 +777,11 @@ FixData::FixData()
 
 void FixData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
   sphereMap.setup("Sphere", ca);
   spheroidMap.setup("Spheroid", ca);
   cylinderconeMap.setup("CylinderAndCone", ca);
+  cylinderhemisphereMap.setup("CylinderAndHemisphere", ca);
 }
 
 //------------------------------------------------------------------------------

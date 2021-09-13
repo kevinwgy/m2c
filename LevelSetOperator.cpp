@@ -375,6 +375,62 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
         }
   }
 
+
+  // cylinder-hemisphere
+  for(auto it=ic.cylinderhemisphereMap.dataMap.begin(); it!=ic.cylinderhemisphereMap.dataMap.end(); it++) {
+
+    if(it->second->initialConditions.materialid != materialid)
+      continue; //not the right one
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder radius
+ 
+    // define the geometry
+    vector<pair<Vec3D, Vec3D> > lineSegments; //boundary of the cylinder
+    Vec3D p0(0.0, 0.0, 0.0); //x0
+    Vec3D p1(0.0, R, 0.0);
+    Vec3D p2(L, R, 0.0);
+    lineSegments.push_back(std::make_pair(p0,p1));
+    lineSegments.push_back(std::make_pair(p1,p2));
+
+    double x, r, r1, toto, dist;
+    Vec3D x1 = x0 + L*dir; //center of sphere
+    Vec3D xp;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+    
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          r1 = (coords[k][j][i] - x1).norm();
+          xp = Vec3D(x,r,0.0);
+
+          //calculate unsigned distance from node to the boundary of the cylinder-cone
+          if(x<L) {
+            dist = DBL_MAX;
+            for(int l=0; l<lineSegments.size(); l++)
+              dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
+                                   lineSegments[l].first, lineSegments[l].second, toto));
+          } else 
+            dist = fabs(r1 - R);
+
+          //figure out the sign, and update phi
+          if(dist<fabs(phi[k][j][i])) {
+            if( (x>0 && x<L && r<R) || (x>=L && r1<R) ) //inside
+              phi[k][j][i] = -dist;
+            else 
+              phi[k][j][i] = dist; 
+          }
+          
+        }
+  }
+
+
   // spheres 
   for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
 
