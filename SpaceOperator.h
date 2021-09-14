@@ -7,7 +7,6 @@
 #include <FluxFcnBase.h>
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
-#include <LaserAbsorptionSolver.h>
 
 /*******************************************
  * class SpaceOperator drives computations
@@ -47,9 +46,6 @@ class SpaceOperator
 
   //! Class for smoothing the solution
   SmoothingOperator* smooth;
-
-  //! Class for solving the laser absorption equation
-  LaserAbsorptionSolver* laser;
 
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;

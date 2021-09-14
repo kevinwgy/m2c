@@ -1,6 +1,7 @@
 #ifndef _PROBE_OUTPUT_H_
 #define _PROBE_OUTPUT_H_
 #include <IoData.h>
+#include <VarFcnBase.h>
 #include <SpaceVariable.h>
 
 /** This class is responsible for interpolating solutions at probe locations and outputing
@@ -14,6 +15,7 @@ class ProbeOutput {
 
   MPI_Comm &comm;
   OutputData &iod_output;
+  std::vector<VarFcnBase*> &vf;
 
   int numNodes;
   int frequency;
@@ -33,23 +35,28 @@ class ProbeOutput {
 
 public:
   //! Constructor 1: write probe info to file. 
-  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_);
+  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_);
   //! Constructor 2: Probe is part of line_plot 
-  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, int line_number); 
+  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_, 
+              int line_number); 
 
   ~ProbeOutput();
 
   void SetupInterpolation(SpaceVariable3D &coordinates);
 
   void WriteSolutionAtProbes(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-           std::vector<SpaceVariable3D*> &Phi, bool force_write); //!< write probe solution to file
+           std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D* L /*laser radiance*/,
+           bool force_write); //!< write probe solution to file
 
   void WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-           std::vector<SpaceVariable3D*> &Phi, bool force_write);
+           std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D* L /* laser radiance*/,
+           bool force_write);
 
 private:
 
   double InterpolateSolutionAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, int dim, int p);
+
+  double CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
 
 };
 

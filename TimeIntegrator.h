@@ -4,6 +4,7 @@
 #include <SpaceOperator.h>
 #include <LevelSetOperator.h>
 #include <MultiPhaseOperator.h>
+#include <LaserAbsorptionSolver.h>
 #include <RiemannSolutions.h>
 using std::vector;
 
@@ -20,36 +21,44 @@ protected:
   vector<LevelSetOperator*>& lso;
   MultiPhaseOperator& mpo;  
 
-  //internal variable to temporarily store old ID
+  //! Laser absorption solver (NULL if laser is not activated)
+  LaserAbsorptionSolver* laser;
+  SpaceVariable3D* LH; //Laser-induced heating
+  bool laser_initialized;
+
+  //!< Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
-  //Solutions of exact Riemann problems
+  //!< Solutions of exact Riemann problems
   RiemannSolutions riemann_solutions;
 
 public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
-                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_) : 
-      comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_),
-      IDn(comm_, &(dms_.ghosted1_1dof)) { }
+                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
+                     LaserAbsorptionSolver* laser_) : 
+      comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_),
+      laser_initialized(false), IDn(comm_, &(dms_.ghosted1_1dof)),
+      LH(laser_ ? new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)) : NULL) { }
 
-  virtual ~TimeIntegratorBase() {}
+  virtual ~TimeIntegratorBase() {if(LH) delete LH;}
 
   // Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                  vector<SpaceVariable3D*> &Phi, double time,
+                                  vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, double time,
                                   double dt, int time_step) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
 
   virtual void Destroy() {
     IDn.Destroy();
+    if(LH) LH->Destroy();
   }
 
   // all the tasks that are done at the end of a time-step, independent of 
   // time integrator
   void UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                       vector<SpaceVariable3D*> &Phi, double time,
-                                       double dt, int time_step);
+                                       vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
+                                       double time, double dt, int time_step);
                                         
 };
 
@@ -67,11 +76,12 @@ class TimeIntegratorFE : public TimeIntegratorBase
 
 public:
   TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
-                   vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_);
+                   vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
+                   LaserAbsorptionSolver* laser_);
   ~TimeIntegratorFE() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                          vector<SpaceVariable3D*>& Phi, double time,
+                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
                           double dt, int time_step);
 
   void Destroy();
@@ -97,11 +107,12 @@ class TimeIntegratorRK2 : public TimeIntegratorBase
 
 public:
   TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
-                    vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_);
+                    vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
+                    LaserAbsorptionSolver* laser_);
   ~TimeIntegratorRK2() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi, double time,
+                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
                           double dt, int time_step);
 
   void Destroy(); 
@@ -127,11 +138,12 @@ class TimeIntegratorRK3 : public TimeIntegratorBase
 
 public:
   TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
-                    vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_);
+                    vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
+                    LaserAbsorptionSolver* laser_);
   ~TimeIntegratorRK3() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi, double time,
+                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
                           double dt, int time_step);
 
   void Destroy();

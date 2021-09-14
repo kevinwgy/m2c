@@ -51,6 +51,9 @@ struct LaserEBM{
   std::vector<std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > > friendsGhostNodes;
   std::vector<int> friendsGhostNodes_receiver;
 
+  // laser radiance at ghost nodes
+  std::vector<double> l1; //ghostNodes1
+  std::vector<std::vector<double> > l2; //ghostNodes2
 };
 
 
@@ -188,6 +191,10 @@ private:
                                      double alpha, double relax);
 
   void ComputeLaserHeating(double*** l, double*** T, double*** id, double*** s);
+
+  void CleanUpGhostNodes(double*** l, bool backup); //!< remove radiance from ghost nodes (for outputting)
+
+  void ApplyStoredGhostNodesRadiance(double*** l);
   //-------------------------------------------------------------
 
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin

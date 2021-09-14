@@ -11,7 +11,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcn
     iod(iod_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
-    probe_output(comm_, iod_.output),
+    probe_output(comm_, iod_.output, vf_),
     matvol_output(comm_, iod_, cell_volume)
 {
   iFrame = 0;
@@ -47,7 +47,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcn
                   line_number, numLines-1); 
       exit(-1);
     }
-    line_outputs[line_number] = new ProbeOutput(comm, iod.output, line_number);
+    line_outputs[line_number] = new ProbeOutput(comm, iod.output, vf, line_number);
   }
 }
 
@@ -77,19 +77,20 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 //--------------------------------------------------------------------------
 
 void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
-                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool force_write)
+                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
+                             SpaceVariable3D *L, bool force_write)
 {
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
-    WriteSolutionSnapshot(time, time_step, V, ID, Phi);
+    WriteSolutionSnapshot(time, time_step, V, ID, Phi, L);
 
   //write solutions at probes
-  probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, force_write);
+  probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, force_write);
 
   //write solutions along lines
   for(int i=0; i<line_outputs.size(); i++)
-    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, V, ID, Phi, force_write);
+    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, V, ID, Phi, L, force_write);
 
   //write material volumes
   matvol_output.WriteSolution(time, dt, time_step, ID, force_write);
@@ -97,7 +98,8 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
 //--------------------------------------------------------------------------
 
 void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
-                                   SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi)
+                                   SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
+                                   SpaceVariable3D *L)
 {
   //! Define vtr file name
   char full_fname[256];
@@ -137,6 +139,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
 
   // Write solution snapshot
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
+  double*** id = (double***)ID.GetDataPointer();
 
   int i0, j0, k0, imax, jmax, kmax;
   V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -177,13 +180,11 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
 
   if(iod.output.internal_energy==OutputData::ON) {
     double*** s  = (double***) scalar.GetDataPointer();
-    double*** id  = (double***)ID.GetDataPointer();
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++)
           s[k][j][i] = vf[(int)id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
     scalar.RestoreDataPointerAndInsert();
-    ID.RestoreDataPointerToLocalVector();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "internal_energy");
     VecView(scalar.GetRefToGlobalVec(), viewer);
   }
@@ -195,13 +196,11 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
 //    VecView(ID.GetRefToGlobalVec(), viewer);
 
     double*** s  = (double***) scalar.GetDataPointer();
-    double*** id  = (double***)ID.GetDataPointer();
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++)
           s[k][j][i] = id[k][j][i];
     scalar.RestoreDataPointerAndInsert();
-    ID.RestoreDataPointerToLocalVector();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "materialid");
     VecView(scalar.GetRefToGlobalVec(), viewer);
 
@@ -219,6 +218,35 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
       VecView(Phi[it->first]->GetRefToGlobalVec(), viewer);
     }
   }
+
+
+  if(iod.output.temperature==OutputData::ON) {
+    double*** s  = (double***) scalar.GetDataPointer();
+    double e;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          e = vf[(int)id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+          s[k][j][i] = vf[(int)id[k][j][i]]->GetTemperature(v[k][j][i][0], e);
+        }
+    scalar.RestoreDataPointerAndInsert();
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "temperature");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
+  }
+
+
+  if(iod.output.laser_radiance==OutputData::ON) {
+    if(L == NULL) {
+      print_error("*** Error: Requested output of laser radiance, but the laser source is not specified.\n");
+      exit_mpi();
+    }
+    PetscObjectSetName((PetscObject)(L->GetRefToGlobalVec()), "laser_radiance"); //adding the name directly to Phi[i].
+    VecView(L->GetRefToGlobalVec(), viewer);
+  }
+
+
+
+
 
   // Add a line to the pvd file to record the new solutio snapshot
   char f1[256];

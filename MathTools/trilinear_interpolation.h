@@ -2,6 +2,8 @@
 
 namespace MathTools {
 
+//----------------------------------------------------------------------------------------
+
 template<typename T>
 T trilinear_interpolation(T c000, T c001, T c010, T c011, 
                           T c100, T c101, T c110, T c111, double *xi)
@@ -17,6 +19,8 @@ T trilinear_interpolation(T c000, T c001, T c010, T c011,
   return (1-xi[2])*c0 + xi[2]*c1; 
 }
 
+//----------------------------------------------------------------------------------------
+
 template<typename T>
 T trilinear_interpolation(T c000, T c001, T c010, T c011, 
                           T c100, T c101, T c110, T c111, double *x0, double *dx, double *x)
@@ -28,4 +32,29 @@ T trilinear_interpolation(T c000, T c001, T c010, T c011,
   return trilinear_interpolation(c000, c001, c010, c011, c100, c101, c110, c111, xi);
 }
 
+//----------------------------------------------------------------------------------------
+/**************************************************************************
+ * Trilinear interpolation
+ *   Inputs:
+ *     xi = (xi1, xi2, xi3) -- local coordinates the interpolation point
+ *     c000, c100, c010, c110, c001, c101, c011, c111 --- 8 nodal values (i,j,k)
+ *   Outputs:
+ *     return value: interpolated value.
+ */
+inline double trilinear_interpolation(Vec3D &xi, double c000, double c100, double c010, double c110,
+                                      double c001, double c101, double c011, double c111)
+{
+  double c00 = c000*(1.0 - xi[0]) + c100*xi[0];
+  double c01 = c001*(1.0 - xi[0]) + c101*xi[0];
+  double c10 = c010*(1.0 - xi[0]) + c110*xi[0];
+  double c11 = c011*(1.0 - xi[0]) + c111*xi[0];
+
+  double c0  = c00*(1.0 - xi[1]) + c10*xi[1];
+  double c1  = c01*(1.0 - xi[1]) + c11*xi[1];
+
+  return c0*(1.0 - xi[2]) + c1*xi[2];
 }
+
+//----------------------------------------------------------------------------------------
+
+} //end of namespace 

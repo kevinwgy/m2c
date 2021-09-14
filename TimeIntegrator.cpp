@@ -7,8 +7,9 @@ using std::endl;
 //----------------------------------------------------------------------------
 
 TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
-                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_)
-                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_),
+                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
+                      LaserAbsorptionSolver* laser_)
+                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_),
                   Un(comm_, &(dms_.ghosted1_5dof)),
                   Rn(comm_, &(dms_.ghosted1_5dof))
 {
@@ -34,11 +35,18 @@ void TimeIntegratorFE::Destroy()
 //----------------------------------------------------------------------------
 
 void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                          vector<SpaceVariable3D*>& Phi, double time,
-                                          double dt, int time_step)
+                                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L,
+                                          double time, double dt, int time_step)
 {
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   spo.ComputeResidual(V, ID, Rn, &riemann_solutions); // compute Rn
+  if(laser) {
+    if(!laser_initialized) {//first call
+      laser->ComputeLaserRadianceAndHeat(V,ID,*L,*LH,time,laser_initialized);
+      laser_initialized = true;
+    }
+    laser->AddHeatToNavierStokesResidual(Rn, *LH);
+  }
   spo.PrimitiveToConservative(V, ID, Un); // get Un
   Un.AXPlusBY(1.0, dt, Rn);
   spo.ConservativeToPrimitive(Un, ID, V); //updates V = V(n+1)
@@ -53,7 +61,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   }
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, time, dt, time_step);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, dt, time_step);
 }
 
 //----------------------------------------------------------------------------
@@ -62,8 +70,8 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
 TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                                      SpaceOperator& spo_ ,vector<LevelSetOperator*>& lso_,
-                                     MultiPhaseOperator& mpo_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_),
+                                     MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
@@ -95,12 +103,19 @@ void TimeIntegratorRK2::Destroy()
 //----------------------------------------------------------------------------
 
 void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                            vector<SpaceVariable3D*>& Phi, double time, double dt, int time_step)
+                            vector<SpaceVariable3D*>& Phi, SpaceVariable3D* L, double time, double dt, int time_step)
 {
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   spo.ComputeResidual(V, ID, R, &riemann_solutions); // compute R = R(V(n))
+  if(laser) {
+    if(!laser_initialized) {//first call
+      laser->ComputeLaserRadianceAndHeat(V,ID,*L,*LH,time,laser_initialized);
+      laser_initialized = true;
+    }
+    laser->AddHeatToNavierStokesResidual(R, *LH);
+  }
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
   U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
@@ -130,6 +145,10 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   spo.ComputeResidual(V1, ID, R); //R = R(V1)
+  if(laser) {
+    laser->ComputeLaserRadianceAndHeat(V1,ID,*L,*LH,time,laser_initialized);
+    laser->AddHeatToNavierStokesResidual(R, *LH);
+  }
   U1.AXPlusBY(0.5, 0.5, Un); //U(n+1) = 0.5*U(n) + 0.5*U1;
   U1.AXPlusBY(1.0, 0.5*dt, R); //U(n+1) = U(n+1) + 0.5*dt*R(V1)
   
@@ -150,7 +169,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //***************************************************
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, time, dt, time_step);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, dt, time_step);
 }
 
 //----------------------------------------------------------------------------
@@ -158,8 +177,8 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 //----------------------------------------------------------------------------
 TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_,
-                                     MultiPhaseOperator &mpo_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_),
+                                     MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
@@ -192,13 +211,21 @@ void TimeIntegratorRK3::Destroy()
 //----------------------------------------------------------------------------
 
 void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                           vector<SpaceVariable3D*>& Phi, double time, 
+                                           vector<SpaceVariable3D*>& Phi, 
+                                           SpaceVariable3D* L, double time, 
                                            double dt, int time_step)
 { 
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
   spo.ComputeResidual(V, ID, R, &riemann_solutions); // get R = R(V(n))
+  if(laser) {
+    if(!laser_initialized) {//first call
+      laser->ComputeLaserRadianceAndHeat(V,ID,*L,*LH,time,laser_initialized);
+      laser_initialized = true;
+    }
+    laser->AddHeatToNavierStokesResidual(R, *LH);
+  }
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
   U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
@@ -228,6 +255,10 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
   spo.ComputeResidual(V1, ID, R); //R = R(V1)
+  if(laser) {
+    laser->ComputeLaserRadianceAndHeat(V1,ID,*L,*LH,time,laser_initialized);
+    laser->AddHeatToNavierStokesResidual(R, *LH);
+  }
   U1.AXPlusBY(0.25, 0.75, Un); //U2 = 0.75*U(n) + 0.25*U1;
   U1.AXPlusBY(1.0, 0.25*dt, R); //U2 = U2 + 0.25*dt*R(V1)
   
@@ -256,6 +287,10 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   spo.ComputeResidual(V1, ID, R); //R = R(V2)
+  if(laser) {
+    laser->ComputeLaserRadianceAndHeat(V1,ID,*L,*LH,time,laser_initialized);
+    laser->AddHeatToNavierStokesResidual(R, *LH);
+  }
   U1.AXPlusBY(2.0/3.0, 1.0/3.0, Un); //U2 = 1/3*U(n) + 2/3*U2;
   U1.AXPlusBY(1.0, 2.0/3.0*dt, R); //U2 = U2 + 2/3*dt*R(V2)
 
@@ -277,15 +312,15 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, time, dt, time_step);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, dt, time_step);
 }
 
 //----------------------------------------------------------------------------
 
 void
 TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                                    vector<SpaceVariable3D*> &Phi, double time,
-                                                    double dt, int time_step)
+                                                    vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
+                                                    double time, double dt, int time_step)
 {
 
   // Reinitialize level set (frequency specified by user)
@@ -320,6 +355,9 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
   // Apply smoothing to U (if specified by user)
   spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
 
+  // Solve laser radiation equation
+  if(laser)
+    laser->ComputeLaserRadianceAndHeat(V,ID,*L,*LH,time,laser_initialized);
 }
 
 //----------------------------------------------------------------------------

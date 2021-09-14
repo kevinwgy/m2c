@@ -1,11 +1,11 @@
 #include <ProbeOutput.h>
-#include <GeoTools.h>
+#include <trilinear_interpolation.h>
 
 //-------------------------------------------------------------------------
 
 // This constructor is for explicitly specified probe nodes (i.e. not a line)
-ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) : 
-             comm(comm_), iod_output(iod_output_)
+ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_) : 
+             comm(comm_), iod_output(iod_output_), vf(vf_)
 {
   iFrame = 0;
 
@@ -88,6 +88,13 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) :
     delete [] filename;
   }
 
+  if (iod_output.probes.laser_radiance[0] != 0) {
+    char *filename = new char[spn + strlen(iod_output.probes.materialid)];
+    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.laser_radiance);
+    file[Probes::LASERRADIANCE] = fopen(filename, "w");
+    delete [] filename;
+  }
+
   if (iod_output.probes.levelset0[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.levelset0)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset0);
@@ -136,8 +143,9 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_) :
 
 //-------------------------------------------------------------------------
 // This constructor is for "line plots"
-ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, int line_number_) : 
-             comm(comm_), iod_output(iod_output_)
+ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_,
+                         int line_number_) : 
+             comm(comm_), iod_output(iod_output_), vf(vf_)
 {
   iFrame = 0;
 
@@ -262,7 +270,7 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
 
 void 
 ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                                        std::vector<SpaceVariable3D*> &Phi, bool force_write)
+                                        std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, bool force_write)
 {
   if(numNodes <= 0)
     return;
@@ -295,11 +303,16 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
         line->x1, line->y1, line->z1);
   print(file, "## Number of points: %d (h = %e)\n", line->numPoints, h);
   print(file, "## Time: %e, Time step: %d.\n", time, time_step);
-  print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  |  LevelSet(s)\n");
+  if(L) 
+    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  "
+                "|  Laser Radiance  |  LevelSet(s)\n");
+  else
+    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  |  LevelSet(s)\n");
 
   //get data
   double***  v  = (double***) V.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
+  double***  l  = L? L->GetDataPointer() : NULL;
   std::vector<double***> phi;
   for(int i=0; i<Phi.size(); i++)
     phi.push_back((double***)Phi[i]->GetDataPointer());
@@ -315,6 +328,10 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
     double myid= InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], id, 1, 0);
     print(file, "%16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  ", 
                 iNode*h, rho, vx, vy, vz, p, myid);
+    if(l) {
+      double laser_rad = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], l, 1, 0);
+      print(file, "%16.8e  ", laser_rad);
+    }
     for(int i=0; i<Phi.size(); i++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi[i], 1, 0);
       print(file, "%16.8e  ", sol);
@@ -324,8 +341,10 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
 
   fclose(file);
 
+
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
+  if(L) L->RestoreDataPointerToLocalVector();
   for(int i=0; i<Phi.size(); i++)
     Phi[i]->RestoreDataPointerToLocalVector();
 
@@ -337,7 +356,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
 
 void 
 ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                                   std::vector<SpaceVariable3D*> &Phi, bool force_write)
+                                   std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, bool force_write)
 {
 
   if(numNodes <= 0) //nothing to be done
@@ -399,7 +418,15 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
   }
 
   if(file[Probes::TEMPERATURE]) {
-    print("Warning: Unable to write temperature result at probe locations.\n");
+    print(file[Probes::TEMPERATURE], "%8d    %16.8e    ", time_step, time);
+    double*** id  = (double***)ID.GetDataPointer();
+    for(int iNode=0; iNode<numNodes; iNode++) {
+      double sol = CalculateTemperatureAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      print(file[Probes::TEMPERATURE], "%16.8e    ", sol);
+    }
+    print(file[Probes::TEMPERATURE],"\n");
+    fflush(file[Probes::TEMPERATURE]);
+    ID.RestoreDataPointerToLocalVector();
   }
 
   if(file[Probes::MATERIALID]) {
@@ -412,6 +439,22 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::MATERIALID],"\n");
     fflush(file[Probes::MATERIALID]);
     ID.RestoreDataPointerToLocalVector();
+  }
+
+  if(file[Probes::LASERRADIANCE]) {
+    print(file[Probes::LASERRADIANCE], "%8d    %16.8e    ", time_step, time);
+    if(L == NULL) {
+      print_error("*** Error: Requested laser radiance probe, but laser source is not specified.\n");
+      exit_mpi();
+    }
+    double*** l  = (double***)L->GetDataPointer();
+    for(int iNode=0; iNode<numNodes; iNode++) {
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], l, 1, 0);
+      print(file[Probes::LASERRADIANCE], "%16.8e    ", sol);
+    }
+    print(file[Probes::LASERRADIANCE],"\n");
+    fflush(file[Probes::LASERRADIANCE]);
+    L->RestoreDataPointerToLocalVector();
   }
 
   if(file[Probes::LEVELSET0] && Phi.size()>=1) {
@@ -498,7 +541,84 @@ ProbeOutput::InterpolateSolutionAtProbe(Int3& ijk, Vec3D &trilinear_coords, doub
     double c101 = v[k+1][j][(i+1)*dim+p];
     double c011 = v[k+1][j+1][i*dim+p];
     double c111 = v[k+1][j+1][(i+1)*dim+p];
-    sol = GeoTools::TrilinearInterpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
+    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &sol, 1, MPI_DOUBLE, MPI_SUM, comm);
+  return sol;
+}
+
+//-------------------------------------------------------------------------
+
+double
+ProbeOutput::CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id)
+{
+  double sol = 0.0;
+
+  int i = ijk[0], j = ijk[1], k = ijk[2];
+  int dim = 5;
+  double rho,p,e;
+  int myid;
+
+  if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
+
+    // c000
+    myid = id[k][j][i]; 
+    rho  =  v[k][j][i*dim];
+    p    =  v[k][j][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c000 = vf[myid]->GetTemperature(rho,e);
+
+    // c100
+    myid = id[k][j][i+1];
+    rho  =  v[k][j][(i+1)*dim];
+    p    =  v[k][j][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c100 = vf[myid]->GetTemperature(rho,e);
+
+    // c010
+    myid = id[k][j+1][i];
+    rho  =  v[k][j+1][i*dim];
+    p    =  v[k][j+1][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c010 = vf[myid]->GetTemperature(rho,e);
+
+    // c110
+    myid = id[k][j+1][i+1];
+    rho  =  v[k][j+1][(i+1)*dim];
+    p    =  v[k][j+1][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c110 = vf[myid]->GetTemperature(rho,e);
+
+    // c001
+    myid = id[k+1][j][i];
+    rho  =  v[k+1][j][i*dim];
+    p    =  v[k+1][j][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c001 = vf[myid]->GetTemperature(rho,e);
+
+    // c101
+    myid = id[k+1][j][i+1];
+    rho  =  v[k+1][j][(i+1)*dim];
+    p    =  v[k+1][j][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c101 = vf[myid]->GetTemperature(rho,e);
+
+    // c011
+    myid = id[k+1][j+1][i];
+    rho  =  v[k+1][j+1][i*dim];
+    p    =  v[k+1][j+1][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c011 = vf[myid]->GetTemperature(rho,e);
+
+    // c111
+    myid = id[k+1][j+1][i+1];
+    rho  =  v[k+1][j+1][(i+1)*dim];
+    p    =  v[k+1][j+1][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c111 = vf[myid]->GetTemperature(rho,e);
+
+    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
   }
 
   MPI_Allreduce(MPI_IN_PLACE, &sol, 1, MPI_DOUBLE, MPI_SUM, comm);

@@ -39,10 +39,11 @@ public:
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh
 
   void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
-                       SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, bool force_write);
+                       SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
+                       SpaceVariable3D *L/*laser radiance*/, bool force_write);
 
   void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                             vector<SpaceVariable3D*> &Phi); //!< write solution to file
+                             vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L); //!< write solution to file
 
   void FinalizeOutput();
 

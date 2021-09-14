@@ -77,7 +77,6 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   // Find ghost nodes outside laser boundary (These include nodes inside and outside the physical domain!)
   SetupLaserGhostNodes();
   
-  exit_mpi();
 }
 
 //--------------------------------------------------------------------------
@@ -1098,6 +1097,13 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   }
   assert(counter == ordered.size() - far_nodes.size());
 
+
+  // Allocate space for storing laser radiance at ghost nodes
+  ebm.l1.resize(ebm.ghostNodes1.size(), 0.0);
+  ebm.l2.resize(ebm.ghostNodes2.size());
+  for(int n1=0; n1<ebm.ghostNodes2.size(); n1++)
+    ebm.l2[n1].resize(ebm.ghostNodes2[n1].size(), 0.0);
+ 
 }
 
 //--------------------------------------------------------------------------
@@ -1240,18 +1246,15 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l, int custom_max_iter)
   bool custom_max_iter_specified = custom_max_iter>0;
   int max_iter = custom_max_iter_specified ? custom_max_iter : iod.laser.max_iter;
 
-  // Create vectors to store "old" values. (These vectors will be small.)
-  vector<double> l1(ebm.ghostNodes1.size(), 0.0);
+  // Store "old" values. (These vectors will be small.)
   for(int n=0; n<ebm.ghostNodes1.size(); n++) {
     int i(ebm.ghostNodes1[n].first[0]), j(ebm.ghostNodes1[n].first[1]), k(ebm.ghostNodes1[n].first[2]);
-    l1[n] = l[k][j][i];
+    ebm.l1[n] = l[k][j][i];
   }
-  vector<vector<double> > l2(ebm.ghostNodes2.size());
   for(int n1=0; n1<ebm.ghostNodes2.size(); n1++) {
-    l2[n1].resize(ebm.ghostNodes2[n1].size(), 0.0);
     for(int n=0; n<ebm.ghostNodes2[n1].size(); n++) {
       int i(ebm.ghostNodes2[n1][n][0]), j(ebm.ghostNodes2[n1][n][1]), k(ebm.ghostNodes2[n1][n][2]);
-      l2[n1][n] = l[k][j][i];
+      ebm.l2[n1][n] = l[k][j][i];
     }
   }
 
@@ -1269,15 +1272,15 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l, int custom_max_iter)
     for(int n=0; n<ebm.ghostNodes1.size(); n++) {
       int i(ebm.ghostNodes1[n].first[0]), j(ebm.ghostNodes1[n].first[1]), k(ebm.ghostNodes1[n].first[2]);
       double lnew = l[k][j][i];
-      max_err = std::max(max_err, fabs((l1[n] - lnew)/lnew));
-      l1[n] = lnew;
+      max_err = std::max(max_err, fabs((ebm.l1[n] - lnew)/lnew));
+      ebm.l1[n] = lnew;
     }
     for(int n1=0; n1<ebm.ghostNodes2.size(); n1++)
       for(int n=0; n<ebm.ghostNodes2[n1].size(); n++) {
         int i(ebm.ghostNodes2[n1][n][0]), j(ebm.ghostNodes2[n1][n][1]), k(ebm.ghostNodes2[n1][n][2]);
         double lnew = l[k][j][i];
-        max_err = std::max(max_err, fabs((l2[n1][n] - lnew)/lnew));
-        l2[n1][n] = lnew;
+        max_err = std::max(max_err, fabs((ebm.l2[n1][n] - lnew)/lnew));
+        ebm.l2[n1][n] = lnew;
       }
 
     // Find global max error and compare with tolerance
@@ -1385,7 +1388,7 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   double*** l     = L.GetDataPointer();
   double*** heat  = S.GetDataPointer();
   double*** T     = Temperature.GetDataPointer();
-  double*** l0    = L.GetDataPointer();
+  double*** l0    = L0.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
   double*** vol   = volume.GetDataPointer();
@@ -1394,16 +1397,19 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   double*** phi   = Phi.GetDataPointer();
   Vec5D*** v      = (Vec5D***)V.GetDataPointer();
 
+  // Note that when L enters this function, its laser ghost nodes (i.e. ghostNodes1 and 2) do not have values.
 
   ComputeTemperatureInLaserDomain(v, id, T);
 
   //If not initialized or source_power changes, set source radiance; initialize laser if needed
-  if(!initialized || !source_power_timehistory.empty()) {
+  if(!initialized || !source_power_timehistory.empty())
     SetSourceRadiance(l, coords, t);
-    if(!initialized)
-      InitializeLaserDomainAndGhostNodes(l, level);
-  }
 
+  //Make sure both real and ghost laser nodes have some meaningful values
+  if(!initialized)
+    InitializeLaserDomainAndGhostNodes(l, level);
+  else
+    ApplyStoredGhostNodesRadiance(l);
 
   //Gauss-Seidel iterations 
   int GSiter = 0;
@@ -1435,6 +1441,9 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   // compute heat source term
   ComputeLaserHeating(l, T, id, heat);
 
+
+  // clean up ghost nodes (for outputting) and store ghost nodes values internally
+  CleanUpGhostNodes(l, true);
 
 
   L.RestoreDataPointerToLocalVector(); //data exchanged using levelcomm
@@ -1624,6 +1633,50 @@ LaserAbsorptionSolver::ComputeErrorsInLaserDomain(double*** lold, double*** lnew
   MPI_Allreduce(MPI_IN_PLACE, &avg_error, 1, MPI_DOUBLE, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &N, 1, MPI_INT, MPI_SUM, comm);
   avg_error /= N;
+
+}
+
+//--------------------------------------------------------------------------
+
+void
+LaserAbsorptionSolver::CleanUpGhostNodes(double*** l, bool backup)
+{
+
+  // Step 1: Clean up ghostNodes1
+  for(auto it = ebm.ghostNodes1.begin(); it != ebm.ghostNodes1.end(); it++) {
+    int i(it->first[0]), j(it->first[1]), k(it->first[2]);
+    if(backup)
+      ebm.l1[it - ebm.ghostNodes1.begin()] = l[k][j][i];
+    l[k][j][i] = 0.0;
+  }
+
+  // Step 2: Clean up ghostNodes2
+  for(int p=0; p<ebm.ghostNodes2.size(); p++)
+    for(int q=0; q<ebm.ghostNodes2[p].size(); q++) {
+      int i(ebm.ghostNodes2[p][q][0]), j(ebm.ghostNodes2[p][q][1]), k(ebm.ghostNodes2[p][q][2]);
+      if(backup)
+        ebm.l2[p][q] = l[k][j][i];
+      l[k][j][i] = 0.0;
+    } 
+
+}
+
+//--------------------------------------------------------------------------
+
+void
+LaserAbsorptionSolver::ApplyStoredGhostNodesRadiance(double*** l)
+{
+
+  for(auto it = ebm.ghostNodes1.begin(); it != ebm.ghostNodes1.end(); it++) {
+    int i(it->first[0]), j(it->first[1]), k(it->first[2]);
+    l[k][j][i] = ebm.l1[it - ebm.ghostNodes1.begin()];
+  }
+
+  for(int p=0; p<ebm.ghostNodes2.size(); p++)
+    for(int q=0; q<ebm.ghostNodes2[p].size(); q++) {
+      int i(ebm.ghostNodes2[p][q][0]), j(ebm.ghostNodes2[p][q][1]), k(ebm.ghostNodes2[p][q][2]);
+      l[k][j][i] = ebm.l2[p][q];
+    } 
 
 }
 

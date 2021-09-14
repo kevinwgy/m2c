@@ -758,7 +758,8 @@ struct Probes {
   double frequency_dt;
 
   enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
-              MATERIALID = 6, LEVELSET0 = 7, LEVELSET1 = 8, LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, SIZE = 12};
+              MATERIALID = 6, LASERRADIANCE = 7, LEVELSET0 = 8, LEVELSET1 = 9, LEVELSET2 = 10, LEVELSET3 = 11, 
+              LEVELSET4 = 12, SIZE = 13};
 
   const char *density;
   const char *velocity_x;
@@ -767,6 +768,7 @@ struct Probes {
   const char *pressure;
   const char *temperature;
   const char *materialid;
+  const char *laser_radiance;
   const char *levelset0;
   const char *levelset1;
   const char *levelset2;

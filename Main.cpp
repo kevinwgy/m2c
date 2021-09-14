@@ -13,6 +13,7 @@
 #include <TimeIntegrator.h>
 #include <MultiPhaseOperator.h>
 #include <GradientCalculatorCentral.h>
+#include <LaserAbsorptionSolver.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -153,6 +154,19 @@ int main(int argc, char* argv[])
   MultiPhaseOperator mpo(comm, dms, iod, vf, spo, lso);
   mpo.UpdateMaterialID(Phi,ID); //populate the ghost layer of ID (outside domain boundary)
 
+
+  //! Initialize laser radiation solver (if needed)
+  LaserAbsorptionSolver* laser = NULL;
+  SpaceVariable3D* L = NULL;  //laser radiance
+  if(iod.laser.source_power>0.0 || iod.laser.source_intensity>0.0 ||
+     strcmp(iod.laser.source_power_timehistory_file, "") != 0) {//laser source is specified
+    laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
+                                      spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
+                                      *(spo.GetPointerToInnerGhostNodes()),
+                                      *(spo.GetPointerToOuterGhostNodes()));
+    L = new SpaceVariable3D(comm, &(dms.ghosted1_1dof)); 
+  }
+ 
   //! Initialize output
   Output out(comm, dms, iod, vf, spo.GetMeshCellVolumes()); 
   out.InitializeOutput(spo.GetMeshCoordinates());
@@ -161,11 +175,11 @@ int main(int argc, char* argv[])
   TimeIntegratorBase *integrator = NULL;
   if(iod.ts.type == TsData::EXPLICIT) {
     if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
-      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo);
+      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
-      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo);
+      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
-      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo);
+      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser);
     else {
       print_error("*** Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();
@@ -188,7 +202,7 @@ int main(int argc, char* argv[])
   double cfl = 0.0;
   int time_step = 0;
   //! write initial condition to file
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, true/*force_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 
   while(t<iod.ts.maxTime && time_step<iod.ts.maxIts) {
 
@@ -209,15 +223,15 @@ int main(int argc, char* argv[])
     // Move forward by one time-step: Update V, Phi, and ID
     //----------------------------------------------------
     t += dt;
-    integrator->AdvanceOneTimeStep(V, ID, Phi, t, dt, time_step); 
+    integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step); 
     //----------------------------------------------------
 
 
-    out.OutputSolutions(t, dt, time_step, V, ID, Phi, false/*force_write*/);
+    out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, false/*force_write*/);
 
   }
 
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, true/*force_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");
@@ -231,6 +245,8 @@ int main(int argc, char* argv[])
   V.Destroy();
   ID.Destroy();
 
+  if(laser) laser->Destroy();
+  if(L)     L->Destroy();
 
   //! Detroy the levelsets
   for(int ls = 0; ls<lso.size(); ls++) {

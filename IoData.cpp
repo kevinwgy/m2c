@@ -2047,6 +2047,7 @@ Probes::Probes() {
   velocity_y = "";
   velocity_z = "";
   materialid = "";
+  laser_radiance = "";
   levelset0 = "";
   levelset1 = "";
   levelset2 = "";
@@ -2060,7 +2061,7 @@ Probes::Probes() {
 void Probes::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 15, father);
+  ClassAssigner *ca = new ClassAssigner(name, 16, father);
 
   new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
   new ClassDouble<Probes>(ca, "TimeInterval", this, &Probes::frequency_dt);
@@ -2071,6 +2072,7 @@ void Probes::setup(const char *name, ClassAssigner *father)
   new ClassStr<Probes>(ca, "VelocityY", this, &Probes::velocity_y);
   new ClassStr<Probes>(ca, "VelocityZ", this, &Probes::velocity_z);
   new ClassStr<Probes>(ca, "MaterialID", this, &Probes::materialid);
+  new ClassStr<Probes>(ca, "LaserRadiance", this, &Probes::laser_radiance);
   new ClassStr<Probes>(ca, "LevelSet0", this, &Probes::levelset0);
   new ClassStr<Probes>(ca, "LevelSet1", this, &Probes::levelset1);
   new ClassStr<Probes>(ca, "LevelSet2", this, &Probes::levelset2);
