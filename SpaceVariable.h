@@ -34,6 +34,8 @@ public:
 
 /*******************************************
  * Defines a space variable
+ * Note: Upon initialization, SpaceVariable3D
+ *       is filled with 0.
  *******************************************
  */
 class SpaceVariable3D {

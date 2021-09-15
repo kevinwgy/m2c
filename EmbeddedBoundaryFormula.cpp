@@ -1,8 +1,8 @@
 #include<EmbeddedBoundaryFormula.h>
 #include<cassert>
 
-//for debug, turn following line on
-#include<trilinear_interpolation.h>
+//if the verification script is activated, turn following line on
+//#include<trilinear_interpolation.h>
 
 //-----------------------------------------------------------------------------
 

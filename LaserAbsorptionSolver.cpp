@@ -1146,7 +1146,7 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
 
     if(l0<lmin) {
       l0 = lmin;
-      if(verbose >= OutputData::MEDIUM)
+      if(verbose >= OutputData::HIGH)
         print("Warning: source radiance (%e) is lower than the cut-off radiance (%e).\n", l0, lmin);
     }
 
@@ -1181,7 +1181,7 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
 
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
-        if(verbose >= OutputData::MEDIUM)
+        if(verbose >= OutputData::HIGH)
           fprintf(stderr,"Warning: [%d] source radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
@@ -1203,10 +1203,11 @@ LaserAbsorptionSolver::InitializeLaserDomainAndGhostNodes(double*** l, double***
   //---------------------------------------------------------------------
   // Step 1. Specify a value of L for nodes inside the laser domain, layer by layer.
   //---------------------------------------------------------------------
+  auto it = sortedNodes.begin() + queueCounter[0];
   for(int lvl = 1; lvl<queueCounter.size(); lvl++) {
-    for(int n = queueCounter[lvl-1]; n < queueCounter[lvl]; n++) {
+    for(int n = 0; n < queueCounter[lvl]; n++) {
 
-      int i(sortedNodes[n].i), j(sortedNodes[n].j), k(sortedNodes[n].k);
+      int i(it->i), j(it->j), k(it->k);
       double sum(0);
       int count(0);
       if(level[k][j][i-1]>=0 && level[k][j][i-1]<lvl) {sum += l[k][j][i-1]; count++;}
@@ -1225,6 +1226,7 @@ LaserAbsorptionSolver::InitializeLaserDomainAndGhostNodes(double*** l, double***
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
 
+      it++;
     }
     levelcomm[lvl]->ExchangeAndInsert(l);
   }
@@ -1285,16 +1287,20 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l, int custom_max_iter)
 
     // Find global max error and compare with tolerance
     MPI_Allreduce(MPI_IN_PLACE, &max_err, 1, MPI_DOUBLE, MPI_MAX, comm);
+    //print("It %d: max_err = %e!\n", iter, max_err);
     if(max_err<iod.laser.convergence_tol)
       break;
 
   }
-  if(iter == max_iter && !custom_max_iter_specified)
-    print("Warning: Ghost nodes in the laser solver didn't converge in %d iterations "
-          "(err = %e, tol = %e).\n", iter, max_err, iod.laser.convergence_tol);
-  else if(verbose == OutputData::HIGH)
-    print("  o Ghost nodes in the laser solver converged in %d iterations "
-          "(err = %e, tol = %e).\n", iter, max_err, iod.laser.convergence_tol);
+
+  if(!custom_max_iter_specified) { //no need to print anything if max_iter is "customized"
+    if(iter == max_iter)
+      print("Warning: Ghost nodes in the laser solver didn't converge in %d iterations "
+            "(err = %e, tol = %e).\n", iter, max_err, iod.laser.convergence_tol);
+    else if(verbose == OutputData::HIGH)
+      print("  o Ghost nodes in the laser solver converged in %d iteration(s) "
+            "(err = %e, tol = %e).\n", iter+1, max_err, iod.laser.convergence_tol);
+  }
 
 }
 
@@ -1315,6 +1321,7 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
         fprintf(stderr,"Warning: [%d] Radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                 mpi_rank, i,j,k, l[k][j][i], lmin);
     }
+//    fprintf(stderr,"[%d] GN1 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
   }
 
   // Step 2: Work on friendsGhostNodes
@@ -1362,6 +1369,7 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
           fprintf(stderr,"Warning: [%d] Received radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
+//      fprintf(stderr,"[%d] GN2 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
     }
   }
 
@@ -1370,23 +1378,22 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
 //--------------------------------------------------------------------------
 
 void
-LaserAbsorptionSolver::ComputeLaserRadianceAndHeat(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L,
-                                                   SpaceVariable3D &S, const double t, bool initialized)
+LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L,
+                                            const double t, bool initialized)
 {
   if(true) // may add other methods later
-    ComputeLaserRadianceMeanFluxMethod(V,ID,L,S,t,initialized);
+    ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,initialized);
 }
 
 //--------------------------------------------------------------------------
 
 void
 LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L,
-                                                          SpaceVariable3D &S, const double t, bool initialized)
+                                                          const double t, bool initialized)
 {
   // This function will use customized communicators. The sub-functions deal with double*** directly
   //
   double*** l     = L.GetDataPointer();
-  double*** heat  = S.GetDataPointer();
   double*** T     = Temperature.GetDataPointer();
   double*** l0    = L0.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
@@ -1424,30 +1431,28 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
     //-----------------------------------------------------------------
 
     ComputeErrorsInLaserDomain(l0, l, max_error, avg_error);
+    print("It %d. max_error = %e, avg_error = %e!\n", GSiter, max_error, avg_error);
+
     if(max_error<iod.laser.convergence_tol)
       break;
 
     UpdateGhostNodes(l);
+
   }
 
   if(GSiter == iod.laser.max_iter) {
-    print_error("*** Error: Laser radiation solver failed to converge in %d iterations. (err = %e, tol = %e)\n",
+    print_error("*** Error: Laser radiation solver failed to converge in %d iterations. (error = %e, tol = %e)\n",
                 GSiter, max_error, iod.laser.convergence_tol);
   } else if(verbose >= OutputData::MEDIUM)
-    print("  o Laser radiation solver converged in %d iterations "
-          "(err = %e, tol = %e).\n", GSiter, max_error, iod.laser.convergence_tol);
-
-
-  // compute heat source term
-  ComputeLaserHeating(l, T, id, heat);
+    print("  o Laser radiation solver converged in %d iteration(s)."
+          "(error = %e, tol = %e).\n", GSiter+1, max_error, iod.laser.convergence_tol);
 
 
   // clean up ghost nodes (for outputting) and store ghost nodes values internally
   CleanUpGhostNodes(l, true);
 
 
-  L.RestoreDataPointerToLocalVector(); //data exchanged using levelcomm
-  S.RestoreDataPointerToLocalVector(); //data exchanged using levelcomm
+  L.RestoreDataPointerAndInsert(); //data exchanged using levelcomm. But need to "insert" for outputting
   Temperature.RestoreDataPointerToLocalVector();
   L0.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
@@ -1468,14 +1473,13 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
                                                      double*** level, double*** phi, 
                                                      double alpha, double relax)
 {
-
+  auto it = sortedNodes.begin() + queueCounter[0];
   for(int lvl = 1; lvl<queueCounter.size(); lvl++) {
-    for(int n = queueCounter[lvl-1]; n < queueCounter[lvl]; n++) { //sortedNodes on lvl
-      NodalLaserInfo& node(sortedNodes[n]);
-      int i(node.i), j(node.j), k(node.k);
+    for(int n = 0; n < queueCounter[lvl]; n++) { //sortedNodes on lvl
+      int i(it->i), j(it->j), k(it->k);
       
-      node.fin  = 0.0;
-      node.fout = 0.0;
+      it->fin  = 0.0;
+      it->fout = 0.0;
 
       // go over the 6 direct neighbors to compute flux across cell boundaries
       Vec3D dir; //laser direction at cell interface
@@ -1488,11 +1492,11 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       proj = -dir[0]; //dir*(-1,0,0)
       proj *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
       if(proj<0) {
-        node.fin  += alpha*proj*l[k][j][i-1];
-        node.fout += (1.0-alpha)*proj;
+        it->fin  += alpha*proj*l[k][j][i-1];
+        it->fout += (1.0-alpha)*proj;
       } else {
-        node.fin  += (1.0-alpha)*proj*l[k][j][i-1];
-        node.fout += alpha*proj;
+        it->fin  += (1.0-alpha)*proj*l[k][j][i-1];
+        it->fout += alpha*proj;
       }
       //2. right
       xinter = coords[k][j][i] + Vec3D(0.5*dxyz[k][j][i][0],0,0);
@@ -1500,11 +1504,11 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       proj = dir[0]; //dir*(1,0,0)
       proj *= dxyz[k][j][i][1]*dxyz[k][j][i][2];
       if(proj<0) {
-        node.fin  += alpha*proj*l[k][j][i+1];
-        node.fout += (1.0-alpha)*proj;
+        it->fin  += alpha*proj*l[k][j][i+1];
+        it->fout += (1.0-alpha)*proj;
       } else {
-        node.fin  += (1.0-alpha)*proj*l[k][j][i+1];
-        node.fout += alpha*proj;
+        it->fin  += (1.0-alpha)*proj*l[k][j][i+1];
+        it->fout += alpha*proj;
       }
       //3. bottom 
       xinter = coords[k][j][i] - Vec3D(0,0.5*dxyz[k][j][i][1],0);
@@ -1512,11 +1516,11 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       proj = -dir[1]; //dir*(0,-1,0)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
       if(proj<0) {
-        node.fin  += alpha*proj*l[k][j-1][i];
-        node.fout += (1.0-alpha)*proj;
+        it->fin  += alpha*proj*l[k][j-1][i];
+        it->fout += (1.0-alpha)*proj;
       } else {
-        node.fin  += (1.0-alpha)*proj*l[k][j-1][i];
-        node.fout += alpha*proj;
+        it->fin  += (1.0-alpha)*proj*l[k][j-1][i];
+        it->fout += alpha*proj;
       }
       //4. top 
       xinter = coords[k][j][i] + Vec3D(0,0.5*dxyz[k][j][i][1],0);
@@ -1524,11 +1528,11 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       proj = dir[1]; //dir*(0,1,0)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][2];
       if(proj<0) {
-        node.fin  += alpha*proj*l[k][j+1][i];
-        node.fout += (1.0-alpha)*proj;
+        it->fin  += alpha*proj*l[k][j+1][i];
+        it->fout += (1.0-alpha)*proj;
       } else {
-        node.fin  += (1.0-alpha)*proj*l[k][j+1][i];
-        node.fout += alpha*proj;
+        it->fin  += (1.0-alpha)*proj*l[k][j+1][i];
+        it->fout += alpha*proj;
       }
       //5. back 
       xinter = coords[k][j][i] - Vec3D(0,0,0.5*dxyz[k][j][i][2]);
@@ -1536,11 +1540,11 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       proj = -dir[2]; //dir*(0,0,-1)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
       if(proj<0) {
-        node.fin  += alpha*proj*l[k-1][j][i];
-        node.fout += (1.0-alpha)*proj;
+        it->fin  += alpha*proj*l[k-1][j][i];
+        it->fout += (1.0-alpha)*proj;
       } else {
-        node.fin  += (1.0-alpha)*proj*l[k-1][j][i];
-        node.fout += alpha*proj;
+        it->fin  += (1.0-alpha)*proj*l[k-1][j][i];
+        it->fout += alpha*proj;
       }
       //6. front 
       xinter = coords[k][j][i] + Vec3D(0,0,0.5*dxyz[k][j][i][2]);
@@ -1548,18 +1552,26 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       proj = dir[2]; //dir*(0,0,1)
       proj *= dxyz[k][j][i][0]*dxyz[k][j][i][1];
       if(proj<0) {
-        node.fin  += alpha*proj*l[k+1][j][i];
-        node.fout += (1.0-alpha)*proj;
+        it->fin  += alpha*proj*l[k+1][j][i];
+        it->fout += (1.0-alpha)*proj;
       } else {
-        node.fin  += (1.0-alpha)*proj*l[k+1][j][i];
-        node.fout += alpha*proj;
+        it->fin  += (1.0-alpha)*proj*l[k+1][j][i];
+        it->fout += alpha*proj;
       }
 
       //update l[k][j][i]
       double eta = GetAbsorptionCoefficient(T[k][j][i], id[k][j][i]); //absorption coeff.
       l[k][j][i] = (1.0-relax)*l[k][j][i] 
-                 + relax*(-node.fin/(vol[k][j][i]*eta + node.fout));
+                 + relax*(-(it->fin)/(vol[k][j][i]*eta + it->fout));
 
+      if(l[k][j][i]<lmin) {
+        l[k][j][i] = lmin;
+        if(verbose >= OutputData::HIGH)
+          fprintf(stderr, "Warning: [%d] Applied cut-off radiance (%e) to (%d,%d,%d) (orig:%e).\n", 
+                  mpi_rank, lmin, i,j,k, l[k][j][i]);
+      }
+
+      it++;
     }
 
     levelcomm[lvl]->ExchangeAndInsert(l);
@@ -1683,46 +1695,41 @@ LaserAbsorptionSolver::ApplyStoredGhostNodesRadiance(double*** l)
 //--------------------------------------------------------------------------
 
 void
-LaserAbsorptionSolver::ComputeLaserHeating(double*** l, double*** T, double*** id, double*** s)
+LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID,
+                                                     SpaceVariable3D *V)
 {
+  Vec5D***  r  = (Vec5D***) R.GetDataPointer();
+  double*** l  = L.GetDataPointer();
+  double*** id = ID.GetDataPointer();
+  Vec5D***  v  = V ? (Vec5D***)V->GetDataPointer() : NULL;
+  double*** T  = Temperature.GetDataPointer();
 
+  if(V)
+    ComputeTemperatureInLaserDomain(v, id, T);
+  //otherwise, use stored temeprature
+
+  auto it = sortedNodes.begin() + queueCounter[0];
   for(int lvl = 1; lvl<queueCounter.size(); lvl++) {
-    for(int n = queueCounter[lvl-1]; n < queueCounter[lvl]; n++) { //sortedNodes on lvl
-      int i(sortedNodes[n].i), j(sortedNodes[n].j), k(sortedNodes[n].k);
-
-      //update s[k][j][i]
+    for(int n = 0; n < queueCounter[lvl]; n++) { //sortedNodes on lvl
+      int i(it->i), j(it->j), k(it->k);
       double eta = GetAbsorptionCoefficient(T[k][j][i], id[k][j][i]); //absorption coeff.
-      s[k][j][i] = eta*l[k][j][i];
+      r[k][j][i][4] += eta*l[k][j][i];
+      it++;
     }
-    levelcomm[lvl]->ExchangeAndInsert(s); //not really needed
+    // No need of data exchange on r
   }
 
-}
-
-//--------------------------------------------------------------------------
-
-void
-LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &S)
-{
-
-  Vec5D***  r = (Vec5D***) R.GetDataPointer();
-  double*** s = S.GetDataPointer();
-
-  for(int lvl = 1; lvl<queueCounter.size(); lvl++) {
-    for(int n = queueCounter[lvl-1]; n < queueCounter[lvl]; n++) { //sortedNodes on lvl
-      int i(sortedNodes[n].i), j(sortedNodes[n].j), k(sortedNodes[n].k);
-      r[k][j][i][4] += s[k][j][i];
-    }
-  }
-
+  Temperature.RestoreDataPointerToLocalVector();
+  if(V) V->RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+  L.RestoreDataPointerToLocalVector();
   R.RestoreDataPointerToLocalVector(); //although data has been udpated, no need to communicate.
                                        //one subdomain does not need the residual info of another
                                        //subdomain
-  S.RestoreDataPointerToLocalVector();
-
 }
 
 //--------------------------------------------------------------------------
+
 
 
 

@@ -1286,7 +1286,7 @@ void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, ve
   }
 
   if(narrow_band) {
-    print("- Reinitializing the level set function (material id: %d), bandwidth = %d.\n", materialid, iod_ls.bandwidth);
+    print("- Reinitializing the level set function (id: %d) after phase transition, bandwidth = %d.\n", materialid, iod_ls.bandwidth);
 
     for(auto it = new_nodes.begin(); it != new_nodes.end(); it++)
       if(std::find(useful_nodes.begin(), useful_nodes.end(), *it) == useful_nodes.end())
@@ -1294,7 +1294,7 @@ void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, ve
 
     reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
   } else {
-    print("- Reinitializing the level set function (material id: %d).\n", materialid);
+    print("- Reinitializing the level set function (id: %d) after phase transition.\n", materialid);
     reinit->ReinitializeFullDomain(Phi);
   }
 

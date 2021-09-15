@@ -23,8 +23,6 @@ protected:
 
   //! Laser absorption solver (NULL if laser is not activated)
   LaserAbsorptionSolver* laser;
-  SpaceVariable3D* LH; //Laser-induced heating
-  bool laser_initialized;
 
   //!< Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
@@ -37,10 +35,9 @@ public:
                      vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
                      LaserAbsorptionSolver* laser_) : 
       comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_),
-      laser_initialized(false), IDn(comm_, &(dms_.ghosted1_1dof)),
-      LH(laser_ ? new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)) : NULL) { }
+      IDn(comm_, &(dms_.ghosted1_1dof)) { }
 
-  virtual ~TimeIntegratorBase() {if(LH) delete LH;}
+  virtual ~TimeIntegratorBase() {} 
 
   // Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
@@ -51,7 +48,6 @@ public:
 
   virtual void Destroy() {
     IDn.Destroy();
-    if(LH) LH->Destroy();
   }
 
   // all the tasks that are done at the end of a time-step, independent of 

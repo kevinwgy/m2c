@@ -1827,7 +1827,7 @@ Assigner* LaserAbsorptionCoefficient::getAssigner()
   new ClassInt<LaserAbsorptionCoefficient>(ca, "MaterialID", this, &LaserAbsorptionCoefficient::materialid);
   new ClassDouble<LaserAbsorptionCoefficient>(ca, "Slope", this, &LaserAbsorptionCoefficient::slope);
   new ClassDouble<LaserAbsorptionCoefficient>(ca, "ReferenceTemperature", this, &LaserAbsorptionCoefficient::T0);
-  new ClassDouble<LaserAbsorptionCoefficient>(ca, "RefedrenceCoefficient", this, &LaserAbsorptionCoefficient::alpha0);
+  new ClassDouble<LaserAbsorptionCoefficient>(ca, "ReferenceCoefficient", this, &LaserAbsorptionCoefficient::alpha0);
   return ca;
 }
 

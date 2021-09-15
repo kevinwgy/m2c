@@ -201,6 +201,10 @@ int main(int argc, char* argv[])
   double dt = 0.0;
   double cfl = 0.0;
   int time_step = 0;
+
+  if(laser) //initialize L (otherwise the initial output will only have 0s)
+    laser->ComputeLaserRadiance(V, ID, *L, t, false);
+
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 

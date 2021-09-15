@@ -130,14 +130,14 @@ public:
 
   void Destroy();
 
-  //!< Compute raser radiance L and heat S = eta*L
-  void ComputeLaserRadianceAndHeat(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
-                                   SpaceVariable3D &S, //heat (eta*L), NOT multiplied by cell vol.
-                                   const double t, bool initialized = false); 
-                                   //initialized: whether L already has some values (e.g., from last time-step)
+  //! Compute raser radiance L 
+  void ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
+                            const double t, bool initialized); 
+                            //initialized: whether L already has some values (e.g., from last time-step)
 
-  //!< Add S to the 5th entry of R. Assuming R is the residual placed on the RHS, and has been divided by cell vol.
-  void AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &S);
+  //! Compute eta*L and add to the 5th entry of R. (Not multiplying cell volume)
+  void AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID, 
+                                     SpaceVariable3D *V = NULL); //if NULL, use stored temperature
   
 private:
 
@@ -160,8 +160,7 @@ private:
   void BuildSortedNodeList();
 
   void BuildCustomizedCommunicators();
-  //! for debug purpose only
-  void VerifySortedNodesAndCommunicators();
+  void VerifySortedNodesAndCommunicators(); //!< for debug purpose only
 
   void SetupLaserGhostNodes();
 
@@ -170,7 +169,7 @@ private:
   void CopyValues(double*** from, double*** to);
 
   void ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
-                                          SpaceVariable3D &S, const double t, bool initialized); 
+                                          const double t, bool initialized); 
 
   //-------------------------------------------------------------
   // functions called by ComputeLaserRadianceMeanFluxMethod
