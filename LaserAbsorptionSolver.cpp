@@ -24,6 +24,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        ghost_nodes_outer(ghost_nodes_outer_),
                        Temperature(comm_, &(dm_all_.ghosted1_1dof)),
                        L0(comm_, &(dm_all_.ghosted1_1dof)),
+                       Lbk(comm_, &(dm_all_.ghosted1_1dof)),
                        Phi(comm_, &(dm_all_.ghosted1_1dof)),
                        Level(comm_, &(dm_all_.ghosted1_1dof)),
                        Tag(comm_, &(dm_all_.ghosted1_1dof))
@@ -95,6 +96,7 @@ LaserAbsorptionSolver::Destroy()
 {
   Temperature.Destroy();
   L0.Destroy();
+  Lbk.Destroy();
   Phi.Destroy();
   Level.Destroy();
   Tag.Destroy();
@@ -1381,21 +1383,51 @@ void
 LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L,
                                             const double t, bool initialized)
 {
-  if(true) // may add other methods later
-    ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,initialized);
+  bool success;
+
+  success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,iod.laser.alpha,
+                                                 iod.laser.relax_coeff,initialized);
+
+  if(!success) {// triger the "failsafe" procedure
+    // Method 1: gradually decreasing the relaxation_factor in SOR
+    double relax = iod.laser.relax_coeff;
+    for(int iter = 0; iter < 5; iter++) {
+      relax /= 2.0;
+      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,iod.laser.alpha,relax,initialized); 
+      if(success)
+        break;
+    }
+  }
+
+  if(!success) {
+    //Method 2: switch to the "Step method"
+    double relax = iod.laser.relax_coeff;
+    for(int iter = 0; iter < 5; iter++) {
+      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,1.0,relax,initialized); 
+      if(success)
+        break;
+      relax /= 2.0;
+    }
+  }
+
+  if(!success)
+    print_error("*** Error: Laser radiance solver failed to converge.\n");
+    
 }
 
 //--------------------------------------------------------------------------
 
-void
+bool
 LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L,
-                                                          const double t, bool initialized)
+                                                          const double t, double alpha, double relax_coeff,
+                                                          bool initialized)
 {
   // This function will use customized communicators. The sub-functions deal with double*** directly
   //
   double*** l     = L.GetDataPointer();
   double*** T     = Temperature.GetDataPointer();
   double*** l0    = L0.GetDataPointer();
+  double*** lbk   = Lbk.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
   double*** vol   = volume.GetDataPointer();
@@ -1403,6 +1435,10 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   double*** level = Level.GetDataPointer();
   double*** phi   = Phi.GetDataPointer();
   Vec5D*** v      = (Vec5D***)V.GetDataPointer();
+
+
+  bool success = true;
+  CopyValues(l, lbk); //if the solver fails, return the original 
 
   // Note that when L enters this function, its laser ghost nodes (i.e. ghostNodes1 and 2) do not have values.
 
@@ -1427,11 +1463,11 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
 
     //-----------------------------------------------------------------
     RunMeanFluxMethodOneIteration(l, T, coords, dxyz, vol, id, level, phi, 
-                                  iod.laser.alpha, iod.laser.relax_coeff);
+                                  alpha, relax_coeff);
     //-----------------------------------------------------------------
 
     ComputeErrorsInLaserDomain(l0, l, max_error, avg_error);
-    print("It %d. max_error = %e, avg_error = %e!\n", GSiter, max_error, avg_error);
+    //print("It %d. max_error = %e, avg_error = %e!\n", GSiter, max_error, avg_error);
 
     if(max_error<iod.laser.convergence_tol)
       break;
@@ -1441,8 +1477,11 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   }
 
   if(GSiter == iod.laser.max_iter) {
-    print_error("*** Error: Laser radiation solver failed to converge in %d iterations. (error = %e, tol = %e)\n",
+    print_error("  o Warning: Laser radiation solver failed to converge in %d iterations. (error = %e, tol = %e)\n",
                 GSiter, max_error, iod.laser.convergence_tol);
+    CopyValues(lbk, l); //l = lbk
+    success = false;
+
   } else if(verbose >= OutputData::MEDIUM)
     print("  o Laser radiation solver converged in %d iteration(s)."
           "(error = %e, tol = %e).\n", GSiter+1, max_error, iod.laser.convergence_tol);
@@ -1455,6 +1494,7 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   L.RestoreDataPointerAndInsert(); //data exchanged using levelcomm. But need to "insert" for outputting
   Temperature.RestoreDataPointerToLocalVector();
   L0.RestoreDataPointerToLocalVector();
+  Lbk.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
   delta_xyz.RestoreDataPointerToLocalVector();
   volume.RestoreDataPointerToLocalVector(); 
@@ -1462,6 +1502,8 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   Level.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerToLocalVector();
   V.RestoreDataPointerToLocalVector();
+
+  return success;
 }
 
 

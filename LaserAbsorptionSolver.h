@@ -99,6 +99,7 @@ class LaserAbsorptionSolver {
   //! Internal variables
   SpaceVariable3D Temperature;
   SpaceVariable3D L0; //!< ``old'' L
+  SpaceVariable3D Lbk; //!< backup of input L (for "failsafe")
   SpaceVariable3D Phi; //!< distance from each node to source; -1 if node is out of scope
   SpaceVariable3D Level; //!< -1 if out of scope
   SpaceVariable3D Tag;
@@ -168,8 +169,9 @@ private:
 
   void CopyValues(double*** from, double*** to);
 
-  void ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
-                                          const double t, bool initialized); 
+  bool ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
+                                          const double t, double alpha, double relax_coeff, 
+                                          bool initialized); 
 
   //-------------------------------------------------------------
   // functions called by ComputeLaserRadianceMeanFluxMethod
