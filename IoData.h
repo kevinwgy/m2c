@@ -758,8 +758,8 @@ struct Probes {
   double frequency_dt;
 
   enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
-              MATERIALID = 6, LASERRADIANCE = 7, LEVELSET0 = 8, LEVELSET1 = 9, LEVELSET2 = 10, LEVELSET3 = 11, 
-              LEVELSET4 = 12, SIZE = 13};
+              DELTA_TEMPERATURE = 6, MATERIALID = 7, LASERRADIANCE = 8, LEVELSET0 = 9, LEVELSET1 = 10, 
+              LEVELSET2 = 11, LEVELSET3 = 12, LEVELSET4 = 13, SIZE = 14};
 
   const char *density;
   const char *velocity_x;
@@ -767,6 +767,7 @@ struct Probes {
   const char *velocity_z;
   const char *pressure;
   const char *temperature;
+  const char *delta_temperature;
   const char *materialid;
   const char *laser_radiance;
   const char *levelset0;
@@ -823,7 +824,7 @@ struct OutputData {
   const char *solution_filename_base; //!< filename without path
 
   enum Options {OFF = 0, ON = 1};
-  Options density, velocity, pressure, materialid, internal_energy, temperature, laser_radiance;
+  Options density, velocity, pressure, materialid, internal_energy, temperature, delta_temperature, laser_radiance;
   enum VerbosityLevel {LOW = 0, MEDIUM = 1, HIGH = 2} verbose;
 
   const static int MAXLS = 5;

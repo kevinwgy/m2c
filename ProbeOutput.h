@@ -58,6 +58,8 @@ private:
 
   double CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
 
+  double CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
+
 };
 
 

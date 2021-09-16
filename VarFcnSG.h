@@ -47,6 +47,7 @@ public:
   inline double GetBigGamma(double rho, double e) const {return gam1;}
 
   inline double GetTemperature(double rho, double e) const {return T0+invcv*(e-e0);}
+  inline double GetReferenceTemperature() const {return T0;}
 
   inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {return e0+cv*(T-T0);}
 

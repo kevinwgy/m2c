@@ -235,6 +235,22 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
   }
 
 
+  if(iod.output.delta_temperature==OutputData::ON) {
+    double*** s  = (double***) scalar.GetDataPointer();
+    double e;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          e = vf[(int)id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+          s[k][j][i] = vf[(int)id[k][j][i]]->GetTemperature(v[k][j][i][0], e)
+                     - vf[(int)id[k][j][i]]->GetReferenceTemperature();
+        }
+    scalar.RestoreDataPointerAndInsert();
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "delta_temperature");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
+  }
+
+
   if(iod.output.laser_radiance==OutputData::ON) {
     if(L == NULL) {
       print_error("*** Error: Requested output of laser radiance, but the laser source is not specified.\n");

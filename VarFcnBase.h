@@ -78,6 +78,11 @@ public:
     exit(-1); return 0.0;}
 
   //! temperature law, defined separately for each EOS
+  virtual double GetReferenceTemperature() const{
+    print_error("*** Error:  GetReferenceTemperature Function not defined\n");
+    exit(-1); return 0.0;}
+
+  //! temperature law, defined separately for each EOS
   virtual double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const{
     print_error("*** Error:  GetInternalEnergyPerUnitMassFromTemperature Function not defined\n");
     exit(-1); return 0.0;}

@@ -30,6 +30,7 @@ class LevelSetReinitializer
   //! Internal variables
   SpaceVariable3D Tag;
   SpaceVariable3D R;
+  SpaceVariable3D Phibk; //!< save input Phi for "failsafe"
   SpaceVariable3D Phi0;
   SpaceVariable3D Phi1;
   SpaceVariable3D Sign;

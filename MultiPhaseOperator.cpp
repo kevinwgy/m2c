@@ -679,9 +679,13 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             // update id
             id[k][j][i] = (*it)->toID;
 
+            // ------------------------------------------------------------------------
             // update p (rho and e fixed)
             double e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+            fprintf(stderr,"Detected phase transition at (%d,%d,%d)(%d->%d). p: %e -> %e.\n", i,j,k, myid, (*it)->toID,
+                    v[k][j][i][4], varFcn[(*it)->toID]->GetPressure(v[k][j][i][0], e));
             v[k][j][i][4] = varFcn[(*it)->toID]->GetPressure(v[k][j][i][0], e);
+            // ------------------------------------------------------------------------
 
             counter++;
             break;

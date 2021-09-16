@@ -17,6 +17,7 @@ LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm
                        Tag(comm_, &(dm_all_.ghosted1_1dof)),
                        NormalDir(comm_, &(dm_all_.ghosted1_3dof)),
                        R(comm_, &(dm_all_.ghosted1_1dof)),
+                       Phibk(comm_, &(dm_all_.ghosted1_1dof)),
                        Phi0(comm_, &(dm_all_.ghosted1_1dof)),
                        Phi1(comm_, &(dm_all_.ghosted1_1dof)),
                        Sign(comm_, &(dm_all_.ghosted1_1dof)),
@@ -55,6 +56,7 @@ LevelSetReinitializer::Destroy()
   Tag.Destroy();
   NormalDir.Destroy();
   R.Destroy();
+  Phibk.Destroy();
   Phi0.Destroy();
   Phi1.Destroy();
   Sign.Destroy();
@@ -82,6 +84,12 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   }
 
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
+
+  //Store Phi (set Phibk = Phi) for failsafe
+  Phibk.AXPlusBY(0.0, 1.0, Phi,true);
+
+RETRY_FullDomain:
+
   double residual = 0.0, dphi_max = 0.0;
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
@@ -126,10 +134,23 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
       break;
   }
 
-  if(iter==iod_ls.reinit.maxIts)
-    print("  o Warning: Failed to converge. Residual = %e, Relative Error = %e, Tol = %e.\n", 
+  // apply failsafe
+  if(iter==iod_ls.reinit.maxIts) {
+    print("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
           residual, dphi_max, iod_ls.reinit.convergence_tolerance);
-
+    if(dphi_max<0.1) //ok...
+      return;
+    if(cfl < 0.02) {//failed...
+      print_error("*** ERROR: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
+                  residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+      exit_mpi();
+    } else {
+      cfl /= 1.5;
+      Phi.AXPlusBY(0.0, 1.0, Phibk,true);
+      goto RETRY_FullDomain;
+    }
+  }
+ 
 }
 
 //--------------------------------------------------------------------------
@@ -161,7 +182,14 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
     ApplyBoundaryConditions(Phi, &UsefulG2);
   }
 
+
   // Step 3: Main loop -- 3rd-order Runge-Kutta w/ spatially varying dt
+  
+  //Store Phi (set Phibk = Phi) for failsafe
+  AXPlusBYInBandPlusOne(0.0, Phibk, 1.0, Phi); 
+  
+RETRY_NarrowBand:
+  
   double residual = 0.0, dphi_max = 0.0;
   int iter;
   for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
@@ -212,9 +240,22 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
       break;
   }
 
-  if(iter==iod_ls.reinit.maxIts)
-    print("  o Warning: Failed to converge. Residual = %e, Relative Error = %e, Tol = %e.\n", 
+  //Failsafe
+  if(iter==iod_ls.reinit.maxIts) {
+    print("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e. Retrying.\n", 
           residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+    if(dphi_max<0.1) //ok...
+      return; 
+    if(cfl < 0.02) {//failed...
+      print_error("*** ERROR: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
+                  residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+      exit_mpi();
+    } else {
+      cfl /= 1.5;
+      AXPlusBYInBandPlusOne(0.0, Phi, 1.0, Phibk); //set Phi = Phibk and retry
+      goto RETRY_NarrowBand;
+    }
+  }
 
 }
 

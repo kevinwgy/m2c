@@ -1276,7 +1276,7 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
 }
 
 //-----------------------------------------------------
-
+//int debug_counter = 0;
 void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, vector<Int3> &new_nodes)
 {
   if(!reinit) {
@@ -1298,6 +1298,11 @@ void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, ve
     reinit->ReinitializeFullDomain(Phi);
   }
 
+/*
+  print_error("Done with reinit. after phase transition!\n");
+  std::string str = "Phi"+std::to_string(++debug_counter)+".vtr";
+  Phi.WriteToVTRFile(str.c_str());
+*/
 }
 
 //-----------------------------------------------------

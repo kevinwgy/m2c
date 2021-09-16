@@ -44,6 +44,10 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   // cut-off radiance (L must be positive inside the laser domain)
   lmin = iod.laser.lmin;
 
+  // parameters in mean flux method & SOR
+  mfm_alpha = iod.laser.alpha;
+  sor_relax = iod.laser.relax_coeff;
+
   // Get absorption coefficient for each material
   int numMaterials = iod.eqs.materials.dataMap.size();
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
@@ -1296,10 +1300,10 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l, int custom_max_iter)
   }
 
   if(!custom_max_iter_specified) { //no need to print anything if max_iter is "customized"
-    if(iter == max_iter)
+    if(iter == max_iter && verbose >= OutputData::HIGH)
       print("Warning: Ghost nodes in the laser solver didn't converge in %d iterations "
             "(err = %e, tol = %e).\n", iter, max_err, iod.laser.convergence_tol);
-    else if(verbose == OutputData::HIGH)
+    else if(verbose >= OutputData::HIGH)
       print("  o Ghost nodes in the laser solver converged in %d iteration(s) "
             "(err = %e, tol = %e).\n", iter+1, max_err, iod.laser.convergence_tol);
   }
@@ -1385,15 +1389,13 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D 
 {
   bool success;
 
-  success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,iod.laser.alpha,
-                                                 iod.laser.relax_coeff,initialized);
+  success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,mfm_alpha,sor_relax,initialized);
 
   if(!success) {// triger the "failsafe" procedure
     // Method 1: gradually decreasing the relaxation_factor in SOR
-    double relax = iod.laser.relax_coeff;
     for(int iter = 0; iter < 5; iter++) {
-      relax /= 2.0;
-      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,iod.laser.alpha,relax,initialized); 
+      sor_relax /= 2.0;
+      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,mfm_alpha,sor_relax,initialized); 
       if(success)
         break;
     }
@@ -1401,12 +1403,13 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D 
 
   if(!success) {
     //Method 2: switch to the "Step method"
-    double relax = iod.laser.relax_coeff;
+    sor_relax = iod.laser.relax_coeff; //restore user input
+    mfm_alpha = 1.0;
     for(int iter = 0; iter < 5; iter++) {
-      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,1.0,relax,initialized); 
+      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,mfm_alpha,sor_relax,initialized); 
       if(success)
         break;
-      relax /= 2.0;
+      sor_relax /= 2.0;
     }
   }
 
@@ -1477,14 +1480,14 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   }
 
   if(GSiter == iod.laser.max_iter) {
-    print_error("  o Warning: Laser radiation solver failed to converge in %d iterations. (error = %e, tol = %e)\n",
-                GSiter, max_error, iod.laser.convergence_tol);
+    print("Warning: Laser radiation solver failed to converge in %d iterations. (Error = %e, Tol = %e) Re-trying.\n",
+          GSiter, max_error, iod.laser.convergence_tol);
     CopyValues(lbk, l); //l = lbk
     success = false;
 
   } else if(verbose >= OutputData::MEDIUM)
-    print("  o Laser radiation solver converged in %d iteration(s)."
-          "(error = %e, tol = %e).\n", GSiter+1, max_error, iod.laser.convergence_tol);
+    print("- Laser radiation solver converged in %d iteration(s)."
+          "(Error = %e, Tol = %e).\n", GSiter+1, max_error, iod.laser.convergence_tol);
 
 
   // clean up ghost nodes (for outputting) and store ghost nodes values internally

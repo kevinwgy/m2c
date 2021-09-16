@@ -1935,6 +1935,7 @@ OutputData::OutputData()
   pressure = OFF;
   materialid = OFF;
   temperature = OFF;
+  delta_temperature = OFF;
   internal_energy = OFF;
   laser_radiance = OFF;
   levelset0 = OFF;
@@ -1948,14 +1949,14 @@ OutputData::OutputData()
 
   mesh_filename = "";
 
-  verbose = MEDIUM;
+  verbose = LOW;
 }
 
 //------------------------------------------------------------------------------
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 16+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 17+MAXLS, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -1977,6 +1978,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "Temperature", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "DeltaTemperature", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::delta_temperature), 2,
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "InternalEnergyPerUnitMass", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::internal_energy), 2,
@@ -2043,6 +2047,7 @@ Probes::Probes() {
   density = "";
   pressure = "";
   temperature = "";
+  delta_temperature = "";
   velocity_x = "";
   velocity_y = "";
   velocity_z = "";
@@ -2061,13 +2066,14 @@ Probes::Probes() {
 void Probes::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 16, father);
+  ClassAssigner *ca = new ClassAssigner(name, 17, father);
 
   new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
   new ClassDouble<Probes>(ca, "TimeInterval", this, &Probes::frequency_dt);
   new ClassStr<Probes>(ca, "Density", this, &Probes::density);
   new ClassStr<Probes>(ca, "Pressure", this, &Probes::pressure);
   new ClassStr<Probes>(ca, "Temperature", this, &Probes::temperature);
+  new ClassStr<Probes>(ca, "DeltaTemperature", this, &Probes::delta_temperature);
   new ClassStr<Probes>(ca, "VelocityX", this, &Probes::velocity_x);
   new ClassStr<Probes>(ca, "VelocityY", this, &Probes::velocity_y);
   new ClassStr<Probes>(ca, "VelocityZ", this, &Probes::velocity_z);

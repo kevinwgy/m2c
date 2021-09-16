@@ -121,6 +121,10 @@ class LaserAbsorptionSolver {
   //! embedded boundary method (for applying embedded and non-embedded boundary conditions)
   LaserEBM ebm;
 
+  //! parameters in the mean flux method and SOR (Set to input values, adjusted only in "failsafe")
+  double mfm_alpha;
+  double sor_relax;
+
 public:
 
   LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, std::vector<VarFcnBase*> &varFcn_,

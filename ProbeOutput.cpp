@@ -81,6 +81,13 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     delete [] filename;
   }
 
+  if (iod_output.probes.delta_temperature[0] != 0) {
+    char *filename = new char[spn + strlen(iod_output.probes.delta_temperature)];
+    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.delta_temperature);
+    file[Probes::DELTA_TEMPERATURE] = fopen(filename, "w");
+    delete [] filename;
+  }
+
   if (iod_output.probes.materialid[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.materialid)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.materialid);
@@ -429,6 +436,18 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     ID.RestoreDataPointerToLocalVector();
   }
 
+  if(file[Probes::DELTA_TEMPERATURE]) {
+    print(file[Probes::DELTA_TEMPERATURE], "%8d    %16.8e    ", time_step, time);
+    double*** id  = (double***)ID.GetDataPointer();
+    for(int iNode=0; iNode<numNodes; iNode++) {
+      double sol = CalculateDeltaTemperatureAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      print(file[Probes::DELTA_TEMPERATURE], "%16.8e    ", sol);
+    }
+    print(file[Probes::DELTA_TEMPERATURE],"\n");
+    fflush(file[Probes::DELTA_TEMPERATURE]);
+    ID.RestoreDataPointerToLocalVector();
+  }
+
   if(file[Probes::MATERIALID]) {
     print(file[Probes::MATERIALID], "%8d    %16.8e    ", time_step, time);
     double*** id  = (double***)ID.GetDataPointer();
@@ -617,6 +636,83 @@ ProbeOutput::CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, dou
     p    =  v[k+1][j+1][(i+1)*dim+4];
     e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
     double c111 = vf[myid]->GetTemperature(rho,e);
+
+    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &sol, 1, MPI_DOUBLE, MPI_SUM, comm);
+  return sol;
+}
+
+//-------------------------------------------------------------------------
+
+double
+ProbeOutput::CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id)
+{
+  double sol = 0.0;
+
+  int i = ijk[0], j = ijk[1], k = ijk[2];
+  int dim = 5;
+  double rho,p,e;
+  int myid;
+
+  if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
+
+    // c000
+    myid = id[k][j][i]; 
+    rho  =  v[k][j][i*dim];
+    p    =  v[k][j][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c000 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+
+    // c100
+    myid = id[k][j][i+1];
+    rho  =  v[k][j][(i+1)*dim];
+    p    =  v[k][j][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c100 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+
+    // c010
+    myid = id[k][j+1][i];
+    rho  =  v[k][j+1][i*dim];
+    p    =  v[k][j+1][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c010 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+
+    // c110
+    myid = id[k][j+1][i+1];
+    rho  =  v[k][j+1][(i+1)*dim];
+    p    =  v[k][j+1][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c110 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+
+    // c001
+    myid = id[k+1][j][i];
+    rho  =  v[k+1][j][i*dim];
+    p    =  v[k+1][j][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c001 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+
+    // c101
+    myid = id[k+1][j][i+1];
+    rho  =  v[k+1][j][(i+1)*dim];
+    p    =  v[k+1][j][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c101 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+
+    // c011
+    myid = id[k+1][j+1][i];
+    rho  =  v[k+1][j+1][i*dim];
+    p    =  v[k+1][j+1][i*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c011 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+
+    // c111
+    myid = id[k+1][j+1][i+1];
+    rho  =  v[k+1][j+1][(i+1)*dim];
+    p    =  v[k+1][j+1][(i+1)*dim+4];
+    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+    double c111 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
 
     sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
   }
