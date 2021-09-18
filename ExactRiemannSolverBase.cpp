@@ -12,6 +12,8 @@ using std::pair;
 using std::cout;
 using std::endl;
 
+extern int verbose;
+
 //-----------------------------------------------------
 
 ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, 
@@ -537,15 +539,18 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
   }
 
   if(!success || i==maxIts_main) {
-    cout << "Warning: Exact Riemann solver failed. (Unable to find a bracketing interval) " << endl;
-    cout << "   left: " << std::setprecision(10) << rhol << ", " << std::setprecision(10) << ul << ", " 
-                           << std::setprecision(10) << pl << " (" << idl << "); right: "
-                           << std::setprecision(10) << rhor << ", " << std::setprecision(10) << ur << ", " 
-                           << std::setprecision(10) << pr << " (" << idr << ")."
-                           << " Residual (|ulstar-urstar|): " << std::setprecision(10) << fmin << endl;
+    if(verbose>=0) {
+      cout << "Warning: Exact Riemann solver failed. (Unable to find a bracketing interval) " << endl;
+      cout << "   left: " << std::setprecision(10) << rhol << ", " << std::setprecision(10) << ul << ", " 
+                             << std::setprecision(10) << pl << " (" << idl << "); right: "
+                             << std::setprecision(10) << rhor << ", " << std::setprecision(10) << ur << ", " 
+                             << std::setprecision(10) << pr << " (" << idr << ")."
+                             << " Residual (|ulstar-urstar|): " << std::setprecision(10) << fmin << endl;
+    }
     if(fmin<failure_threshold*fabs(ul-ur)) {
-      cout << "*** Best approximate solution: rhols = " << rhol_fmin << ", ps = " << p_fmin << ", us = ("
-           << ul_fmin << "(l) + " << ur_fmin << "(r))/2, rhors = " << rhor_fmin << "." << endl;
+      if(verbose>=1) 
+        cout << "*** Best approximate solution: rhols = " << rhol_fmin << ", ps = " << p_fmin << ", us = ("
+             << ul_fmin << "(l) + " << ur_fmin << "(r))/2, rhors = " << rhor_fmin << "." << endl;
       p0    = p1    = p_fmin;
       rhol0 = rhol1 = rhol_fmin;
       rhor0 = rhor1 = rhor_fmin;
@@ -557,16 +562,18 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
       // compute the 3-wave only if the 1-wave is succeeded
       success = success && ComputeRhoUStar(3, rhor, ur, pr,  p2, idr, rhor0, rhor1, rhor2, ur2);
       if(success) {
-        cout << "*** Prescribed solution: rhols = " << rhol2 << ", ps = " << p2 << ", us = ("
-             << ul2 << "(l) + " << ur2 << "(r))/2, rhors = " << rhor2 << "." << endl;
+        if(verbose >= 1)
+          cout << "*** Prescribed solution: rhols = " << rhol2 << ", ps = " << p2 << ", us = ("
+               << ul2 << "(l) + " << ur2 << "(r))/2, rhors = " << rhor2 << "." << endl;
         p0    = p1    = p2;
         rhol0 = rhol1 = rhol2; 
         rhor0 = rhor1 = rhor2;
         ul0   = ul1   = ul2; 
         ur0   = ur1   = ur2;
       } else {
-        cout << "*** Best approximation: rhols = " << rhol_fmin << ", ps = " << p_fmin << ", us = ("
-             << ul_fmin << "(l) + " << ur_fmin << "(r))/2, rhors = " << rhor_fmin << "." << endl;
+        if(verbose >= 1)
+          cout << "*** Best approximation: rhols = " << rhol_fmin << ", ps = " << p_fmin << ", us = ("
+               << ul_fmin << "(l) + " << ur_fmin << "(r))/2, rhors = " << rhor_fmin << "." << endl;
         p0    = p1    = p_fmin;
         rhol0 = rhol1 = rhol_fmin;
         rhor0 = rhor1 = rhor_fmin;
