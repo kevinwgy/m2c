@@ -223,7 +223,7 @@ Assigner *CylinderConeData::getAssigner()
 
 //------------------------------------------------------------------------------
 
-CylinderHemisphereData::CylinderHemisphereData() {
+CylinderSphereData::CylinderSphereData() {
 
   cen_x  = 0.0;
   cen_y  = 0.0;
@@ -234,22 +234,32 @@ CylinderHemisphereData::CylinderHemisphereData() {
 
   r = 1.0;
   L = 0.0;
+
+  front_cap = Off;
+  back_cap = Off;
+
 }
 
 //------------------------------------------------------------------------------
 
-Assigner *CylinderHemisphereData::getAssigner()
+Assigner *CylinderSphereData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
 
-  new ClassDouble<CylinderHemisphereData> (ca, "Axis_x", this, &CylinderHemisphereData::nx);
-  new ClassDouble<CylinderHemisphereData> (ca, "Axis_y", this, &CylinderHemisphereData::ny);
-  new ClassDouble<CylinderHemisphereData> (ca, "Axis_z", this, &CylinderHemisphereData::nz);
-  new ClassDouble<CylinderHemisphereData> (ca, "BaseCenter_x", this, &CylinderHemisphereData::cen_x);
-  new ClassDouble<CylinderHemisphereData> (ca, "BaseCenter_y", this, &CylinderHemisphereData::cen_y);
-  new ClassDouble<CylinderHemisphereData> (ca, "BaseCenter_z", this, &CylinderHemisphereData::cen_z);
-  new ClassDouble<CylinderHemisphereData> (ca, "CylinderRadius", this, &CylinderHemisphereData::r);
-  new ClassDouble<CylinderHemisphereData> (ca, "CylinderHeight", this, &CylinderHemisphereData::L);
+  new ClassDouble<CylinderSphereData> (ca, "Axis_x", this, &CylinderSphereData::nx);
+  new ClassDouble<CylinderSphereData> (ca, "Axis_y", this, &CylinderSphereData::ny);
+  new ClassDouble<CylinderSphereData> (ca, "Axis_z", this, &CylinderSphereData::nz);
+  new ClassDouble<CylinderSphereData> (ca, "CylinderCenter_x", this, &CylinderSphereData::cen_x);
+  new ClassDouble<CylinderSphereData> (ca, "CylinderCenter_y", this, &CylinderSphereData::cen_y);
+  new ClassDouble<CylinderSphereData> (ca, "CylinderCenter_z", this, &CylinderSphereData::cen_z);
+  new ClassDouble<CylinderSphereData> (ca, "CylinderRadius", this, &CylinderSphereData::r);
+  new ClassDouble<CylinderSphereData> (ca, "CylinderHeight", this, &CylinderSphereData::L);
+  new ClassToken<CylinderSphereData> (ca, "FrontSphericalCap", this,
+     reinterpret_cast<int CylinderSphereData::*>(&CylinderSphereData::front_cap), 2,
+     "Off", 0, "On", 1);
+  new ClassToken<CylinderSphereData> (ca, "BackSphericalCap", this,
+     reinterpret_cast<int CylinderSphereData::*>(&CylinderSphereData::back_cap), 2,
+     "Off", 0, "On", 1);
 
   initialConditions.setup("InitialState", ca);
 
@@ -266,7 +276,7 @@ void MultiInitialConditionsData::setup(const char *name, ClassAssigner *father)
   sphereMap.setup("Sphere", ca);
   spheroidMap.setup("Spheroid", ca);
   cylinderconeMap.setup("CylinderAndCone", ca);
-  cylinderhemisphereMap.setup("CylinderAndHemisphere", ca);
+  cylindersphereMap.setup("CylinderWithSphericalCaps", ca);
 }
 
 //------------------------------------------------------------------------------
@@ -781,7 +791,7 @@ void FixData::setup(const char *name, ClassAssigner *father)
   sphereMap.setup("Sphere", ca);
   spheroidMap.setup("Spheroid", ca);
   cylinderconeMap.setup("CylinderAndCone", ca);
-  cylinderhemisphereMap.setup("CylinderAndHemisphere", ca);
+  cylindersphereMap.setup("CylinderWithSphericalCaps", ca);
 }
 
 //------------------------------------------------------------------------------

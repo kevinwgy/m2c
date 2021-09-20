@@ -376,8 +376,8 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
   }
 
 
-  // cylinder-hemisphere
-  for(auto it=ic.cylinderhemisphereMap.dataMap.begin(); it!=ic.cylinderhemisphereMap.dataMap.end(); it++) {
+  // cylinder with spherical cap(s)
+  for(auto it=ic.cylindersphereMap.dataMap.begin(); it!=ic.cylindersphereMap.dataMap.end(); it++) {
 
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
@@ -387,18 +387,24 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     dir /= dir.norm();
 
     double L = it->second->L; //cylinder height
+    double Lhalf = L/2.0;
     double R = it->second->r; //cylinder radius
+    bool front_cap = (it->second->front_cap == CylinderSphereData::On);
+    bool back_cap = (it->second->back_cap == CylinderSphereData::On);
  
     // define the geometry
     vector<pair<Vec3D, Vec3D> > lineSegments; //boundary of the cylinder
-    Vec3D p0(0.0, 0.0, 0.0); //x0
-    Vec3D p1(0.0, R, 0.0);
-    Vec3D p2(L, R, 0.0);
+    Vec3D p0(-Lhalf, 0.0, 0.0); //x0
+    Vec3D p1(-Lhalf, R, 0.0);
+    Vec3D p2(Lhalf, R, 0.0);
+    Vec3D p3(Lhalf, 0.0, 0.0);
     lineSegments.push_back(std::make_pair(p0,p1));
     lineSegments.push_back(std::make_pair(p1,p2));
+    lineSegments.push_back(std::make_pair(p2,p3));
 
-    double x, r, r1, toto, dist;
-    Vec3D x1 = x0 + L*dir; //center of sphere
+    double x, r, rf(0.0), rb(0.0), toto, dist;
+    Vec3D xf = x0 + Lhalf*dir; //center of the front face
+    Vec3D xb = x0 - Lhalf*dir; //center of the back face
     Vec3D xp;
 
     for(int k=k0; k<kmax; k++)
@@ -407,21 +413,28 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     
           x = (coords[k][j][i]-x0)*dir;
           r = (coords[k][j][i] - x0 - x*dir).norm();
-          r1 = (coords[k][j][i] - x1).norm();
           xp = Vec3D(x,r,0.0);
 
-          //calculate unsigned distance from node to the boundary of the cylinder-cone
-          if(x<L) {
+          //calculate unsigned distance from node to the boundary of the cylinder
+          if(back_cap && x<=-Lhalf) {
+            rb = (coords[k][j][i] - xb).norm();
+            dist = fabs(rb - R);
+          } 
+          else if(front_cap && x>= Lhalf) {
+            rf = (coords[k][j][i] - xf).norm();
+            dist = fabs(rf - R);
+          }
+          else {
             dist = DBL_MAX;
             for(int l=0; l<lineSegments.size(); l++)
               dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
                                    lineSegments[l].first, lineSegments[l].second, toto));
-          } else 
-            dist = fabs(r1 - R);
+          } 
 
           //figure out the sign, and update phi
           if(dist<fabs(phi[k][j][i])) {
-            if( (x>0 && x<L && r<R) || (x>=L && r1<R) ) //inside
+            if( (x>-Lhalf && x<Lhalf && r<R) || (back_cap && x<=-Lhalf && rb<R) ||
+                (front_cap && x>=Lhalf && rf<R) ) //inside
               phi[k][j][i] = -dist;
             else 
               phi[k][j][i] = dist; 

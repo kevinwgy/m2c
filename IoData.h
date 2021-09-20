@@ -130,14 +130,18 @@ struct CylinderConeData {
 
 //------------------------------------------------------------------------------
 
-struct CylinderHemisphereData {
+struct CylinderSphereData {
 
   double cen_x, cen_y, cen_z, nx, ny, nz, r, L;
  
+  enum OnOff {Off = 0, On = 1};
+  OnOff front_cap;
+  OnOff back_cap;
+
   StateVariable initialConditions;
 
-  CylinderHemisphereData();
-  ~CylinderHemisphereData() {}
+  CylinderSphereData();
+  ~CylinderSphereData() {}
   Assigner *getAssigner();
 
 };
@@ -151,7 +155,7 @@ struct MultiInitialConditionsData {
   ObjectMap<SphereData>   sphereMap;
   ObjectMap<SpheroidData> spheroidMap;
   ObjectMap<CylinderConeData> cylinderconeMap;
-  ObjectMap<CylinderHemisphereData> cylinderhemisphereMap;
+  ObjectMap<CylinderSphereData> cylindersphereMap;
 
   void setup(const char *, ClassAssigner * = 0);
 };
@@ -338,7 +342,7 @@ struct FixData {
   ObjectMap<SphereData>   sphereMap;
   ObjectMap<SpheroidData> spheroidMap;
   ObjectMap<CylinderConeData> cylinderconeMap;
-  ObjectMap<CylinderHemisphereData> cylinderhemisphereMap;
+  ObjectMap<CylinderSphereData> cylindersphereMap;
 
   FixData();
   ~FixData() {}

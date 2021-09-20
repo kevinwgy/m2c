@@ -931,27 +931,39 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   }
 
 
-  // cylinder-hemisphere
-  for(auto it=ic.cylinderhemisphereMap.dataMap.begin(); it!=ic.cylinderhemisphereMap.dataMap.end(); it++) {
+  // cylinder with spherical cap(s)
+  for(auto it=ic.cylindersphereMap.dataMap.begin(); it!=ic.cylindersphereMap.dataMap.end(); it++) {
 
-    print("- Applying initial condition within a cylinder-hemisphere (material id: %d).\n",
+    print("- Applying initial condition within a cylinder-sphere (material id: %d).\n",
           it->second->initialConditions.materialid);
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
 
     double L = it->second->L; //cylinder height
-    double R = it->second->r; //cylinder & hemisphere radius
+    double R = it->second->r; //cylinder & sphere's radius
+    double Lhalf = 0.5*L;
+    bool front_cap = (it->second->front_cap == CylinderSphereData::On);
+    bool back_cap = (it->second->back_cap == CylinderSphereData::On);
 
-    Vec3D x1 = x0 + L*dir;
-    double x, r, r1;
+    Vec3D xf = x0 + Lhalf*dir;
+    Vec3D xb = x0 - Lhalf*dir;
+    double x, r;
+    bool inside;
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++) {
+          inside = false;
           x = (coords[k][j][i]-x0)*dir;
           r = (coords[k][j][i] - x0 - x*dir).norm();
-          r1= (coords[k][j][i] - x1).norm(); 
-          if( (x>0 && x<L && r<R) || (x>=L && r1<R) ) {//inside
+          if(x>-Lhalf && x<Lhalf && r<R)
+            inside = true;
+          else if(front_cap && x>=Lhalf && (coords[k][j][i]-xf).norm() < R)
+            inside = true;
+          else if(back_cap && x<=-Lhalf && (coords[k][j][i]-xb).norm() < R)
+            inside = true;
+
+          if(inside) {
             v[k][j][i][0] = it->second->initialConditions.density;
             v[k][j][i][1] = it->second->initialConditions.velocity_x;
             v[k][j][i][2] = it->second->initialConditions.velocity_y;
