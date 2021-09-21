@@ -1031,6 +1031,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
 
   //! Apply boundary condition to populate ghost nodes (no need to do this for ID)
+  ClipDensityAndPressure(V, ID);
   ApplyBoundaryConditions(V);   
 
 }

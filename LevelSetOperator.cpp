@@ -398,9 +398,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     Vec3D p1(-Lhalf, R, 0.0);
     Vec3D p2(Lhalf, R, 0.0);
     Vec3D p3(Lhalf, 0.0, 0.0);
-    lineSegments.push_back(std::make_pair(p0,p1));
     lineSegments.push_back(std::make_pair(p1,p2));
-    lineSegments.push_back(std::make_pair(p2,p3));
+    if(!back_cap)
+      lineSegments.push_back(std::make_pair(p0,p1));
+    if(!front_cap)
+      lineSegments.push_back(std::make_pair(p2,p3));
 
     double x, r, rf(0.0), rb(0.0), toto, dist;
     Vec3D xf = x0 + Lhalf*dir; //center of the front face

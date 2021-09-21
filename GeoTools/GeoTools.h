@@ -41,14 +41,16 @@ inline bool IsPointInRectangle(double x, double y, double cen_x, double cen_y, d
  *   Outputs:
  *     alpha -- affine coordinate (i.e. xA + alpha*AB = projection point)
  *     return value -- distance from the point to the line
- *   Note: If the "edge" is actually a point (i.e. xA = xB), alpha and 
- *         the distance will both be nan.
+ *   Note: If the "edge" is actually a point (i.e. xA = xB), alpha will be 0,
+ *         and the distance will be the distance to that point
  */
 inline double ProjectPointToLine(Vec3D& x0, Vec3D& xA, Vec3D& xB, double &alpha)
 {
   Vec3D AB= xB-xA;
   Vec3D AX = x0-xA;
-  alpha = AB*AX/(AB*AB);
+  double length2 = AB*AB;
+
+  alpha = (length2 != 0) ? AB*AX/length2 : 0.0;
   Vec3D P = xA + alpha*AB;
   return (P-x0).norm();
 }
