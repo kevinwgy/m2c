@@ -734,9 +734,68 @@ struct LaserData {
   LaserData();
   ~LaserData() {}
 
-  void setup(const char *);
+  void setup(const char *, ClassAssigner * = 0);
 
 };
+
+//------------------------------------------------------------------------------
+
+struct ElementIonizationModel {
+
+  double molar_fraction;
+  int atomic_number;
+
+  const char* ionization_energy_filename; //!< file that stores ionization energies
+  
+  const char* excitation_energy_files_prefix; //!< prefix of files that contain excitation energies (for different excited states)
+  const char* excitation_energy_files_suffix;
+
+  const char* angular_momentum_files_prefix; //!< prefix of files that contain total momentum energies (for different excited states)
+  const char* angular_momentum_files_suffix;
+
+  ElementIonizationModel();
+  ~ElementIonizationModel() {}
+
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct MaterialIonizationModel{
+
+  enum Type {NONE = 0, SAHA_IDEAL = 1, SAHA_NONIDEAL = 2, SIZE = 3} type;
+
+  int maxIts;
+  double convergence_tol;
+
+  ObjectMap<ElementIonizationModel> elementMap;
+  
+  MaterialIonizationModel();
+  ~MaterialIonizationModel() {}
+
+  Assigner *getAssigner();
+};
+
+//------------------------------------------------------------------------------
+
+struct IonizationData {
+
+  // global constants
+  double planck_constant;
+  double electron_charge; //needed?
+  double electron_mass;
+  double boltzmann_constant;
+  
+  ObjectMap<MaterialIonizationModel> materialMap;
+  
+  IonizationData();
+  ~IonizationData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
 //------------------------------------------------------------------------------
 
 struct ProbeNode {
@@ -829,16 +888,29 @@ struct OutputData {
 
   enum Options {OFF = 0, ON = 1};
   Options density, velocity, pressure, materialid, internal_energy, temperature, delta_temperature, laser_radiance;
+
   enum VerbosityLevel {LOW = 0, MEDIUM = 1, HIGH = 2} verbose;
 
   const static int MAXLS = 5;
   Options levelset[MAXLS];
-
   Options levelset0;
   Options levelset1;
   Options levelset2;
   Options levelset3;
   Options levelset4;
+
+  //! ionization-related outputs
+  Options mean_charge; //!< Zav
+  Options heavy_particles_density; //!< number density of heavy particles
+  Options electron_density; //!< number density of electrons
+  int max_charge_number; //!< all the ions with higher charge number will be lumped together in the output
+  const static int MAXSPECIES = 5; //!< This only limits outputing. MaterialIonizationModel can have more species.
+  Options molar_fractions[MAXSPECIES];
+  Options molar_fractions0;
+  Options molar_fractions1;
+  Options molar_fractions2;
+  Options molar_fractions3;
+  Options molar_fractions4;
 
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
@@ -880,6 +952,8 @@ public:
   MultiPhaseData multiphase;
 
   LaserData laser;
+
+  IonizationData ion;
 
   TsData ts;
 

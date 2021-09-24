@@ -1286,7 +1286,7 @@ void IcData::readUserSpecifiedIC()
   std::fstream input;
   input.open(user_specified_ic, std::fstream::in);
   if (!input.is_open()) {
-    print_error("*** Error: could not open user-specified initial condition file %s.\n", user_specified_ic);
+    print_error("*** Error: Cannot open user-specified initial condition file %s.\n", user_specified_ic);
     exit_mpi();
   } else
     print("- Reading user-specified initial condition file: %s.\n", user_specified_ic);
@@ -1874,9 +1874,9 @@ LaserData::LaserData() {
 //------------------------------------------------------------------------------
 
 
-void LaserData::setup(const char *name) {
+void LaserData::setup(const char *name, ClassAssigner *father) {
 
-  ClassAssigner *ca = new ClassAssigner(name, 22, NULL); 
+  ClassAssigner *ca = new ClassAssigner(name, 22, father); 
 
   //Physical Parameters
   new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
@@ -1905,6 +1905,106 @@ void LaserData::setup(const char *name) {
   new ClassDouble<LaserData>(ca, "MaxIts", this, &LaserData::max_iter);
   new ClassDouble<LaserData>(ca, "RelaxationCoefficient", this, &LaserData::relax_coeff);
   new ClassInt<LaserData>(ca, "OneWayCoupling", this, &LaserData::oneWay);
+
+}
+
+//------------------------------------------------------------------------------
+
+ElementIonizationModel::ElementIonizationModel()
+{
+  molar_fraction = -1.0;
+  atomic_number = -1;
+  ionization_energy_filename = "";
+  excitation_energy_files_prefix = "";
+  excitation_energy_files_suffix = "";
+  angular_momentum_files_prefix = ""; 
+  angular_momentum_files_suffix = ""; 
+}
+
+//------------------------------------------------------------------------------
+
+Assigner* ElementIonizationModel::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
+
+  new ClassDouble<ElementIonizationModel>(ca, "MolarFraction", this, 
+          &ElementIonizationModel::molar_fraction);
+  
+  new ClassInt<ElementIonizationModel>(ca, "AtomicNumber", this, 
+          &ElementIonizationModel::atomic_number);
+  
+  new ClassStr<ElementIonizationModel>(ca, "IonizationEnergyFile", this, 
+          &ElementIonizationModel::ionization_energy_filename);
+
+  new ClassStr<ElementIonizationModel>(ca, "ExcitationEnergyFilesPrefix", this, 
+          &ElementIonizationModel::excitation_energy_files_prefix);
+
+  new ClassStr<ElementIonizationModel>(ca, "ExcitationEnergyFilesSuffix", this, 
+          &ElementIonizationModel::excitation_energy_files_suffix);
+
+  new ClassStr<ElementIonizationModel>(ca, "AngularMomentumFilesPrefix", this, 
+          &ElementIonizationModel::angular_momentum_files_prefix);
+
+  new ClassStr<ElementIonizationModel>(ca, "AngularMomentumFilesSuffix", this, 
+          &ElementIonizationModel::angular_momentum_files_suffix);
+
+  return ca;
+
+}
+
+//------------------------------------------------------------------------------
+
+MaterialIonizationModel::MaterialIonizationModel()
+{
+  type = NONE;
+  maxIts = 200;
+  convergence_tol = 1.0e-5;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner* MaterialIonizationModel::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 4, nullAssigner);
+
+  new ClassToken<MaterialIonizationModel> (ca, "Type", this,
+        reinterpret_cast<int MaterialIonizationModel::*>(&MaterialIonizationModel::type), 
+        3, "None", 0, "IdealSahaEquation", 1, "NonIdealSahaEquation", 2);
+
+  new ClassInt<MaterialIonizationModel>(ca, "MaxIts", this, &MaterialIonizationModel::maxIts);
+
+  new ClassDouble<MaterialIonizationModel>(ca, "ConvergenceTolerance", this, 
+        &MaterialIonizationModel::convergence_tol);
+
+  elementMap.setup("Element", ca);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
+IonizationData::IonizationData()
+{
+  planck_constant = 6.62607004e-25;  //unit: (mm^2).g/s  (dim: [energy]/[freq])
+  electron_charge = 1.60217662e-19;  //unit: A.s (Coulombs)
+  electron_mass = 9.10938356e-28; //unit: g
+  boltzmann_constant = 1.38064852e-14; //unit: (mm^2).g/(s^2*K)  (dim: [energy]/[temperature])
+}
+
+//------------------------------------------------------------------------------
+
+void IonizationData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+
+  new ClassDouble<IonizationData>(ca, "PlanckConstant", this, &IonizationData::planck_constant);
+  new ClassDouble<IonizationData>(ca, "ElectronCharge", this, &IonizationData::electron_charge);
+  new ClassDouble<IonizationData>(ca, "ElectronMass", this, &IonizationData::electron_mass);
+  new ClassDouble<IonizationData>(ca, "BoltzmannConstant", this, &IonizationData::boltzmann_constant);
+
+  materialMap.setup("Material", ca);
 
 }
 
@@ -1957,6 +2057,19 @@ OutputData::OutputData()
   for(int i=0; i<MAXLS; i++)
     levelset[i] = OFF;
 
+  mean_charge = OFF;
+  heavy_particles_density = OFF;
+  electron_density = OFF;
+  max_charge_number = 3;
+  molar_fractions0 = OFF; 
+  molar_fractions1 = OFF; 
+  molar_fractions2 = OFF; 
+  molar_fractions3 = OFF; 
+  molar_fractions4 = OFF; 
+
+  for(int i=0; i<MAXSPECIES; i++)
+    molar_fractions[i] = OFF;
+
   mesh_filename = "";
 
   verbose = LOW;
@@ -1966,7 +2079,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 17+MAXLS, father);
+  ClassAssigner *ca = new ClassAssigner(name, 21+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2013,6 +2126,34 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LevelSet4", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::levelset4), 2,
+                               "Off", 0, "On", 1);
+
+  new ClassToken<OutputData>(ca, "MeanCharge", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::mean_charge), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "HeavyParticlesDensity", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::heavy_particles_density), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "ElectronDensity", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::electron_density), 2,
+                               "Off", 0, "On", 1);
+
+  new ClassInt<OutputData>(ca, "MaxChargeNumber", this, &OutputData::max_charge_number);
+
+  new ClassToken<OutputData>(ca, "MolarFractionsElement0", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions0), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "MolarFractionsElement1", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions1), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "MolarFractionsElement2", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions2), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "MolarFractionsElement3", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions3), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "MolarFractionsElement4", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions4), 2,
                                "Off", 0, "On", 1);
 
   new ClassStr<OutputData>(ca, "MeshInformation", this, &OutputData::mesh_filename);
@@ -2193,6 +2334,13 @@ void IoData::readCmdFile()
   output.levelset[2] = output.levelset2;
   output.levelset[3] = output.levelset3;
   output.levelset[4] = output.levelset4;
+
+  //FIX elemental molar fractions (TODO: need a better way...)
+  output.molar_fractions[0] = output.molar_fractions0;
+  output.molar_fractions[1] = output.molar_fractions1;
+  output.molar_fractions[2] = output.molar_fractions2;
+  output.molar_fractions[3] = output.molar_fractions3;
+  output.molar_fractions[4] = output.molar_fractions4;
 }
 
 //------------------------------------------------------------------------------
@@ -2210,6 +2358,8 @@ void IoData::setupCmdFileVariables()
   exact_riemann.setup("ExactRiemannSolution");
 
   laser.setup("Laser");
+
+  ion.setup("Ionization");
 
   ts.setup("Time");
 

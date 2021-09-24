@@ -87,6 +87,8 @@ MeshGenerator.cpp
 LevelSetOperator.cpp
 LevelSetReinitializer.cpp
 LaserAbsorptionSolver.cpp
+IonizationOperator.cpp
+SahaEquationSolver.cpp
 EmbeddedBoundaryFormula.cpp
 TimeIntegrator.cpp
 Utils.cpp)

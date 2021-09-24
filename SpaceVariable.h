@@ -18,6 +18,7 @@ public:
   static DM ghosted1_3dof;  
   static DM ghosted1_4dof;  
   static DM ghosted1_5dof;  
+  static DM ghosted1_6dof;  
 
   static DM ghosted2_1dof;
   static DM ghosted2_3dof;
