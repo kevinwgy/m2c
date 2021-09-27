@@ -21,7 +21,7 @@ IonizationOperator::IonizationOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
       exit_mpi();
     }
     print("- Initializing Saha Equation solver for material %d.\n", it->first);
-    saha[it->first] = new SahaEquationSolver(*(it->second), iod, varFcn_[it->first]);
+    saha[it->first] = new SahaEquationSolver(*(it->second), iod, varFcn_[it->first], &comm_);
   }
   for(int i=0; i<saha.size(); i++) { //create dummy solvers for materials w/o ionization model
     if(saha[i] == NULL)
@@ -95,7 +95,7 @@ IonizationOperator::ComputeIonization(SpaceVariable3D &V, SpaceVariable3D &ID)
 
   for(auto it = AlphaRJ.begin(); it != AlphaRJ.end(); it++) {
     alphas[it->first] = it->second->GetDataPointer();
-    nodal_alphas[it->first] = vector<double>(max_charge_in_output);
+    nodal_alphas[it->first] = vector<double>(max_charge_in_output+2);
   }
 
   // Main loop
@@ -109,8 +109,8 @@ IonizationOperator::ComputeIonization(SpaceVariable3D &V, SpaceVariable3D &ID)
 
         auto it0 = nodal_alphas.begin();
         for(auto it = alphas.begin(); it != alphas.end(); it++) {
-          for(int p=0; p<max_charge_in_output; p++) 
-            (it->second)[k][j][i*max_charge_in_output+p] = (it0->second)[p];
+          for(int p=0; p<max_charge_in_output+2; p++) 
+            (it->second)[k][j][i*(max_charge_in_output+2)+p] = (it0->second)[p];
           it0++;
         }
 

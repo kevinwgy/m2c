@@ -740,10 +740,12 @@ struct LaserData {
 
 //------------------------------------------------------------------------------
 
-struct ElementIonizationModel {
+struct AtomicIonizationModel {
 
   double molar_fraction;
   int atomic_number;
+
+  int max_charge;
 
   const char* ionization_energy_filename; //!< file that stores ionization energies
   
@@ -753,8 +755,8 @@ struct ElementIonizationModel {
   const char* angular_momentum_files_prefix; //!< prefix of files that contain total momentum energies (for different excited states)
   const char* angular_momentum_files_suffix;
 
-  ElementIonizationModel();
-  ~ElementIonizationModel() {}
+  AtomicIonizationModel();
+  ~AtomicIonizationModel() {}
 
   Assigner *getAssigner();
 
@@ -769,7 +771,14 @@ struct MaterialIonizationModel{
   int maxIts;
   double convergence_tol;
 
-  ObjectMap<ElementIonizationModel> elementMap;
+  enum PartitionFunctionEvaluation {ON_THE_FLY = 0, CUBIC_SPLINE_INTERPOLATION = 1,
+                                    LINEAR_INTERPOLATION = 2} partition_evaluation;
+  
+  // numerical parameters for sampling & interpolating the partition function
+  double Tmin, Tmax;
+  int sample_size;
+
+  ObjectMap<AtomicIonizationModel> elementMap;
   
   MaterialIonizationModel();
   ~MaterialIonizationModel() {}

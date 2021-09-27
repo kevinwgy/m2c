@@ -1910,10 +1910,11 @@ void LaserData::setup(const char *name, ClassAssigner *father) {
 
 //------------------------------------------------------------------------------
 
-ElementIonizationModel::ElementIonizationModel()
+AtomicIonizationModel::AtomicIonizationModel()
 {
   molar_fraction = -1.0;
   atomic_number = -1;
+  max_charge = 10;
   ionization_energy_filename = "";
   excitation_energy_files_prefix = "";
   excitation_energy_files_suffix = "";
@@ -1923,31 +1924,34 @@ ElementIonizationModel::ElementIonizationModel()
 
 //------------------------------------------------------------------------------
 
-Assigner* ElementIonizationModel::getAssigner()
+Assigner* AtomicIonizationModel::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 8, nullAssigner);
 
-  new ClassDouble<ElementIonizationModel>(ca, "MolarFraction", this, 
-          &ElementIonizationModel::molar_fraction);
+  new ClassDouble<AtomicIonizationModel>(ca, "MolarFraction", this, 
+          &AtomicIonizationModel::molar_fraction);
   
-  new ClassInt<ElementIonizationModel>(ca, "AtomicNumber", this, 
-          &ElementIonizationModel::atomic_number);
+  new ClassInt<AtomicIonizationModel>(ca, "AtomicNumber", this, 
+          &AtomicIonizationModel::atomic_number);
   
-  new ClassStr<ElementIonizationModel>(ca, "IonizationEnergyFile", this, 
-          &ElementIonizationModel::ionization_energy_filename);
+  new ClassInt<AtomicIonizationModel>(ca, "MaxChargeNumber", this, 
+          &AtomicIonizationModel::max_charge);
+  
+  new ClassStr<AtomicIonizationModel>(ca, "IonizationEnergyFile", this, 
+          &AtomicIonizationModel::ionization_energy_filename);
 
-  new ClassStr<ElementIonizationModel>(ca, "ExcitationEnergyFilesPrefix", this, 
-          &ElementIonizationModel::excitation_energy_files_prefix);
+  new ClassStr<AtomicIonizationModel>(ca, "ExcitationEnergyFilesPrefix", this, 
+          &AtomicIonizationModel::excitation_energy_files_prefix);
 
-  new ClassStr<ElementIonizationModel>(ca, "ExcitationEnergyFilesSuffix", this, 
-          &ElementIonizationModel::excitation_energy_files_suffix);
+  new ClassStr<AtomicIonizationModel>(ca, "ExcitationEnergyFilesSuffix", this, 
+          &AtomicIonizationModel::excitation_energy_files_suffix);
 
-  new ClassStr<ElementIonizationModel>(ca, "AngularMomentumFilesPrefix", this, 
-          &ElementIonizationModel::angular_momentum_files_prefix);
+  new ClassStr<AtomicIonizationModel>(ca, "AngularMomentumFilesPrefix", this, 
+          &AtomicIonizationModel::angular_momentum_files_prefix);
 
-  new ClassStr<ElementIonizationModel>(ca, "AngularMomentumFilesSuffix", this, 
-          &ElementIonizationModel::angular_momentum_files_suffix);
+  new ClassStr<AtomicIonizationModel>(ca, "AngularMomentumFilesSuffix", this, 
+          &AtomicIonizationModel::angular_momentum_files_suffix);
 
   return ca;
 
@@ -1960,17 +1964,34 @@ MaterialIonizationModel::MaterialIonizationModel()
   type = NONE;
   maxIts = 200;
   convergence_tol = 1.0e-5;
+
+  partition_evaluation = CUBIC_SPLINE_INTERPOLATION;
+  sample_size = 5000;
+  Tmin = 100.0; //100 Kelvin
+  Tmax = 2.0e6; //Kelvin
 }
 
 //------------------------------------------------------------------------------
 
 Assigner* MaterialIonizationModel::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 4, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 8, nullAssigner);
 
   new ClassToken<MaterialIonizationModel> (ca, "Type", this,
         reinterpret_cast<int MaterialIonizationModel::*>(&MaterialIonizationModel::type), 
         3, "None", 0, "IdealSahaEquation", 1, "NonIdealSahaEquation", 2);
+
+  new ClassToken<MaterialIonizationModel> (ca, "PartitionFunctionEvaluation", this,
+        reinterpret_cast<int MaterialIonizationModel::*>(&MaterialIonizationModel::partition_evaluation), 
+        3, "OnTheFly", 0, "CubicSplineInterpolation", 1, "LinearInterpolation", 2);
+
+  new ClassDouble<MaterialIonizationModel>(ca, "Tmin", this, 
+        &MaterialIonizationModel::Tmin);
+
+  new ClassDouble<MaterialIonizationModel>(ca, "Tmax", this, 
+        &MaterialIonizationModel::Tmax);
+
+  new ClassInt<MaterialIonizationModel>(ca, "SampleSize", this, &MaterialIonizationModel::sample_size);
 
   new ClassInt<MaterialIonizationModel>(ca, "MaxIts", this, &MaterialIonizationModel::maxIts);
 

@@ -89,6 +89,7 @@ LevelSetReinitializer.cpp
 LaserAbsorptionSolver.cpp
 IonizationOperator.cpp
 SahaEquationSolver.cpp
+AtomicIonizationData.cpp
 EmbeddedBoundaryFormula.cpp
 TimeIntegrator.cpp
 Utils.cpp)
