@@ -40,6 +40,7 @@ SahaEquationSolver::SahaEquationSolver(MaterialIonizationModel& iod_ion_mat_, Io
   // Read element data
   int numElems = iod_ion_mat->elementMap.dataMap.size();
   elem.resize(numElems, AtomicIonizationData());
+  double total_molar = 0.0;
   for(auto it = iod_ion_mat->elementMap.dataMap.begin(); 
       it != iod_ion_mat->elementMap.dataMap.end(); it++) {
     int element_id = it->first;
@@ -49,6 +50,7 @@ SahaEquationSolver::SahaEquationSolver(MaterialIonizationModel& iod_ion_mat_, Io
       exit_mpi();
     }
 
+    total_molar += it->second->molar_fraction;
 
     AtomicIonizationData& data(elem[it->first]);
     if(iod_ion_mat->partition_evaluation == MaterialIonizationModel::CUBIC_SPLINE_INTERPOLATION)
@@ -62,6 +64,13 @@ SahaEquationSolver::SahaEquationSolver(MaterialIonizationModel& iod_ion_mat_, Io
       exit_mpi();
     }
   }
+
+  if(total_molar >= 1.0 + 1e-12) {
+    print_error("*** Error: Sum of molar fractions (%e) exceeds 1.\n", total_molar);
+    exit_mpi();
+  }
+  if(total_molar <= 1.0 - 1e-12) //throw out a warning, but continue to run
+    print("Warning: Sum of molar fractions (%e) is less than 1.\n", total_molar);
 
   // find max atomic number among all the species/elements
   max_atomic_number = 0;
@@ -120,6 +129,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
   bool found_initial_interval = false;
   for(int i=0; i<iod_ion_mat->maxIts; i++) {
     f1 = fun(zav1);
+    fprintf(stderr,"It %d: f(%e) = %e; f(%e) = %e.\n", i, zav0, f0, zav1, f1);
     if(f0*f1<=0.0) {
       found_initial_interval = true;
       break;
@@ -151,6 +161,8 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
   //*******************************************************************
 
   fprintf(stderr,"-- Saha equation solver converged in %d iterations, Zav = %e.\n", (int)maxit, zav);
+
+  exit_mpi();
 
   //post-processing.
   ne = zav*nh;
@@ -191,9 +203,10 @@ SahaEquationSolver::ZavEquation::ZavEquation(double kb, double T, double p, doub
 
   double pi = 2.0*acos(0);
   double kbT = kb*T;
-  double fcore = pow( (2.0*pi*me*kbT)/(h*h), 1.5);
-
   nh = p/kbT;
+
+  double fcore = pow( (2.0*pi*(me/h)*(kbT/h)), 1.5)/nh;
+
 
   // compute fprod
   fprod.resize(elem.size(), vector<double>());
@@ -235,26 +248,28 @@ SahaEquationSolver::ZavEquation::ComputeRHS_ElementJ(double zav, int j)
 {
 
   if(zav == 0.0) //special case
-      return elem[j].molar_fraction*elem[j].rmax;
+    return elem[j].molar_fraction*elem[j].rmax;
 
   // zav != 0
-  double ne = zav*nh;
 
   double denominator = 0.0;
   double numerator = 0.0;
-  double ne_power = 1.0;
+  double zav_power = zav;
 
   double ith_term;
 
-  for(int i=elem[j].rmax; i>=1; i--) {
-    ith_term     = ne_power*fprod[j][i];
+  for(int i=1; i<=elem[j].rmax; i++) {
+    ith_term     = fprod[j][i]/zav_power;
+    if(fprod[j][i]<0) {fprintf(stderr,"Not right! fprod[%d][%d] = %e.\n", j, i, fprod[j][i]); exit_mpi();}
     numerator   += (double)i*ith_term;
     denominator += ith_term;
 
-    ne_power *= ne;
+    zav_power *= zav;
   } 
 
-  denominator += ne_power;
+  denominator += 1.0;
+
+  fprintf(stderr,"j = %d, frac = %e, numerator = %e, denominator = %e.\n", j, elem[j].molar_fraction, numerator, denominator);
 
   return elem[j].molar_fraction*numerator/denominator;
 

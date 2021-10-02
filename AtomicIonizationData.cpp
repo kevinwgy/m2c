@@ -168,7 +168,10 @@ AtomicIonizationData::InitializeInterpolation(MPI_Comm &comm)
 }
 
 //--------------------------------------------------------------------------
-
+// KW: I was originally planning to do linear interpolation w/ a lot of sample
+// points (millions...), which is why MPI is involved. Later, it looked like 
+// cubic splines are sufficiently accurate with thousands of sample points, 
+// which makes MPI unnecessary.
 void
 AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
 {
@@ -231,7 +234,6 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
   delete [] counts;
   delete [] displacements;
 
-  exit_mpi();
 }
 
 //--------------------------------------------------------------------------
