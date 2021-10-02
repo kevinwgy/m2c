@@ -32,7 +32,7 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
   // Step 1: Read molar fraction, atomic number, and max charge
   molar_fraction = iod_aim->molar_fraction;
   atomic_number = iod_aim->atomic_number;
-  rmax = iod_aim->max_charge;
+  rmax = iod_aim->max_charge - 1;
   if(molar_fraction<=0 || atomic_number<=0) {
     print_error("*** Error: Detected molar fraction %e, atomic number %d. (Should be greater than 0.)\n",
                 molar_fraction, atomic_number);
@@ -64,8 +64,8 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
   E.resize(atomic_number);
   int max_size = 0;
   for(int i=0; i<atomic_number; i++) {
-    std::string filename = std::string(iod_aim->excitation_energy_files_prefix) + "_" 
-                         + std::to_string(atomic_number) + "_" + std::to_string(i)
+    std::string filename = std::string(iod_aim->excitation_energy_files_prefix) 
+                         + std::to_string(i)
                          + std::string(iod_aim->excitation_energy_files_suffix);
     file.open(filename.c_str(), std::fstream::in);
     if(!file.is_open()) {
@@ -77,8 +77,8 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
     if(max_size<E[i].size())
       max_size = E[i].size();
   }
-  print("    * Read %d excitation energy files %s_%d_X%s. Max excited state: %d.\n", atomic_number,
-        iod_aim->excitation_energy_files_prefix, atomic_number,
+  print("    * Read %d excitation energy files: %sX%s. Max excited state: %d.\n", atomic_number,
+        iod_aim->excitation_energy_files_prefix, 
         iod_aim->excitation_energy_files_suffix, max_size);
 
 
@@ -86,8 +86,8 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
   g.resize(atomic_number);
   max_size = 0;
   for(int i=0; i<atomic_number; i++) {
-    std::string filename = std::string(iod_aim->angular_momentum_files_prefix) + "_" 
-                         + std::to_string(atomic_number) + "_" + std::to_string(i)
+    std::string filename = std::string(iod_aim->angular_momentum_files_prefix)
+                         + std::to_string(i)
                          + std::string(iod_aim->angular_momentum_files_suffix);
     file.open(filename.c_str(), std::fstream::in);
     if(!file.is_open()) {
@@ -102,8 +102,8 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
     if(max_size<g[i].size())
       max_size = g[i].size();
   }
-  print("    * Read %d angular momentum files %s_%d_X%s. Max excited state: %d.\n", atomic_number,
-        iod_aim->angular_momentum_files_prefix, atomic_number,
+  print("    * Read %d angular momentum files: %sX%s. Max excited state: %d.\n", atomic_number,
+        iod_aim->angular_momentum_files_prefix, 
         iod_aim->angular_momentum_files_suffix, max_size);
 
       
@@ -115,6 +115,11 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
 
   // if interpolation is true, create the interpolation database
   interpolation = interp;
+  if(interpolation && Tmax_<=Tmin_){
+    print_error("*** Error: Incorrect Tmin and/or Tmax in atomic ionization model (atomic no. %d). "
+                "Tmin must be less than Tmax.\n", atomic_number);
+    exit_mpi();
+  } 
   Tmin = Tmin_;
   Tmax = Tmax_;
   sample_size = sample_size_;
@@ -127,19 +132,20 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
 
 //--------------------------------------------------------------------------
 
+template<class T>
 void
-AtomicIonizationData::GetDataInFile(std::fstream& file, vector<double> &X, int MaxCount, bool non_negative)
+AtomicIonizationData::GetDataInFile(std::fstream& file, vector<T> &X, int MaxCount, bool non_negative)
 {
   double tmp;
   for(int i=0; i<MaxCount; i++) {
     file >> tmp;
-    if(non_negative && tmp<=0) {
+    if(file.eof())
+      break;
+    if(non_negative && tmp<0) {
       print_error("*** Error: Detected negative number (%e) in an ionization data file.\n", tmp);
       exit_mpi();
     }
     X.push_back(tmp);
-    if(file.eof())
-      break;
   }
 }
 
@@ -170,7 +176,12 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
   vector<double>& U(Us[r]); 
   std::tuple<double,double,double>& coeffs(UsCoeffs[r]);
 
-  double factor = -E[r][0]/kb;
+  double factor(0);
+  for(int i=0; i<E[r].size(); i++){
+    factor = -E[r][i]/kb;
+    if(factor!=0)
+      break;
+  }
 
   double expmin = exp(factor/Tmin);
   double expmax = exp(factor/Tmax);
@@ -203,21 +214,24 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
   int my_block_size = counts[mpi_rank];
   double T;
   for(int i=0; i<my_block_size; i++) {
-    T = factor/log(expmin+(my_start_id+i)*delta_exp);
+    T = (my_start_id+i==0) ? Tmin : factor/log(expmin+(my_start_id+i)*delta_exp); //expmin can be 0 if Tmin is small (but nonzero)
     U[my_start_id+i] = CalculatePartitionFunctionOnTheFly(r, T);
   }
+
 
   //communication
   MPI_Allgatherv(MPI_IN_PLACE, my_block_size, MPI_DOUBLE, U.data(), counts, displacements, MPI_DOUBLE, comm);
  
+
   //initialize spline interpolation
   if(interpolation == 1)
-    spline[r] = new boost::math::cubic_b_spline<double>(U.data(), U.size(), expmin, delta_exp);
-  
+    spline[r] = new boost::math::cubic_b_spline<double>(U.begin(), U.end(), expmin, delta_exp);
+
 
   delete [] counts;
   delete [] displacements;
 
+  exit_mpi();
 }
 
 //--------------------------------------------------------------------------
@@ -266,7 +280,7 @@ AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T)
 
   if(interpolation==1) 
 
-    return (*spline[r])(T); 
+    return (*spline[r])(expT); 
 
   else if(interpolation==2) { //linear
 

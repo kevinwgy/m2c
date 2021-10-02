@@ -775,6 +775,8 @@ struct MaterialIonizationModel{
                                     LINEAR_INTERPOLATION = 2} partition_evaluation;
   
   // numerical parameters for sampling & interpolating the partition function
+  // Note that even w/o interpolation, Tmin is still used as a threshold, below which
+  // calculation will not be performed (i.e. ionization will not happen)
   double Tmin, Tmax;
   int sample_size;
 

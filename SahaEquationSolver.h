@@ -15,23 +15,25 @@
 class SahaEquationSolver {
 
   // constants
-  double h; //planck_constant; 
-  double e; //electron_charge;
-  double me; //electron_mass;
-  double kb; //boltzmann_constant;
+  double h; //!< planck_constant; 
+  double e; //!< electron_charge;
+  double me; //!< electron_mass;
+  double kb; //!< boltzmann_constant;
 
   int max_atomic_number;
+
+  double Tmin; //!< min temperature specified by user
 
   // IoData
   MaterialIonizationModel* iod_ion_mat;
 
-  std::vector<AtomicIonizationData> elem; //chemical elements / species
+  std::vector<AtomicIonizationData> elem; //!< chemical elements / species
 
   VarFcnBase* vf;
 
 public:
 
-  SahaEquationSolver(IoData& iod, VarFcnBase* vf_); //creates a dummy solver
+  SahaEquationSolver(IoData& iod, VarFcnBase* vf_); //!< creates a dummy solver
 
   SahaEquationSolver(MaterialIonizationModel& iod_ion_mat_, IoData& iod_, VarFcnBase* vf_, MPI_Comm* comm);
 

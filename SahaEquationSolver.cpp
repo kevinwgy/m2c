@@ -31,6 +31,12 @@ SahaEquationSolver::SahaEquationSolver(MaterialIonizationModel& iod_ion_mat_, Io
     exit_mpi();
   }
 
+  Tmin = iod_ion_mat->Tmin;
+  if(Tmin<=0) {
+    print_error("*** Error: Detected Tmin = %e in material ionization model. Must be positive.\n", Tmin);
+    exit_mpi();
+  }
+
   // Read element data
   int numElems = iod_ion_mat->elementMap.dataMap.size();
   elem.resize(numElems, AtomicIonizationData());
@@ -50,7 +56,7 @@ SahaEquationSolver::SahaEquationSolver(MaterialIonizationModel& iod_ion_mat_, Io
     else if(iod_ion_mat->partition_evaluation == MaterialIonizationModel::LINEAR_INTERPOLATION)
       data.Setup(it->second, h, e, me, kb, 2, iod_ion_mat->Tmin, iod_ion_mat->Tmax, iod_ion_mat->sample_size, comm);
     else if(iod_ion_mat->partition_evaluation == MaterialIonizationModel::ON_THE_FLY)
-      data.Setup(it->second, h, e, me, kb, 0, 0, 0, 0, NULL);
+      data.Setup(it->second, h, e, me, kb, 0, iod_ion_mat->Tmin, iod_ion_mat->Tmax, 0, NULL);
     else {
       print_error("*** Error: Detected an unknown method for partition function evaluation.\n");
       exit_mpi();
@@ -79,17 +85,27 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
   double T = vf->GetTemperature(v[0], vf->GetInternalEnergyPerUnitMass(v[0], v[4]));
   nh = v[4]/(kb*T);
 
-  if(!iod_ion_mat) { //dummy solver
+  if(!iod_ion_mat) { //dummy solver 
     zav = 0.0;
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
       for(int r=0; r<alpha.size(); r++)
-        alpha[r] = 0.0;
+        alpha[r] = (it==alpha_rj.begin() && r==0) ? 1.0 : 0.0;
     }
     return;
   }
 
+  if(T<=Tmin) { //no ionization
+    zav = 0.0;
+    ne = 0.0;
+    for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
+      vector<double> &alpha = it->second;
+      for(int r=0; r<alpha.size(); r++)
+        alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
+    }
+    return;
+  }
 
   // ------------------------------
   // Step 1: Solve for Zav 

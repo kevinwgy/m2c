@@ -21,9 +21,9 @@ public: //!< data is public
   double molar_fraction;
   int atomic_number;
   std::vector<double> I; //!< ionization energy
-  std::vector<std::vector<double> > g; //!< degeneracy (=2l+1, l: angular momentum)
+  std::vector<std::vector<int> > g; //!< degeneracy (=2l+1, l: angular momentum)
   std::vector<std::vector<double> > E; //!< excitation energy
-  int rmax; //max charge state
+  int rmax; //max charge state - 1 
 
 private:
 
@@ -53,7 +53,8 @@ public:
 
 private: 
 
-  void GetDataInFile(std::fstream& file, vector<double> &X, int MaxCount, bool non_negative);
+  template<class T>
+  void GetDataInFile(std::fstream& file, vector<T> &X, int MaxCount, bool non_negative);
 
   void InitializeInterpolation(MPI_Comm& comm);
   void InitializeInterpolationForCharge(int r, MPI_Comm &comm);

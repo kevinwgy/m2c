@@ -1966,9 +1966,9 @@ MaterialIonizationModel::MaterialIonizationModel()
   convergence_tol = 1.0e-5;
 
   partition_evaluation = CUBIC_SPLINE_INTERPOLATION;
-  sample_size = 5000;
-  Tmin = 100.0; //100 Kelvin
-  Tmax = 2.0e6; //Kelvin
+  sample_size = 150;
+  Tmin = 10.0; //10 Kelvin
+  Tmax = 1.0e10; //Kelvin
 }
 
 //------------------------------------------------------------------------------
@@ -2369,6 +2369,8 @@ void IoData::readCmdFile()
 void IoData::setupCmdFileVariables()
 {
   eqs.setup("Equations");
+  eqs.setup("NavierStokesEquations");
+
   ic.setup("InitialCondition");
   bc.setup("BoundaryConditions");
 
