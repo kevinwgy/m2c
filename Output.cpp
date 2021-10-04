@@ -6,13 +6,14 @@
 //--------------------------------------------------------------------------
 
 Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, 
-               SpaceVariable3D &cell_volume) : 
+               SpaceVariable3D &cell_volume, IonizationOperator* ion_) : 
     comm(comm_), 
     iod(iod_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
-    probe_output(comm_, iod_.output, vf_),
-    matvol_output(comm_, iod_, cell_volume)
+    probe_output(comm_, iod_.output, vf_, ion_),
+    matvol_output(comm_, iod_, cell_volume),
+    ion(ion_)
 {
   iFrame = 0;
 
@@ -45,10 +46,18 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcn
     if(line_number<0 || line_number>=numLines) {
       print_error("*** Error: Detected error in line output. Line number = %d (should be between 0 and %d)\n",
                   line_number, numLines-1); 
-      exit(-1);
+      exit_mpi();
     }
-    line_outputs[line_number] = new ProbeOutput(comm, iod.output, vf, line_number);
+    line_outputs[line_number] = new ProbeOutput(comm, iod.output, vf, ion, line_number);
   }
+
+
+  // check ionization requests
+  if(iod.output.ionization_output_requested() && !ion) {
+    print_error("*** Error: User requested ionization output(s) without specifying an ionization model.\n");
+    exit_mpi();
+  }
+
 }
 
 //--------------------------------------------------------------------------
@@ -101,6 +110,10 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
                                    SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
                                    SpaceVariable3D *L)
 {
+  //! Post-processing
+  if(iod.output.ionization_output_requested())
+    ion->ComputeIonization(V,ID);
+
   //! Define vtr file name
   char full_fname[256];
   char fname[256];
@@ -256,12 +269,60 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
       print_error("*** Error: Requested output of laser radiance, but the laser source is not specified.\n");
       exit_mpi();
     }
-    PetscObjectSetName((PetscObject)(L->GetRefToGlobalVec()), "laser_radiance"); //adding the name directly to Phi[i].
+    PetscObjectSetName((PetscObject)(L->GetRefToGlobalVec()), "laser_radiance");
     VecView(L->GetRefToGlobalVec(), viewer);
   }
 
 
+  if(iod.output.mean_charge==OutputData::ON) {
+    SpaceVariable3D& Zav(ion->GetReferenceToZav());
+    PetscObjectSetName((PetscObject)(Zav.GetRefToGlobalVec()), "mean_charge_number");
+    VecView(Zav.GetRefToGlobalVec(), viewer);
+  }
 
+  if(iod.output.heavy_particles_density==OutputData::ON) {
+    SpaceVariable3D& Nh(ion->GetReferenceToNh());
+    PetscObjectSetName((PetscObject)(Nh.GetRefToGlobalVec()), "heavy_particles_density");
+    VecView(Nh.GetRefToGlobalVec(), viewer);
+  }
+
+  if(iod.output.electron_density==OutputData::ON) {
+    SpaceVariable3D& Ne(ion->GetReferenceToNe());
+    PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
+    VecView(Ne.GetRefToGlobalVec(), viewer);
+  }
+
+  if(iod.output.electron_density==OutputData::ON) {
+    SpaceVariable3D& Ne(ion->GetReferenceToNe());
+    PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
+    VecView(Ne.GetRefToGlobalVec(), viewer);
+  }
+
+  bool molar_fractions_requested = false;
+  for(int j=0; j<OutputData::MAXSPECIES; j++)
+    if(iod.output.molar_fractions[j]==OutputData::ON) {
+      molar_fractions_requested = true;
+      break;
+    }
+  if(molar_fractions_requested) {
+    std::map<int, SpaceVariable3D*>& AlphaRJ(ion->GetReferenceToAlphaRJ());
+    for(int j=0; j<OutputData::MAXSPECIES; j++) {
+      if(iod.output.molar_fractions[j] != OutputData::ON)
+        continue;
+
+      auto it = AlphaRJ.find(j);
+      if(it == AlphaRJ.end()) {
+        print_error("*** Error: User requested output of molar fractions for species %d, but it does not exist.\n", j);
+        exit_mpi();
+      }
+
+      SpaceVariable3D* AlphaR = it->second;
+      char word[40];
+      sprintf(word, "molar_fractions_%d", j); 
+      PetscObjectSetName((PetscObject)(AlphaR->GetRefToGlobalVec()), word);
+      VecView(AlphaR->GetRefToGlobalVec(), viewer);
+    }
+  }
 
 
   // Add a line to the pvd file to record the new solutio snapshot

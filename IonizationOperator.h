@@ -32,6 +32,8 @@ public:
 
   void Destroy();
 
+  Vec3D ComputeIonizationAtOnePoint(int id, double rho, double p);
+
   void ComputeIonization(SpaceVariable3D &V, SpaceVariable3D &ID);
 
   // Get reference to results (e.g., for outputing)

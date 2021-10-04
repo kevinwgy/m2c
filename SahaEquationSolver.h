@@ -22,7 +22,9 @@ class SahaEquationSolver {
 
   int max_atomic_number;
 
-  double Tmin; //!< min temperature specified by user
+  double molar_mass; //the material is possibly a mixture
+
+  double Tmin; //!< min temperature specified by user for ionization cal.
 
   // IoData
   MaterialIonizationModel* iod_ion_mat;
@@ -47,11 +49,10 @@ protected:
 
   //! nested class / functor: nonlinear equation for Zav
   class ZavEquation {
-    double nh; //p/(kb*T)
     std::vector<std::vector<double> > fprod; // f_{r,j}(T,...)*f_{r-1,j}(T,...)*...*f_{0,j}(T,...)
     std::vector<AtomicIonizationData>& elem;
   public:
-    ZavEquation(double kb, double T, double p, double me, double h, std::vector<AtomicIonizationData>& elem_);
+    ZavEquation(double kb, double T, double nh, double me, double h, std::vector<AtomicIonizationData>& elem_);
     ~ZavEquation() {}
     double operator() (double zav) {return zav - ComputeRHS(zav);}
     double GetFProd(int r, int j) {assert(j<fprod.size() && r<fprod[j].size()); return fprod[j][r];}

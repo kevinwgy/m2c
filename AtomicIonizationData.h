@@ -19,11 +19,12 @@ class AtomicIonizationData {
 public: //!< data is public
 
   double molar_fraction;
+  double molar_mass;
   int atomic_number;
   std::vector<double> I; //!< ionization energy
   std::vector<std::vector<int> > g; //!< degeneracy (=2l+1, l: angular momentum)
   std::vector<std::vector<double> > E; //!< excitation energy
-  int rmax; //max charge state - 1 
+  int rmax; //max charge state 
 
 private:
 
@@ -39,7 +40,7 @@ private:
   std::vector<std::tuple<double,double,double> > UsCoeffs; //!< for each r: ("factor", "expmin", "delta_exp")
   std::vector<boost::math::cubic_b_spline<double>* > spline; 
   int sample_size; //!< the size of Us[r], r = 0,1,...,rmax
-  double Tmin, Tmax;
+  double sample_Tmin, sample_Tmax;
 
 public:
 
@@ -47,7 +48,7 @@ public:
   ~AtomicIonizationData();
 
   void Setup(AtomicIonizationModel* iod_aim, double h_, double e_, double me_, double kb_,
-             int interp, double Tmin_, double Tmax_, int sample_size_, MPI_Comm* comm);
+             int interp, double sample_Tmin_, double sample_Tmax_, int sample_size_, MPI_Comm* comm);
 
   double CalculatePartitionFunction(int r, double T);
 

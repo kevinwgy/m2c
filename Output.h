@@ -5,10 +5,11 @@
 #include <SpaceVariable.h>
 #include <ProbeOutput.h>
 #include <MaterialVolumeOutput.h>
+#include <IonizationOperator.h>
 #include <stdio.h>
 
-/** This class is responsible (only) for writing solutions to files. It uses PETSc functionalities
- *  to write VTK files. It is not designed for post-processing results --- we leave this job to
+/** Class Output is responsible  for writing solutions to files. It uses PETSc functionalities
+ *  to write VTK files. It should not try to do post-processing work that can be done by some
  *  external software (e.g., Paraview). Keep it as simple as possible.
  */
 class Output
@@ -16,6 +17,9 @@ class Output
   MPI_Comm& comm;
   IoData& iod;
   vector<VarFcnBase*> &vf;
+
+  //! Ionization solver (Currently, a post-processer)
+  IonizationOperator* ion;
 
   //! These variables will temporarily hold solutions before they are printed to file
   SpaceVariable3D scalar;   
@@ -33,7 +37,8 @@ class Output
   MaterialVolumeOutput matvol_output;
 
 public:
-  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume);
+  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
+         IonizationOperator* ion_ = NULL);
   ~Output();
 
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh

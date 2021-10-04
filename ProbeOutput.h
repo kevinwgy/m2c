@@ -3,6 +3,7 @@
 #include <IoData.h>
 #include <VarFcnBase.h>
 #include <SpaceVariable.h>
+#include <IonizationOperator.h>
 
 /** This class is responsible for interpolating solutions at probe locations and outputing
  *  the interpolated solutions to files. It is owned by class Output
@@ -16,6 +17,9 @@ class ProbeOutput {
   MPI_Comm &comm;
   OutputData &iod_output;
   std::vector<VarFcnBase*> &vf;
+
+  //post-processor
+  IonizationOperator* ion;
 
   int numNodes;
   int frequency;
@@ -35,9 +39,9 @@ class ProbeOutput {
 
 public:
   //! Constructor 1: write probe info to file. 
-  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_);
+  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_, IonizationOperator* ion_);
   //! Constructor 2: Probe is part of line_plot 
-  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_, 
+  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_, IonizationOperator* ion_,
               int line_number); 
 
   ~ProbeOutput();
@@ -59,6 +63,8 @@ private:
   double CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
 
   double CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
+
+  Vec3D CalculateIonizationAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
 
 };
 

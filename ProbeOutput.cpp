@@ -4,8 +4,9 @@
 //-------------------------------------------------------------------------
 
 // This constructor is for explicitly specified probe nodes (i.e. not a line)
-ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_) : 
-             comm(comm_), iod_output(iod_output_), vf(vf_)
+ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_,
+                         IonizationOperator* ion_) : 
+             comm(comm_), iod_output(iod_output_), vf(vf_), ion(ion_)
 {
   iFrame = 0;
 
@@ -137,6 +138,17 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     delete [] filename;
   }
 
+  if (iod_output.probes.ionization_result[0] != 0) {
+    if(!ion) {
+      print_error("*** Error: Requested ionization result at probe(s), without specifying an ionization model.\n");
+      exit_mpi();
+    }
+    char *filename = new char[spn + strlen(iod_output.probes.ionization_result)];
+    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.ionization_result);
+    file[Probes::IONIZATION] = fopen(filename, "w");
+    delete [] filename;
+  }
+
   for(int i=0; i<Probes::SIZE; i++)
     if(file[i]) { //write header
       for(int iNode = 0; iNode<numNodes; iNode++)
@@ -151,8 +163,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 //-------------------------------------------------------------------------
 // This constructor is for "line plots"
 ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_,
-                         int line_number_) : 
-             comm(comm_), iod_output(iod_output_), vf(vf_)
+                         IonizationOperator* ion_, int line_number_) : 
+             comm(comm_), iod_output(iod_output_), vf(vf_), ion(ion_)
 {
   iFrame = 0;
 
@@ -312,9 +324,12 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
   print(file, "## Time: %e, Time step: %d.\n", time, time_step);
   if(L) 
     print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  "
-                "|  Laser Radiance  |  LevelSet(s)\n");
+                "|  Laser Radiance  |  LevelSet(s)");
   else
-    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  |  LevelSet(s)\n");
+    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  |  LevelSet(s)");
+
+  if(ion)
+    print(file, "  |  Mean Charge  |  Heavy Particles Density\n");
 
   //get data
   double***  v  = (double***) V.GetDataPointer();
@@ -343,6 +358,12 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
       double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi[i], 1, 0);
       print(file, "%16.8e  ", sol);
     }
+
+    if(ion) {
+      Vec3D ion_res = CalculateIonizationAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      print(file, "%16.8e  %16.8e  ", ion_res[0], ion_res[1]);
+    }
+
     print(file, "\n");
   }
 
@@ -536,6 +557,19 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     Phi[4]->RestoreDataPointerToLocalVector(); //no changes made
   }
 
+  if(file[Probes::IONIZATION]) {
+    print(file[Probes::IONIZATION], "%8d    %16.8e    ", time_step, time);
+    double*** id  = (double***)ID.GetDataPointer();
+    for(int iNode=0; iNode<numNodes; iNode++) {
+      Vec3D sol = CalculateIonizationAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      print(file[Probes::IONIZATION], "%16.8e    %16.8e    ", sol[0], sol[1]);
+    }
+    print(file[Probes::IONIZATION],"\n");
+    fflush(file[Probes::IONIZATION]);
+    ID.RestoreDataPointerToLocalVector();
+  }
+
+
   V.RestoreDataPointerToLocalVector();
 
   last_snapshot_time = time;
@@ -722,4 +756,74 @@ ProbeOutput::CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords
 }
 
 //-------------------------------------------------------------------------
+
+Vec3D
+ProbeOutput::CalculateIonizationAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id)
+{
+  Vec3D sol(0.0);
+
+  int i = ijk[0], j = ijk[1], k = ijk[2];
+  int dim = 5;
+  double rho,p;
+  int myid;
+
+  if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
+
+    // c000
+    myid = id[k][j][i]; 
+    rho  =  v[k][j][i*dim];
+    p    =  v[k][j][i*dim+4];
+    Vec3D c000 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    // c100
+    myid = id[k][j][i+1];
+    rho  =  v[k][j][(i+1)*dim];
+    p    =  v[k][j][(i+1)*dim+4];
+    Vec3D c100 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    // c010
+    myid = id[k][j+1][i];
+    rho  =  v[k][j+1][i*dim];
+    p    =  v[k][j+1][i*dim+4];
+    Vec3D c010 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    // c110
+    myid = id[k][j+1][i+1];
+    rho  =  v[k][j+1][(i+1)*dim];
+    p    =  v[k][j+1][(i+1)*dim+4];
+    Vec3D c110 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    // c001
+    myid = id[k+1][j][i];
+    rho  =  v[k+1][j][i*dim];
+    p    =  v[k+1][j][i*dim+4];
+    Vec3D c001 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    // c101
+    myid = id[k+1][j][i+1];
+    rho  =  v[k+1][j][(i+1)*dim];
+    p    =  v[k+1][j][(i+1)*dim+4];
+    Vec3D c101 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    // c011
+    myid = id[k+1][j+1][i];
+    rho  =  v[k+1][j+1][i*dim];
+    p    =  v[k+1][j+1][i*dim+4];
+    Vec3D c011 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    // c111
+    myid = id[k+1][j+1][i+1];
+    rho  =  v[k+1][j+1][(i+1)*dim];
+    p    =  v[k+1][j+1][(i+1)*dim+4];
+    Vec3D c111 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+
+    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, (double*)sol, 3, MPI_DOUBLE, MPI_SUM, comm);
+  return sol;
+}
+
+//-------------------------------------------------------------------------
+
 

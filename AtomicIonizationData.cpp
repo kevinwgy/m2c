@@ -20,7 +20,7 @@ AtomicIonizationData::~AtomicIonizationData()
 
 void
 AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_, double me_, double kb_,
-                            int interp, double Tmin_, double Tmax_, int sample_size_, MPI_Comm* comm)
+                            int interp, double sample_Tmin_, double sample_Tmax_, int sample_size_, MPI_Comm* comm)
 {
 
   // Step 0: Get constants
@@ -31,15 +31,16 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
 
   // Step 1: Read molar fraction, atomic number, and max charge
   molar_fraction = iod_aim->molar_fraction;
+  molar_mass     = iod_aim->molar_mass;
   atomic_number = iod_aim->atomic_number;
-  rmax = iod_aim->max_charge - 1;
-  if(molar_fraction<=0 || atomic_number<=0) {
-    print_error("*** Error: Detected molar fraction %e, atomic number %d. (Should be greater than 0.)\n",
-                molar_fraction, atomic_number);
+  rmax = iod_aim->max_charge;
+  if(molar_fraction<=0 || molar_mass<=0 || atomic_number<=0) {
+    print_error("*** Error: Detected molar fraction %e, molar mass %e, atomic number %d. (Should be greater than 0.)\n",
+                molar_fraction, molar_mass, atomic_number);
     exit_mpi();
   }
-  print("  o Found chemical element with atomic number %d and molar fraction %e.\n", atomic_number,
-        molar_fraction);
+  print("  o Found chemical element with atomic number %d, molar mass %e, and molar fraction %e.\n", atomic_number,
+        molar_mass, molar_fraction);
 
 
   // Step 2: Read the ionization energies
@@ -82,46 +83,43 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
         iod_aim->excitation_energy_files_suffix, max_size);
 
 
-  // Step 4: Read angular momentum energy files ("l") and convert to the degeneracy, g = 2l + 1
+  // Step 4: Read degeneracy files ("g") 
   g.resize(atomic_number);
   max_size = 0;
   for(int i=0; i<atomic_number; i++) {
-    std::string filename = std::string(iod_aim->angular_momentum_files_prefix)
+    std::string filename = std::string(iod_aim->degeneracy_files_prefix)
                          + std::to_string(i)
-                         + std::string(iod_aim->angular_momentum_files_suffix);
+                         + std::string(iod_aim->degeneracy_files_suffix);
     file.open(filename.c_str(), std::fstream::in);
     if(!file.is_open()) {
-      print_error("*** Error: Cannot open angular momentum file %s.\n", filename.c_str());
+      print_error("*** Error: Cannot open degeneracy file %s.\n", filename.c_str());
       exit_mpi();
     }
     GetDataInFile(file, g[i], 10000, true);
-    //convert g to l
-    for(auto it = g[i].begin(); it != g[i].end(); it++)
-      *it = 2.0*(*it) + 1.0;
     file.close();
     if(max_size<g[i].size())
       max_size = g[i].size();
   }
-  print("    * Read %d angular momentum files: %sX%s. Max excited state: %d.\n", atomic_number,
-        iod_aim->angular_momentum_files_prefix, 
-        iod_aim->angular_momentum_files_suffix, max_size);
+  print("    * Read %d degeneracy files: %sX%s. Max excited state: %d.\n", atomic_number,
+        iod_aim->degeneracy_files_prefix, 
+        iod_aim->degeneracy_files_suffix, max_size);
 
       
   // check to see if rmax should be reduced based on data files
   int data_size = std::min(I.size(), std::min(g.size(), E.size()));
-  if(rmax > data_size-1) //rmax should be smaller than or equal to "size" - 1
-    rmax = data_size-1;
+  if(rmax > data_size) //rmax should be smaller than or equal to "size"
+    rmax = data_size;
 
 
   // if interpolation is true, create the interpolation database
   interpolation = interp;
-  if(interpolation && Tmax_<=Tmin_){
-    print_error("*** Error: Incorrect Tmin and/or Tmax in atomic ionization model (atomic no. %d). "
+  if(interpolation && sample_Tmax_<=sample_Tmin_){
+    print_error("*** Error: Incorrect Tmin and/or Tmax for samples in atomic ionization model (atomic no. %d). "
                 "Tmin must be less than Tmax.\n", atomic_number);
     exit_mpi();
   } 
-  Tmin = Tmin_;
-  Tmax = Tmax_;
+  sample_Tmin = sample_Tmin_;
+  sample_Tmax = sample_Tmax_;
   sample_size = sample_size_;
   if(interpolation) {
     assert(comm);
@@ -154,15 +152,15 @@ AtomicIonizationData::GetDataInFile(std::fstream& file, vector<T> &X, int MaxCou
 void
 AtomicIonizationData::InitializeInterpolation(MPI_Comm &comm)
 {
-  for(int r=0; r<=rmax; r++) {
+  for(int r=0; r<rmax; r++) {
     Us.push_back(vector<double>(sample_size));
   }
-  UsCoeffs.resize(rmax+1, std::tuple<double,double,double>(0,0,0));
+  UsCoeffs.resize(rmax, std::tuple<double,double,double>(0,0,0));
 
   if(interpolation == 1) //cubic spline interpolation
-    spline.resize(rmax+1, NULL);
+    spline.resize(rmax, NULL);
 
-  for(int r=0; r<=rmax; r++)
+  for(int r=0; r<rmax; r++)
     InitializeInterpolationForCharge(r, comm);
 
 }
@@ -186,8 +184,8 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
       break;
   }
 
-  double expmin = exp(factor/Tmin);
-  double expmax = exp(factor/Tmax);
+  double expmin = exp(factor/sample_Tmin);
+  double expmax = exp(factor/sample_Tmax);
   assert(expmin<expmax);
   
   double delta_exp = (expmax-expmin)/(sample_size-1.0);
@@ -217,7 +215,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
   int my_block_size = counts[mpi_rank];
   double T;
   for(int i=0; i<my_block_size; i++) {
-    T = (my_start_id+i==0) ? Tmin : factor/log(expmin+(my_start_id+i)*delta_exp); //expmin can be 0 if Tmin is small (but nonzero)
+    T = (my_start_id+i==0) ? sample_Tmin : factor/log(expmin+(my_start_id+i)*delta_exp); //expmin can be 0 if Tmin is small (but nonzero)
     U[my_start_id+i] = CalculatePartitionFunctionOnTheFly(r, T);
   }
 
@@ -242,7 +240,11 @@ double
 AtomicIonizationData::CalculatePartitionFunction(int r, double T)
 {
   assert(r<=rmax);
-  if(interpolation && T>=Tmin && T<=Tmax)
+
+  if(r==atomic_number)
+    return 1.0; //per Shafquat
+
+  if(interpolation && T>=sample_Tmin && T<=sample_Tmax)
     return CalculatePartitionFunctionByInterpolation(r, T);
 
   return CalculatePartitionFunctionOnTheFly(r, T);
@@ -254,16 +256,15 @@ double
 AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T)
 {
 
-  if(r==atomic_number)
-    return 1.0; //per Shafquat
-
   double Ur = 0.0;
   int nsize = std::max(g[r].size(), E[r].size());
   for(int n=0; n<nsize; n++) {
+/* //TODO: Check with Shafquat
     if(I[r]<E[r][n]) {
       assert(n>0);
       break;
     }
+*/
     Ur += g[r][n]*exp(-E[r][n]/(kb*T));
   }
 

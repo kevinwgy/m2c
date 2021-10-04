@@ -14,6 +14,7 @@
 #include <MultiPhaseOperator.h>
 #include <GradientCalculatorCentral.h>
 #include <LaserAbsorptionSolver.h>
+#include <IonizationOperator.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -167,8 +168,15 @@ int main(int argc, char* argv[])
     L = new SpaceVariable3D(comm, &(dms.ghosted1_1dof)); 
   }
  
+
+  //! Initialize ionization solver (if needed)
+  IonizationOperator* ion = NULL;
+  if(iod.ion.materialMap.dataMap.size() != 0)
+    ion = new IonizationOperator(comm, dms, iod, vf);
+
+
   //! Initialize output
-  Output out(comm, dms, iod, vf, spo.GetMeshCellVolumes()); 
+  Output out(comm, dms, iod, vf, spo.GetMeshCellVolumes(), ion); 
   out.InitializeOutput(spo.GetMeshCoordinates());
 
   //! Initialize time integrator
@@ -255,8 +263,10 @@ int main(int argc, char* argv[])
   V.Destroy();
   ID.Destroy();
 
-  if(laser) laser->Destroy();
-  if(L)     L->Destroy();
+  if(laser) {laser->Destroy(); delete laser;}
+  if(L)     {L->Destroy(); delete L;}
+
+  if(ion) {ion->Destroy(); delete ion;}
 
   //! Detroy the levelsets
   for(int ls = 0; ls<lso.size(); ls++) {

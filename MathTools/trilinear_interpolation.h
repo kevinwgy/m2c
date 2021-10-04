@@ -41,16 +41,17 @@ T trilinear_interpolation(T c000, T c001, T c010, T c011,
  *   Outputs:
  *     return value: interpolated value.
  */
-inline double trilinear_interpolation(Vec3D &xi, double c000, double c100, double c010, double c110,
-                                      double c001, double c101, double c011, double c111)
+template<typename T>
+T trilinear_interpolation(Vec3D &xi, T c000, T c100, T c010, T c110,
+                          T c001, T c101, T c011, T c111)
 {
-  double c00 = c000*(1.0 - xi[0]) + c100*xi[0];
-  double c01 = c001*(1.0 - xi[0]) + c101*xi[0];
-  double c10 = c010*(1.0 - xi[0]) + c110*xi[0];
-  double c11 = c011*(1.0 - xi[0]) + c111*xi[0];
+  T c00 = c000*(1.0 - xi[0]) + c100*xi[0];
+  T c01 = c001*(1.0 - xi[0]) + c101*xi[0];
+  T c10 = c010*(1.0 - xi[0]) + c110*xi[0];
+  T c11 = c011*(1.0 - xi[0]) + c111*xi[0];
 
-  double c0  = c00*(1.0 - xi[1]) + c10*xi[1];
-  double c1  = c01*(1.0 - xi[1]) + c11*xi[1];
+  T c0  = c00*(1.0 - xi[1]) + c10*xi[1];
+  T c1  = c01*(1.0 - xi[1]) + c11*xi[1];
 
   return c0*(1.0 - xi[2]) + c1*xi[2];
 }

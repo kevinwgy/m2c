@@ -743,7 +743,8 @@ struct LaserData {
 struct AtomicIonizationModel {
 
   double molar_fraction;
-  int atomic_number;
+  int    atomic_number;
+  double molar_mass;
 
   int max_charge;
 
@@ -752,8 +753,8 @@ struct AtomicIonizationModel {
   const char* excitation_energy_files_prefix; //!< prefix of files that contain excitation energies (for different excited states)
   const char* excitation_energy_files_suffix;
 
-  const char* angular_momentum_files_prefix; //!< prefix of files that contain total momentum energies (for different excited states)
-  const char* angular_momentum_files_suffix;
+  const char* degeneracy_files_prefix; //!< prefix of files that contain degeneracy (for different excited states)
+  const char* degeneracy_files_suffix;
 
   AtomicIonizationModel();
   ~AtomicIonizationModel() {}
@@ -774,10 +775,12 @@ struct MaterialIonizationModel{
   enum PartitionFunctionEvaluation {ON_THE_FLY = 0, CUBIC_SPLINE_INTERPOLATION = 1,
                                     LINEAR_INTERPOLATION = 2} partition_evaluation;
   
+  //! Tmin is still used as a threshold, below which
+  //! calculation will not be performed (i.e. ionization will not happen)
+  double ionization_Tmin;
+
   // numerical parameters for sampling & interpolating the partition function
-  // Note that even w/o interpolation, Tmin is still used as a threshold, below which
-  // calculation will not be performed (i.e. ionization will not happen)
-  double Tmin, Tmax;
+  double sample_Tmin, sample_Tmax;
   int sample_size;
 
   ObjectMap<AtomicIonizationModel> elementMap;
@@ -833,7 +836,7 @@ struct Probes {
 
   enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
               DELTA_TEMPERATURE = 6, MATERIALID = 7, LASERRADIANCE = 8, LEVELSET0 = 9, LEVELSET1 = 10, 
-              LEVELSET2 = 11, LEVELSET3 = 12, LEVELSET4 = 13, SIZE = 14};
+              LEVELSET2 = 11, LEVELSET3 = 12, LEVELSET4 = 13, IONIZATION = 14, SIZE = 15};
 
   const char *density;
   const char *velocity_x;
@@ -849,6 +852,7 @@ struct Probes {
   const char *levelset2;
   const char *levelset3;
   const char *levelset4;
+  const char *ionization_result;
 
   Probes();
   ~Probes() {}
@@ -922,6 +926,9 @@ struct OutputData {
   Options molar_fractions2;
   Options molar_fractions3;
   Options molar_fractions4;
+  inline bool ionization_output_requested() {
+    return mean_charge==ON || heavy_particles_density==ON || electron_density==ON || molar_fractions0==ON ||
+           molar_fractions1==ON || molar_fractions2==ON || molar_fractions3==ON || molar_fractions4==ON;}
 
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number

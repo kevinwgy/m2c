@@ -1,6 +1,8 @@
 #include<IonizationOperator.h>
 #include<Vector5D.h>
 
+extern int verbose;
+
 //-----------------------------------------------------------------------
 
 IonizationOperator::IonizationOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, 
@@ -80,6 +82,20 @@ IonizationOperator::Destroy()
 
 //-----------------------------------------------------------------------
 
+Vec3D
+IonizationOperator::ComputeIonizationAtOnePoint(int id, double rho, double p)
+{
+  double v[5] = {rho, 0.0, 0.0, 0.0, p}; //velocities are not needed
+  std::map<int, vector<double> > nodal_alphas; //empty map
+  Vec3D result; //(zav, nh, he)
+
+  saha[id]->Solve(v, result[0], result[1], result[2], nodal_alphas);
+
+  return result;
+}
+
+//-----------------------------------------------------------------------
+
 void
 IonizationOperator::ComputeIonization(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
@@ -125,6 +141,8 @@ IonizationOperator::ComputeIonization(SpaceVariable3D &V, SpaceVariable3D &ID)
   for(auto it = AlphaRJ.begin(); it != AlphaRJ.end(); it++)
     it->second->RestoreDataPointerAndInsert();
 
+  if(verbose>=2)
+    print("- Computed ionizations.\n");
 }
 
 //-----------------------------------------------------------------------
