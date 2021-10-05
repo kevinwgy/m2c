@@ -259,12 +259,12 @@ AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T)
   double Ur = 0.0;
   int nsize = std::max(g[r].size(), E[r].size());
   for(int n=0; n<nsize; n++) {
-/* //TODO: Check with Shafquat
+
     if(I[r]<E[r][n]) {
       assert(n>0);
       break;
     }
-*/
+
     Ur += g[r][n]*exp(-E[r][n]/(kb*T));
   }
 
