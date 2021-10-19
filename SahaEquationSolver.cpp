@@ -181,6 +181,12 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     int j = it->first; //element id
     vector<double> &alpha = it->second; //alpha_r
 
+    if(j>=elem.size()) {//this material does not have element j
+      for(int r=0; r<alpha.size(); r++)
+        alpha[r] = 0.0;
+      continue;
+    }
+
     double zej = fun.GetZej(zav, j);
     double denom = 0.0;
     double zav_power = 1.0;
@@ -191,15 +197,19 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     assert(denom>0.0);
     alpha[0] = zej/denom;
  
-    for(int r=1; r<alpha.size()-1; r++)
-      alpha[r] = (r<=elem[j].rmax) ? alpha[r-1]/zav*fun.GetFProd(r,j)/fun.GetFProd(r-1,j) : 0.0;
+    double fr(0.0);
+    for(int r=1; r<alpha.size()-1; r++) {
+      fr = (fun.GetFProd(r-1,j) == 0.0) ? 0.0 : fun.GetFProd(r,j)/fun.GetFProd(r-1,j);
+      alpha[r] = (r<=elem[j].rmax) ? alpha[r-1]/zav*fr : 0.0;
+    }
 
     int last_one = alpha.size()-1; 
     alpha[last_one] = elem[j].molar_fraction;
     for(int r=0; r<last_one; r++)
       alpha[last_one] -= alpha[r];
 
-    assert(alpha[last_one]>=-1.0e-10); //allow some roundoff error
+    //allow some roundoff error
+    assert(alpha[last_one]>=-1.0e-8);
     if(alpha[last_one]<0)
       alpha[last_one] = 0;
   }
