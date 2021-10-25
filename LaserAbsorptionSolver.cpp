@@ -1415,7 +1415,6 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D 
 
   if(!success)
     print_error("*** Error: Laser radiance solver failed to converge.\n");
-    
 }
 
 //--------------------------------------------------------------------------

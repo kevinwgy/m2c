@@ -633,7 +633,7 @@ MaterialTransitionData::MaterialTransitionData()
 {
   from_id = -1;
   to_id = -1;
-  temperature_lowerbound = -DBL_MAX;
+  temperature_lowerbound = 0.0;
   temperature_upperbound = DBL_MAX;
   pressure_lowerbound = -DBL_MAX;
   pressure_upperbound = DBL_MAX;

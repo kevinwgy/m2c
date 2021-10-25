@@ -639,8 +639,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
-        //if(coords[k][j][i].norm()<0.02) {
-        if(fabs(coords[k][j][i][0]-0.01)<0.005 && fabs(coords[k][j][i][1]-0.01)<0.005) {
+        if(coords[k][j][i].norm()<0.1) {
           fprintf(stderr,"Changing state at (%d,%d,%d) (%e, %e, %e).\n", i,j,k, 
                   coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2]);
           v[k][j][i][0] = 8.9e-4;
