@@ -1864,6 +1864,8 @@ LaserData::LaserData() {
 
   lmin = 1.0e-12;
 
+  parallel = BALANCED;
+
   source_depth = 0.0;
   alpha = 1.0;
   convergence_tol = 1.0e-4;
@@ -1878,7 +1880,7 @@ LaserData::LaserData() {
 
 void LaserData::setup(const char *name, ClassAssigner *father) {
 
-  ClassAssigner *ca = new ClassAssigner(name, 22, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 23, father); 
 
   //Physical Parameters
   new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
@@ -1899,6 +1901,10 @@ void LaserData::setup(const char *name, ClassAssigner *father) {
   new ClassDouble<LaserData>(ca, "RadianceCutOff", this, &LaserData::lmin);
 
   abs.setup("AbsorptionCoefficient", ca);
+
+  //Parallelization approach
+  new ClassToken<LaserData> (ca, "Parallelization", this,
+        reinterpret_cast<int LaserData::*>(&LaserData::parallel), 2, "Original", 0, "Balanced", 1);
 
   //Numerical Parameters
   new ClassDouble<LaserData>(ca, "SourceDepth", this, &LaserData::source_depth);

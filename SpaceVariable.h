@@ -40,7 +40,7 @@ public:
  *******************************************
  */
 class SpaceVariable3D {
-  MPI_Comm&  comm; 
+  MPI_Comm*  comm; 
   DM*        dm;   
   Vec        globalVec;  //!< each process only stores a local portion, without ghost
   Vec        localVec; //!< local portion of globalVec (separate memory allocation), with ghost layer
@@ -63,7 +63,10 @@ class SpaceVariable3D {
 
 public:
   SpaceVariable3D(MPI_Comm &comm_, DM *dm_);
+  SpaceVariable3D(); //must be followed by a call to function Setup(...)
   ~SpaceVariable3D();
+
+  void Setup(MPI_Comm &comm_, DM *dm_);
 
   double*** GetDataPointer(); 
 

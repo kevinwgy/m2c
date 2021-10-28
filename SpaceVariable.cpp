@@ -156,8 +156,23 @@ void DataManagers3D::DestroyAllDataManagers()
 // SpaceVariable3D
 //---------------------------------------------------------
 
-SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : comm(comm_), globalVec(), localVec()
+SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_) : comm(NULL), globalVec(), localVec()
 {
+
+}
+
+//---------------------------------------------------------
+
+SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : comm(NULL), globalVec(), localVec()
+{
+  Setup(comm_, dm_);
+}
+  
+//---------------------------------------------------------
+
+void SpaceVariable3D::Setup(MPI_Comm &comm_, DM *dm_)
+{
+  comm = &comm_;
   dm = dm_;
 
   auto ierr = DMCreateGlobalVector(*dm, &globalVec); 
@@ -181,8 +196,8 @@ SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : comm(comm_), global
   } else if(bx==DM_BOUNDARY_GHOSTED && by==DM_BOUNDARY_GHOSTED && bz==DM_BOUNDARY_GHOSTED) {
     ghosted = true;
   } else {
-    PetscPrintf(comm, "*** Error: Unsupported ghost type.\n");
-    MPI_Abort(comm, 1); 
+    PetscPrintf(*comm, "*** Error: Unsupported ghost type.\n");
+    MPI_Abort(*comm, 1); 
   }
 
   DMDAGetCorners(*dm, &i0, &j0, &k0, &nx, &ny, &nz);
@@ -201,7 +216,7 @@ SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : comm(comm_), global
 
 SpaceVariable3D::~SpaceVariable3D() 
 {
-  Destroy();
+  Destroy(); //Actually, the vector should have already been destroyed.
 }
 
 //---------------------------------------------------------
@@ -423,7 +438,7 @@ SpaceVariable3D::CalculateGlobalMin(int mydof, bool workOnGhost)
       for(int i=myi0; i<myimax; i++)
         global_min = std::min(global_min, v[k][j][i*dof+mydof]); 
 
-  MPI_Allreduce(MPI_IN_PLACE, &global_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &global_min, 1, MPI_DOUBLE, MPI_MIN, *comm);
 
   RestoreDataPointerToLocalVector(); 
 
@@ -453,7 +468,7 @@ SpaceVariable3D::CalculateGlobalMax(int mydof, bool workOnGhost)
       for(int i=myi0; i<myimax; i++)
         global_max = std::max(global_max, v[k][j][i*dof+mydof]); 
 
-  MPI_Allreduce(MPI_IN_PLACE, &global_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &global_max, 1, MPI_DOUBLE, MPI_MAX, *comm);
 
   RestoreDataPointerToLocalVector(); 
 

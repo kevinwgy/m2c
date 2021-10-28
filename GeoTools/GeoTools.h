@@ -172,5 +172,53 @@ inline double TrilinearInterpolation(Vec3D &xi, double c000, double c100, double
   return c0*(1.0 - xi[2]) + c1*xi[2];
 }
 
+/**************************************************************************
+ * Find the smallest 3D axis-aligned boundingbox of a circle 
+ *   Inputs:
+ *     x0 -- center of the circle
+ *     dir -- normal direction
+ *     r -- radius of circle
+ *   Outputs:
+ *     xyzmin, xyzmax -- the bounding box, defined by two points: (xmin,ymin,zmin) and (xmax,ymax,zmax)
+ */
+inline void BoundingBoxOfCircle3D(Vec3D &x0, Vec3D &dir, double r, Vec3D &xyzmin, Vec3D &xyzmax)
+{
+  Vec3D dir0 = dir / dir.norm();
+  double r_axis;
+  for(int i=0; i<3; i++) {
+    r_axis = sqrt(1.0 - dir0[i]*dir0[i])*r;
+    xyzmin[i] = x0[i] - r_axis;
+    xyzmax[i] = x0[i] + r_axis;
+  }
+}
+
+/**************************************************************************
+ * Find the smallest 3D axis-aligned boundingbox of a cylinder or truncated cone
+ *   Inputs:
+ *     x0 -- center of the base
+ *     r0 -- radius of the base
+ *     x1 -- center of the cap 
+ *     r1 -- radius of the cap 
+ *     dir -- normal direction
+ *   Outputs:
+ *     bbmin, bbmax -- the bounding box, defined by two points: (xmin,ymin,zmin) and (xmax,ymax,zmax)
+ */
+inline void BoundingBoxOfCylinder(Vec3D &x0, double r0, Vec3D &x1, double r1, Vec3D &dir, Vec3D &bbmin, Vec3D &bbmax)
+{
+  BoundingBoxOfCircle3D(x0, dir, r0, bbmin, bbmax);
+  Vec3D xyzmin(0.0), xyzmax(0.0);
+  BoundingBoxOfCircle3D(x1, dir, r1, xyzmin, xyzmax);
+  for(int i=0; i<3; i++) {
+    if(bbmin[i] > xyzmin[i])  bbmin[i] = xyzmin[i];
+    if(bbmax[i] < xyzmax[i])  bbmax[i] = xyzmax[i];
+  }
+}
+
+
+
+
+
+
+
 
 } //end of namespace

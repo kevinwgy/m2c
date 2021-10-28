@@ -19,15 +19,17 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                          SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
                          vector<GhostPoint> &ghost_nodes_inner_, 
                          vector<GhostPoint> &ghost_nodes_outer_)
-                     : comm(comm_), iod(iod_), varFcn(varFcn_), coordinates(coordinates_), delta_xyz(delta_xyz_),
-                       volume(volume_), ghost_nodes_inner(ghost_nodes_inner_),
-                       ghost_nodes_outer(ghost_nodes_outer_),
+                     : comm(comm_), nscomm(comm_), active_core(true),
+                       iod(iod_), varFcn(varFcn_), coordinates(&coordinates_), delta_xyz(&delta_xyz_),
+                       volume(&volume_), ghost_nodes_inner(&ghost_nodes_inner_),
+                       ghost_nodes_outer(&ghost_nodes_outer_),
                        Temperature(comm_, &(dm_all_.ghosted1_1dof)),
                        L0(comm_, &(dm_all_.ghosted1_1dof)),
                        Lbk(comm_, &(dm_all_.ghosted1_1dof)),
                        Phi(comm_, &(dm_all_.ghosted1_1dof)),
                        Level(comm_, &(dm_all_.ghosted1_1dof)),
-                       Tag(comm_, &(dm_all_.ghosted1_1dof))
+                       Tag(comm_, &(dm_all_.ghosted1_1dof)),
+                       matcher(NULL), dms(NULL), spo(NULL)
 {
   // Check input parameters
   CheckForInputErrors();
@@ -37,8 +39,82 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   MPI_Comm_size(comm, &mpi_size);
 
   // Mesh info
-  coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
-  coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+  coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  coordinates->GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+  CalculateGlobalMeshInfo();
+
+  // cut-off radiance (L must be positive inside the laser domain)
+  lmin = iod.laser.lmin;
+
+  // parameters in mean flux method & SOR
+  mfm_alpha = iod.laser.alpha;
+  sor_relax = iod.laser.relax_coeff;
+
+  // Get absorption coefficient for each material
+  int numMaterials = iod.eqs.materials.dataMap.size();
+  absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
+  for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
+    if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
+      fprintf(stderr,"ERROR: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
+      exit_mpi();
+    }
+    std::get<0>(absorption[it->first]) = it->second->slope;
+    std::get<1>(absorption[it->first]) = it->second->T0;
+    std::get<2>(absorption[it->first]) = it->second->alpha0;
+  }
+
+  // Store time history of source power (if provided by user)
+  if(strcmp(iod.laser.source_power_timehistory_file, ""))
+    ReadUserSpecifiedPowerFile(iod.laser.source_power_timehistory_file);
+
+  // Calculate laser info ("source" and "laser_range")
+  CalculateLaserInfo();
+
+  // Calculate distance from each node to source
+  CalculateDistanceToSource(Phi); 
+
+  // Sort nodes in scope (Not all the nodes) by queue-level (primary) and dist-to-source (secondary)
+  BuildSortedNodeList();
+
+  // Sort nodes in scope (Not all the nodes) by queue-level (primary) and dist-to-source (secondary)
+  // Create a custom communicator for each level
+  BuildCustomizedCommunicators();
+  //VerifySortedNodesAndCommunicators(); //for debug purpose
+
+  // Find ghost nodes outside laser boundary (These include nodes inside and outside the physical domain!)
+  SetupLaserGhostNodes();
+  
+}
+
+//--------------------------------------------------------------------------
+// Used with the option of re-balancing load
+LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, 
+                         vector<VarFcnBase*> &varFcn_, SpaceVariable3D &coordinates_, 
+                         SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+                         FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
+                         vector<double> &x, vector<double> &y, vector<double> &z,
+                         vector<double> &dx, vector<double> &dy, vector<double> &dz)
+                     : nscomm(comm_), iod(iod_), varFcn(varFcn_), 
+                       Temperature(), L0(), Lbk(), Phi(), Level(), Tag()
+{
+  // Check input parameters
+  CheckForInputErrors();
+
+  // Build new mesh
+
+  //MPI info
+  MPI_Comm_rank(comm, &mpi_rank);
+  MPI_Comm_size(comm, &mpi_size);
+
+  // Calculate laser info ("source" and "laser_range")
+  CalculateLaserInfo();
+
+
+
+
+  // Mesh info
+  coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  coordinates->GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
   CalculateGlobalMeshInfo();
 
   // cut-off radiance (L must be positive inside the laser domain)
@@ -86,11 +162,153 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
 //--------------------------------------------------------------------------
 
+void LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, 
+                                               SpaceVariable3D &volume_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
+                                               vector<double> &x, vector<double> &y, vector<double> &z,
+                                               vector<double> &dx, vector<double> &dy, vector<double> &dz)
+{
+
+  // -------------------------------------------------------------
+  // Step 1. Find a bounding box that contains the laser domain
+  // -------------------------------------------------------------
+  Vec3D x0, x1;
+  double r0, r1;
+  if(source.angle == 0) { //paralell laser
+    x0 = source.x0;
+    x1 = source.x0 + laser_range*dir;
+    r0 = r1 = source.radius;
+  } else if (source.angle > 0) { //focusing laser
+    x0 = source.x0;
+    r0 = source.R*tan(angle);
+    x1 = source.x0 + (source.R - (source.R - laser_range)*cos(angle))*dir;
+    r1 = (source.R - laser_range)*sin(angle);
+  } else { // diverging laser
+    double theta = -source.angle;
+    x0 = source.O + source.R*cos(theta)*source.dir;
+    r0 = source.radius;
+    x1 = source.O + (source.R+laser_range)*source.dir;
+    r1 = (source.R + laser_range)*tan(theta);
+  }
+  
+  Vec3D bbmin(0.0), bbmax(0.0);
+  GeoTools::BoundingBoxOfCylinder(x0, r0, x1, r1, source.dir, bbmin, bbmax);
+
+
+  // -------------------------------------------------------------
+  // Step 2. Define the sub-mesh
+  // -------------------------------------------------------------
+  int lower = std::lower_bound(x.begin(), x.end(), bbmin[0]) - x.begin();
+  int upper = std::upper_bound(x.begin(), x.end(), bbmax[0]) - x.begin();
+  lower = std::max(0, lower-3);
+  upper = std::min(x.size()-1, upper+3);
+  vector<double> xsub(x.begin()+lower, x.begin()+upper);
+  vector<double> dxsub(dx.begin()+lower, dx.begin()+upper);
+
+  lower = std::lower_bound(y.begin(), y.end(), bbmin[1]) - y.begin();
+  upper = std::upper_bound(y.begin(), y.end(), bbmax[1]) - y.begin();
+  lower = std::max(0, lower-3);
+  upper = std::min(y.size()-1, upper+3);
+  vector<double> ysub(y.begin()+lower, y.begin()+upper);
+  vector<double> dysub(dy.begin()+lower, dy.begin()+upper);
+
+  lower = std::lower_bound(z.begin(), z.end(), bbmin[2]) - z.begin();
+  upper = std::upper_bound(z.begin(), z.end(), bbmax[2]) - z.begin();
+  lower = std::max(0, lower-3);
+  upper = std::min(z.size()-1, upper+3);
+  vector<double> zsub(z.begin()+lower, z.begin()+upper);
+  vector<double> dzsub(dz.begin()+lower, dz.begin()+upper);
+
+
+  // -------------------------------------------------------------
+  // Step 3. Determine the processor cores used for laser computation
+  // -------------------------------------------------------------
+  int N = xsub.size()*ysub.size()*zsub.size();
+  int min_size_per_core = 100; //at least 100 cells per processor core
+
+  int ns_mpi_rank, ns_mpi_size;
+  MPI_Comm_rank(nscomm, &ns_mpi_rank);
+  MPI_Comm_size(nscomm, &ns_mpi_size);
+
+  if(N/ns_mpi_size >= min_size_per_core) {
+    comm = nscomm;
+    active_core = true;
+  } 
+  else { //use a subset of the cores
+    int Ncores = N/min_size_per_core;
+    int color;
+    if(ns_mpi_rank<Ncores) {
+      active_core = true;
+      color = 1; 
+    } else {
+      active_core = false;
+      color = 0;
+    }
+    MPI_Comm_split(nscomm, color, ns_mpi_rank, &comm);
+  }
+
+  if(active_core) {
+    MPI_Comm_rank(comm, &mpi_rank);
+    MPI_Comm_size(comm, &mpi_size);
+  } else {
+    mpi_rank = -1;
+    mpi_size = -1;
+  }
+
+  // -------------------------------------------------------------
+  // Step 4. Partition the sub-mesh
+  // -------------------------------------------------------------
+  if(active_core) {
+    dms = new DataManagers3D(comm, xsub.size(), ysub.size(), zsub.size());
+    spo = new SpaceOperator(comm, dms, iod, vf, *ff, riemann, xsub, ysub, zsub, dxsub, dysub, dzsub);  
+    coordinates       = &(spo->GetMeshCoordinates());
+    delta_xyz         = &(spo->GetMeshDeltaXYZ());
+    volume            = &(spo->GetMeshCellVolumes());
+    ghost_nodes_inner = spo->GetPointerToInnerGhostNodes();
+    ghost_nodes_outer = spo->GetPointerToOuterGhostNodes();
+  } 
+  else {
+    dms               = NULL;
+    spo               = NULL;
+    coordinates       = NULL;
+    delta_xyz         = NULL;
+    volume            = NULL; 
+    ghost_nodes_inner = NULL; 
+    ghost_nodes_outer = NULL; 
+  }
+
+
+  // -------------------------------------------------------------
+  // Step 5. Create internal variables
+  // -------------------------------------------------------------
+  if(active_core) {
+    Temperature.Setup(comm, &(dms.ghosted1_1dof));
+    L0.Setup(comm, &(dms.ghosted1_1dof));
+    Lbk.Setup(comm, &(dms.ghosted1_1dof));
+    Phi.Setup(comm, &(dms.ghosted1_1dof));
+    Level.Setup(comm, &(dms.ghosted1_1dof));
+    Tag.Setup(comm, &(dms.ghosted1_1dof));
+  }
+
+  // -------------------------------------------------------------
+  // Step 6. Setup Mesh matcher
+  // -------------------------------------------------------------
+  matcher = new MeshMatcher(&nscomm, 
+                            &nscomm, active_core ? &comm : NULL, coordinates_, coordinates,
+                            x, y, z, xsub, ysub, zsub);
+
+}
+
+//--------------------------------------------------------------------------
+
 LaserAbsorptionSolver::~LaserAbsorptionSolver()
 {
   for(int i=0; i<levelcomm.size(); i++)
     if(levelcomm[i])
       delete levelcomm[i];
+
+  if(matcher) delete matcher;
+  if(dms) delete dms;
+  if(spo) delete spo;
 }
 
 //--------------------------------------------------------------------------
@@ -151,8 +369,8 @@ LaserAbsorptionSolver::CheckForInputErrors()
 void
 LaserAbsorptionSolver::CalculateGlobalMeshInfo()
 {
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates->GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***)delta_xyz->GetDataPointer();
 
   dxmin_glob = DBL_MAX;
   for(int i=ii0; i<iimax; i++)
@@ -174,8 +392,8 @@ LaserAbsorptionSolver::CalculateGlobalMeshInfo()
   MPI_Allreduce(MPI_IN_PLACE, xmin_glob_ghost, 3, MPI_DOUBLE, MPI_MIN, comm);
   MPI_Allreduce(MPI_IN_PLACE, xmax_glob_ghost, 3, MPI_DOUBLE, MPI_MAX, comm);
 
-  delta_xyz.RestoreDataPointerToLocalVector();
-  coordinates.RestoreDataPointerToLocalVector();
+  delta_xyz->RestoreDataPointerToLocalVector();
+  coordinates->RestoreDataPointerToLocalVector();
 }
 
 //--------------------------------------------------------------------------
@@ -260,7 +478,7 @@ void
 LaserAbsorptionSolver::CalculateDistanceToSource(SpaceVariable3D &Phi)
 {
 
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates->GetDataPointer();
   double*** phi   = Phi.GetDataPointer();
 
   for(int k=k0; k<kmax; k++)
@@ -274,7 +492,7 @@ LaserAbsorptionSolver::CalculateDistanceToSource(SpaceVariable3D &Phi)
           phi[k][j][i] = dist; 
       }
 
-  coordinates.RestoreDataPointerToLocalVector();
+  coordinates->RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerAndInsert(); 
 
 /*
@@ -456,7 +674,7 @@ LaserAbsorptionSolver::BuildSortedNodeList()
   ResetTag();
 
   int NX, NY, NZ;
-  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+  coordinates->GetGlobalSize(&NX, &NY, &NZ);
 
   double*** phi = Phi.GetDataPointer();
 
@@ -612,7 +830,7 @@ LaserAbsorptionSolver::BuildCustomizedCommunicators()
   vector<vector<Int3> > nodes_on_level(queueCounter.size());
 
   double*** level = Level.GetDataPointer();
-  for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) { 
+  for(auto it = ghost_nodes_inner->begin(); it != ghost_nodes_inner->end(); it++) { 
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]); 
     if(level[k][j][i]<0)
       continue;
@@ -643,7 +861,7 @@ LaserAbsorptionSolver::VerifySortedNodesAndCommunicators()
 
   for(int lvl = 0; lvl<queueCounter.size(); lvl++) {
     levelcomm[lvl]->ExchangeAndInsert(l0);
-    for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
+    for(auto it = ghost_nodes_inner->begin(); it != ghost_nodes_inner->end(); it++) {
       int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
       if(level[k][j][i]==lvl) 
         assert(l0[k][j][i] == lvl);
@@ -731,7 +949,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   double eps = std::min(dxmin_glob[0], std::min(dxmin_glob[1], dxmin_glob[2]));
   eps /= 1.0e10;
 
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates->GetDataPointer();
 
   //----------------------------------------------------------------
   // Step 1: Find ghost nodes (inside and outside physical domain)
@@ -806,9 +1024,9 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
       else                          status.push_back(4);
     }
     else { //Category (2)
-      assert(coordinates.BoundaryType(i,j,k) == 1); //boundary-face
+      assert(coordinates->BoundaryType(i,j,k) == 1); //boundary-face
       bool found = false;
-      for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+      for(auto it = ghost_nodes_outer->begin(); it != ghost_nodes_outer->end(); it++) {
         if(it->ijk[0] == i && it->ijk[1] == j && it->ijk[2] == k) {
         
           // verify that it is next to a symmetry boundary (of the laser)
@@ -1067,7 +1285,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
   }
 
-  coordinates.RestoreDataPointerToLocalVector();
+  coordinates->RestoreDataPointerToLocalVector();
   
 
   //----------------------------------------------------------------
@@ -1430,9 +1648,9 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   double*** T     = Temperature.GetDataPointer();
   double*** l0    = L0.GetDataPointer();
   double*** lbk   = Lbk.GetDataPointer();
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer();
-  double*** vol   = volume.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates->GetDataPointer();
+  Vec3D*** dxyz   = (Vec3D***)delta_xyz->GetDataPointer();
+  double*** vol   = volume->GetDataPointer();
   double*** id    = ID.GetDataPointer();
   double*** level = Level.GetDataPointer();
   double*** phi   = Phi.GetDataPointer();
@@ -1497,9 +1715,9 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   Temperature.RestoreDataPointerToLocalVector();
   L0.RestoreDataPointerToLocalVector();
   Lbk.RestoreDataPointerToLocalVector();
-  coordinates.RestoreDataPointerToLocalVector();
-  delta_xyz.RestoreDataPointerToLocalVector();
-  volume.RestoreDataPointerToLocalVector(); 
+  coordinates->RestoreDataPointerToLocalVector();
+  delta_xyz->RestoreDataPointerToLocalVector();
+  volume->RestoreDataPointerToLocalVector(); 
   ID.RestoreDataPointerToLocalVector();
   Level.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerToLocalVector();

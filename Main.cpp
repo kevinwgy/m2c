@@ -161,10 +161,18 @@ int main(int argc, char* argv[])
   SpaceVariable3D* L = NULL;  //laser radiance
   if(iod.laser.source_power>0.0 || iod.laser.source_intensity>0.0 ||
      strcmp(iod.laser.source_power_timehistory_file, "") != 0) {//laser source is specified
-    laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
-                                      spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
-                                      *(spo.GetPointerToInnerGhostNodes()),
-                                      *(spo.GetPointerToOuterGhostNodes()));
+
+    if(iod.laser.parallel == LaserData::BALANCED) //re-balance the load
+      laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
+                                        spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
+                                        //the following inputs are used for creating a new dms/spo
+                                        *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
+    else
+      laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
+                                        spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
+                                        *(spo.GetPointerToInnerGhostNodes()),
+                                        *(spo.GetPointerToOuterGhostNodes()));
+
     L = new SpaceVariable3D(comm, &(dms.ghosted1_1dof)); 
   }
  

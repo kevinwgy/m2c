@@ -6,6 +6,7 @@
 #include<Vector5D.h>
 #include<VarFcnBase.h>
 #include<EmbeddedBoundaryFormula.h>
+#include<SpaceOperator.h>
 #include<tuple>
 
 //------------------------------------------------------------
@@ -60,10 +61,20 @@ struct LaserEBM{
 //! Laser absorption solver
 class LaserAbsorptionSolver {
 
-  MPI_Comm& comm;
+  //! Laser MPI (may or may not be the same as the N-S MPI)
+  bool active_core;  //!< whether this core is used for laser computation
+  MPI_Comm comm; //!< creating a new copy (a small object anyway)
   int mpi_rank;
   int mpi_size;
 
+  //! N-S MPI (different from comm only if iod.laser.parallel == BALANCED)
+  MPI_Comm& nscomm;
+
+  //! Transfer data between the two mesh partitions (used when iod.laser.parallel==BALANCED)
+  MeshMatcher* matcher;
+  DataManagers3D *dms;
+  SpaceOperator *spo;
+  
   //! Cutoff radiance (L must be non-negative)
   double lmin;
 
@@ -81,9 +92,9 @@ class LaserAbsorptionSolver {
   double laser_range; //!< range
 
   //! Mesh info
-  SpaceVariable3D &coordinates;
-  SpaceVariable3D &delta_xyz;
-  SpaceVariable3D &volume;
+  SpaceVariable3D *coordinates;
+  SpaceVariable3D *delta_xyz;
+  SpaceVariable3D *volume;
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
@@ -93,8 +104,8 @@ class LaserAbsorptionSolver {
   Vec3D xmin_glob_ghost, xmax_glob_ghost; //coords of the first and last nodes in the ghost boundary layer
 
   //! Pointer to ghost node lists (outside domain boundary)
-  vector<GhostPoint> &ghost_nodes_inner;
-  vector<GhostPoint> &ghost_nodes_outer;
+  vector<GhostPoint> *ghost_nodes_inner;
+  vector<GhostPoint> *ghost_nodes_outer;
 
   //! Internal variables
   SpaceVariable3D Temperature;
@@ -131,6 +142,13 @@ public:
                         SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
                         std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_);
 
+  //! This construction is used with the option of load balancing
+  LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, std::vector<VarFcnBase*> &varFcn_,
+                        SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+                        FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_, 
+                        vector<double> &x, vector<double> &y, vector<double> &z,
+                        vector<double> &dx, vector<double> &dy, vector<double> &dz);
+                        
   ~LaserAbsorptionSolver();
 
   void Destroy();

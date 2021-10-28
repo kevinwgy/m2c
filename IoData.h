@@ -723,6 +723,9 @@ struct LaserData {
   double lmin; //!< inside the laser domain (and ghosts), L>=lmin. (should be a tiny pos number.)
   ObjectMap<LaserAbsorptionCoefficient> abs; //!< absorption coefficients
 
+  // parallel solution approach
+  enum Parallelization {ORIGINAL = 0, BALANCED = 1} parallel;
+
   // numerical parameters
   double source_depth;
   double alpha;
