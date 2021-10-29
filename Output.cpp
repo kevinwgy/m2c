@@ -180,6 +180,35 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     VecView(vector3.GetRefToGlobalVec(), viewer);
   }
 
+
+  //KW: Looks like "VecView" may have a problem depending on the order. I had to move "molar_fractions" up here.
+  bool molar_fractions_requested = false;
+  for(int j=0; j<OutputData::MAXSPECIES; j++)
+    if(iod.output.molar_fractions[j]==OutputData::ON) {
+      molar_fractions_requested = true;
+      break;
+    }
+
+  if(molar_fractions_requested) {
+    std::map<int, SpaceVariable3D*>& AlphaRJ(ion->GetReferenceToAlphaRJ());
+    for(int j=0; j<OutputData::MAXSPECIES; j++) {
+      if(iod.output.molar_fractions[j] != OutputData::ON)
+        continue;
+
+      auto it = AlphaRJ.find(j);
+      if(it == AlphaRJ.end()) {
+        print_error("*** Error: User requested output of molar fractions for species %d, but it does not exist.\n", j);
+        exit_mpi();
+      }
+
+      SpaceVariable3D* AlphaR = it->second;
+      char word[40];
+      sprintf(word, "molar_fractions_%d", j); 
+      PetscObjectSetName((PetscObject)(AlphaR->GetRefToGlobalVec()), word);
+      VecView(AlphaR->GetRefToGlobalVec(), viewer);
+    } 
+  }
+
   if(iod.output.pressure==OutputData::ON) {
     double*** s  = (double***) scalar.GetDataPointer();
     for(int k=k0; k<kmax; k++)
@@ -298,31 +327,6 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     VecView(Ne.GetRefToGlobalVec(), viewer);
   }
 
-  bool molar_fractions_requested = false;
-  for(int j=0; j<OutputData::MAXSPECIES; j++)
-    if(iod.output.molar_fractions[j]==OutputData::ON) {
-      molar_fractions_requested = true;
-      break;
-    }
-  if(molar_fractions_requested) {
-    std::map<int, SpaceVariable3D*>& AlphaRJ(ion->GetReferenceToAlphaRJ());
-    for(int j=0; j<OutputData::MAXSPECIES; j++) {
-      if(iod.output.molar_fractions[j] != OutputData::ON)
-        continue;
-
-      auto it = AlphaRJ.find(j);
-      if(it == AlphaRJ.end()) {
-        print_error("*** Error: User requested output of molar fractions for species %d, but it does not exist.\n", j);
-        exit_mpi();
-      }
-
-      SpaceVariable3D* AlphaR = it->second;
-      char word[40];
-      sprintf(word, "molar_fractions_%d", j); 
-      PetscObjectSetName((PetscObject)(AlphaR->GetRefToGlobalVec()), word);
-      VecView(AlphaR->GetRefToGlobalVec(), viewer);
-    }
-  }
 
 
   // Add a line to the pvd file to record the new solutio snapshot
