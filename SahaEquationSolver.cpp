@@ -161,17 +161,45 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
   } else if(f1==0.0) {
     zav = zav1; maxit = 0;
   } else {
-    pair<double,double> sol; 
-    sol = toms748_solve(fun, zav0, zav1, f0, f1,
-                        [=](double r0, double r1){return r1-r0<std::min(tol,0.001*(zav1-zav0));},
-                        maxit);
-    zav = 0.5*(sol.first + sol.second);
+    for(int trial = 0; trial < 2; trial++) {
+      pair<double,double> sol; 
+      sol = toms748_solve(fun, zav0, zav1, f0, f1,
+                          [=](double r0, double r1){return r1-r0<std::min(tol,0.001*(zav1-zav0));},
+                          maxit);
+      zav = 0.5*(sol.first + sol.second);
+      if(zav>=0) break;
+
+      // fail-safe
+      if(trial>0) break;
+
+      if(isnan(sol.first) || sol.first<0)
+        sol.first = 0.0;
+      if(isnan(sol.second) || sol.second<sol.first)
+        sol.second = zav1;
+      zav0 = sol.first;
+      zav1 = sol.second;
+      f0 = fun(zav0);
+      f1 = fun(zav1); 
+      if(f0*f1>0)
+        break;
+    }
   }
-  assert(zav>0.0);
+
+  if(!(zav>0)) {
+    zav = 0.0;
+    ne = 0.0;
+    for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
+      vector<double> &alpha = it->second;
+      for(int r=0; r<alpha.size(); r++)
+        alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
+    }
+    return;
+  }
+
   //*******************************************************************
 
 #if DEBUG_SAHA_SOLVER == 1
-  fprintf(stderr,"-- Saha equation solver converged in %d iterations, Zav = %e.\n", (int)maxit, zav);
+  fprintf(stderr,"-- Saha equation solver converged in %d iterations, Zav = %.12e.\n", (int)maxit, zav);
 #endif
 
   //post-processing.
@@ -194,8 +222,15 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
       zav_power *= zav;
       denom += (double)i/zav_power*fun.GetFProd(i,j);
     }
-    assert(denom>0.0);
-    alpha[0] = zej/denom;
+
+    if(denom>0)
+      alpha[0] = zej/denom;
+    else {
+      alpha[0] = 1.0;
+      for(int r=1; r<alpha.size(); r++)
+        alpha[r] = 0.0;
+      return;
+    }
  
     double fr(0.0);
     for(int r=1; r<alpha.size()-1; r++) {
@@ -209,7 +244,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
       alpha[last_one] -= alpha[r];
 
     //allow some roundoff error
-    assert(alpha[last_one]>=-1.0e-8);
+    //assert(alpha[last_one]>=-1.0e-4);
     if(alpha[last_one]<0)
       alpha[last_one] = 0;
   }
