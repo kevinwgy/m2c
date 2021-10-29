@@ -61,6 +61,11 @@ public:
                 vector<double> &dx, vector<double> &dy, vector<double> &dz); 
   ~SpaceOperator();
 
+  //! Reset the coords of ghost layer nodes  (a NULL pointer means that value does not need to be reset)
+  void ResetGhostLayer(double* xminus, double* xplus, double* yminus,  double* yplus,
+                       double* zminus, double* zplus, double* dxminus, double* dxplus, double* dyminus,
+                       double* dyplus, double* dzminus, double* dzplus);
+
   void ConservativeToPrimitive(SpaceVariable3D &U, SpaceVariable3D &ID, SpaceVariable3D &V,
                                bool workOnGhost = false);
   void PrimitiveToConservative(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &U,

@@ -84,6 +84,7 @@ Output.cpp
 Reconstructor.cpp
 SpaceOperator.cpp
 MeshGenerator.cpp
+MeshMatcher.cpp
 LevelSetOperator.cpp
 LevelSetReinitializer.cpp
 LaserAbsorptionSolver.cpp

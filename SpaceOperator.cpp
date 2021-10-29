@@ -274,6 +274,128 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
 
 //-----------------------------------------------------
 
+/** Re-set ghost nodes */
+void SpaceOperator::ResetGhostLayer(double* xminus, double* xplus, double* yminus, double* yplus,
+                        double* zminus, double* zplus, double* dxminus, double* dxplus, double* dyminus, 
+                        double* dyplus, double* dzminus, double* dzplus)
+{
+  Vec3D*** v    = (Vec3D***) coordinates.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***) delta_xyz.GetDataPointer();
+
+  int nnx, nny, nnz, NX, NY, NZ;
+  coordinates.GetGhostedSize(&nnx, &nny, &nnz);
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+  // capture the mesh info of the corners 
+  double v0[3], v1[3];
+  double dxyz0[3], dxyz1[3];
+  for(int p=0; p<3; p++) {
+    v0[p]    = v[k0][j0][i0][p] - dxyz[k0][j0][i0][p];
+    v1[p]    = v[kmax-1][jmax-1][imax-1][p] + dxyz[kmax-1][jmax-1][imax-1][p];
+    dxyz0[p] = dxyz[k0][j0][i0][p];
+    dxyz1[p] = dxyz[kmax-1][jmax-1][imax-1][p];
+  }
+
+  //-----------------------------------------------------------------
+  // RESET
+  if(xminus) {v0[0] = *xminus;} if(xplus) {v1[0] = *xplus;}
+  if(yminus) {v0[1] = *yminus;} if(yplus) {v1[1] = *yplus;}
+  if(zminus) {v0[2] = *zminus;} if(zplus) {v1[2] = *zplus;}
+  if(dxminus) {dxyz0[0] = *dxminus;} if(dxplus) {dxyz1[0] = *dxplus;}
+  if(dyminus) {dxyz0[1] = *dyminus;} if(dyplus) {dxyz1[1] = *dyplus;}
+  if(dzminus) {dxyz0[2] = *dzminus;} if(dzplus) {dxyz1[2] = *dzplus;}
+  //-----------------------------------------------------------------
+
+
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        if(k!=-1 && k!=NZ && j!=-1 && j!=NY && i!=-1 && i!=NX)
+          continue; //not in the ghost layer of the physical domain
+
+        Vec3D& X  = v[k][j][i];
+        Vec3D& dX = dxyz[k][j][i];
+
+        bool xdone = false, ydone = false, zdone = false;
+
+        if(i==-1) {
+          X[0]  = v0[0];
+          dX[0] = dxyz0[0];
+          xdone = true;
+        }
+
+        if(i==NX) {
+          X[0]  = v1[0];
+          dX[0] = dxyz1[0];
+          xdone = true;
+        }
+
+        if(j==-1) {
+          X[1]  = v0[1];
+          dX[1] = dxyz0[1];
+          ydone = true;
+        }
+
+        if(j==NY) {
+          X[1]  = v1[1];
+          dX[1] = dxyz1[1];
+          ydone = true;
+        }
+
+        if(k==-1) {
+          X[2]  = v0[2];
+          dX[2] = dxyz0[2];
+          zdone = true;
+        }
+
+        if(k==NZ) {
+          X[2]  = v1[2];
+          dX[2] = dxyz1[2];
+          zdone = true;
+        }
+
+        if(!xdone) {
+          X[0]  = v[k0][j0][i][0];    //x[i]
+          dX[0] = dxyz[k0][j0][i][0]; //dx[i]
+        }
+
+        if(!ydone) {
+          X[1]  = v[k0][j][i0][1];    //y[j]
+          dX[1] = dxyz[k0][j][i0][1]; //dy[j]
+        }
+
+        if(!zdone) {
+          X[2]  = v[k][j0][i0][2];    //z[k]
+          dX[2] = dxyz[k][j0][i0][2]; //dz[k]
+        }
+
+      }
+  
+  coordinates.RestoreDataPointerAndInsert();
+  delta_xyz.RestoreDataPointerAndInsert();
+
+
+  //! Compute mesh information
+  dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  double*** vol  = (double***)volume.GetDataPointer();
+
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+        vol[k][j][i] /*volume of cv*/ = dxyz[k][j][i][0]*dxyz[k][j][i][1]*dxyz[k][j][i][2];
+
+  delta_xyz.RestoreDataPointerAndInsert();
+  volume.RestoreDataPointerAndInsert();
+
+
+  CreateGhostNodeLists(); //create ghost_nodes_inner and ghost_nodes_outer
+
+}
+
+
+//-----------------------------------------------------
+
 void SpaceOperator::CreateGhostNodeLists()
 {
   ghost_nodes_inner.clear();

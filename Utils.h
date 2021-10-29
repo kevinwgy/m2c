@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string>
+#include <mpi.h>
 
 using std::string;
 
@@ -13,15 +14,19 @@ using std::string;
 //--------------------------------------------------
 //! MPI Rank 0 will print to stdout
 void print(const char format[],...);
+void print(MPI_Comm& comm, const char format[],...);
 //--------------------------------------------------
 //! MPI Rank 0 will print to stdout in red color
 void print_error(const char format[],...);
+void print_error(MPI_Comm& comm, const char format[],...);
 //--------------------------------------------------
 //! MPI Rank i will print to stdout
-void print(int i, const char format[],...);
+//void print(int i, const char format[],...);
+void print(MPI_Comm& comm, int i, const char format[],...);
 //--------------------------------------------------
 //! MPI Rank 0 will print to a file
 void print(FILE* fd, const char format[],...);
+void print(MPI_Comm& comm, FILE* fd, const char format[],...);
 //--------------------------------------------------
 //! Check for NAN
 template <class T>

@@ -1,38 +1,114 @@
 #include<MeshMatcher.h>
+#include<SpaceVariable.h>
+#include<Utils.h>
+#include<cfloat> //DBL_MAX
+#include<cassert>
 using std::vector;
 using std::pair;
 using std::map;
 
 //-------------------------------------------------------------------------------
 
-MeshMatcher::MeshMatcher(MPI_Comm* comm_, MPI_Comm* comm1_, MPI_Comm* comm2_, 
-                         SpaceVariable3D* coords1_, SpaceVariable3D* coords2_,
-                         vector<double>& x1, vector<double>& y1, vector<double>& z1,
-                         vector<double>& x2, vector<double>& y2, vector<double>& z2)
-           : comm(comm_), comm1(comm1_), comm2(comm2_), 
-             coordinates1(coords1_), coordinates2(coords2_)
+MeshMatcher::MeshMatcher(MPI_Comm& comm_, SpaceVariable3D* coordinates1, SpaceVariable3D* coordinates2)
+           : comm(comm_)
 {
 
   exact_match = true; //can be extended in future if needed
 
-  assert(comm_); //this cannot be NULL!
-  MPI_Comm_rank(*comm, &rank);
-  MPI_Comm_size(*comm, &size);
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
 
-  if(comm1) {
-    MPI_Comm_rank(*comm1, &rank1);
-    MPI_Comm_size(*comm1, &size1);
-  } else 
-    rank1 = size1 = -1;
+  mesh1_owner = (coordinates1!=NULL);
+  mesh2_owner = (coordinates2!=NULL);
 
-  if(comm2) {
-    MPI_Comm_rank(*comm2, &rank2);
-    MPI_Comm_size(*comm2, &size2);
-  } else 
-    rank2 = size2 = -1;
+//  int i0_1(-INT_MAX), j0_1(-INT_MAX), k0_1(-INT_MAX), imax_1(-INT_MAX), jmax_1(-INT_MAX), kmax_1(-INT_MAX);    
+  int ii0_1(-INT_MAX), jj0_1(-INT_MAX), kk0_1(-INT_MAX), iimax_1(-INT_MAX), jjmax_1(-INT_MAX), kkmax_1(-INT_MAX);    
+  if(coordinates1) {
+//    coordinates1->GetCornerIndices(&i0_1, &j0_1, &k0_1, &imax_1, &jmax_1, &kmax_1);
+    coordinates1->GetGhostedCornerIndices(&ii0_1, &jj0_1, &kk0_1, &iimax_1, &jjmax_1, &kkmax_1);
+  }
 
-  SetupMesh1ToMesh2Transfer(x1,y1,z1,x2,y2,z2);
+//  int i0_2(-INT_MAX), j0_2(-INT_MAX), k0_2(-INT_MAX), imax_2(-INT_MAX), jmax_2(-INT_MAX), kmax_2(-INT_MAX);    
+  int ii0_2(-INT_MAX), jj0_2(-INT_MAX), kk0_2(-INT_MAX), iimax_2(-INT_MAX), jjmax_2(-INT_MAX), kkmax_2(-INT_MAX);    
+  if(coordinates2) {
+//    coordinates2->GetCornerIndices(&i0_2, &j0_2, &k0_2, &imax_2, &jmax_2, &kmax_2);
+    coordinates2->GetGhostedCornerIndices(&ii0_2, &jj0_2, &kk0_2, &iimax_2, &jjmax_2, &kkmax_2);
+  }
 
+  vector<double> x1, y1, z1, x1_minus, x1_plus, y1_minus, y1_plus, z1_minus, z1_plus;
+  FindGlobalMeshInfo(coordinates1, x1, y1, z1, x1_minus, x1_plus, y1_minus, y1_plus, z1_minus, z1_plus);
+
+  vector<double> x2, y2, z2, x2_minus, x2_plus, y2_minus, y2_plus, z2_minus, z2_plus;
+  FindGlobalMeshInfo(coordinates2, x2, y2, z2, x2_minus, x2_plus, y2_minus, y2_plus, z2_minus, z2_plus);
+
+  SetupTransferExactMatch(x1,y1,z1,x1_minus,x1_plus,y1_minus,y1_plus,z1_minus,z1_plus,
+                          x2,y2,z2,x2_minus,x2_plus,y2_minus,y2_plus,z2_minus,z2_plus,
+                          mesh1_owner, ii0_1, jj0_1, kk0_1, iimax_1, jjmax_1, kkmax_1,
+                          mesh2_owner, ii0_2, jj0_2, kk0_2, iimax_2, jjmax_2, kkmax_2);
+
+}
+
+//-------------------------------------------------------------------------------
+
+MeshMatcher::~MeshMatcher()
+{ }
+
+//-------------------------------------------------------------------------------
+
+void
+MeshMatcher::FindGlobalMeshInfo(SpaceVariable3D* coordinates, std::vector<double> &x, std::vector<double> &y,
+                                std::vector<double> &z, std::vector<double> &x_minus, std::vector<double> &x_plus, 
+                                std::vector<double> &y_minus, std::vector<double> &y_plus, 
+                                std::vector<double> &z_minus, std::vector<double> &z_plus)
+{
+
+  vector<int> info(4, -INT_MAX);
+  if(coordinates) {//owner
+    coordinates->GetGlobalSize(&(info[0]), &(info[1]), &(info[2]));
+    info[3] = coordinates->NumGhostLayers();
+  }
+  MPI_Allreduce(MPI_IN_PLACE, info.data(), info.size(), MPI_INT, MPI_MAX, comm);
+
+  int i0(-INT_MAX), j0(-INT_MAX), k0(-INT_MAX), imax(-INT_MAX), jmax(-INT_MAX), kmax(-INT_MAX);    
+  int ii0(-INT_MAX), jj0(-INT_MAX), kk0(-INT_MAX), iimax(-INT_MAX), jjmax(-INT_MAX), kkmax(-INT_MAX);    
+  if(coordinates) {
+    coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+    coordinates->GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+  }
+
+  Vec3D*** coords = coordinates ? (Vec3D***)coordinates->GetDataPointer() : NULL;
+
+  //collect x,y,z and the ghost coords
+  x.resize(info[0], -INT_MAX);
+  y.resize(info[1], -INT_MAX);
+  z.resize(info[2], -INT_MAX);
+  x_minus.resize(info[3], -INT_MAX);  x_plus.resize(info[3], -INT_MAX);
+  y_minus.resize(info[3], -INT_MAX);  y_plus.resize(info[3], -INT_MAX);
+  z_minus.resize(info[3], -INT_MAX);  z_plus.resize(info[3], -INT_MAX);
+  if(coordinates) {
+    for(int i=i0; i<imax; i++)  x[i] = coords[k0][j0][i][0];    
+    for(int j=j0; j<jmax; j++)  y[j] = coords[k0][j][i0][1];
+    for(int k=k0; k<kmax; k++)  z[k] = coords[k][j0][i0][2];
+    for(int i=ii0; i<0; i++)    x_minus[i-ii0] = coords[k0][j0][i][0];
+    for(int j=jj0; j<0; j++)    y_minus[j-jj0] = coords[k0][j][i0][1];
+    for(int k=kk0; k<0; k++)    z_minus[k-kk0] = coords[k][j0][i0][2];
+    for(int i=iimax-1; i>=info[0]; i--)  x_plus[i-info[0]] = coords[k0][j0][i][0];
+    for(int j=jjmax-1; j>=info[1]; j--)  y_plus[j-info[1]] = coords[k0][j][i0][1];
+    for(int k=kkmax-1; k>=info[2]; k--)  z_plus[k-info[2]] = coords[k][j0][i0][2];
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, x.data(), x.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, y.data(), y.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, z.data(), z.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, x_minus.data(), x_minus.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, y_minus.data(), y_minus.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, z_minus.data(), z_minus.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, x_plus.data(), x_plus.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, y_plus.data(), y_plus.size(), MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, z_plus.data(), z_plus.size(), MPI_DOUBLE, MPI_MAX, comm);
+
+  if(coordinates)
+    coordinates->RestoreDataPointerToLocalVector();
 
 }
 
@@ -51,9 +127,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
                                      bool mesh1_owner, int ii0_1, int jj0_1, int kk0_1,
                                      int iimax_1, int jjmax_1, int kkmax_1,
                                      bool mesh2_owner, int ii0_2, int jj0_2, int kk0_2,
-                                     int iimax_2, int jjmax_2, int kkmax_2,
-                                     vector<vector<Int3> > &send_nodes,
-                                     vector<vector<Int3> > &receiver_packages,
+                                     int iimax_2, int jjmax_2, int kkmax_2)
 {
   int inactive = -999;
 
@@ -75,18 +149,9 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
   //----------------------------------------------------------
   // Step 1. Gather information about the ownership of Mesh1
   //----------------------------------------------------------
-  int* mesh1_indices = new int[6*size]; //(ii0,jj0,kk0,iimax,jjmax,kkmax)
-  if(mesh1_owner){
-    mesh1_indices[6*rank]   = ii0_1;
-    mesh1_indices[6*rank+1] = jj0_1;
-    mesh1_indices[6*rank+2] = kk0_1;
-    mesh1_indices[6*rank+3] = iimax_1;
-    mesh1_indices[6*rank+4] = jjmax_1;
-    mesh1_indices[6*rank+5] = kkmax_1;
-  } else
-    for(int p=0; p<6; p++)
-      mesh1_indices[6*rank+p] = inactive;
-  MPI_Allgather(MPI_IN_PLACE, 6, MPI_INT, mesh1_indices, 6, MPI_INT, *comm);
+  int* mesh1_ownership = new int[size]; 
+  mesh1_ownership[rank] = mesh1_owner ? 1 : 0;
+  MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, mesh1_ownership, 1, MPI_INT, comm);
 
 
   //----------------------------------------------------------
@@ -103,7 +168,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
   } else
     for(int p=0; p<6; p++)
       mesh2_indices[6*rank+p] = inactive;
-  MPI_Allgather(MPI_IN_PLACE, 6, MPI_INT, mesh2_indices, 6, MPI_INT, *comm);
+  MPI_Allgather(MPI_IN_PLACE, 6, MPI_INT, mesh2_indices, 6, MPI_INT, comm);
 
 
   //----------------------------------------------------------
@@ -121,9 +186,9 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
     myxyz0[0] = myid0[0]<0 ? x1_minus[ghost_width_1+myid0[0]] : x1[myid0[0]];
     myxyz0[1] = myid0[1]<0 ? y1_minus[ghost_width_1+myid0[1]] : y1[myid0[1]];
     myxyz0[2] = myid0[2]<0 ? z1_minus[ghost_width_1+myid0[2]] : z1[myid0[2]];
-    myxyzmax[0] = myidmax[0]>=x1.size() ? x1_plus[myidmax[0]-x1.size()] : x1[myidmax[0]];
-    myxyzmax[1] = myidmax[1]>=y1.size() ? y1_plus[myidmax[1]-y1.size()] : y1[myidmax[1]];
-    myxyzmax[2] = myidmax[2]>=z1.size() ? z1_plus[myidmax[2]-z1.size()] : z1[myidmax[2]];
+    myxyzmax[0] = (myidmax[0]-1)>=x1.size() ? x1_plus[myidmax[0]-1-x1.size()] : x1[myidmax[0]-1];
+    myxyzmax[1] = (myidmax[1]-1)>=y1.size() ? y1_plus[myidmax[1]-1-y1.size()] : y1[myidmax[1]-1];
+    myxyzmax[2] = (myidmax[2]-1)>=z1.size() ? z1_plus[myidmax[2]-1-z1.size()] : z1[myidmax[2]-1];
 
     for(int proc=0; proc<size; proc++) {
       if(mesh2_indices[6*proc] == inactive)
@@ -136,9 +201,9 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
       xyz0[0] = id0[0]<0 ? x2_minus[ghost_width_2+id0[0]] : x2[id0[0]];
       xyz0[1] = id0[1]<0 ? y2_minus[ghost_width_2+id0[1]] : y2[id0[1]];
       xyz0[2] = id0[2]<0 ? z2_minus[ghost_width_2+id0[2]] : z2[id0[2]];
-      xyzmax[0] = idmax[0]>=x2.size() ? x2_plus[idmax[0]-x2.size()] : x2[idmax[0]];
-      xyzmax[1] = idmax[1]>=y2.size() ? y2_plus[idmax[1]-y2.size()] : y2[idmax[1]];
-      xyzmax[2] = idmax[2]>=z2.size() ? z2_plus[idmax[2]-z2.size()] : z2[idmax[2]];
+      xyzmax[0] = (idmax[0]-1)>=x2.size() ? x2_plus[idmax[0]-1-x2.size()] : x2[idmax[0]-1];
+      xyzmax[1] = (idmax[1]-1)>=y2.size() ? y2_plus[idmax[1]-1-y2.size()] : y2[idmax[1]-1];
+      xyzmax[2] = (idmax[2]-1)>=z2.size() ? z2_plus[idmax[2]-1-z2.size()] : z2[idmax[2]-1];
 
       bool overlap = true;
       for(int p=0; p<3; p++)
@@ -172,18 +237,18 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
         vector<double>&     s2_plus(dir==0 ? x2_plus      : (dir==1 ?      y2_plus : z2_plus));
 
         int i1 = myid0[dir];
-        double s, s1;
+        double s, sprime;
         for(int i=id0[dir]; i<idmax[dir]; i++) { 
           if(i<0)                s = s2_minus[ghost_width_2+i];
           else if(i>=s2.size())  s = s2_plus[i-s2.size()];
           else                   s = s2[i];
 
           while(i1<myidmax[dir]) {
-            if(i1<0)                s1 = s1_minus[ghost_width_1+i1];
-            else if(i1>=x1.size())  s1 = s1_plus[i1-s1.size()];
-            else                    s1 = s1[i1]; 
+            if(i1<0)                sprime = s1_minus[ghost_width_1+i1];
+            else if(i1>=s1.size())  sprime = s1_plus[i1-s1.size()];
+            else                    sprime = s1[i1]; 
 
-            if(fabs(s1-s)<eps) { //found an exact match
+            if(fabs(sprime-s)<eps) { //found an exact match
               send.push_back(i1);
               dest.push_back(i);
               break;
@@ -199,6 +264,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
 
       }
     }   
+
   }
   
 
@@ -210,7 +276,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
   // loop through all the processor cores as senders
   for(int sender = 0; sender < size; sender++) {
 
-    if(mesh1_indices[6*sender] == inactive)
+    if(!mesh1_ownership[sender])
       continue; //nothing to send
 
     //send number of matched nodes to everyone (including itself)
@@ -220,24 +286,24 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
         for(int receiver = 0; receiver < size; receiver++) {
           auto it = dest.find(receiver);
           package_size[receiver] = (it==dest.end()) ? 0 : it->second.size();
-          MPI_Send(&(package_size[receiver]), 1, MPI_INT, receiver, sender, *comm);
+          MPI_Send(&(package_size[receiver]), 1, MPI_INT, receiver, sender, comm);
         }
       }  
       int num_nodes_to_receive = 0;
-      MPI_Recv(&num_nodes_to_receive, 1, MPI_INT, sender, sender, *comm);
+      MPI_Recv(&num_nodes_to_receive, 1, MPI_INT, sender, sender, comm, MPI_STATUS_IGNORE);
 
       //send node-to-node mappings to everyone (including itself)
       if(rank == sender) { 
         map<int, vector<int> >& dest(dir==0 ? dest_i : (dir==1 ? dest_j : dest_k));
         for(auto it = dest.begin(); it != dest.end(); it++) {
           int receiver = it->first;
-          MPI_Send(it->second.data(), it->second.size(), MPI_INT, receiver, sender, *comm);
+          MPI_Send(it->second.data(), it->second.size(), MPI_INT, receiver, sender, comm);
         }
       }  
       if(num_nodes_to_receive>0) {
         map<int, vector<int> >& recv(dir==0 ? recv_i : (dir==1 ? recv_j : recv_k));
         recv[sender] = vector<int>(num_nodes_to_receive, 0);
-        MPI_Recv(recv[sender].data(), num_nodes_to_receive, MPI_INT, sender, sender, *comm);
+        MPI_Recv(recv[sender].data(), num_nodes_to_receive, MPI_INT, sender, sender, comm, MPI_STATUS_IGNORE);
       }
     }
 
@@ -306,10 +372,10 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
     assert(send_buffer_dim1[receiver].size() == it_i->second.size()*it_j->second.size()*it_k->second.size());
 
     fprintf(stderr,"[%d]: Sending %d points to [%d]. i = [%d, %d), j = [%d, %d), k = [%d, %d).\n", 
-            rank, send_buffer_dim1[receiver].size(), receiver,
-            it_i->second->front(), it_i->second->back(),
-            it_j->second->front(), it_j->second->back(),
-            it_k->second->front(), it_k->second->back());
+            rank, (int)send_buffer_dim1[receiver].size(), receiver,
+            it_i->second.front(), it_i->second.back(),
+            it_j->second.front(), it_j->second.back(),
+            it_k->second.front(), it_k->second.back());
 
     it_i++;  it_j++;  it_k++;
   }
@@ -320,13 +386,13 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
   while(it_i != recv_i.end()) {
     int sender = it_i->first;
     assert(sender == it_j->first && sender == it_k->first);
-    assert(recv_buffer_dim1[receiver].size() == it_i->second.size()*it_j->second.size()*it_k->second.size());
+    assert(recv_buffer_dim1[sender].size() == it_i->second.size()*it_j->second.size()*it_k->second.size());
 
     fprintf(stderr,"[%d]: Receiving %d points from [%d]. i = [%d, %d), j = [%d, %d), k = [%d, %d).\n", 
-            rank, recv_buffer_dim1[sender].size(), sender,
-            it_i->second->front(), it_i->second->back(),
-            it_j->second->front(), it_j->second->back(),
-            it_k->second->front(), it_k->second->back());
+            rank, (int)recv_buffer_dim1[sender].size(), sender,
+            it_i->second.front(), it_i->second.back(),
+            it_j->second.front(), it_j->second.back(),
+            it_k->second.front(), it_k->second.back());
 
     it_i++;  it_j++;  it_k++;
   }
@@ -335,7 +401,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
   //----------------------------------------------------------
   // Step 6. Clean-up
   //----------------------------------------------------------
-  delete [] mesh1_indices;
+  delete [] mesh1_ownership;
   delete [] mesh2_indices;
   delete [] package_size;
 
@@ -344,10 +410,10 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
 //-------------------------------------------------------------------------------
 
 void
-MeshMatcher::SendData(SpaceVariable3D* V1, SpaceVariable3D* V2)
+MeshMatcher::Transfer(SpaceVariable3D* V1, SpaceVariable3D* V2)
 {
-  if(mesh1_owner) assert(V1) else assert(V1==NULL); 
-  if(mesh2_owner) assert(V2) else assert(V2==NULL); 
+  if(mesh1_owner) assert(V1); else assert(V1==NULL); 
+  if(mesh2_owner) assert(V2); else assert(V2==NULL); 
     
   int dim = 1;
   if(mesh1_owner) dim = V1->NumDOF();
@@ -357,17 +423,17 @@ MeshMatcher::SendData(SpaceVariable3D* V1, SpaceVariable3D* V2)
   if(dim<1 || dim>3) 
     fprintf(stderr,"*** Error: Cannot transfer %d-dimensional data between two meshes.\n", dim);
 
-  map<int,vector<double> > send_buffer(dim==1 ? send_buffer_dim1 : (dim==2 ? send_buffer_dim2 : send_buffer_dim3));
-  map<int,vector<double> > recv_buffer(dim==1 ? recv_buffer_dim1 : (dim==2 ? recv_buffer_dim2 : recv_buffer_dim3));
+  map<int,vector<double> >& send_buffer(dim==1 ? send_buffer_dim1 : (dim==2 ? send_buffer_dim2 : send_buffer_dim3));
+  map<int,vector<double> >& recv_buffer(dim==1 ? recv_buffer_dim1 : (dim==2 ? recv_buffer_dim2 : recv_buffer_dim3));
    
   // non-blocking send
   double*** v1 = V1 ? V1->GetDataPointer() : NULL;
   vector<MPI_Request> send_requests;
   for(auto it = send_buffer.begin(); it != send_buffer.end(); it++) {
     int receiver = it->first;
-    vector<int> &sendi(send_i[receiver]);
-    vector<int> &sendj(send_j[receiver]);
-    vector<int> &sendk(send_k[receiver]);
+    vector<int>& sendi(send_i[receiver]);
+    vector<int>& sendj(send_j[receiver]);
+    vector<int>& sendk(send_k[receiver]);
     vector<double>& buffer = it->second;
 
     // fill buffer
@@ -383,9 +449,10 @@ MeshMatcher::SendData(SpaceVariable3D* V1, SpaceVariable3D* V2)
 
     // send package to "receiver"
     send_requests.push_back(MPI_Request());
-    MPI_Isend(buffer.data(), buffer.size(), MPI_DOUBLE, receiver, rank, *comm, &(send_requests.back());
+    MPI_Isend(buffer.data(), buffer.size(), MPI_DOUBLE, receiver, rank, comm, &(send_requests.back()));
   }
-  if(V1) V1.RestoreDataPointerToLocalVector();
+  if(V1) 
+    V1->RestoreDataPointerToLocalVector();
 
 
   // non-blocking recv
@@ -394,7 +461,7 @@ MeshMatcher::SendData(SpaceVariable3D* V1, SpaceVariable3D* V2)
     int sender = it->first;
     vector<double>& buffer = it->second;
     recv_requests.push_back(MPI_Request());
-    MPI_Irecv(buffer.data(), buffer.size(), MPI_DOUBLE, sender, sender, *comm, &(recv_requests.bac()));
+    MPI_Irecv(buffer.data(), buffer.size(), MPI_DOUBLE, sender, sender, comm, &(recv_requests.back()));
   }
 
   // wait
@@ -407,9 +474,9 @@ MeshMatcher::SendData(SpaceVariable3D* V1, SpaceVariable3D* V2)
     int sender = it->first;
     vector<double>& buffer = it->second;
 
-    vector<int> &recvi(recv_i[sender]);
-    vector<int> &recvj(recv_j[sender]);
-    vector<int> &recvk(recv_k[sender]);
+    vector<int>& recvi(recv_i[sender]);
+    vector<int>& recvj(recv_j[sender]);
+    vector<int>& recvk(recv_k[sender]);
     int counter = 0;
     for(auto it_k = recvk.begin(); it_k != recvk.end(); it_k++) 
       for(auto it_j = recvj.begin(); it_j != recvj.end(); it_j++) 

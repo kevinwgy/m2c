@@ -7,6 +7,7 @@
 #include<VarFcnBase.h>
 #include<EmbeddedBoundaryFormula.h>
 #include<SpaceOperator.h>
+#include<MeshMatcher.h>
 #include<tuple>
 
 //------------------------------------------------------------
@@ -67,11 +68,12 @@ class LaserAbsorptionSolver {
   int mpi_rank;
   int mpi_size;
 
-  //! N-S MPI (different from comm only if iod.laser.parallel == BALANCED)
+  //! N-S MPI (can be different from comm only if iod.laser.parallel == BALANCED)
   MPI_Comm& nscomm;
 
   //! Transfer data between the two mesh partitions (used when iod.laser.parallel==BALANCED)
-  MeshMatcher* matcher;
+  MeshMatcher* NS2Laser;
+  MeshMatcher* Laser2NS;
   DataManagers3D *dms;
   SpaceOperator *spo;
   
@@ -107,8 +109,13 @@ class LaserAbsorptionSolver {
   vector<GhostPoint> *ghost_nodes_inner;
   vector<GhostPoint> *ghost_nodes_outer;
 
-  //! Internal variables
+  //! Internal variable on the NS mesh
+  SpaceVariable3D TemperatureNS;
+
+  //! Internal variables (on the Laser mesh)
   SpaceVariable3D Temperature;
+  SpaceVariable3D *ID; //!< material id 
+  SpaceVariable3D *L;  //!< latest L
   SpaceVariable3D L0; //!< ``old'' L
   SpaceVariable3D Lbk; //!< backup of input L (for "failsafe")
   SpaceVariable3D Phi; //!< distance from each node to source; -1 if node is out of scope
@@ -142,10 +149,9 @@ public:
                         SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
                         std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_);
 
-  //! This construction is used with the option of load balancing
+  //! This constructor is used when load balancing is requested (i.e. a sub-mesh is constructed/partitioned for the laser domain)
   LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, std::vector<VarFcnBase*> &varFcn_,
-                        SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
-                        FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_, 
+                        SpaceVariable3D &coordinates_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_, 
                         vector<double> &x, vector<double> &y, vector<double> &z,
                         vector<double> &dx, vector<double> &dy, vector<double> &dz);
                         
@@ -168,9 +174,18 @@ private:
 
   void CalculateGlobalMeshInfo();
 
-  void ReadUserSpecifiedPowerFile(const char *source_power_timehistory_file);
-
   void CalculateLaserInfo();
+
+  //! Create/partion a new sub-mesh for laser calculation
+  void SetupLoadBalancing(SpaceVariable3D &coordinates_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
+                          vector<double> &x, vector<double> &y, vector<double> &z,
+                          vector<double> &dx, vector<double> &dy, vector<double> &dz);
+
+  void PopulateLaserMesh(SpaceVariable3D &V_, SpaceVariable3D &ID_, SpaceVariable3D &L_);
+
+  void PopulateRadianceOnNavierStokesMesh(SpaceVariable3D &L_);
+
+  void ReadUserSpecifiedPowerFile(const char *source_power_timehistory_file);
 
   double DistanceToSource(Vec3D &x, int &loc, double *image = NULL);
 
@@ -191,8 +206,7 @@ private:
 
   void CopyValues(double*** from, double*** to);
 
-  bool ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
-                                          const double t, double alpha, double relax_coeff, 
+  bool ComputeLaserRadianceMeanFluxMethod(const double t, double alpha, double relax_coeff, 
                                           bool initialized); 
 
   //-------------------------------------------------------------
@@ -220,6 +234,9 @@ private:
   void ApplyStoredGhostNodesRadiance(double*** l);
   //-------------------------------------------------------------
 
+  void AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID, 
+                                               SpaceVariable3D *V = NULL); //if NULL, use stored temperature
+  
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin
     return std::get<0>(absorption[id])*(T - std::get<1>(absorption[id])) + std::get<2>(absorption[id]);}
 };

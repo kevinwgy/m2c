@@ -164,7 +164,6 @@ int main(int argc, char* argv[])
 
     if(iod.laser.parallel == LaserData::BALANCED) //re-balance the load
       laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
-                                        spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
                                         //the following inputs are used for creating a new dms/spo
                                         *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
     else

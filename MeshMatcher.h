@@ -3,6 +3,7 @@
 
 #include<Vector3D.h>
 #include<SpaceVariable.h>
+#include<map>
 
 //------------------------------------------------------------
 // Class MeshMatcher is responsible for transferring data from 
@@ -14,15 +15,13 @@ class MeshMatcher {
   //! whether exact node-to-node matching is expected
   bool exact_match;
 
-  //! communicators (may be NULL for some processor cores)
-  MPI_Comm* comm; //all the cores
-  MPI_Comm* comm1; //!< mesh 1
-  MPI_Comm* comm2; //!< mesh 2
-  int rank, size, rank1, size1, rank2, size2;
+  //! communicator (combination of mesh1 and mesh2)
+  MPI_Comm& comm; //all the cores
+  int rank, size;
 
-  //! mesh coordinates
-  SpaceVariable3D* coordinates1;
-  SpaceVariable3D* coordinates2;
+  //! whether the current proc cores owns part of mesh1 or mesh2
+  bool mesh1_owner;
+  bool mesh2_owner;
 
   //! matched_nodes
   std::map<int, std::vector<int> >    send_i;
@@ -40,16 +39,30 @@ class MeshMatcher {
 
 public:
 
-  MeshMatcher(MPI_Comm* comm_, MPI_Comm* comm1_, MPI_Comm* comm2_, 
-              SpaceVariable3D* coords1_, SpaceVariable3D* coords2_,
-              vector<double>& x1, vector<double>& y1, vector<double>& z1,
-              vector<double>& x2, vector<double>& y2, vector<double>& z2);
-
+  MeshMatcher(MPI_Comm& comm_, SpaceVariable3D* coordinates1, SpaceVariable3D* coordinates2);
   ~MeshMatcher();
   
-  void SendData(SpaceVariable3D* V1, SpaceVariable3D* V2);
+  void Transfer(SpaceVariable3D* V1, SpaceVariable3D* V2);
 
+private:
 
+  void FindGlobalMeshInfo(SpaceVariable3D* coordinates, std::vector<double> &x, std::vector<double> &y, 
+                          std::vector<double> &z, std::vector<double> &x_minus, std::vector<double> &x_plus, 
+                          std::vector<double> &y_minus, std::vector<double> &y_plus, 
+                          std::vector<double> &z_minus, std::vector<double> &z_plus);
+
+  void SetupTransferExactMatch(std::vector<double>& x1, std::vector<double>& y1, std::vector<double>& z1,
+                               std::vector<double>& x1_minus, std::vector<double>& x1_plus, //coords of ghosts
+                               std::vector<double>& y1_minus, std::vector<double>& y1_plus, //coords of ghosts
+                               std::vector<double>& z1_minus, std::vector<double>& z1_plus, //coords of ghosts
+                               std::vector<double>& x2, std::vector<double>& y2, std::vector<double>& z2,
+                               std::vector<double>& x2_minus, std::vector<double>& x2_plus, //coords of ghosts
+                               std::vector<double>& y2_minus, std::vector<double>& y2_plus, //coords of ghosts
+                               std::vector<double>& z2_minus, std::vector<double>& z2_plus, //coords of ghosts
+                               bool mesh1_owner, int ii0_1, int jj0_1, int kk0_1,
+                               int iimax_1, int jjmax_1, int kkmax_1,
+                               bool mesh2_owner, int ii0_2, int jj0_2, int kk0_2,
+                               int iimax_2, int jjmax_2, int kkmax_2);
 
 };
 

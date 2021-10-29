@@ -1,7 +1,6 @@
 #include <iostream>
 #include <Utils.h>
 #include <time.h>
-#include <mpi.h>
 #include <version.h>
 #include <stdio.h>
 #include <cstring>
@@ -21,6 +20,22 @@ void print(const char format[],...)
     va_end(Argp);
   }
   MPI_Barrier(MPI_COMM_WORLD);
+  return;
+}
+
+//--------------------------------------------------
+// MPI Rank 0 will print to stdout
+void print(MPI_Comm& comm, const char format[],...)
+{
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+  if(!rank) {
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format, Argp);
+    va_end(Argp);
+  }
+  MPI_Barrier(comm);
   return;
 }
 
@@ -47,9 +62,32 @@ void print_error(const char format[],...)
   return;
 }
 
+//--------------------------------------------------
+// MPI Rank 0 will print to stdout in red color
+void print_error(MPI_Comm& comm, const char format[],...)
+{
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+
+  if(!rank) {
+
+    char format_colored[strlen(format)+40] = "";
+    strcat(format_colored, "\033[0;31m");
+    strcat(format_colored, format);
+    strcat(format_colored, "\033[0m");
+
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format_colored, Argp);
+    va_end(Argp);
+  }
+  MPI_Barrier(comm);
+  return;
+}
 
 //--------------------------------------------------
 // MPI Rank i will print to stdout
+/*
 void print(int i, const char format[],...)
 {
   int rank;
@@ -63,6 +101,24 @@ void print(int i, const char format[],...)
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
+  return;
+}
+*/
+//--------------------------------------------------
+// MPI Rank i will print to stdout
+void print(MPI_Comm& comm, int i, const char format[],...)
+{
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+
+  if(rank == i) {
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format, Argp);
+    va_end(Argp);
+  }
+
+  MPI_Barrier(comm);
   return;
 }
 
@@ -81,6 +137,24 @@ void print(FILE* fd, const char format[],...)
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
+  return;
+}
+
+//--------------------------------------------------
+// MPI Rank 0 will print to a file
+void print(MPI_Comm& comm, FILE* fd, const char format[],...)
+{
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+
+  if(!rank) {
+    va_list Argp;
+    va_start(Argp, format);
+    vfprintf(fd, format, Argp);
+    va_end(Argp);
+  }
+
+  MPI_Barrier(comm);
   return;
 }
 

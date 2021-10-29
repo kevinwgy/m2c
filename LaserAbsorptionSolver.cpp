@@ -29,7 +29,8 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        Phi(comm_, &(dm_all_.ghosted1_1dof)),
                        Level(comm_, &(dm_all_.ghosted1_1dof)),
                        Tag(comm_, &(dm_all_.ghosted1_1dof)),
-                       matcher(NULL), dms(NULL), spo(NULL)
+                       ID(NULL), L(NULL), TemperatureNS(),
+                       NS2Laser(NULL), Laser2NS(NULL), dms(NULL), spo(NULL)
 {
   // Check input parameters
   CheckForInputErrors();
@@ -90,29 +91,28 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 // Used with the option of re-balancing load
 LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, 
                          vector<VarFcnBase*> &varFcn_, SpaceVariable3D &coordinates_, 
-                         SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
                          FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
                          vector<double> &x, vector<double> &y, vector<double> &z,
                          vector<double> &dx, vector<double> &dy, vector<double> &dz)
                      : nscomm(comm_), iod(iod_), varFcn(varFcn_), 
-                       Temperature(), L0(), Lbk(), Phi(), Level(), Tag()
+                       Temperature(), L0(), Lbk(), Phi(), Level(), Tag(),
+                       TemperatureNS(comm_, &(dm_all_.ghosted1_1dof))
 {
   // Check input parameters
   CheckForInputErrors();
 
-  // Build new mesh
-
-  //MPI info
-  MPI_Comm_rank(comm, &mpi_rank);
-  MPI_Comm_size(comm, &mpi_size);
-
   // Calculate laser info ("source" and "laser_range")
   CalculateLaserInfo();
 
+  //-------------------------------------------------------------------------
+  // Create new mesh
+  SetupLoadBalancing(coordinates_, fluxFcn_, riemann_, x, y, z, dx, dy, dz);
+  //-------------------------------------------------------------------------
+
+  if(!active_core)
+    return; //nothing needs to be done
 
 
-
-  // Mesh info
   coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates->GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
   CalculateGlobalMeshInfo();
@@ -130,7 +130,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
     if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
       fprintf(stderr,"ERROR: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
-      exit_mpi();
+      exit(-1);
     }
     std::get<0>(absorption[it->first]) = it->second->slope;
     std::get<1>(absorption[it->first]) = it->second->T0;
@@ -141,8 +141,6 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   if(strcmp(iod.laser.source_power_timehistory_file, ""))
     ReadUserSpecifiedPowerFile(iod.laser.source_power_timehistory_file);
 
-  // Calculate laser info ("source" and "laser_range")
-  CalculateLaserInfo();
 
   // Calculate distance from each node to source
   CalculateDistanceToSource(Phi); 
@@ -162,10 +160,11 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
 //--------------------------------------------------------------------------
 
-void LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, 
-                                               SpaceVariable3D &volume_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
-                                               vector<double> &x, vector<double> &y, vector<double> &z,
-                                               vector<double> &dx, vector<double> &dy, vector<double> &dz)
+void
+LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_, 
+                                          FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
+                                          vector<double> &x, vector<double> &y, vector<double> &z,
+                                          vector<double> &dx, vector<double> &dy, vector<double> &dz)
 {
 
   // -------------------------------------------------------------
@@ -175,13 +174,13 @@ void LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_, Sp
   double r0, r1;
   if(source.angle == 0) { //paralell laser
     x0 = source.x0;
-    x1 = source.x0 + laser_range*dir;
+    x1 = source.x0 + laser_range*source.dir;
     r0 = r1 = source.radius;
   } else if (source.angle > 0) { //focusing laser
     x0 = source.x0;
-    r0 = source.R*tan(angle);
-    x1 = source.x0 + (source.R - (source.R - laser_range)*cos(angle))*dir;
-    r1 = (source.R - laser_range)*sin(angle);
+    r0 = source.R*tan(source.angle);
+    x1 = source.x0 + (source.R - (source.R - laser_range)*cos(source.angle))*source.dir;
+    r1 = (source.R - laser_range)*sin(source.angle);
   } else { // diverging laser
     double theta = -source.angle;
     x0 = source.O + source.R*cos(theta)*source.dir;
@@ -197,27 +196,38 @@ void LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_, Sp
   // -------------------------------------------------------------
   // Step 2. Define the sub-mesh
   // -------------------------------------------------------------
+
+  //may need to explicitly set ghost layer (to obtain a perfect match)
+  double *xminus(NULL), *xplus(NULL), *yminus(NULL), *yplus(NULL), *zminus(NULL), *zplus(NULL);
+  double *dxminus(NULL), *dxplus(NULL), *dyminus(NULL), *dyplus(NULL), *dzminus(NULL), *dzplus(NULL);
+
   int lower = std::lower_bound(x.begin(), x.end(), bbmin[0]) - x.begin();
   int upper = std::upper_bound(x.begin(), x.end(), bbmax[0]) - x.begin();
   lower = std::max(0, lower-3);
-  upper = std::min(x.size()-1, upper+3);
+  upper = std::min((int)(x.size())-1, upper+3);
   vector<double> xsub(x.begin()+lower, x.begin()+upper);
   vector<double> dxsub(dx.begin()+lower, dx.begin()+upper);
+  if(lower>0)           {*xminus = x[lower-1]; *dxminus = dx[lower-1];}
+  if(upper<x.size()-1)  {*xplus  = x[upper+1]; *dxplus  = dx[upper+1];}
 
   lower = std::lower_bound(y.begin(), y.end(), bbmin[1]) - y.begin();
   upper = std::upper_bound(y.begin(), y.end(), bbmax[1]) - y.begin();
   lower = std::max(0, lower-3);
-  upper = std::min(y.size()-1, upper+3);
+  upper = std::min((int)(y.size())-1, upper+3);
   vector<double> ysub(y.begin()+lower, y.begin()+upper);
   vector<double> dysub(dy.begin()+lower, dy.begin()+upper);
+  if(lower>0)           {*yminus = y[lower-1]; *dyminus = dy[lower-1];}
+  if(upper<y.size()-1)  {*yplus  = y[upper+1]; *dyplus  = dy[upper+1];}
 
   lower = std::lower_bound(z.begin(), z.end(), bbmin[2]) - z.begin();
   upper = std::upper_bound(z.begin(), z.end(), bbmax[2]) - z.begin();
   lower = std::max(0, lower-3);
-  upper = std::min(z.size()-1, upper+3);
+  upper = std::min((int)(z.size()-1), upper+3);
   vector<double> zsub(z.begin()+lower, z.begin()+upper);
   vector<double> dzsub(dz.begin()+lower, dz.begin()+upper);
-
+  if(lower>0)           {*zminus = z[lower-1]; *dzminus = dz[lower-1];}
+  if(upper<z.size()-1)  {*zplus  = z[upper+1]; *dzplus  = dz[upper+1];}
+  
 
   // -------------------------------------------------------------
   // Step 3. Determine the processor cores used for laser computation
@@ -259,7 +269,8 @@ void LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_, Sp
   // -------------------------------------------------------------
   if(active_core) {
     dms = new DataManagers3D(comm, xsub.size(), ysub.size(), zsub.size());
-    spo = new SpaceOperator(comm, dms, iod, vf, *ff, riemann, xsub, ysub, zsub, dxsub, dysub, dzsub);  
+    spo = new SpaceOperator(comm, *dms, iod, varFcn, fluxFcn_, riemann_, xsub, ysub, zsub, dxsub, dysub, dzsub);
+    spo->ResetGhostLayer(xminus, xplus, yminus, yplus, zminus, zplus, dxminus, dxplus, dyminus, dyplus, dzminus, dzplus);
     coordinates       = &(spo->GetMeshCoordinates());
     delta_xyz         = &(spo->GetMeshDeltaXYZ());
     volume            = &(spo->GetMeshCellVolumes());
@@ -281,20 +292,24 @@ void LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_, Sp
   // Step 5. Create internal variables
   // -------------------------------------------------------------
   if(active_core) {
-    Temperature.Setup(comm, &(dms.ghosted1_1dof));
-    L0.Setup(comm, &(dms.ghosted1_1dof));
-    Lbk.Setup(comm, &(dms.ghosted1_1dof));
-    Phi.Setup(comm, &(dms.ghosted1_1dof));
-    Level.Setup(comm, &(dms.ghosted1_1dof));
-    Tag.Setup(comm, &(dms.ghosted1_1dof));
+    Temperature.Setup(comm, &(dms->ghosted1_1dof));
+    L0.Setup(comm, &(dms->ghosted1_1dof));
+    Lbk.Setup(comm, &(dms->ghosted1_1dof));
+    Phi.Setup(comm, &(dms->ghosted1_1dof));
+    Level.Setup(comm, &(dms->ghosted1_1dof));
+    Tag.Setup(comm, &(dms->ghosted1_1dof));
+    ID = new SpaceVariable3D(comm, &(dms->ghosted1_1dof));
+    L  = new SpaceVariable3D(comm, &(dms->ghosted1_1dof));
+  } {
+    ID = NULL;
+    L  = NULL;
   }
 
   // -------------------------------------------------------------
   // Step 6. Setup Mesh matcher
   // -------------------------------------------------------------
-  matcher = new MeshMatcher(&nscomm, 
-                            &nscomm, active_core ? &comm : NULL, coordinates_, coordinates,
-                            x, y, z, xsub, ysub, zsub);
+  NS2Laser = new MeshMatcher(nscomm, &coordinates_, coordinates);
+  Laser2NS = new MeshMatcher(nscomm, coordinates, &coordinates_);
 
 }
 
@@ -306,9 +321,15 @@ LaserAbsorptionSolver::~LaserAbsorptionSolver()
     if(levelcomm[i])
       delete levelcomm[i];
 
-  if(matcher) delete matcher;
+  if(NS2Laser) delete NS2Laser;
+  if(Laser2NS) delete Laser2NS;
   if(dms) delete dms;
   if(spo) delete spo;
+
+  if(iod.laser.parallel==LaserData::BALANCED && active_core) {
+    delete ID;
+    delete L;
+  }
 }
 
 //--------------------------------------------------------------------------
@@ -316,6 +337,13 @@ LaserAbsorptionSolver::~LaserAbsorptionSolver()
 void
 LaserAbsorptionSolver::Destroy()
 {
+  if(iod.laser.parallel==LaserData::BALANCED) {
+    TemperatureNS.Destroy();
+    if(active_core) {
+      ID->Destroy(); 
+      L->Destroy();
+    }
+  }
   Temperature.Destroy();
   L0.Destroy();
   Lbk.Destroy();
@@ -406,8 +434,8 @@ LaserAbsorptionSolver::ReadUserSpecifiedPowerFile(const char *source_power_timeh
   sprintf(filename, "%s", iod.laser.source_power_timehistory_file);
   input.open(filename, std::fstream::in);
   if(!input.is_open()) {
-    print_error("*** Error: Could not open user-specified laser power file %s.\n", filename);
-    exit_mpi();
+    print_error(comm,"*** Error: Could not open user-specified laser power file %s.\n", filename);
+    exit(-1);
   }
 
   double time0(-DBL_MAX), time, power;
@@ -416,14 +444,14 @@ LaserAbsorptionSolver::ReadUserSpecifiedPowerFile(const char *source_power_timeh
     source_power_timehistory.push_back(std::make_pair(time, power));
     time0 = time;
   }
-  print("- Loaded user-specified laser power file %s, final time: %e.\n", filename, time);
+  print(comm,"- Loaded user-specified laser power file %s, final time: %e.\n", filename, time);
   if(source_power_timehistory[0].first>0) //if the first time stamp is greater than 0, insert one at 0.
     source_power_timehistory.insert(source_power_timehistory.begin(), 
                                     std::make_pair(0.0, source_power_timehistory[0].second));
   else if(source_power_timehistory[0].first<0) {
-    print_error("*** Error: Detected negative time stamp (%e) in laser power file.\n",
+    print_error(comm, "*** Error: Detected negative time stamp (%e) in laser power file.\n",
                 source_power_timehistory[0].first);
-    exit_mpi();
+    exit(-1);
   }
 
   delete [] filename;
@@ -455,8 +483,9 @@ LaserAbsorptionSolver::CalculateLaserInfo()
     source.R = source.radius/sin(source.angle); //radius of curvature
     double eps = std::max(dxmin_glob[0], std::max(dxmin_glob[1], dxmin_glob[2]));
     if(laser_range > source.R - 2.0*eps) {
-      print_error("*** Error: Laser range must not include the focal point. range = %e, R = %e, hmin = %e. (Stay away by at least 2 cells.)\n",
-                   laser_range, source.R, eps);
+      print_error("*** Error: Laser range must not include the focal point. range = %e, R = %e, hmin = %e."
+                  " (Stay away by at least 2 cells.)\n",
+                  laser_range, source.R, eps);
       exit_mpi();
     }
     source.O = source.x0 + source.R*cos(source.angle)*source.dir; //origin of the circle/curve 
@@ -824,7 +853,7 @@ LaserAbsorptionSolver::BuildCustomizedCommunicators()
 {
 
   if(mpi_size>1)
-    print("- Creating a customized communicator for the laser radiation solver.\n");
+    print(comm,"- Creating a customized communicator for the laser radiation solver.\n");
 
   // Build one custom communicator per level  
   vector<vector<Int3> > nodes_on_level(queueCounter.size());
@@ -919,7 +948,7 @@ LaserAbsorptionSolver::VerifySortedNodesAndCommunicators()
   auto duration = duration_cast<microseconds>(stop - start);
   double cost = duration.count();
   MPI_Allreduce(MPI_IN_PLACE, &cost, 1, MPI_DOUBLE, MPI_MAX, comm);
-  print(stderr,"cost is %e.\n", cost); 
+  print(comm,"cost is %e.\n", cost); 
 
 
   MPI_Barrier(comm);
@@ -934,7 +963,7 @@ LaserAbsorptionSolver::VerifySortedNodesAndCommunicators()
   duration = duration_cast<microseconds>(stop - start);
   cost = duration.count();
   MPI_Allreduce(MPI_IN_PLACE, &cost, 1, MPI_DOUBLE, MPI_MAX, comm);
-  print(stderr,"cost is %e.\n", cost); 
+  print(comm,"cost is %e.\n", cost); 
   //---------------------------------------------------
 */
 
@@ -1351,8 +1380,8 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
       }
     }
     if(power <0.0) {
-      print_error("*** Error: Found negative laser source power %e at t = %e.\n", power, t);
-      exit_mpi();
+      print_error(comm,"*** Error: Found negative laser source power %e at t = %e.\n", power, t);
+      exit(-1);
     }
   } else
     power = iod.laser.source_power;
@@ -1371,7 +1400,7 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
     if(l0<lmin) {
       l0 = lmin;
       if(verbose >= OutputData::HIGH)
-        print("Warning: source radiance (%e) is lower than the cut-off radiance (%e).\n", l0, lmin);
+        print(comm,"Warning: source radiance (%e) is lower than the cut-off radiance (%e).\n", l0, lmin);
     }
 
     for(int n=0; n<queueCounter[0]; n++) //level 0
@@ -1519,10 +1548,10 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l, int custom_max_iter)
 
   if(!custom_max_iter_specified) { //no need to print anything if max_iter is "customized"
     if(iter == max_iter && verbose >= OutputData::HIGH)
-      print("Warning: Ghost nodes in the laser solver didn't converge in %d iterations "
+      print(comm,"Warning: Ghost nodes in the laser solver didn't converge in %d iterations "
             "(err = %e, tol = %e).\n", iter, max_err, iod.laser.convergence_tol);
     else if(verbose >= OutputData::HIGH)
-      print("  o Ghost nodes in the laser solver converged in %d iteration(s) "
+      print(comm,"  o Ghost nodes in the laser solver converged in %d iteration(s) "
             "(err = %e, tol = %e).\n", iter+1, max_err, iod.laser.convergence_tol);
   }
 
@@ -1602,67 +1631,135 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
 //--------------------------------------------------------------------------
 
 void
-LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L,
+LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D &ID_, SpaceVariable3D &L_,
                                             const double t, bool initialized)
 {
-  bool success;
 
-  success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,mfm_alpha,sor_relax,initialized);
+  PopulateLaserMesh(V_, ID_, L_); //get Temperature, ID, and L on the laser mesh (may or may not be the same as the N-S mesh)
 
-  if(!success) {// triger the "failsafe" procedure
-    // Method 1: gradually decreasing the relaxation_factor in SOR
-    for(int iter = 0; iter < 5; iter++) {
-      sor_relax /= 2.0;
-      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,mfm_alpha,sor_relax,initialized); 
-      if(success)
-        break;
+  // Compute L on the laser mesh
+  if(active_core) {
+    bool success;
+
+    success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax,initialized);
+
+    if(!success) {// triger the "failsafe" procedure
+      // Method 1: gradually decreasing the relaxation_factor in SOR
+      for(int iter = 0; iter < 5; iter++) {
+        sor_relax /= 2.0;
+        success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax,initialized); 
+        if(success)
+          break;
+      }
     }
+
+    if(!success) {
+      //Method 2: switch to the "Step method"
+      sor_relax = iod.laser.relax_coeff; //restore user input
+      mfm_alpha = 1.0;
+      for(int iter = 0; iter < 5; iter++) {
+        success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax,initialized); 
+        if(success)
+          break;
+        sor_relax /= 2.0;
+      }
+    }
+
+    if(!success)
+      print_error(comm,"*** Error: Laser radiance solver failed to converge.\n");
   }
 
-  if(!success) {
-    //Method 2: switch to the "Step method"
-    sor_relax = iod.laser.relax_coeff; //restore user input
-    mfm_alpha = 1.0;
-    for(int iter = 0; iter < 5; iter++) {
-      success = ComputeLaserRadianceMeanFluxMethod(V,ID,L,t,mfm_alpha,sor_relax,initialized); 
-      if(success)
-        break;
-      sor_relax /= 2.0;
-    }
-  }
-
-  if(!success)
-    print_error("*** Error: Laser radiance solver failed to converge.\n");
+  PopulateRadianceOnNavierStokesMesh(L_);
 }
 
 //--------------------------------------------------------------------------
 
+void
+LaserAbsorptionSolver::PopulateLaserMesh(SpaceVariable3D &V_, SpaceVariable3D &ID_, SpaceVariable3D &L_) 
+{
+  if(iod.laser.parallel == LaserData::BALANCED) {
+
+    double*** id  = ID_.GetDataPointer();
+    Vec5D*** v    = (Vec5D***)V_.GetDataPointer();
+
+    // Compute Temperature on the N-S mesh, then send to the laser mesh
+    double*** Tns = TemperatureNS.GetDataPointer();
+
+    int i0_ns(0), j0_ns(0), k0_ns(0), imax_ns(0), jmax_ns(0), kmax_ns(0);
+    TemperatureNS.GetGhostedCornerIndices(&i0_ns, &j0_ns, &k0_ns, &imax_ns, &jmax_ns, &kmax_ns);
+    double e;
+    int myid;
+    for(int k=k0_ns; k<kmax_ns; k++)
+      for(int j=j0_ns; j<jmax_ns; j++)
+        for(int i=i0_ns; i<imax_ns; i++) {
+          myid = id[k][j][i];
+          e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+          Tns[k][j][i] = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
+        } 
+    TemperatureNS.RestoreDataPointerAndInsert();
+
+    // Transfer to laser mesh
+    NS2Laser->Transfer(&TemperatureNS, &Temperature);
+    NS2Laser->Transfer(&ID_, ID);
+    NS2Laser->Transfer(&L_, L);
+
+    ID_.RestoreDataPointerToLocalVector();
+    V_.RestoreDataPointerToLocalVector();
+
+  } else { // same mesh used for Laser and N-S equations
+
+    // Compute Temperature in the relevant region
+    double*** T  = Temperature.GetDataPointer();
+    double*** id = ID_.GetDataPointer();
+    Vec5D*** v   = (Vec5D***)V_.GetDataPointer();
+    ComputeTemperatureInLaserDomain(v, id, T); //data exchanged using the customized communicator
+    Temperature.RestoreDataPointerToLocalVector();
+
+    ID_.RestoreDataPointerToLocalVector();
+    V_.RestoreDataPointerToLocalVector();
+
+    ID = &ID_;
+    L  = &L_;
+
+  }
+}
+
+//--------------------------------------------------------------------------
+
+void
+LaserAbsorptionSolver::PopulateRadianceOnNavierStokesMesh(SpaceVariable3D &L_) 
+{
+  if(iod.laser.parallel == LaserData::BALANCED) {
+    Laser2NS->Transfer(L, &L_);
+  } else {
+    /*L_ is already updated*/
+  }
+}
+
+//--------------------------------------------------------------------------
+// Working on the laser mesh (may or may not be the same as the N-S mesh)
 bool
-LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L,
-                                                          const double t, double alpha, double relax_coeff,
+LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double alpha, double relax_coeff,
                                                           bool initialized)
 {
   // This function will use customized communicators. The sub-functions deal with double*** directly
   //
-  double*** l     = L.GetDataPointer();
+  double*** l     = L->GetDataPointer();
   double*** T     = Temperature.GetDataPointer();
   double*** l0    = L0.GetDataPointer();
   double*** lbk   = Lbk.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates->GetDataPointer();
   Vec3D*** dxyz   = (Vec3D***)delta_xyz->GetDataPointer();
   double*** vol   = volume->GetDataPointer();
-  double*** id    = ID.GetDataPointer();
+  double*** id    = ID->GetDataPointer();
   double*** level = Level.GetDataPointer();
   double*** phi   = Phi.GetDataPointer();
-  Vec5D*** v      = (Vec5D***)V.GetDataPointer();
 
 
   bool success = true;
   CopyValues(l, lbk); //if the solver fails, return the original 
 
   // Note that when L enters this function, its laser ghost nodes (i.e. ghostNodes1 and 2) do not have values.
-
-  ComputeTemperatureInLaserDomain(v, id, T);
 
   //If not initialized or source_power changes, set source radiance; initialize laser if needed
   if(!initialized || !source_power_timehistory.empty())
@@ -1687,7 +1784,7 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
     //-----------------------------------------------------------------
 
     ComputeErrorsInLaserDomain(l0, l, max_error, avg_error);
-    //print("It %d. max_error = %e, avg_error = %e!\n", GSiter, max_error, avg_error);
+    //print(comm,"It %d. max_error = %e, avg_error = %e!\n", GSiter, max_error, avg_error);
 
     if(max_error<iod.laser.convergence_tol)
       break;
@@ -1697,13 +1794,13 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   }
 
   if(GSiter == iod.laser.max_iter) {
-    print("Warning: Laser radiation solver failed to converge in %d iterations. (Error = %e, Tol = %e) Re-trying.\n",
+    print(comm,"Warning: Laser radiation solver failed to converge in %d iterations. (Error = %e, Tol = %e) Re-trying.\n",
           GSiter, max_error, iod.laser.convergence_tol);
     CopyValues(lbk, l); //l = lbk
     success = false;
 
   } else if(verbose >= OutputData::MEDIUM)
-    print("- Laser radiation solver converged in %d iteration(s)."
+    print(comm,"- Laser radiation solver converged in %d iteration(s)."
           "(Error = %e, Tol = %e).\n", GSiter+1, max_error, iod.laser.convergence_tol);
 
 
@@ -1711,17 +1808,16 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(SpaceVariable3D &V, Sp
   CleanUpGhostNodes(l, true);
 
 
-  L.RestoreDataPointerAndInsert(); //data exchanged using levelcomm. But need to "insert" for outputting
+  L->RestoreDataPointerAndInsert(); //data exchanged using levelcomm. But need to "insert" for outputting
   Temperature.RestoreDataPointerToLocalVector();
   L0.RestoreDataPointerToLocalVector();
   Lbk.RestoreDataPointerToLocalVector();
   coordinates->RestoreDataPointerToLocalVector();
   delta_xyz->RestoreDataPointerToLocalVector();
   volume->RestoreDataPointerToLocalVector(); 
-  ID.RestoreDataPointerToLocalVector();
+  ID->RestoreDataPointerToLocalVector();
   Level.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerToLocalVector();
-  V.RestoreDataPointerToLocalVector();
 
   return success;
 }
@@ -1957,16 +2053,72 @@ LaserAbsorptionSolver::ApplyStoredGhostNodesRadiance(double*** l)
 //--------------------------------------------------------------------------
 
 void
-LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID,
-                                                     SpaceVariable3D *V)
+LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceVariable3D &L_, SpaceVariable3D &ID_,
+                                                     SpaceVariable3D *V_)
 {
-  Vec5D***  r  = (Vec5D***) R.GetDataPointer();
-  double*** l  = L.GetDataPointer();
-  double*** id = ID.GetDataPointer();
-  Vec5D***  v  = V ? (Vec5D***)V->GetDataPointer() : NULL;
+
+  if(iod.laser.parallel != LaserData::BALANCED) {
+
+    AddHeatToNavierStokesResidualSingleMesh(R_, L_, ID_, V_);
+
+  } else {
+
+    // --------------------------
+    // Working on the N-S mesh
+    // --------------------------
+    Vec5D***  r  = (Vec5D***) R_.GetDataPointer();
+    double*** l  = L_.GetDataPointer();
+    double*** id = ID_.GetDataPointer();
+    Vec5D***  v  = V_ ? (Vec5D***)V_->GetDataPointer() : NULL;
+    double*** Tns= TemperatureNS.GetDataPointer();
+
+
+    int i0_ns(0), j0_ns(0), k0_ns(0), imax_ns(0), jmax_ns(0), kmax_ns(0);
+    TemperatureNS.GetGhostedCornerIndices(&i0_ns, &j0_ns, &k0_ns, &imax_ns, &jmax_ns, &kmax_ns);
+
+    int myid;
+    double e, myT, eta;
+
+    for(int k=k0_ns; k<kmax_ns; k++)
+      for(int j=j0_ns; j<jmax_ns; j++)
+        for(int i=i0_ns; i<imax_ns; i++) {
+
+          myid = id[k][j][i];
+          if(V_) {//calculate Temperature  
+            e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+            myT = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
+          } else
+            myT = Tns[k][j][i];
+
+          eta = GetAbsorptionCoefficient(myT, myid); //absorption coeff.
+          r[k][j][i][4] += eta*l[k][j][i];
+        } 
+   
+
+    TemperatureNS.RestoreDataPointerToLocalVector();
+    if(V_) V_->RestoreDataPointerToLocalVector();
+    ID_.RestoreDataPointerToLocalVector();
+    L_.RestoreDataPointerToLocalVector();
+    R_.RestoreDataPointerToLocalVector(); //although data has been udpated, no need to communicate.
+                                          //one subdomain does not need the residual info of another
+                                          //subdomain
+  }
+
+}
+
+//--------------------------------------------------------------------------
+
+void
+LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &R_, SpaceVariable3D &L_, SpaceVariable3D &ID_,
+                                                               SpaceVariable3D *V_)
+{
+  Vec5D***  r  = (Vec5D***) R_.GetDataPointer();
+  double*** l  = L_.GetDataPointer();
+  double*** id = ID_.GetDataPointer();
+  Vec5D***  v  = V_ ? (Vec5D***)V_->GetDataPointer() : NULL;
   double*** T  = Temperature.GetDataPointer();
 
-  if(V)
+  if(V_)
     ComputeTemperatureInLaserDomain(v, id, T);
   //otherwise, use stored temeprature
 
@@ -1982,10 +2134,10 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVa
   }
 
   Temperature.RestoreDataPointerToLocalVector();
-  if(V) V->RestoreDataPointerToLocalVector();
-  ID.RestoreDataPointerToLocalVector();
-  L.RestoreDataPointerToLocalVector();
-  R.RestoreDataPointerToLocalVector(); //although data has been udpated, no need to communicate.
+  if(V_) V_->RestoreDataPointerToLocalVector();
+  ID_.RestoreDataPointerToLocalVector();
+  L_.RestoreDataPointerToLocalVector();
+  R_.RestoreDataPointerToLocalVector(); //although data has been udpated, no need to communicate.
                                        //one subdomain does not need the residual info of another
                                        //subdomain
 }
