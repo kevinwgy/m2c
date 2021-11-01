@@ -156,14 +156,14 @@ void DataManagers3D::DestroyAllDataManagers()
 // SpaceVariable3D
 //---------------------------------------------------------
 
-SpaceVariable3D::SpaceVariable3D() : comm(NULL), globalVec(), localVec()
+SpaceVariable3D::SpaceVariable3D() : comm(NULL), dm(NULL), globalVec(), localVec()
 {
   array = NULL;
 }
 
 //---------------------------------------------------------
 
-SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : comm(NULL), globalVec(), localVec()
+SpaceVariable3D::SpaceVariable3D(MPI_Comm &comm_, DM *dm_) : globalVec(), localVec()
 {
   Setup(comm_, dm_);
 }
@@ -216,7 +216,7 @@ void SpaceVariable3D::Setup(MPI_Comm &comm_, DM *dm_)
 
 SpaceVariable3D::~SpaceVariable3D() 
 {
-  if(array)
+  if(dm) //"Setup(...)" has been called.
     Destroy(); //Actually, the vector should have already been destroyed.
 }
 
@@ -224,7 +224,7 @@ SpaceVariable3D::~SpaceVariable3D()
 
 double*** SpaceVariable3D::GetDataPointer()
 {
-  if(!array) return NULL;
+  if(!dm) return NULL;
 
   auto ierr = DMDAVecGetArray(*dm, localVec, &array);
   //CHKERRQ(ierr);
@@ -235,7 +235,7 @@ double*** SpaceVariable3D::GetDataPointer()
 
 void SpaceVariable3D::RestoreDataPointerAndInsert()
 {
-  if(!array)
+  if(!dm)
     return;
 
   RestoreDataPointerToLocalVector();
@@ -251,7 +251,7 @@ void SpaceVariable3D::RestoreDataPointerAndInsert()
 
 void SpaceVariable3D::RestoreDataPointerAndAdd()
 {
-  if(!array)
+  if(!dm)
     return;
 
   RestoreDataPointerToLocalVector();
@@ -267,7 +267,7 @@ void SpaceVariable3D::RestoreDataPointerAndAdd()
 
 void SpaceVariable3D::RestoreDataPointerToLocalVector()
 {
-  if(!array)
+  if(!dm)
     return;
 
   auto ierr = DMDAVecRestoreArray(*dm, localVec, &array);  
@@ -278,7 +278,7 @@ void SpaceVariable3D::RestoreDataPointerToLocalVector()
 
 void SpaceVariable3D::Destroy()
 {
-  if(!array)
+  if(!dm)
     return;
 
   VecDestroy(&globalVec);
