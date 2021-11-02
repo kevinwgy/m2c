@@ -725,6 +725,7 @@ struct LaserData {
 
   // parallel solution approach
   enum Parallelization {ORIGINAL = 0, BALANCED = 1} parallel;
+  int min_cells_per_core;
 
   // numerical parameters
   double source_depth;

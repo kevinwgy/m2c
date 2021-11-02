@@ -291,6 +291,9 @@ void SpaceVariable3D::Destroy()
 
 void SpaceVariable3D::StoreMeshCoordinates(SpaceVariable3D &coordinates)
 {
+  if(!dm)
+    return;
+
   auto ierr = DMSetCoordinateDim(*dm, 3/*3D*/);
   //CHKERRQ(ierr);
   ierr = DMSetCoordinates(*dm, coordinates.globalVec);
@@ -301,6 +304,9 @@ void SpaceVariable3D::StoreMeshCoordinates(SpaceVariable3D &coordinates)
 
 void SpaceVariable3D::WriteToVTRFile(const char *filename)
 {
+  if(!dm)
+    return;
+
   PetscViewer viewer;
   PetscViewerVTKOpen(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer);
   VecView(globalVec, viewer);
@@ -311,6 +317,9 @@ void SpaceVariable3D::WriteToVTRFile(const char *filename)
 
 void SpaceVariable3D::AXPlusB(double a, double b, bool workOnGhost)
 {
+  if(!dm)
+    return;
+
   double*** v = GetDataPointer();
   int myi0, myj0, myk0, myimax, myjmax, mykmax;
 

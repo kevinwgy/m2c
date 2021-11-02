@@ -204,7 +204,7 @@ void printHeader(int argc, char *argv[])
     cout << "\033[0;36m               ( _.-'                            \033[0m" << endl;
     cout << endl;
     cout << "Revision: " << GIT_REV << " | " << "Branch: " << GIT_BRANCH << " | " << "Tag: " << GIT_TAG << endl;
-    cout << "Simulation started at: " << getCurrentDateTime() << endl;
+    cout << "Computation started at: " << getCurrentDateTime() << endl;
     cout << "Using " << size << " processor cores." << endl;
     cout << "Command:";
     for(int i=0; i<argc; i++)

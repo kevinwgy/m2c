@@ -21,8 +21,6 @@ MeshMatcher::MeshMatcher(MPI_Comm& comm_, SpaceVariable3D* coordinates1, SpaceVa
   mesh1_owner = (coordinates1!=NULL);
   mesh2_owner = (coordinates2!=NULL);
 
-  fprintf(stderr,"[%d] mesh1_owner = %d, mesh2_owner = %d.\n", rank, (int)mesh1_owner, (int)mesh2_owner);
-
 //  int i0_1(-INT_MAX), j0_1(-INT_MAX), k0_1(-INT_MAX), imax_1(-INT_MAX), jmax_1(-INT_MAX), kmax_1(-INT_MAX);    
   int ii0_1(-INT_MAX), jj0_1(-INT_MAX), kk0_1(-INT_MAX), iimax_1(-INT_MAX), jjmax_1(-INT_MAX), kkmax_1(-INT_MAX);    
   if(coordinates1) {
@@ -426,8 +424,8 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
 void
 MeshMatcher::Transfer(SpaceVariable3D* V1, SpaceVariable3D* V2)
 {
-  if(mesh1_owner) assert(V1); else assert(V1==NULL); 
-  if(mesh2_owner) assert(V2); else assert(V2==NULL); 
+  if(mesh1_owner) assert(V1); 
+  if(mesh2_owner) assert(V2); 
     
   int dim = 1;
   if(mesh1_owner) dim = V1->NumDOF();

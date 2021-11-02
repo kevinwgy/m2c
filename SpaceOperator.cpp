@@ -1000,7 +1000,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   // planes
   for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
 
-    print("- Applying initial condition on one side of a plane (material id: %d).\n", 
+    print("- Applying initial condition on one side of a plane (material id: %d).\n\n", 
           it->second->initialConditions.materialid);
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
@@ -1025,7 +1025,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   // cylinder-cone
   for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
 
-    print("- Applying initial condition within a cylinder-cone (material id: %d).\n",
+    print("- Applying initial condition within a cylinder-cone (material id: %d).\n\n",
           it->second->initialConditions.materialid);
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
@@ -1058,7 +1058,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   // cylinder with spherical cap(s)
   for(auto it=ic.cylindersphereMap.dataMap.begin(); it!=ic.cylindersphereMap.dataMap.end(); it++) {
 
-    print("- Applying initial condition within a cylinder-sphere (material id: %d).\n",
+    print("- Applying initial condition within a cylinder-sphere (material id: %d).\n\n",
           it->second->initialConditions.materialid);
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
@@ -1102,7 +1102,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   // spheres
   for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
 
-    print("- Applying initial condition within a sphere (material id: %d).\n",
+    print("- Applying initial condition within a sphere (material id: %d).\n\n",
           it->second->initialConditions.materialid);
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     double dist;
@@ -1125,7 +1125,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   // spheroids 
   for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
 
-    print("- Applying initial condition within a spheroid (material id: %d).\n",
+    print("- Applying initial condition within a spheroid (material id: %d).\n\n",
           it->second->initialConditions.materialid);
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);

@@ -98,7 +98,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        Temperature(), L0(), Lbk(), Phi(), Level(), Tag(),
                        TemperatureNS(comm_, &(dm_all_.ghosted1_1dof))
 {
-  fprintf(stderr,"HELLO!\n");
+
   // Check input parameters
   CheckForInputErrors();
 
@@ -110,13 +110,6 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   SetupLoadBalancing(coordinates_, fluxFcn_, riemann_, x, y, z, dx, dy, dz);
   //-------------------------------------------------------------------------
 
-  if(!active_core)
-    return; //nothing needs to be done
-
-
-  coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
-  coordinates->GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
-  CalculateGlobalMeshInfo();
 
   // cut-off radiance (L must be positive inside the laser domain)
   lmin = iod.laser.lmin;
@@ -143,6 +136,15 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
     ReadUserSpecifiedPowerFile(iod.laser.source_power_timehistory_file);
 
 
+
+  if(!active_core)
+    return; //nothing needs to be done
+
+
+  coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  coordinates->GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+  CalculateGlobalMeshInfo();
+
   // Calculate distance from each node to source
   CalculateDistanceToSource(Phi); 
 
@@ -157,8 +159,6 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   // Find ghost nodes outside laser boundary (These include nodes inside and outside the physical domain!)
   SetupLaserGhostNodes();
   
-  fprintf(stderr,"DONE!\n");
-  exit_mpi();
 }
 
 //--------------------------------------------------------------------------
@@ -195,7 +195,6 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   Vec3D bbmin(0.0), bbmax(0.0);
   GeoTools::BoundingBoxOfCylinder(x0, r0, x1, r1, source.dir, bbmin, bbmax);
 
-  fprintf(stderr,"Here. bbmin = %e %e %e, bbmax = %e %e %e\n", bbmin[0], bbmin[1], bbmin[2], bbmax[0], bbmax[1], bbmax[2]);
 
   // -------------------------------------------------------------
   // Step 2. Define the sub-mesh
@@ -232,14 +231,14 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   if(lower>0)           {zminus = new double(z[lower-1]); dzminus = new double(dz[lower-1]);}
   if(upper<z.size()-1)  {zplus  = new double(z[upper+1]); dzplus  = new double(dz[upper+1]);}
   
+//  print("- Reduced computational domain (sub-mesh). X:[%e, %e], Y:[%e, %e], Z:[%e, %e].\n", xsub.front(), xsub.back(), 
+//        ysub.front(), ysub.back(), zsub.front(), zsub.back());
 
   // -------------------------------------------------------------
   // Step 3. Determine the processor cores used for laser computation
   // -------------------------------------------------------------
   int N = xsub.size()*ysub.size()*zsub.size();
-  int min_size_per_core = 500; //at least 100 cells per processor core
-  fprintf(stderr,"SET TO 500!!\n");
-  //TODO
+  int min_size_per_core = iod.laser.min_cells_per_core; 
 
   int ns_mpi_rank, ns_mpi_size;
   MPI_Comm_rank(nscomm, &ns_mpi_rank);
@@ -307,7 +306,7 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
     Tag.Setup(comm, &(dms->ghosted1_1dof));
     ID = new SpaceVariable3D(comm, &(dms->ghosted1_1dof));
     L  = new SpaceVariable3D(comm, &(dms->ghosted1_1dof));
-  } {
+  } else {
     ID = NULL;
     L  = NULL;
   }
@@ -318,7 +317,6 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   // -------------------------------------------------------------
   NS2Laser = new MeshMatcher(nscomm, &coordinates_, coordinates);
   Laser2NS = new MeshMatcher(nscomm, coordinates, &coordinates_);
-
 
 
   // free memory
@@ -350,6 +348,7 @@ LaserAbsorptionSolver::~LaserAbsorptionSolver()
   if(dms) delete dms;
   if(spo) delete spo;
 
+  //delete ID and L ONLY IF memory is allocated inside this class.
   if(iod.laser.parallel==LaserData::BALANCED && active_core) {
     delete ID;
     delete L;
@@ -1574,9 +1573,9 @@ LaserAbsorptionSolver::UpdateGhostNodes(double ***l, int custom_max_iter)
     if(iter == max_iter && verbose >= OutputData::HIGH)
       print(comm,"Warning: Ghost nodes in the laser solver didn't converge in %d iterations "
             "(err = %e, tol = %e).\n", iter, max_err, iod.laser.convergence_tol);
-    else if(verbose >= OutputData::HIGH)
-      print(comm,"  o Ghost nodes in the laser solver converged in %d iteration(s) "
-            "(err = %e, tol = %e).\n", iter+1, max_err, iod.laser.convergence_tol);
+//    else if(verbose >= OutputData::HIGH)
+//      print(comm,"  o Ghost nodes in the laser solver converged in %d iteration(s) "
+//            "(err = %e, tol = %e).\n", iter+1, max_err, iod.laser.convergence_tol);
   }
 
 }
@@ -1694,6 +1693,7 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D
   }
 
   PopulateRadianceOnNavierStokesMesh(L_);
+
 }
 
 //--------------------------------------------------------------------------
@@ -1720,15 +1720,31 @@ LaserAbsorptionSolver::PopulateLaserMesh(SpaceVariable3D &V_, SpaceVariable3D &I
           e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
           Tns[k][j][i] = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
         } 
+
     TemperatureNS.RestoreDataPointerAndInsert();
+    ID_.RestoreDataPointerToLocalVector();
+    V_.RestoreDataPointerToLocalVector();
+
 
     // Transfer to laser mesh
     NS2Laser->Transfer(&TemperatureNS, &Temperature);
     NS2Laser->Transfer(&ID_, ID);
     NS2Laser->Transfer(&L_, L);
 
-    ID_.RestoreDataPointerToLocalVector();
-    V_.RestoreDataPointerToLocalVector();
+/*
+    TemperatureNS.WriteToVTRFile("T1.vtr");
+    ID_.WriteToVTRFile("ID1.vtr");
+    L_.WriteToVTRFile("L1.vtr");
+    if(active_core) {
+      Temperature.StoreMeshCoordinates(*coordinates);
+      Temperature.WriteToVTRFile("T2.vtr");
+      ID->StoreMeshCoordinates(*coordinates);
+      ID->WriteToVTRFile("ID2.vtr");
+      L->StoreMeshCoordinates(*coordinates);
+      L->WriteToVTRFile("L2.vtr");
+    }
+*/
+
 
   } else { // same mesh used for Laser and N-S equations
 
@@ -2096,9 +2112,8 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceV
     Vec5D***  v  = V_ ? (Vec5D***)V_->GetDataPointer() : NULL;
     double*** Tns= TemperatureNS.GetDataPointer();
 
-
     int i0_ns(0), j0_ns(0), k0_ns(0), imax_ns(0), jmax_ns(0), kmax_ns(0);
-    TemperatureNS.GetGhostedCornerIndices(&i0_ns, &j0_ns, &k0_ns, &imax_ns, &jmax_ns, &kmax_ns);
+    TemperatureNS.GetCornerIndices(&i0_ns, &j0_ns, &k0_ns, &imax_ns, &jmax_ns, &kmax_ns);
 
     int myid;
     double e, myT, eta;
@@ -2118,7 +2133,6 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceV
           r[k][j][i][4] += eta*l[k][j][i];
         } 
    
-
     TemperatureNS.RestoreDataPointerToLocalVector();
     if(V_) V_->RestoreDataPointerToLocalVector();
     ID_.RestoreDataPointerToLocalVector();

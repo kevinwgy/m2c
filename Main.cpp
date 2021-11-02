@@ -139,7 +139,7 @@ int main(int argc, char* argv[])
 
     lso.back()->SetInitialCondition(*Phi.back());
 
-    print("- Initialized level set function (%d) for tracking the boundary of material %d.\n", 
+    print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           lso.size()-1, matid);
   }  
 

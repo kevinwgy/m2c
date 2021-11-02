@@ -1865,6 +1865,7 @@ LaserData::LaserData() {
   lmin = 1.0e-12;
 
   parallel = BALANCED;
+  min_cells_per_core = 100;
 
   source_depth = 0.0;
   alpha = 1.0;
@@ -1880,7 +1881,7 @@ LaserData::LaserData() {
 
 void LaserData::setup(const char *name, ClassAssigner *father) {
 
-  ClassAssigner *ca = new ClassAssigner(name, 23, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 24, father); 
 
   //Physical Parameters
   new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
@@ -1905,6 +1906,7 @@ void LaserData::setup(const char *name, ClassAssigner *father) {
   //Parallelization approach
   new ClassToken<LaserData> (ca, "Parallelization", this,
         reinterpret_cast<int LaserData::*>(&LaserData::parallel), 2, "Original", 0, "Balanced", 1);
+  new ClassInt<LaserData>(ca, "NumberOfCellsPerCore", this, &LaserData::min_cells_per_core);
 
   //Numerical Parameters
   new ClassDouble<LaserData>(ca, "SourceDepth", this, &LaserData::source_depth);
