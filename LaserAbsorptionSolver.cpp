@@ -98,6 +98,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        Temperature(), L0(), Lbk(), Phi(), Level(), Tag(),
                        TemperatureNS(comm_, &(dm_all_.ghosted1_1dof))
 {
+  fprintf(stderr,"HELLO!\n");
   // Check input parameters
   CheckForInputErrors();
 
@@ -156,6 +157,8 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   // Find ghost nodes outside laser boundary (These include nodes inside and outside the physical domain!)
   SetupLaserGhostNodes();
   
+  fprintf(stderr,"DONE!\n");
+  exit_mpi();
 }
 
 //--------------------------------------------------------------------------
@@ -192,6 +195,7 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   Vec3D bbmin(0.0), bbmax(0.0);
   GeoTools::BoundingBoxOfCylinder(x0, r0, x1, r1, source.dir, bbmin, bbmax);
 
+  fprintf(stderr,"Here. bbmin = %e %e %e, bbmax = %e %e %e\n", bbmin[0], bbmin[1], bbmin[2], bbmax[0], bbmax[1], bbmax[2]);
 
   // -------------------------------------------------------------
   // Step 2. Define the sub-mesh
@@ -205,35 +209,37 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   int upper = std::upper_bound(x.begin(), x.end(), bbmax[0]) - x.begin();
   lower = std::max(0, lower-3);
   upper = std::min((int)(x.size())-1, upper+3);
-  vector<double> xsub(x.begin()+lower, x.begin()+upper);
-  vector<double> dxsub(dx.begin()+lower, dx.begin()+upper);
-  if(lower>0)           {*xminus = x[lower-1]; *dxminus = dx[lower-1];}
-  if(upper<x.size()-1)  {*xplus  = x[upper+1]; *dxplus  = dx[upper+1];}
-
+  vector<double> xsub(x.begin()+lower, x.begin()+upper+1);
+  vector<double> dxsub(dx.begin()+lower, dx.begin()+upper+1);
+  if(lower>0)           {xminus = new double(x[lower-1]); dxminus = new double(dx[lower-1]);}
+  if(upper<x.size()-1)  {xplus  = new double(x[upper+1]); dxplus  = new double(dx[upper+1]);}
+  
   lower = std::lower_bound(y.begin(), y.end(), bbmin[1]) - y.begin();
   upper = std::upper_bound(y.begin(), y.end(), bbmax[1]) - y.begin();
   lower = std::max(0, lower-3);
   upper = std::min((int)(y.size())-1, upper+3);
-  vector<double> ysub(y.begin()+lower, y.begin()+upper);
-  vector<double> dysub(dy.begin()+lower, dy.begin()+upper);
-  if(lower>0)           {*yminus = y[lower-1]; *dyminus = dy[lower-1];}
-  if(upper<y.size()-1)  {*yplus  = y[upper+1]; *dyplus  = dy[upper+1];}
+  vector<double> ysub(y.begin()+lower, y.begin()+upper+1);
+  vector<double> dysub(dy.begin()+lower, dy.begin()+upper+1);
+  if(lower>0)           {yminus = new double(y[lower-1]); dyminus = new double(dy[lower-1]);}
+  if(upper<y.size()-1)  {yplus  = new double(y[upper+1]); dyplus  = new double(dy[upper+1]);}
 
   lower = std::lower_bound(z.begin(), z.end(), bbmin[2]) - z.begin();
   upper = std::upper_bound(z.begin(), z.end(), bbmax[2]) - z.begin();
   lower = std::max(0, lower-3);
   upper = std::min((int)(z.size()-1), upper+3);
-  vector<double> zsub(z.begin()+lower, z.begin()+upper);
-  vector<double> dzsub(dz.begin()+lower, dz.begin()+upper);
-  if(lower>0)           {*zminus = z[lower-1]; *dzminus = dz[lower-1];}
-  if(upper<z.size()-1)  {*zplus  = z[upper+1]; *dzplus  = dz[upper+1];}
+  vector<double> zsub(z.begin()+lower, z.begin()+upper+1);
+  vector<double> dzsub(dz.begin()+lower, dz.begin()+upper+1);
+  if(lower>0)           {zminus = new double(z[lower-1]); dzminus = new double(dz[lower-1]);}
+  if(upper<z.size()-1)  {zplus  = new double(z[upper+1]); dzplus  = new double(dz[upper+1]);}
   
 
   // -------------------------------------------------------------
   // Step 3. Determine the processor cores used for laser computation
   // -------------------------------------------------------------
   int N = xsub.size()*ysub.size()*zsub.size();
-  int min_size_per_core = 100; //at least 100 cells per processor core
+  int min_size_per_core = 500; //at least 100 cells per processor core
+  fprintf(stderr,"SET TO 500!!\n");
+  //TODO
 
   int ns_mpi_rank, ns_mpi_size;
   MPI_Comm_rank(nscomm, &ns_mpi_rank);
@@ -263,6 +269,7 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
     mpi_rank = -1;
     mpi_size = -1;
   }
+
 
   // -------------------------------------------------------------
   // Step 4. Partition the sub-mesh
@@ -305,11 +312,28 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
     L  = NULL;
   }
 
+
   // -------------------------------------------------------------
   // Step 6. Setup Mesh matcher
   // -------------------------------------------------------------
   NS2Laser = new MeshMatcher(nscomm, &coordinates_, coordinates);
   Laser2NS = new MeshMatcher(nscomm, coordinates, &coordinates_);
+
+
+
+  // free memory
+  if(xminus) delete xminus;    
+  if(xplus) delete xplus;
+  if(yminus) delete yminus;    
+  if(yplus) delete yplus;
+  if(zminus) delete zminus;    
+  if(zplus) delete zplus;
+  if(dxminus) delete dxminus;    
+  if(dxplus) delete dxplus;
+  if(dyminus) delete dyminus;    
+  if(dyplus) delete dyplus;
+  if(dzminus) delete dzminus;    
+  if(dzplus) delete dzplus;
 
 }
 

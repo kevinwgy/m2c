@@ -22,7 +22,8 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
                              vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
                              ExactRiemannSolverBase &riemann_,
                              vector<double> &x, vector<double> &y, vector<double> &z,
-                             vector<double> &dx, vector<double> &dy, vector<double> &dz) 
+                             vector<double> &dx, vector<double> &dy, vector<double> &dz,
+                             bool screenout) 
   : comm(comm_), dm_all(dm_all_),
     iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
@@ -44,7 +45,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
 
   SetupMesh(x,y,z,dx,dy,dz);
 
-  CreateGhostNodeLists(); //create ghost_nodes_inner and ghost_nodes_outer
+  CreateGhostNodeLists(screenout); //create ghost_nodes_inner and ghost_nodes_outer
 
   rec.Setup(&ghost_nodes_inner, &ghost_nodes_outer); //this function requires mesh info (dxyz)
   
@@ -389,14 +390,14 @@ void SpaceOperator::ResetGhostLayer(double* xminus, double* xplus, double* yminu
   volume.RestoreDataPointerAndInsert();
 
 
-  CreateGhostNodeLists(); //create ghost_nodes_inner and ghost_nodes_outer
+  CreateGhostNodeLists(false); //create ghost_nodes_inner and ghost_nodes_outer
 
 }
 
 
 //-----------------------------------------------------
 
-void SpaceOperator::CreateGhostNodeLists()
+void SpaceOperator::CreateGhostNodeLists(bool screenout)
 {
   ghost_nodes_inner.clear();
   ghost_nodes_outer.clear();
@@ -481,12 +482,13 @@ void SpaceOperator::CreateGhostNodeLists()
   int nOuter = ghost_nodes_outer.size();
   MPI_Allreduce(MPI_IN_PLACE, &nInner, 1, MPI_INT, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &nOuter, 1, MPI_INT, MPI_SUM, comm);
-  print("- Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
-        nInner);
-  print("- Number of ghost nodes outside computational domain: %d\n",
-        nOuter);
-  print("\n");
-
+  if(screenout) {
+    print(comm,"- Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
+          nInner);
+    print(comm,"- Number of ghost nodes outside computational domain: %d\n",
+          nOuter);
+    print(comm,"\n");
+  }
 
 /*
   for(int i=0; i<ghost_nodes_outer.size(); i++)

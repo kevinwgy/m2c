@@ -13,15 +13,15 @@ public:
   //! Note: To avoid ambiguities, ghosted means DM_BOUNDARY_GHOSTED. We do NOT use DM_BOUNDARY_MIRROR, 
   //!       _PERIODIC, _TWISTED, ... Also, we always use DMDA_STENCIL_BOX for "stencil type"
   //
-  static DM ghosted1_1dof; //!< ghosted"1" --> stencil width is 1 
-  static DM ghosted1_2dof;  
-  static DM ghosted1_3dof;  
-  static DM ghosted1_4dof;  
-  static DM ghosted1_5dof;  
-  static DM ghosted1_6dof;  
+  DM ghosted1_1dof; //!< ghosted"1" --> stencil width is 1 
+  DM ghosted1_2dof;  
+  DM ghosted1_3dof;  
+  DM ghosted1_4dof;  
+  DM ghosted1_5dof;  
+  DM ghosted1_6dof;  
 
-  static DM ghosted2_1dof;
-  static DM ghosted2_3dof;
+  DM ghosted2_1dof;
+  DM ghosted2_3dof;
 
 public:
   DataManagers3D();

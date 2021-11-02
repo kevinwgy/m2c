@@ -6,6 +6,7 @@
 // DataManagers3D
 //---------------------------------------------------------
 // static member variables
+/*
 DM DataManagers3D::ghosted1_1dof; //ghosted"1" --> stencil width is 1
 DM DataManagers3D::ghosted1_2dof;
 DM DataManagers3D::ghosted1_3dof;
@@ -15,7 +16,7 @@ DM DataManagers3D::ghosted1_6dof;
 
 DM DataManagers3D::ghosted2_1dof;
 DM DataManagers3D::ghosted2_3dof;
-
+*/
 //---------------------------------------------------------
 
 DataManagers3D::DataManagers3D()
@@ -226,6 +227,7 @@ double*** SpaceVariable3D::GetDataPointer()
 {
   if(!dm) return NULL;
 
+  int grank; MPI_Comm_rank(MPI_COMM_WORLD, &grank);
   auto ierr = DMDAVecGetArray(*dm, localVec, &array);
   //CHKERRQ(ierr);
   return array;

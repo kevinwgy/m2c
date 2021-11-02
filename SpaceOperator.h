@@ -58,7 +58,8 @@ public:
                 vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
                 ExactRiemannSolverBase &riemann_,
                 vector<double> &x, vector<double> &y, vector<double> &z,
-                vector<double> &dx, vector<double> &dy, vector<double> &dz); 
+                vector<double> &dx, vector<double> &dy, vector<double> &dz,
+                bool screenout = true); 
   ~SpaceOperator();
 
   //! Reset the coords of ghost layer nodes  (a NULL pointer means that value does not need to be reset)
@@ -107,7 +108,7 @@ private:
   void SetupMeshUniformRectangularDomain();
   void PopulateGhostBoundaryCoordinates();
 
-  void CreateGhostNodeLists();
+  void CreateGhostNodeLists(bool screenout);
 
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
 
