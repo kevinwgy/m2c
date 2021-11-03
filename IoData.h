@@ -733,7 +733,6 @@ struct LaserData {
   double convergence_tol;
   double max_iter;
   double relax_coeff;
-  int oneWay;
 
   LaserData();
   ~LaserData() {}

@@ -1869,10 +1869,9 @@ LaserData::LaserData() {
 
   source_depth = 0.0;
   alpha = 1.0;
-  convergence_tol = 1.0e-4;
-  max_iter = 100;
+  convergence_tol = 1.0e-5;
+  max_iter = 400;
   relax_coeff = 1.0;
-  oneWay = 0;
 
 }
 
@@ -1881,7 +1880,7 @@ LaserData::LaserData() {
 
 void LaserData::setup(const char *name, ClassAssigner *father) {
 
-  ClassAssigner *ca = new ClassAssigner(name, 24, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 23, father); 
 
   //Physical Parameters
   new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
@@ -1914,7 +1913,6 @@ void LaserData::setup(const char *name, ClassAssigner *father) {
   new ClassDouble<LaserData>(ca, "ConvergenceTolerance", this, &LaserData::convergence_tol);
   new ClassDouble<LaserData>(ca, "MaxIts", this, &LaserData::max_iter);
   new ClassDouble<LaserData>(ca, "RelaxationCoefficient", this, &LaserData::relax_coeff);
-  new ClassInt<LaserData>(ca, "OneWayCoupling", this, &LaserData::oneWay);
 
 }
 
