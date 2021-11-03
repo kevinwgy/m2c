@@ -1333,7 +1333,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
       // 2. everyone (including proc itself) calculates the shortest distance from any real node to each problematmic node
       vector<Int3> nearest_node(local_size, INT_MAX);
-      vector<double> shortest_dist(local_size, INT_MAX);
+      vector<double> shortest_dist(local_size, DBL_MAX);
       vector<int> owner(local_size, INT_MAX);
       for(auto it0 = sortedNodes.begin(); it0 != sortedNodes.end(); it0++) {
         int i(it0->i), j(it0->j), k(it0->k);
@@ -1397,7 +1397,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
             ebm.ghostNodes2_sender.push_back(owner_rank);
             ebm.ghostNodes2.back().push_back(ghost_tmp[prob_nodes[n]]);
           } else {
-            ebm.ghostNodes2[*iter].push_back(ghost_tmp[prob_nodes[n]]); 
+            ebm.ghostNodes2[iter - ebm.ghostNodes2_sender.begin()].push_back(ghost_tmp[prob_nodes[n]]); 
           }
         }
 
@@ -1473,7 +1473,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
     counter++;
   }
-  assert(counter == ordered.size() - far_nodes.size());
+  assert(counter == ordered.size()-far_nodes.size()-prob_nodes.size()+prob_nodes_owned_by_myself.size());
 
 
   // Allocate space for storing laser radiance at ghost nodes
