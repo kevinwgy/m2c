@@ -231,8 +231,8 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   if(lower>0)           {zminus = new double(z[lower-1]); dzminus = new double(dz[lower-1]);}
   if(upper<z.size()-1)  {zplus  = new double(z[upper+1]); dzplus  = new double(dz[upper+1]);}
   
-//  print("- Reduced computational domain (sub-mesh). X:[%e, %e], Y:[%e, %e], Z:[%e, %e].\n", xsub.front(), xsub.back(), 
-//        ysub.front(), ysub.back(), zsub.front(), zsub.back());
+  print("- Laser domain (cell centers): X:[%e, %e], Y:[%e, %e], Z:[%e, %e].\n", xsub.front(), xsub.back(), 
+        ysub.front(), ysub.back(), zsub.front(), zsub.back());
 
   // -------------------------------------------------------------
   // Step 3. Determine the processor cores used for laser computation
@@ -1053,7 +1053,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   // (2.1) if it is next to a symmetry boundary (i.e. should be populated by mirroring) ---> status  = -1
   //       if it is "downstream" (i.e. should be populated by linear extrap.) --> report error!
   //
-  // (status = -99 and -98) reserved for special cases (see below).
+  // (status = -99, -98, -97) reserved for special cases (see below).
   //
   // Note: Althought status 1 and 2 are tracked here. In the embedded boundary method for laser absorption,
   //       we don't really need to deal with these two cases, as long as (1) the scheme is strictly upwinding
@@ -1159,7 +1159,10 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   }
   Level.RestoreDataPointerToLocalVector();
 
+
+  //-------------------------------------------------------------------------
   // Now, work on the "far" nodes (image is inside another subdomain)
+  //-------------------------------------------------------------------------
   int total_far_nodes = far_nodes.size();
   MPI_Allreduce(MPI_IN_PLACE, &total_far_nodes, 1, MPI_INT, MPI_SUM, comm);
   if(total_far_nodes>0) {
@@ -1294,46 +1297,137 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 */
 
 
-  // Now, work on the problematic nodes (KW believes this should rarely happen, and if it does, it must
-  // be a 2D (or 2D-cylindrical) simulation. 
-  // We only try to find the closest valid point within the SAME subdomain, instead of doing another round of MPI
-  // communications like what we did for "far_nodes". This means we may get slightly different results when running
-  // the same case using different mesh partitions --- but the difference should be minimal.
-  if(prob_nodes.size()>0) {
 
-    vector<pair<Int3,double> > closest(prob_nodes.size(), std::make_pair(Int3(0), DBL_MAX));
-    for(auto it0 = sortedNodes.begin(); it0 != sortedNodes.end(); it0++) {
-      int i(it0->i), j(it0->j), k(it0->k);
-      for(int n=0; n<prob_nodes.size(); n++) {
-        double dist = (image[prob_nodes[n]] - coords[k][j][i]).norm();
-        if(dist < closest[n].second) {
-          closest[n].second = dist;
-          closest[n].first = Int3(i,j,k);
-        } 
-      }
-    }
-    double*** phi = Phi.GetDataPointer();
-    for(int p=0; p<prob_nodes.size(); p++) {
-      int n = prob_nodes[p];
-      if(closest[p].second == DBL_MAX) {
-        fprintf(stderr,"*** Error: [%d] Cannot find a valid image for ghost node (%d,%d,%d)(%e,%e,%e). "
-                       "Original image: (%e,%e,%e).\n", mpi_rank, ghost_tmp[n][0], ghost_tmp[n][1], ghost_tmp[n][2],
-                       coords[ghost_tmp[n][2]][ghost_tmp[n][1]][ghost_tmp[n][0]][0],
-                       coords[ghost_tmp[n][2]][ghost_tmp[n][1]][ghost_tmp[n][0]][1],
-                       coords[ghost_tmp[n][2]][ghost_tmp[n][1]][ghost_tmp[n][0]][2],
-                       image[n][0], image[n][1], image[n][2]);
-        exit(-1);
-      }
-      image_ijk[n] = closest[p].first;
-      image_xi[n]  = Vec3D(0,0,0);
+  //-------------------------------------------------------------------------
+  // Now, work on the problematic nodes (ghost nodes whose image is outside 
+  // the physical domain defined by cell-centers)
+  //-------------------------------------------------------------------------
+  int total_prob_nodes = prob_nodes.size();
+  MPI_Allreduce(MPI_IN_PLACE, &total_prob_nodes, 1, MPI_INT, MPI_SUM, comm);
+  std::map<int, Int3> prob_nodes_owned_by_myself;
+  if(total_prob_nodes>0) {
+    for(int proc=0; proc<mpi_size; proc++) {
 
-/*
-      fprintf(stderr,"[%d] Prob node (%d %d %d), image(%e,%e,%e), closest (%d %d %d).\n", mpi_rank, ghost_tmp[n][0], 
-              ghost_tmp[n][1], ghost_tmp[n][2], image[n][0], image[n][1], image[n][2], image_ijk[n][0], image_ijk[n][1],
-              image_ijk[n][2]);
-*/
-    }
-    Phi.RestoreDataPointerToLocalVector();
+      // 1. proc sends far nodes (ijk) and their images (coords) to everyone else
+      int local_size = 0;
+      if(mpi_rank == proc)
+        local_size = prob_nodes.size();
+      MPI_Bcast(&local_size, 1, MPI_INT, proc, comm);
+
+      if(local_size == 0) //proc does not have problematic nodes
+        continue;
+
+
+      int*    nod = new int[3*local_size];
+      double* img = new double[3*local_size];
+      if(mpi_rank == proc)
+        for(int i = 0; i < prob_nodes.size(); i++) {
+          int n = prob_nodes[i];
+          for(int j = 0; j < 3; j++) {
+            nod[3*i+j] = ghost_tmp[n][j];
+            img[3*i+j] = image[n][j];
+          }
+        }
+      MPI_Bcast(nod, 3*local_size, MPI_INT, proc, comm);
+      MPI_Bcast(img, 3*local_size, MPI_DOUBLE, proc, comm);
+
+      // 2. everyone (including proc itself) calculates the shortest distance from any real node to each problematmic node
+      vector<Int3> nearest_node(local_size, INT_MAX);
+      vector<double> shortest_dist(local_size, INT_MAX);
+      vector<int> owner(local_size, INT_MAX);
+      for(auto it0 = sortedNodes.begin(); it0 != sortedNodes.end(); it0++) {
+        int i(it0->i), j(it0->j), k(it0->k);
+        Vec3D& x(coords[k][j][i]);
+        for(int n=0; n<local_size; n++) {
+          Vec3D x1(img[3*n],img[3*n+1],img[3*n+2]);
+          double dist = (x1-x).norm();
+          if(dist<shortest_dist[n]) {
+            shortest_dist[n] = dist;
+            nearest_node[n] = Int3(i,j,k);
+            owner[n] = mpi_rank;
+          }
+        }
+      }
+
+      if(mpi_rank != proc) {//send to proc
+
+        MPI_Send(shortest_dist.data(), shortest_dist.size(), MPI_DOUBLE, proc, mpi_rank, comm);
+
+      } else { // receive and process the data
+
+        for(int sender = 0; sender < mpi_size; sender++) {
+          if(sender == proc) //myself...
+            continue; 
+
+          vector<double> buffer(local_size, 0.0);
+          MPI_Recv(buffer.data(), buffer.size(), MPI_DOUBLE, sender, sender, comm, MPI_STATUS_IGNORE);
+          
+          for(int n=0; n<local_size; n++)
+            if(buffer[n] < shortest_dist[n]) {
+              shortest_dist[n] = buffer[n];
+              owner[n] = sender; 
+            }
+        }
+
+        // check that every problematic node has an owner.
+        for(int n=0; n<local_size; n++)
+          assert(owner[n]<mpi_size); //verify that it is not INT_MAX
+      }
+
+
+      // tells everyone about the owner of each problematic node on "proc"
+      MPI_Bcast(owner.data(), owner.size(), MPI_INT, proc, comm); 
+
+      // insert relevant nodes into ghostNodes2 (proc) or friendsGhostNodes (others)
+      if(mpi_rank == proc) { 
+
+        for(int n=0; n<local_size; n++) {
+
+          int owner_rank = owner[n];
+
+          if(owner_rank == proc) { //will be added to ghostNodes1
+            prob_nodes_owned_by_myself[prob_nodes[n]] = nearest_node[n];
+            status[prob_nodes[n]] = -97;
+            continue;
+          }
+
+          auto iter = std::find(ebm.ghostNodes2_sender.begin(), ebm.ghostNodes2_sender.end(), owner_rank);
+          if(iter == ebm.ghostNodes2_sender.end()) {
+            ebm.ghostNodes2.push_back(vector<Int3>());
+            ebm.ghostNodes2_sender.push_back(owner_rank);
+            ebm.ghostNodes2.back().push_back(ghost_tmp[prob_nodes[n]]);
+          } else {
+            ebm.ghostNodes2[*iter].push_back(ghost_tmp[prob_nodes[n]]); 
+          }
+        }
+
+      } else {
+
+        for(int n=0; n<local_size; n++) {
+          if(owner[n] == mpi_rank) {
+
+            int id;
+            auto iter = std::find(ebm.friendsGhostNodes_receiver.begin(), ebm.friendsGhostNodes_receiver.end(), proc);
+            if(iter == ebm.friendsGhostNodes_receiver.end()) {
+              ebm.friendsGhostNodes.push_back(vector<std::pair<Int3, EmbeddedBoundaryFormula> >() );
+              ebm.friendsGhostNodes_receiver.push_back(proc);
+              id = ebm.friendsGhostNodes.size() - 1;
+            } else 
+              id = iter - ebm.friendsGhostNodes_receiver.begin();
+
+            Int3 nod_int3(nod[3*n],nod[3*n+1],nod[3*n+2]);
+            ebm.friendsGhostNodes[id].push_back(std::make_pair(nod_int3, EmbeddedBoundaryFormula(eps)));
+            vector<Int3> node(1, nearest_node[n]);
+            vector<double> coeff(1, 1.0);
+            ebm.friendsGhostNodes[id].back().second.SpecifyFormula(EmbeddedBoundaryFormula::MIRRORING, 
+                                                        EmbeddedBoundaryFormula::NODE, node, coeff);
+          }
+        }
+      }
+
+      delete [] nod;
+      delete [] img;
+    } 
 
   }
 
@@ -1352,17 +1446,25 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   //----------------------------------------------------------------
   // Step 5: Figure out formula for ghost node update
   //----------------------------------------------------------------
-  ebm.ghostNodes1.resize(ordered.size() - far_nodes.size(), std::make_pair(Int3(0), EmbeddedBoundaryFormula(eps)));
+  ebm.ghostNodes1.resize(ordered.size()-far_nodes.size()-prob_nodes.size()+prob_nodes_owned_by_myself.size(), 
+                         std::make_pair(Int3(0), EmbeddedBoundaryFormula(eps)));
   int counter = 0;
   for(int o = 0; o < ordered.size(); o++) {
     int n = ordered[o]; 
 
-    if(status[n] == -98) //added to ghostNodes2 already
+    if(status[n] == -98 || status[n] == -99) //added to ghostNodes2 already
       continue;
 
     ebm.ghostNodes1[counter].first = ghost_tmp[n];
-    if(status[n] == -1 || status[n] == -99) {
-      vector<Int3> node(1,image_ijk[n]);
+    if(status[n] == -1) {
+      vector<Int3> node(1, image_ijk[n]);
+      vector<double> coeff(1,1.0);
+      ebm.ghostNodes1[counter].second.SpecifyFormula(EmbeddedBoundaryFormula::MIRRORING, 
+                                                     EmbeddedBoundaryFormula::NODE, node, coeff);
+    } else if(status[n] == -97) { //prob node whose closest point is owned by itself
+      auto iter = prob_nodes_owned_by_myself.find(n);
+      assert(iter != prob_nodes_owned_by_myself.end());
+      vector<Int3> node(1, iter->second);
       vector<double> coeff(1,1.0);
       ebm.ghostNodes1[counter].second.SpecifyFormula(EmbeddedBoundaryFormula::MIRRORING, 
                                                      EmbeddedBoundaryFormula::NODE, node, coeff);
