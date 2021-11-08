@@ -247,12 +247,6 @@ int main(int argc, char* argv[])
     //----------------------------------------------------
 
 
-/*
-    if(time_step>19800 && time_step<20038 && time_step % 2 == 0)
-      out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true);
-*/
-
-
     out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, false/*force_write*/);
 
   }

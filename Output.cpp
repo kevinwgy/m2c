@@ -346,6 +346,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
   // clean up
   PetscViewerDestroy(&viewer);
   V.RestoreDataPointerToLocalVector(); //no changes made to V.
+  ID.RestoreDataPointerToLocalVector();
 
   // bookkeeping
   iFrame++;

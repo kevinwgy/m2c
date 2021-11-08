@@ -2130,7 +2130,6 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
                                         SpaceVariable3D &ID)
 {
 
-  Vec5D*** v  = (Vec5D***) V.GetDataPointer();
   Vec5D*** vl = (Vec5D***) Vl.GetDataPointer();
   Vec5D*** vr = (Vec5D***) Vr.GetDataPointer();
   Vec5D*** vb = (Vec5D***) Vb.GetDataPointer();
@@ -2196,7 +2195,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 
         if(error) {
           fprintf(stderr, "\033[0;31m*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\033[0m\n", i,j,k, myid);
-          fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+          //fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
           fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
           fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
           fprintf(stderr, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);

@@ -159,6 +159,9 @@ MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariabl
     Tag.RestoreDataPointerAndInsert();
   else
     Tag.RestoreDataPointerToLocalVector();
+
+  ID.RestoreDataPointerAndInsert();
+
 }
 
 //-----------------------------------------------------
