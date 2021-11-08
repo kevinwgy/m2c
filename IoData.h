@@ -207,7 +207,14 @@ struct StiffenedGasModelData {
   //! parameters related to temperature
   double cv; //!< specific heat at constant volume
   double T0;  //!< temperature is T0 when internal energy (per mass) is e0
-  double e0;
+  double e0;  //!< internal energy per specific mass at T0
+
+  double cp; //!< specific heat at constant pressure
+  double h0; //!< enthalpy per specific mass at T0
+  //NOTE: For stiffened (non-perfect) gas, calculating temperature using (cv, T0, e0) is NOT
+  //      equivalent to using (cp, T0, h0). See KW's note. By default, cv is used. But if cv
+  //      is 0 while cp>0, cp will be used.
+ 
 
   StiffenedGasModelData();
   ~StiffenedGasModelData() {}

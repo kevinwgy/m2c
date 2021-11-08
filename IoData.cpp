@@ -437,6 +437,9 @@ StiffenedGasModelData::StiffenedGasModelData()
   T0 = 0.0;
   e0 = 0.0;
 
+  cp = 0.0;
+  h0 = 0.0;
+
 }
 
 //------------------------------------------------------------------------------
@@ -444,7 +447,7 @@ StiffenedGasModelData::StiffenedGasModelData()
 void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatRatio", this,
                                 &StiffenedGasModelData::specificHeatRatio);
@@ -458,6 +461,10 @@ void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<StiffenedGasModelData>(ca, "ReferenceSpecificInternalEnergy", this,
                                 &StiffenedGasModelData::e0);
 
+  new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatAtConstantPressure", this,
+                                &StiffenedGasModelData::cp);
+  new ClassDouble<StiffenedGasModelData>(ca, "ReferenceSpecificEnthalpy", this,
+                                &StiffenedGasModelData::h0);
 }
 
 //------------------------------------------------------------------------------
