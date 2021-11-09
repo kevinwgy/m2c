@@ -87,6 +87,11 @@ public:
     print_error("*** Error:  GetInternalEnergyPerUnitMassFromTemperature Function not defined\n");
     exit(-1); return 0.0;}
 
+  //! calculate e from rho and h
+  virtual double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const{
+    print_error("*** Error:  GetInternalEnergyPerUnitMassFromEnthalpy Function not defined\n");
+    exit(-1); return 0.0;}
+
   //checks that the Euler equations are still hyperbolic
   virtual bool CheckState(double rho, double p) const{
     if(m2c_isnan(rho) || m2c_isnan(p)) {

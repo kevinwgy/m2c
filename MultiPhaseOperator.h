@@ -38,6 +38,9 @@ class MultiPhaseOperator
   //! phase transition 
   vector<vector<PhaseTransitionBase*> > trans;  //!< trans[i] contains all possible destinations of phase i
 
+  //! latent heat reservoir (for modeling phase transition)
+  SpaceVariable3D Lambda;
+
 public:
   MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                      vector<VarFcnBase*> &varFcn_, SpaceOperator &spo, vector<LevelSetOperator*> &lso);

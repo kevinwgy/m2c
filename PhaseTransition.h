@@ -3,6 +3,7 @@
 
 #include <VarFcnBase.h>
 #include <IoData.h>
+#include <cassert>
 
 /****************************************************************************
  * Classes defined in this file are responsible for determining whether 
@@ -29,7 +30,7 @@ public:
 
   double pmin, pmax, Tmin, Tmax;
   double latent_heat;
-  double emax, emin; //internal energy that would trigger phase transition
+  //double emax, emin; //internal energy that would trigger phase transition
 
   PhaseTransitionBase(MaterialTransitionData &data, VarFcnBase &vf1_, VarFcnBase &vf2_) 
      : fromID(data.from_id), toID(data.to_id),
@@ -40,23 +41,61 @@ public:
   {
     type = BASE; //no other choices at the moment
 
-    emax = vf1.GetInternalEnergyPerUnitMassFromTemperature(0.0, Tmax) + latent_heat;
-    emin = vf1.GetInternalEnergyPerUnitMassFromTemperature(0.0, Tmin) - latent_heat;
+//    emax = vf1.GetInternalEnergyPerUnitMassFromTemperature(0.0, Tmax) + latent_heat;
+//    emin = vf1.GetInternalEnergyPerUnitMassFromTemperature(0.0, Tmin) - latent_heat;
   }
 
   virtual ~PhaseTransitionBase() {}
 
-  virtual bool Transition(double *v) {
+  virtual bool Transition(double *v, double &lambda) {
 
     // check temperature
     double e = vf1.GetInternalEnergyPerUnitMass(v[0], v[4]);
-    if(e<=emin || e>emax)
-      return true;
+    double T = vf1.GetTemperature(v[0], e);
 
-    // check pressure
-    // TODO
+    if(T<=Tmax) { //no phase transition, but if lambda (latent heat reservoir) is non-zero, should pour it 
+                  //back to raise temperature
+      if(lambda>0) {
+        double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax); 
+        assert(e_vap >= e);
+        double de = e_vap - e;
+
+        double dlam = std::min(de, lambda);
+
+        lambda -= dlam;
+        e      += dlam;
+
+        v[4] = vf1.GetPressure(v[0], e);
+      }
+
+      return false;
+
+    } else { // excessive heat should go to lambda. Then, check if latent heat is reached
+
+      double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax);
+      assert(e_vap < e); 
+      double de = e - e_vap;
+
+      lambda += de;
+      e      -= de; //= e_vap
+
+      v[4] = vf1.GetPressure(v[0], e);
+
+      if(lambda >= latent_heat) {//DETECTED PHASE TRANSITION
+
+        double h = e + v[4]/v[0]; //enthalpy before phase transition (using vf1)
+        h += lambda; //enthalpy after phase transition
+        e = vf2.GetInternalEnergyPerUnitMassFromEnthalpy(v[0], h); //rho is always fixed
+        v[4] = vf2.GetPressure(v[0], e);
+        return true;
+
+      } else
+        return false;
+
+    }
+
+    // TODO: may also check pressure in future
     
-    return false;
   }
 
 };

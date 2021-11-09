@@ -27,7 +27,8 @@ private:
   double gam;
   double Pstiff;
 
-  double gam1; //!< gamma-1
+  double invgam;  //!< 1/gamma
+  double gam1;    //!< gamma-1
   double invgam1; //!< 1/(gamma-1)
 
   double cv; //!< specific heat at constant volume
@@ -61,14 +62,16 @@ public:
 
   inline double GetReferenceTemperature() const {return T0;}
 
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double e, double T) const {
-    if(use_cp) {
-      double p = GetPressure(rho, e);
-      return h0 + cp*(T-T0) - p/rho;
-    } else
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {
+    if(use_cp) 
+      return invgam*(h0 + cp*(T-T0)) + Pstiff/rho;
+    else
       return e0 + cv*(T-T0);
   }
   
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return invgam*h+Pstiff/rho;}
+
+
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + Pstiff < 0 (Not p + gamma*Pstiff). 
   inline bool CheckState(double rho, double p) const{
     if(m2c_isnan(rho) || m2c_isnan(p)) {
@@ -98,6 +101,7 @@ VarFcnSG::VarFcnSG(MaterialModelData &data) : VarFcnBase(data) {
   type = STIFFENED_GAS;
 
   gam = data.sgModel.specificHeatRatio;
+  invgam = (gam==0.0) ? 0.0 : 1.0/gam;
   gam1 = gam -1.0;
   invgam1 = 1.0/gam1;
   Pstiff = data.sgModel.pressureConstant;

@@ -18,7 +18,8 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                   : comm(comm_), iod(iod_), varFcn(varFcn_),
                     coordinates(spo.GetMeshCoordinates()),
                     delta_xyz(spo.GetMeshDeltaXYZ()),
-                    Tag(comm_, &(dm_all_.ghosted1_1dof))
+                    Tag(comm_, &(dm_all_.ghosted1_1dof)),
+                    Lambda(comm_, &(dm_all_.ghosted1_1dof))
 {
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -101,6 +102,8 @@ void
 MultiPhaseOperator::Destroy()
 {
   Tag.Destroy();
+
+  Lambda.Destroy();
 
   for(int i=0; i<trans.size(); i++)
     for(auto it = trans[i].begin(); it != trans[i].end(); it++)
@@ -630,6 +633,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   //---------------------------------------------
   double*** id  = ID.GetDataPointer();
   Vec5D***  v   = (Vec5D***) V.GetDataPointer();
+  double*** lam = Lambda.GetDataPointer();
 
   int counter = 0;
   vector<tuple<Int3,int,int> >  changed; //(i,j,k), old id, new id -- incl. ghosts inside physical domain
@@ -663,13 +667,23 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
+
         myid = (int)id[k][j][i];
         // skip nodes outside the physical domain
         if(coordinates.OutsidePhysicalDomain(i,j,k))
           continue;
 
         for(auto it = trans[myid].begin(); it != trans[myid].end(); it++) {
-          if((*it)->Transition(v[k][j][i])) { //detected phase transition
+
+          //for debug only
+          double rho0 = v[k][j][i][0];
+          double p0 = v[k][j][i][4]; 
+          double e0 = varFcn[myid]->GetInternalEnergyPerUnitMass(rho0, p0);
+          double T0 = varFcn[myid]->GetTemperature(rho0, e0);
+
+          if((*it)->Transition(v[k][j][i], lam[k][j][i])) { //NOTE: v[k][j][i][4] (p) and lam may be modified even if the 
+                                                            //      return value is FALSE
+            //detected phase transition
 
             // register the node
             changed.push_back(std::make_tuple(Int3(i,j,k), myid, (*it)->toID));
@@ -682,11 +696,13 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             id[k][j][i] = (*it)->toID;
 
             // ------------------------------------------------------------------------
-            // update p (rho and e fixed)
-            double e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-            fprintf(stderr,"Detected phase transition at (%d,%d,%d)(%d->%d). p: %e -> %e.\n", i,j,k, myid, (*it)->toID,
-                    v[k][j][i][4], varFcn[(*it)->toID]->GetPressure(v[k][j][i][0], e));
-            v[k][j][i][4] = varFcn[(*it)->toID]->GetPressure(v[k][j][i][0], e);
+            // print to screen (for debug only)
+            double rho1 = v[k][j][i][0];
+            double p1 = v[k][j][i][4];
+            double e1 = varFcn[(*it)->toID]->GetInternalEnergyPerUnitMass(rho1, p1);
+            double T1 = varFcn[(*it)->toID]->GetTemperature(rho1, e1);
+            fprintf(stderr,"Detected phase transition at (%d,%d,%d)(%d->%d). rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
+                    i,j,k, myid, (*it)->toID, rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
             // ------------------------------------------------------------------------
 
             counter++;
@@ -696,6 +712,8 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
       }
 
   MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
+
+  Lambda.RestoreDataPointerAndInsert();
 
   if(counter>0) {
     ID.RestoreDataPointerAndInsert();
