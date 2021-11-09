@@ -38,6 +38,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
                                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L,
                                           double time, double dt, int time_step)
 {
+
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   spo.ComputeResidual(V, ID, Rn, &riemann_solutions); // compute Rn
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);

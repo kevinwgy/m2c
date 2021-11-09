@@ -1552,7 +1552,8 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
       else {//focusing or diverging
         Vec3D O2p = coords[k][j][i] - source.O;
         double theta = acos(fabs(O2p*source.dir)/O2p.norm());
-        ratio = theta/fabs(source.angle);
+        ratio = theta*O2p.norm()/beamwaist;
+        //ratio = theta/fabs(source.angle);
       }
 
       l[k][j][i] = (2.0*power/(PI*beamwaist*beamwaist))*exp(-2.0*ratio*ratio);

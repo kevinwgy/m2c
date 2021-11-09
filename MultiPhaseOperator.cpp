@@ -646,16 +646,20 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
-        if(coords[k][j][i].norm()<0.1) {
-          fprintf(stderr,"Changing state at (%d,%d,%d) (%e, %e, %e).\n", i,j,k, 
-                  coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2]);
-          v[k][j][i][0] = 8.9e-4;
-          v[k][j][i][4] = 1.2e10;
+        if(coords[k][j][i].norm()<0.05) {
+          //v[k][j][i][0] = 8.9e-4;
+          //v[k][j][i][4] = 1.2e10;
           int myid = id[k][j][i]; 
-          double e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          double T = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
-          double h = varFcn[myid]->ComputeEnthalpyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          fprintf(stderr," ...  e = %e, h = %e, T = %e.\n", e, h, T);
+          double p0 = v[k][j][i][4];
+          double e0 = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], p0);
+          double T0 = varFcn[myid]->GetTemperature(v[k][j][i][0], e0);
+          double T  = T0 + 0.4;
+          double e  = varFcn[myid]->GetInternalEnergyPerUnitMassFromTemperature(v[k][j][i][0], T);
+          double p  = varFcn[myid]->GetPressure(v[k][j][i][0], e);
+          v[k][j][i][4] = p;
+          if(coords[k][j][i].norm()<0.015)
+            fprintf(stderr,"Changing state at (%d,%d,%d) p: %e->%e, T: %e->%e, h: %e->%e\n", i,j,k, 
+                    p0, p, T0, T, e0 + p0/v[k][j][i][0], e + p/v[k][j][i][0]);
         }
       }
   coordinates.RestoreDataPointerToLocalVector();
@@ -673,6 +677,9 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
         if(coordinates.OutsidePhysicalDomain(i,j,k))
           continue;
 
+//        if(lam[k][j][i]>0)
+//          fprintf(stderr,"lam[%d][%d][%d] = %e.\n", k,j,i, lam[k][j][i]);
+
         for(auto it = trans[myid].begin(); it != trans[myid].end(); it++) {
 
           //for debug only
@@ -683,7 +690,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 
           if((*it)->Transition(v[k][j][i], lam[k][j][i])) { //NOTE: v[k][j][i][4] (p) and lam may be modified even if the 
                                                             //      return value is FALSE
-            //detected phase transition
+            // detected phase transition
 
             // register the node
             changed.push_back(std::make_tuple(Int3(i,j,k), myid, (*it)->toID));
