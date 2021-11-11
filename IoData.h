@@ -549,6 +549,13 @@ struct MultiPhaseData {
 
   enum PhaseChangeType {RIEMANN_SOLUTION = 0, EXTRAPOLATION = 1} phasechange_type;
 
+  enum OnOff {Off = 0, On = 1};
+  OnOff latent_heat_transfer; //!< whether stored latent heat would be added to the enthalpy
+                              //Note: In the case of a "physical" phase transition, the
+                              //      latent heat is always added to the enthalpy. The option here
+                              //      is about whether this operation will be done if a phase
+                              //      change occurs due to the motion of material interface(s).
+
   MultiPhaseData();
   ~MultiPhaseData() {}
 

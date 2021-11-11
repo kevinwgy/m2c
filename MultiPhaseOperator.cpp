@@ -188,6 +188,10 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
                   (int)iod.multiphase.phasechange_type);
   }
 
+
+  if(trans.size()!=0 && iod.multiphase.latent_heat_transfer==MultiPhaseData::On) 
+    AddLambdaToEnthalpyAfterInterfaceMotion(IDn, ID, V); // Add stored latent_heat (Lambda) to cells that 
+                                                         // changed phase due to interface motion.
 }
 
 //-----------------------------------------------------
@@ -751,6 +755,74 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
     print("- Detected phase/material transitions at %d node(s).\n", counter);
 
   return counter;
+
+}
+
+
+//-------------------------------------------------------------------------
+
+void
+MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
+                                                            SpaceVariable3D &V)
+{
+
+  if(trans.size()==0)
+    return; //nothing to do
+
+  double*** idn = IDn.GetDataPointer();
+  double*** id  = ID.GetDataPointer();
+  Vec5D***  v   = (Vec5D***) V.GetDataPointer();
+  double*** lam = Lambda.GetDataPointer();
+
+  int myidn, myid;
+  int counter = 0;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        myidn = (int)idn[k][j][i];
+        myid  = (int)id[k][j][i];
+
+        if(myidn == myid) //id remains the same. Skip
+          continue;
+
+        if(lam[k][j][i]<=0.0) //no latent heat here
+          continue;
+
+        for(auto it = trans[myidn].begin(); it != trans[myidn].end(); it++) {
+
+          // check if this is the phase transition from "myidn" to "myid"
+          if((*it)->ToID() != myid)
+            continue;
+
+          //---------------------------------------------------------------------
+          // Now, do the actual work: Add lam to enthalpy
+          double rho = v[k][j][i][0];
+          double p   = v[k][j][i][4];
+          double e   = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+          double h   = e + p/rho + lam[k][j][i]; //adding lam
+          lam[k][j][i] = 0.0;
+          e = varFcn[myid]->GetInternalEnergyPerUnitMassFromEnthalpy(rho, h);
+          // update p to account for the increase of enthalpy (rho is fixed)
+          v[k][j][i][4] = varFcn[myid]->GetPressure(rho, e);
+
+          counter++;
+          //---------------------------------------------------------------------
+          
+        }
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
+
+  IDn.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+  if(counter>0) {  
+    Lambda.RestoreDataPointerAndInsert();
+    V.RestoreDataPointerAndInsert();
+  } else { //nothing is changed...
+    Lambda.RestoreDataPointerToLocalVector();
+    V.RestoreDataPointerToLocalVector();
+  }
 
 }
 

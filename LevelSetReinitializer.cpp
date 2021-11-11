@@ -72,6 +72,9 @@ LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
   vector<FirstLayerNode> firstLayer;
   bool detected = TagFirstLayerNodes(Phi, firstLayer); //also calculates the associated coefficients
   if(!detected) return; //possible, especially in sims w/ phase transition
+
+  print("- Reinitializing the level set function (material id: %d).\n", iod_ls.materialid);
+
   EvaluateSignFunctionFullDomain(Phi, 1.0/*smoothing coefficient*/);
 
   // Step 2: Reinitialize first layer nodes (no iterations needed)
@@ -169,6 +172,10 @@ LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D 
   vector<Int3> firstLayerIncGhost;
   bool detected = TagFirstLayerNodesInBand(Phi, useful_nodes, firstLayer, firstLayerIncGhost);
   if(!detected) return; //possible, especially in sims w/ phase transition
+
+  print("- Reinitializing the level set function (material id: %d), bandwidth = %d.\n", 
+        iod_ls.materialid, iod_ls.bandwidth);
+  
   UpdateNarrowBand(Phi, firstLayerIncGhost, Level, UsefulG2, Active, useful_nodes, active_nodes);
   EvaluateSignFunctionInBand(Phi, useful_nodes, 1.0/*smoothing coefficient*/);
 

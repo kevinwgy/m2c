@@ -47,6 +47,10 @@ public:
 
   virtual ~PhaseTransitionBase() {}
 
+  inline int FromID() {return fromID;}
+  inline int ToID() {return toID;}
+
+
   virtual bool Transition(double *v, double &lambda) {
 
     // check temperature
@@ -57,7 +61,7 @@ public:
                   //back to raise temperature
       if(lambda>0) {
         double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax); 
-        assert(e_vap >= e);
+        //assert(e_vap >= e); //this may be violated due to round-off error
         double de = e_vap - e;
 
         double dlam = std::min(de, lambda);
@@ -73,7 +77,8 @@ public:
     } else { // excessive heat should go to lambda. Then, check if latent heat is reached
 
       double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax);
-      assert(e_vap < e); 
+      //assert(e_vap < e);  //this may be violated due to round-off error
+
       double de = e - e_vap;
 
       lambda += de;
@@ -85,6 +90,7 @@ public:
 
         double h = e + v[4]/v[0]; //enthalpy before phase transition (using vf1)
         h += lambda; //enthalpy after phase transition
+        lambda = 0.0;
         e = vf2.GetInternalEnergyPerUnitMassFromEnthalpy(v[0], h); //rho is always fixed
         v[4] = vf2.GetPressure(v[0], e);
         return true;
