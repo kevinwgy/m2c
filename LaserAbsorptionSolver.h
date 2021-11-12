@@ -116,6 +116,7 @@ class LaserAbsorptionSolver {
   SpaceVariable3D Temperature;
   SpaceVariable3D *ID; //!< material id 
   SpaceVariable3D *L;  //!< latest L
+  bool L_initialized;  //!< whether L has been initialized
   SpaceVariable3D L0; //!< ``old'' L
   SpaceVariable3D Lbk; //!< backup of input L (for "failsafe")
   SpaceVariable3D Phi; //!< distance from each node to source; -1 if node is out of scope
@@ -161,8 +162,7 @@ public:
 
   //! Compute raser radiance L 
   void ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
-                            const double t, bool initialized); 
-                            //initialized: whether L already has some values (e.g., from last time-step)
+                            const double t); 
 
   //! Compute eta*L and add to the 5th entry of R. (Not multiplying cell volume)
   void AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID, 
@@ -206,8 +206,7 @@ private:
 
   void CopyValues(double*** from, double*** to);
 
-  bool ComputeLaserRadianceMeanFluxMethod(const double t, double alpha, double relax_coeff, 
-                                          bool initialized); 
+  bool ComputeLaserRadianceMeanFluxMethod(const double t, double alpha, double relax_coeff);
 
   //-------------------------------------------------------------
   // functions called by ComputeLaserRadianceMeanFluxMethod
@@ -217,7 +216,11 @@ private:
 
   void UpdateGhostNodesOneIteration(double ***l);
 
+  double GetSourcePower(double t);
+
   void SetSourceRadiance(double*** l, Vec3D*** coords, double t);
+
+  void AdjustRadianceToPowerChange(double*** l);
 
   void InitializeLaserDomainAndGhostNodes(double*** l, double*** level);
 

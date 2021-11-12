@@ -135,7 +135,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   spo.ComputeResidual(V1, ID, R); //R = R(V1)
   if(laser) {
-    laser->ComputeLaserRadiance(V1,ID,*L,time,true);
+    laser->ComputeLaserRadiance(V1,ID,*L,time);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
   U1.AXPlusBY(0.5, 0.5, Un); //U(n+1) = 0.5*U(n) + 0.5*U1;
@@ -239,7 +239,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
   spo.ComputeResidual(V1, ID, R); //R = R(V1)
   if(laser) {
-    laser->ComputeLaserRadiance(V1,ID,*L,time,true);
+    laser->ComputeLaserRadiance(V1,ID,*L,time);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
   U1.AXPlusBY(0.25, 0.75, Un); //U2 = 0.75*U(n) + 0.25*U1;
@@ -271,7 +271,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   spo.ComputeResidual(V1, ID, R); //R = R(V2)
   if(laser) {
-    laser->ComputeLaserRadiance(V1,ID,*L,time,true);
+    laser->ComputeLaserRadiance(V1,ID,*L,time);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
   U1.AXPlusBY(2.0/3.0, 1.0/3.0, Un); //U2 = 1/3*U(n) + 2/3*U2;
@@ -340,7 +340,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
   // Solve laser radiation equation
   if(laser)
-    laser->ComputeLaserRadiance(V,ID,*L,time,true);
+    laser->ComputeLaserRadiance(V,ID,*L,time);
 }
 
 //----------------------------------------------------------------------------

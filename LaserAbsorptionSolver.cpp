@@ -32,6 +32,9 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        ID(NULL), L(NULL), TemperatureNS(),
                        NS2Laser(NULL), Laser2NS(NULL), dms(NULL), spo(NULL)
 {
+
+  L_initialized = false;
+
   // Check input parameters
   CheckForInputErrors();
 
@@ -1486,12 +1489,11 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
 //--------------------------------------------------------------------------
 
-void
-LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
+double
+LaserAbsorptionSolver::GetSourcePower(double t)
 {
   // User-specified power time-history overrides (fixed) power, which then overrides (fixed) intensity.
   // If user-specified power time-history is available, find the current power by linear interpolation
-
   double power = -1.0, dt;
   if(!source_power_timehistory.empty()) {//user-specified power time-history is available
     for(auto it=source_power_timehistory.begin(); it!=source_power_timehistory.end(); it++) {
@@ -1510,6 +1512,17 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
     }
   } else
     power = iod.laser.source_power;
+
+  return power;
+}
+
+//--------------------------------------------------------------------------
+
+void
+LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
+{
+
+  double power = GetSourcePower(t);
 
   if(iod.laser.source_distribution == LaserData::CONSTANT){ //The Laser source is uniform
 
@@ -1615,6 +1628,49 @@ LaserAbsorptionSolver::InitializeLaserDomainAndGhostNodes(double*** l, double***
   // Step 2. Update ghost nodes
   //---------------------------------------------------------------------
   UpdateGhostNodes(l);
+
+}
+
+//--------------------------------------------------------------------------
+// these file-scope varialbes are only used to improve the initial state of l
+// in the case a power time-history is applied
+static double power_previous = 0.0;
+static double power_current = 0.0;
+//--------------------------------------------------------------------------
+// scale initial values of l up or down uniformly based on variation of source power
+void
+LaserAbsorptionSolver::AdjustRadianceToPowerChange(double*** l)
+{
+  double eps = 1.0e-16;
+
+  if(power_previous<=eps)
+    return;
+
+  double ratio = power_current/power_previous;
+  if(fabs(ratio-1.0)<eps)
+    return;
+
+  // Step 1: Loop through the interior of the laser domain
+  auto it = sortedNodes.begin() + queueCounter[0];
+  for(int lvl = 1; lvl<queueCounter.size(); lvl++) {
+    for(int n = 0; n < queueCounter[lvl]; n++) {
+      l[it->k][it->j][it->i] *= ratio;
+      it++;
+    }
+    levelcomm[lvl]->ExchangeAndInsert(l);
+  }
+  
+  // Step 2: Update ghost nodes
+  for(auto it = ebm.ghostNodes1.begin(); it != ebm.ghostNodes1.end(); it++) {
+    int i(it->first[0]), j(it->first[1]), k(it->first[2]);
+    l[k][j][i] *= ratio;
+  }
+
+  for(int p=0; p<ebm.ghostNodes2.size(); p++)
+    for(int q=0; q<ebm.ghostNodes2[p].size(); q++) {
+      int i(ebm.ghostNodes2[p][q][0]), j(ebm.ghostNodes2[p][q][1]), k(ebm.ghostNodes2[p][q][2]);
+      l[k][j][i] *= ratio;
+    } 
 
 }
 
@@ -1758,8 +1814,22 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
 
 void
 LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D &ID_, SpaceVariable3D &L_,
-                                            const double t, bool initialized)
+                                            const double t)
 {
+
+  // ------------------------------------------------------------------------------------------------------------------
+  // Check is source power is zero at this time (possible if a time-history is specified). If yes, set L = 0 and return.
+  if(!source_power_timehistory.empty()) {
+    power_current = GetSourcePower(t);
+    if(power_current < 1.0e-18/*eps*/) {
+      L_.SetConstantValue(0.0, true);
+      L_initialized = false; 
+      power_previous = power_current;
+      return;
+    }
+  }
+  // ------------------------------------------------------------------------------------------------------------------
+
 
   PopulateLaserMesh(V_, ID_, L_); //get Temperature, ID, and L on the laser mesh (may or may not be the same as the N-S mesh)
 
@@ -1767,13 +1837,13 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D
   if(active_core) {
     bool success;
 
-    success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax,initialized);
+    success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax);
 
     if(!success) {// triger the "failsafe" procedure
       // Method 1: gradually decreasing the relaxation_factor in SOR
       for(int iter = 0; iter < 5; iter++) {
         sor_relax /= 2.0;
-        success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax,initialized); 
+        success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax); 
         if(success)
           break;
       }
@@ -1784,7 +1854,7 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D
       sor_relax = iod.laser.relax_coeff; //restore user input
       mfm_alpha = 1.0;
       for(int iter = 0; iter < 5; iter++) {
-        success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax,initialized); 
+        success = ComputeLaserRadianceMeanFluxMethod(t,mfm_alpha,sor_relax); 
         if(success)
           break;
         sor_relax /= 2.0;
@@ -1797,6 +1867,8 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D
 
   PopulateRadianceOnNavierStokesMesh(L_);
 
+  if(!source_power_timehistory.empty())
+    power_previous = power_current;
 }
 
 //--------------------------------------------------------------------------
@@ -1882,8 +1954,7 @@ LaserAbsorptionSolver::PopulateRadianceOnNavierStokesMesh(SpaceVariable3D &L_)
 //--------------------------------------------------------------------------
 // Working on the laser mesh (may or may not be the same as the N-S mesh)
 bool
-LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double alpha, double relax_coeff,
-                                                          bool initialized)
+LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double alpha, double relax_coeff)
 {
   // This function will use customized communicators. The sub-functions deal with double*** directly
   //
@@ -1905,15 +1976,19 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double
   // Note that when L enters this function, its laser ghost nodes (i.e. ghostNodes1 and 2) do not have values.
 
   //If not initialized or source_power changes, set source radiance; initialize laser if needed
-  if(!initialized || !source_power_timehistory.empty())
+  if(!L_initialized || !source_power_timehistory.empty())
     SetSourceRadiance(l, coords, t);
 
   //Make sure both real and ghost laser nodes have some meaningful values
-  if(!initialized)
+  if(!L_initialized)
     InitializeLaserDomainAndGhostNodes(l, level);
-  else
+  else {
     ApplyStoredGhostNodesRadiance(l);
+    if(!source_power_timehistory.empty())
+      AdjustRadianceToPowerChange(l);
+  }
 
+  
   //Gauss-Seidel iterations 
   int GSiter = 0;
   double max_error(DBL_MAX), avg_error(DBL_MAX);
@@ -1961,6 +2036,10 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double
   ID->RestoreDataPointerToLocalVector();
   Level.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerToLocalVector();
+
+
+  if(success)
+    L_initialized = true;
 
   return success;
 }
