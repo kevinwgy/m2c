@@ -35,7 +35,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
  * to Two Materials. See KW's notes for details
  */
 void
-ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/, 
+ExactRiemannSolverBase::ComputeRiemannSolution(double *dir, 
                             double *Vm, int idl /*"left" state*/, 
                             double *Vp, int idr /*"right" state*/, 
                             double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
@@ -44,10 +44,10 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 {
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
-  double ul    = Vm[dir+1];
+  double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
   double pl    = Vm[4];
   double rhor  = Vp[0];
-  double ur    = Vp[dir+1];
+  double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
   double pr    = Vp[4];
   //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
 
@@ -163,7 +163,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
       cout << "*** Error: Division-by-zero while using the secant method to solve the Riemann problem." << endl;
       cout << "           left state: " << rhol << ", " << ul << ", " << pl << ", " << idl << " | right: " 
            << rhor << ", " << ur << ", " << pr << ", " << idr << endl;
-      cout << "           dir = " << dir << ", f0 = " << f0 << ", f1 = " << f1 << endl;
+      cout << "           dir = " << dir[0] << "," << dir[1] << "," << dir[2]
+           << ", f0 = " << f0 << ", f1 = " << f1 << endl;
       exit(-1);
     }
 
@@ -261,13 +262,19 @@ ExactRiemannSolverBase::ComputeRiemannSolution(int dir/*0~x,1~y,2~z*/,
 //-----------------------------------------------------
 
 void
-ExactRiemannSolverBase::FinalizeSolution(int dir, double *Vm, double *Vp,
+ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
                                          double rhol, double ul, double pl, int idl, 
                                          double rhor, double ur, double pr, int idr, 
                                          double rhol2, double rhor2, double u2, double p2,
                                          bool trans_rare, double Vrare_x0[3], /*inputs*/
                                          double *Vs, int &id, double *Vsm, double *Vsp /*outputs*/)
 {
+  // find tangential velocity from input
+  double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
+  double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
+  double utanl[3] = {Vm[1]-ul*dir[0], Vm[2]-ul*dir[1], Vm[3]-ul*dir[2]};
+  double utanr[3] = {Vp[1]-ur*dir[0], Vp[2]-ur*dir[1], Vp[3]-ur*dir[2]};
+
   // find material id at xi = x = 0
   if(u2>=0)
     id = idl;
@@ -283,9 +290,11 @@ ExactRiemannSolverBase::FinalizeSolution(int dir, double *Vm, double *Vp,
   Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
 
   if(trans_rare) {
-    Vs[0]     = Vrare_x0[0];
-    Vs[dir+1] = Vrare_x0[1];
-    Vs[4]     = Vrare_x0[2];
+    Vs[0] = Vrare_x0[0];
+    Vs[1] = Vrare_x0[1]*dir[0];
+    Vs[2] = Vrare_x0[1]*dir[1];
+    Vs[3] = Vrare_x0[1]*dir[2];
+    Vs[4] = Vrare_x0[2];
   }
   else { 
     //find state variables at xi = x = 0
@@ -316,13 +325,17 @@ ExactRiemannSolverBase::FinalizeSolution(int dir, double *Vm, double *Vp,
       }
 
       if(is_star_state) {
-        Vs[0]     = rhol2;
-        Vs[dir+1] = u2;
-        Vs[4]     = p2;
+        Vs[0] = rhol2;
+        Vs[1] = u2*dir[0];
+        Vs[2] = u2*dir[1];
+        Vs[3] = u2*dir[2];
+        Vs[4] = p2;
       } else {
-        Vs[0]     = rhol;
-        Vs[dir+1] = ul;
-        Vs[4]     = pl;
+        Vs[0] = rhol;
+        Vs[1] = ul*dir[0];
+        Vs[2] = ul*dir[1];
+        Vs[3] = ul*dir[2];
+        Vs[4] = pl;
       }
 
     } else { //either Vr or Vrstar --- check the 3-wave
@@ -351,13 +364,17 @@ ExactRiemannSolverBase::FinalizeSolution(int dir, double *Vm, double *Vp,
       }
 
       if(is_star_state) {
-        Vs[0]     = rhor2;
-        Vs[dir+1] = u2;
-        Vs[4]     = p2;
+        Vs[0] = rhor2;
+        Vs[1] = u2*dir[0];
+        Vs[2] = u2*dir[1];
+        Vs[3] = u2*dir[2];
+        Vs[4] = p2;
       } else {
-        Vs[0]     = rhor;
-        Vs[dir+1] = ur;
-        Vs[4]     = pr;
+        Vs[0] = rhor;
+        Vs[1] = ur*dir[0];
+        Vs[2] = ur*dir[1];
+        Vs[3] = ur*dir[2];
+        Vs[4] = pr;
       }
 
     }
@@ -366,35 +383,31 @@ ExactRiemannSolverBase::FinalizeSolution(int dir, double *Vm, double *Vp,
   // determine the tangential components of velocity -- upwinding
   int k;
   if(u2>0) {
-    for(int i=1; i<=2; i++) {
-      k = (dir + i)%3 + 1;
-      Vs[k] = Vm[k];
-    }
-  } else if(u2<0) {
-    for(int i=1; i<=2; i++) {
-      k = (dir + i)%3 + 1;
-      Vs[k] = Vp[k];
-    }
-  } else {//u2 == 0
-    for(int i=1; i<=2; i++) {
-      k = (dir + i)%3 + 1;
-      Vs[k] = 0.5*(Vm[k]+Vp[k]);
-    }
+    for(int i=1; i<=3; i++)
+      Vs[i] += utanl[i-1];
+  } 
+  else if(u2<0) {
+    for(int i=1; i<=3; i++)
+      Vs[i] += utanr[i-1];
+  } 
+  else {//u2 == 0
+    for(int i=1; i<=3; i++)
+      Vs[i] += 0.5*(utanl[i-1]+utanr[i-1]);
   }
 
 
   // determine Vsm and Vsp, i.e. the star states on the minus and plus sides of the contact discontinuity
-  Vsm[0]     = rhol2;
-  Vsm[dir+1] = u2;
-  Vsm[4]     = p2;
-  Vsp[0]     = rhor2;
-  Vsp[dir+1] = u2;
-  Vsp[4]     = p2;
-  for(int i=1; i<=2; i++) { //tangential velocity
-    k = (dir + i)%3 + 1;
-    Vsm[k] = Vm[k];
-    Vsp[k] = Vp[k];
-  }
+  Vsm[0] = rhol2;
+  Vsm[1] = utanl[0] + u2*dir[0];
+  Vsm[2] = utanl[1] + u2*dir[1];
+  Vsm[3] = utanl[2] + u2*dir[2];
+  Vsm[4] = p2;
+  Vsp[0] = rhor2;
+  Vsp[1] = utanr[0] + u2*dir[0];
+  Vsp[2] = utanr[1] + u2*dir[1];
+  Vsp[3] = utanr[2] + u2*dir[2];
+  Vsp[4] = p2;
+
 
 
 #if PRINT_RIEMANN_SOLUTION == 1

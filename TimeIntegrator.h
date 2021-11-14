@@ -27,17 +27,19 @@ protected:
   //!< Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
+  //!< Internal variable to store the gradient of phi / level-set, and the mat. ID tracked
+  vector<SpaceVariable3D*> NPhi;
+  vector<int> ls_mat_id;
+
   //!< Solutions of exact Riemann problems
   RiemannSolutions riemann_solutions;
 
 public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
                      vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
-                     LaserAbsorptionSolver* laser_) : 
-      comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_),
-      IDn(comm_, &(dms_.ghosted1_1dof)) { }
+                     LaserAbsorptionSolver* laser_);
 
-  virtual ~TimeIntegratorBase() {} 
+  virtual ~TimeIntegratorBase();
 
   // Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
@@ -46,9 +48,7 @@ public:
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
 
-  virtual void Destroy() {
-    IDn.Destroy();
-  }
+  virtual void Destroy();
 
   // all the tasks that are done at the end of a time-step, independent of 
   // time integrator

@@ -78,8 +78,7 @@ public:
 
   void AXPlusBY(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
 
-  void ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
-  void ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
+  void ComputeNormalDirection(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
 
   void Destroy();
 
@@ -90,6 +89,10 @@ private:
   // functions for internal use within the class
   
   void CreateGhostNodeLists(); //almost the same as the function in SpaceOperator, except bcType
+
+  // compute derivatives of phi at nodes
+  void ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
+  void ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
 
   // Finite difference method
   void ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);

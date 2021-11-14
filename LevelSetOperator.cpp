@@ -1421,6 +1421,17 @@ void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, Spac
 //-----------------------------------------------------
 
 void
+LevelSetOperator::ComputeNormalDirection(SpaceVariable3D &Phi, SpaceVariable3D &NPhi)
+{
+  if(!narrow_band)
+    ComputeNormalDirectionCentralDifferencing_FullDomain(Phi,NPhi);
+  else
+    ComputeNormalDirectionCentralDifferencing_NarrowBand(Phi,NPhi);
+}
+
+//-----------------------------------------------------
+
+void
 LevelSetOperator::ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVariable3D &Phi, SpaceVariable3D &NPhi)
 {
   double*** phi   = Phi.GetDataPointer();

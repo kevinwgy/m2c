@@ -3,6 +3,44 @@ using std::cout;
 using std::endl;
 
 //----------------------------------------------------------------------------
+// BASE
+//----------------------------------------------------------------------------
+
+TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
+                        SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
+                        LaserAbsorptionSolver* laser_)
+                  : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_),
+                    IDn(comm_, &(dms_.ghosted1_1dof)) 
+{
+  for(int i=0; i<lso.size(); i++) {
+    NPhi.push_back(new SpaceVariable3D(comm, &(dms_.ghosted1_3dof)));
+    ls_mat_id.push_back(lso[i]->GetMaterialID());
+  }
+}
+
+//----------------------------------------------------------------------------
+
+TimeIntegratorBase::~TimeIntegratorBase()
+{
+  for(int i=0; i<NPhi.size(); i++)
+    delete NPhi[i];
+} 
+
+//----------------------------------------------------------------------------
+
+void
+TimeIntegratorFE::Destroy()
+{
+  IDn.Destroy();
+
+  for(int i=0; i<NPhi.size(); i++)
+    NPhi[i]->Destroy();
+}
+
+//----------------------------------------------------------------------------
+
+
+//----------------------------------------------------------------------------
 // FORWARD EULER
 //----------------------------------------------------------------------------
 
@@ -38,24 +76,36 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
                                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L,
                                           double time, double dt, int time_step)
 {
-
+  // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, Rn, &riemann_solutions); // compute Rn
+  // -------------------------------------------------------------------------------
+  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+    for(int i=0; i<lso.size(); i++)
+      lso[i]->ComputeNormalDirection(*Phi[i], *NPhi[i]); 
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &NPhi); // compute Rn
+  } else //using mesh normal at material interface
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL); // compute Rn
+
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
+
   spo.PrimitiveToConservative(V, ID, Un); // get Un
   Un.AXPlusBY(1.0, dt, Rn);
   spo.ConservativeToPrimitive(Un, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
 
+  // -------------------------------------------------------------------------------
   // Forward Euler step for the level set equation(s): Phi(n+1) = Phi(n) + dt*R(Phi(n))
+  // -------------------------------------------------------------------------------
   for(int i=0; i<Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i], time, dt); //compute Rn_ls (level set)
     lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
   }
 
+  // -------------------------------------------------------------------------------
   // End-of-step tasks
+  // -------------------------------------------------------------------------------
   UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, dt, time_step);
 }
 
@@ -103,8 +153,15 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R, &riemann_solutions); // compute R = R(V(n))
+  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+    for(int i=0; i<lso.size(); i++)
+      lso[i]->ComputeNormalDirection(*Phi[i], *NPhi[i]); 
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &NPhi); // compute R(V(n))
+  } else //using mesh normal at material interface
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL); // compute R(V(n))
+
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
+
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
   U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
@@ -133,7 +190,13 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
-  spo.ComputeResidual(V1, ID, R); //R = R(V1)
+  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+    for(int i=0; i<lso.size(); i++)
+      lso[i]->ComputeNormalDirection(*Phi1[i], *NPhi[i]); 
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &NPhi); // compute R(V1)
+  } else //using mesh normal at material interface
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL); // compute R(V1)
+
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
@@ -207,8 +270,15 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R, &riemann_solutions); // get R = R(V(n))
+  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+    for(int i=0; i<lso.size(); i++)
+      lso[i]->ComputeNormalDirection(*Phi[i], *NPhi[i]); 
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &NPhi); // compute R(V(n))
+  } else //using mesh normal at material interface
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL); // compute R(V(n))
+
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
+
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
   U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
@@ -237,11 +307,18 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
-  spo.ComputeResidual(V1, ID, R); //R = R(V1)
+  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+    for(int i=0; i<lso.size(); i++)
+      lso[i]->ComputeNormalDirection(*Phi1[i], *NPhi[i]); 
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &NPhi); // compute R(V1)
+  } else //using mesh normal at material interface
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL); // compute R(V1)
+
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
+
   U1.AXPlusBY(0.25, 0.75, Un); //U2 = 0.75*U(n) + 0.25*U1;
   U1.AXPlusBY(1.0, 0.25*dt, R); //U2 = U2 + 0.25*dt*R(V1)
   
@@ -269,7 +346,13 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
-  spo.ComputeResidual(V1, ID, R); //R = R(V2)
+  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+    for(int i=0; i<lso.size(); i++)
+      lso[i]->ComputeNormalDirection(*Phi1[i], *NPhi[i]); 
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &NPhi); // compute R(V1)
+  } else //using mesh normal at material interface
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL); // compute R(V2)
+
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);

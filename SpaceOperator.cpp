@@ -1863,7 +1863,7 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
-                                           RiemannSolutions *riemann_solutions)
+                                           RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *NPhi)
 {
   //------------------------------------
   // Preparation: Delete previous riemann_solutions
@@ -1941,11 +1941,18 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           } else {//material interface
 
+            Vec3D dir(0.0,0.0,0.0);
+
+            if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
+              dir[0] = 1.0;
+            else {
+              I AM HERE
+            }
 
             if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-              riemann.ComputeRiemannSolution(0/*F*/, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else//linear reconstruction w/ limitor
-              riemann.ComputeRiemannSolution(0/*F*/, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -1999,10 +2006,17 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           } else {//material interface
 
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-              riemann.ComputeRiemannSolution(1/*G*/, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            Vec3D dir(0.0,0.0,0.0);
+
+            if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
+              dir[1] = 1.0;
             else
-              riemann.ComputeRiemannSolution(1/*G*/, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            I AM HERE
+
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+              riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            else
+              riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -2056,10 +2070,17 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           } else {//material interface
 
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-              riemann.ComputeRiemannSolution(2/*H*/, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            Vec3D dir(0.0,0.0,0.0);
+
+            if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
+              dir[2] = 1.0;
             else
-              riemann.ComputeRiemannSolution(2/*H*/, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            I AM HERE
+
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
+              riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            else
+              riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -2223,7 +2244,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
-                                    RiemannSolutions *riemann_solutions)
+                                    RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *NPhi)
 {
 
 #ifdef LEVELSET_TEST
@@ -2233,7 +2254,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
-  ComputeAdvectionFluxes(V, ID, R, riemann_solutions);
+  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, NPhi);
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, R);

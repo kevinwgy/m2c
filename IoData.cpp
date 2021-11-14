@@ -1053,6 +1053,8 @@ MultiPhaseData::MultiPhaseData()
   recon = CONSTANT;
   phasechange_type = RIEMANN_SOLUTION;
 
+  riemann_normal = MESH;
+
   latent_heat_transfer = Off;
 }
 
@@ -1061,7 +1063,7 @@ MultiPhaseData::MultiPhaseData()
 void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
@@ -1077,6 +1079,11 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
     (ca, "PhaseChange", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_type), 2,
      "RiemannSolution", 0, "Extrapolation", 1);
+
+  new ClassToken<MultiPhaseData>
+    (ca, "RiemannNormal", this,
+     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::riemann_normal), 2,
+     "LevelSet", 0, "Mesh", 1);
 
   new ClassToken<MultiPhaseData>
     (ca, "LatentHeatTransfer", this,

@@ -91,7 +91,8 @@ public:
 
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
-                       RiemannSolutions *riemann_solutions = NULL);
+                       RiemannSolutions *riemann_solutions = NULL,
+                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *NPhi = NULL);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}
@@ -118,7 +119,8 @@ private:
                                 SpaceVariable3D &ID);
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
-                              RiemannSolutions *riemann_solutions = NULL);
+                              RiemannSolutions *riemann_solutions = NULL,
+                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *NPhi = NULL);
 
 };
 
