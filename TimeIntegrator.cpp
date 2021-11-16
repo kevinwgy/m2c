@@ -29,7 +29,7 @@ TimeIntegratorBase::~TimeIntegratorBase()
 //----------------------------------------------------------------------------
 
 void
-TimeIntegratorFE::Destroy()
+TimeIntegratorBase::Destroy()
 {
   IDn.Destroy();
 
@@ -76,10 +76,14 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
                                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L,
                                           double time, double dt, int time_step)
 {
+
+  bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
+                      iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
-  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+  if(use_grad_phi) {
     for(int i=0; i<lso.size(); i++)
       lso[i]->ComputeNormalDirection(*Phi[i], *NPhi[i]); 
     spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &NPhi); // compute Rn
@@ -151,9 +155,13 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
                             vector<SpaceVariable3D*>& Phi, SpaceVariable3D* L, double time, double dt, int time_step)
 {
 
+  bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
+                      iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
+
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
-  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+  if(use_grad_phi) {
     for(int i=0; i<lso.size(); i++)
       lso[i]->ComputeNormalDirection(*Phi[i], *NPhi[i]); 
     spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &NPhi); // compute R(V(n))
@@ -190,7 +198,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
-  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+  if(use_grad_phi) {
     for(int i=0; i<lso.size(); i++)
       lso[i]->ComputeNormalDirection(*Phi1[i], *NPhi[i]); 
     spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &NPhi); // compute R(V1)
@@ -268,9 +276,12 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
                                            double dt, int time_step)
 { 
 
+  bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
+                      iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
-  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+  if(use_grad_phi) {
     for(int i=0; i<lso.size(); i++)
       lso[i]->ComputeNormalDirection(*Phi[i], *NPhi[i]); 
     spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &NPhi); // compute R(V(n))
@@ -307,7 +318,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
-  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+  if(use_grad_phi) {
     for(int i=0; i<lso.size(); i++)
       lso[i]->ComputeNormalDirection(*Phi1[i], *NPhi[i]); 
     spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &NPhi); // compute R(V1)
@@ -346,7 +357,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
-  if(!lso.empty() && iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET) {
+  if(use_grad_phi) {
     for(int i=0; i<lso.size(); i++)
       lso[i]->ComputeNormalDirection(*Phi1[i], *NPhi[i]); 
     spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &NPhi); // compute R(V1)

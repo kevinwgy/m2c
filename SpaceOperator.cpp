@@ -1863,7 +1863,8 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
-                                           RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *NPhi)
+                                           RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
+                                           vector<SpaceVariable3D*> *NPhi)
 {
   //------------------------------------
   // Preparation: Delete previous riemann_solutions
@@ -1897,6 +1898,16 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   double*** id = (double***) ID.GetDataPointer();
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer(); //for debugging
+ 
+  //------------------------------------
+  // Extract level set gradient data
+  //------------------------------------
+  vector<Vec3D***> nphi;
+  if(NPhi && ls_mat_id) {
+    nphi.resize(NPhi->size(), NULL);
+    for(int i=0; i<nphi.size(); i++)
+      nphi[i] = (Vec3D***)((*NPhi)[i]->GetDataPointer());
+  }
  
   //------------------------------------
   // Compute fluxes
@@ -1941,14 +1952,50 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           } else {//material interface
 
-            Vec3D dir(0.0,0.0,0.0);
-
+            // determine the axis/direction of the 1D Riemann problem
+            Vec3D dir;
             if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
-              dir[0] = 1.0;
-            else {
-              I AM HERE
+              dir = Vec3D(1.0,0.0,0.0);
+            else { //LEVEL_SET or AVERAGE
+
+              // calculate level-set gradient at cell interface
+              int my_ls_id    = (myid==0)       ? neighborid : myid;
+              int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
+              Vec3D *my_nphi(NULL), *neigh_nphi(NULL);
+              for(int s=0; s<nphi.size(); s++) {
+                if((*ls_mat_id)[s] == my_ls_id)     my_nphi    = &(nphi[s][k][j][i]);
+                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi = &(nphi[s][k][j][i-1]);
+                if(my_nphi && neigh_nphi) break;
+              }
+              assert(my_nphi && neigh_nphi);
+              // normalize the normals
+              double my_nphi_norm = my_nphi->norm();
+              if(my_nphi_norm>0) (*my_nphi) /= my_nphi_norm;
+              double neigh_nphi_norm = neigh_nphi->norm();
+              if(neigh_nphi_norm>0) (*neigh_nphi) /= neigh_nphi_norm;
+              // dir should point from i-1 towards i
+              if(myid!=0 && neighborid!=0) { //2 level set functions are involved
+                (*my_nphi) *= -1.0;
+              } else if(neighborid==0) {
+                (*my_nphi)    *= -1.0;
+                (*neigh_nphi) *= -1.0;
+              }
+              dir = *my_nphi + *neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
+                                            //    I don't think that should happen in reality --> it would mean an
+                                            //    interface between a real node and its ghost image. Even if that
+                                            //    happens, this formula may still be ok because "nphi" at any ghost
+                                            //    cell outside physical domain should be 0.
+              double dirnorm = dir.norm();
+              dir = (dirnorm==0) ? Vec3D(1.0,0.0,0.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
+              assert(dir[0]>0.0);
+
+              if(iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE) {
+                dir[0] += 1.0;
+                dir /= dir.norm();
+              }
             }
 
+            //Solve 1D Riemann problem
             if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
               riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else//linear reconstruction w/ limitor
@@ -2006,13 +2053,50 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           } else {//material interface
 
-            Vec3D dir(0.0,0.0,0.0);
-
+            // determine the axis/direction of the 1D Riemann problem
+            Vec3D dir;
             if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
-              dir[1] = 1.0;
-            else
-            I AM HERE
+              dir = Vec3D(0.0,1.0,0.0);
+            else { //LEVEL_SET or AVERAGE
 
+              // calculate level-set gradient at cell interface
+              int my_ls_id    = (myid==0)       ? neighborid : myid;
+              int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
+              Vec3D *my_nphi(NULL), *neigh_nphi(NULL);
+              for(int s=0; s<nphi.size(); s++) {
+                if((*ls_mat_id)[s] == my_ls_id)     my_nphi    = &(nphi[s][k][j][i]);
+                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi = &(nphi[s][k][j-1][i]);
+                if(my_nphi && neigh_nphi) break;
+              }
+              assert(my_nphi && neigh_nphi);
+              // normalize the normals
+              double my_nphi_norm = my_nphi->norm();
+              if(my_nphi_norm>0) (*my_nphi) /= my_nphi_norm;
+              double neigh_nphi_norm = neigh_nphi->norm();
+              if(neigh_nphi_norm>0) (*neigh_nphi) /= neigh_nphi_norm;
+              // dir should point from i-1 towards i
+              if(myid!=0 && neighborid!=0) { //2 level set functions are involved
+                (*my_nphi) *= -1.0;
+              } else if(neighborid==0) {
+                (*my_nphi)    *= -1.0;
+                (*neigh_nphi) *= -1.0;
+              }
+              dir = *my_nphi + *neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
+                                            //    I don't think that should happen in reality --> it would mean an
+                                            //    interface between a real node and its ghost image. Even if that
+                                            //    happens, this formula may still be ok because "nphi" at any ghost
+                                            //    cell outside physical domain should be 0.
+              double dirnorm = dir.norm();
+              dir = (dirnorm==0) ? Vec3D(0.0,1.0,0.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
+              assert(dir[1]>0.0);
+
+              if(iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE) {
+                dir[1] += 1.0;
+                dir /= dir.norm();
+              }
+            }
+
+            //Solve 1D Riemann problem
             if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
               riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else
@@ -2070,13 +2154,50 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           } else {//material interface
 
-            Vec3D dir(0.0,0.0,0.0);
-
+            // determine the axis/direction of the 1D Riemann problem
+            Vec3D dir;
             if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
-              dir[2] = 1.0;
-            else
-            I AM HERE
+              dir = Vec3D(0.0,0.0,1.0);
+            else {
 
+              // calculate level-set gradient at cell interface
+              int my_ls_id    = (myid==0)       ? neighborid : myid;
+              int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
+              Vec3D *my_nphi(NULL), *neigh_nphi(NULL);
+              for(int s=0; s<nphi.size(); s++) {
+                if((*ls_mat_id)[s] == my_ls_id)     my_nphi    = &(nphi[s][k][j][i]);
+                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi = &(nphi[s][k-1][j][i]);
+                if(my_nphi && neigh_nphi) break;
+              }
+              assert(my_nphi && neigh_nphi);
+              // normalize the normals
+              double my_nphi_norm = my_nphi->norm();
+              if(my_nphi_norm>0) (*my_nphi) /= my_nphi_norm;
+              double neigh_nphi_norm = neigh_nphi->norm();
+              if(neigh_nphi_norm>0) (*neigh_nphi) /= neigh_nphi_norm;
+              // dir should point from i-1 towards i
+              if(myid!=0 && neighborid!=0) { //2 level set functions are involved
+                (*my_nphi) *= -1.0;
+              } else if(neighborid==0) {
+                (*my_nphi)    *= -1.0;
+                (*neigh_nphi) *= -1.0;
+              }
+              dir = *my_nphi + *neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
+                                            //    I don't think that should happen in reality --> it would mean an
+                                            //    interface between a real node and its ghost image. Even if that
+                                            //    happens, this formula may still be ok because "nphi" at any ghost
+                                            //    cell outside physical domain should be 0.
+              double dirnorm = dir.norm();
+              dir = (dirnorm==0) ? Vec3D(0.0,0.0,1.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
+              assert(dir[2]>0.0);
+
+              if(iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE) {
+                dir[2] += 1.0;
+                dir /= dir.norm();
+              }
+            }
+
+            //Solve 1D Riemann problem
             if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
               riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else
@@ -2125,6 +2246,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Restore Spatial Variables
   //------------------------------------
+
+  if(NPhi && ls_mat_id) {
+    for(int i=0; i<NPhi->size(); i++)
+      (*NPhi)[i]->RestoreDataPointerToLocalVector();
+  }
+
   delta_xyz.RestoreDataPointerToLocalVector(); //no changes
   ID.RestoreDataPointerToLocalVector(); //no changes
   coordinates.RestoreDataPointerToLocalVector(); //no changes

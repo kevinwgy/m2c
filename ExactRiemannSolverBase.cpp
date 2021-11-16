@@ -270,10 +270,10 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
                                          double *Vs, int &id, double *Vsm, double *Vsp /*outputs*/)
 {
   // find tangential velocity from input
-  double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
-  double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
-  double utanl[3] = {Vm[1]-ul*dir[0], Vm[2]-ul*dir[1], Vm[3]-ul*dir[2]};
-  double utanr[3] = {Vp[1]-ur*dir[0], Vp[2]-ur*dir[1], Vp[3]-ur*dir[2]};
+  double unorl    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
+  double unorr    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
+  double utanl[3] = {Vm[1]-unorl*dir[0], Vm[2]-unorl*dir[1], Vm[3]-unorl*dir[2]};
+  double utanr[3] = {Vp[1]-unorr*dir[0], Vp[2]-unorr*dir[1], Vp[3]-unorr*dir[2]};
 
   // find material id at xi = x = 0
   if(u2>=0)

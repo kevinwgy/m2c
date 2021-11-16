@@ -549,7 +549,7 @@ struct MultiPhaseData {
 
   enum PhaseChangeType {RIEMANN_SOLUTION = 0, EXTRAPOLATION = 1} phasechange_type;
 
-  enum RiemannNormal {LEVEL_SET = 0, MESH = 1} riemann_normal;
+  enum RiemannNormal {LEVEL_SET = 0, MESH = 1, AVERAGE = 2} riemann_normal;
 
   enum OnOff {Off = 0, On = 1};
   OnOff latent_heat_transfer; //!< whether stored latent heat would be added to the enthalpy
