@@ -329,7 +329,9 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
     print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  |  LevelSet(s)");
 
   if(ion)
-    print(file, "  |  Mean Charge  |  Heavy Particles Density\n");
+    print(file, "  |  Mean Charge  |  Heavy Particles Density");
+
+  print(file, "\n");
 
   //get data
   double***  v  = (double***) V.GetDataPointer();

@@ -1961,30 +1961,31 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               // calculate level-set gradient at cell interface
               int my_ls_id    = (myid==0)       ? neighborid : myid;
               int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
-              Vec3D *my_nphi(NULL), *neigh_nphi(NULL);
+              Vec3D *my_nphi_ptr(NULL), *neigh_nphi_ptr(NULL);
               for(int s=0; s<nphi.size(); s++) {
-                if((*ls_mat_id)[s] == my_ls_id)     my_nphi    = &(nphi[s][k][j][i]);
-                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi = &(nphi[s][k][j][i-1]);
-                if(my_nphi && neigh_nphi) break;
+                if((*ls_mat_id)[s] == my_ls_id)     my_nphi_ptr    = &(nphi[s][k][j][i]);
+                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi_ptr = &(nphi[s][k][j][i-1]);
+                if(my_nphi_ptr && neigh_nphi_ptr) break;
               }
-              assert(my_nphi && neigh_nphi);
+              assert(my_nphi_ptr && neigh_nphi_ptr);
+              Vec3D my_nphi(*my_nphi_ptr), neigh_nphi(*neigh_nphi_ptr); //so that we don't change the original values
               // normalize the normals
-              double my_nphi_norm = my_nphi->norm();
-              if(my_nphi_norm>0) (*my_nphi) /= my_nphi_norm;
-              double neigh_nphi_norm = neigh_nphi->norm();
-              if(neigh_nphi_norm>0) (*neigh_nphi) /= neigh_nphi_norm;
+              double my_nphi_norm = my_nphi.norm();
+              if(my_nphi_norm>0) my_nphi /= my_nphi_norm;
+              double neigh_nphi_norm = neigh_nphi.norm();
+              if(neigh_nphi_norm>0) neigh_nphi /= neigh_nphi_norm;
               // dir should point from i-1 towards i
               if(myid!=0 && neighborid!=0) { //2 level set functions are involved
-                (*my_nphi) *= -1.0;
+                my_nphi *= -1.0;
               } else if(neighborid==0) {
-                (*my_nphi)    *= -1.0;
-                (*neigh_nphi) *= -1.0;
+                my_nphi    *= -1.0;
+                neigh_nphi *= -1.0;
               }
-              dir = *my_nphi + *neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
-                                            //    I don't think that should happen in reality --> it would mean an
-                                            //    interface between a real node and its ghost image. Even if that
-                                            //    happens, this formula may still be ok because "nphi" at any ghost
-                                            //    cell outside physical domain should be 0.
+              dir = my_nphi + neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
+                                          //    I don't think that should happen in reality --> it would mean an
+                                          //    interface between a real node and its ghost image. Even if that
+                                          //    happens, this formula may still be ok because "nphi" at any ghost
+                                          //    cell outside physical domain should be 0.
               double dirnorm = dir.norm();
               dir = (dirnorm==0) ? Vec3D(1.0,0.0,0.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
               assert(dir[0]>0.0);
@@ -2062,30 +2063,31 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               // calculate level-set gradient at cell interface
               int my_ls_id    = (myid==0)       ? neighborid : myid;
               int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
-              Vec3D *my_nphi(NULL), *neigh_nphi(NULL);
+              Vec3D *my_nphi_ptr(NULL), *neigh_nphi_ptr(NULL);
               for(int s=0; s<nphi.size(); s++) {
-                if((*ls_mat_id)[s] == my_ls_id)     my_nphi    = &(nphi[s][k][j][i]);
-                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi = &(nphi[s][k][j-1][i]);
-                if(my_nphi && neigh_nphi) break;
+                if((*ls_mat_id)[s] == my_ls_id)     my_nphi_ptr    = &(nphi[s][k][j][i]);
+                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi_ptr = &(nphi[s][k][j-1][i]);
+                if(my_nphi_ptr && neigh_nphi_ptr) break;
               }
-              assert(my_nphi && neigh_nphi);
+              assert(my_nphi_ptr && neigh_nphi_ptr);
+              Vec3D my_nphi(*my_nphi_ptr), neigh_nphi(*neigh_nphi_ptr); //so that we don't change the original values
               // normalize the normals
-              double my_nphi_norm = my_nphi->norm();
-              if(my_nphi_norm>0) (*my_nphi) /= my_nphi_norm;
-              double neigh_nphi_norm = neigh_nphi->norm();
-              if(neigh_nphi_norm>0) (*neigh_nphi) /= neigh_nphi_norm;
+              double my_nphi_norm = my_nphi.norm();
+              if(my_nphi_norm>0) my_nphi /= my_nphi_norm;
+              double neigh_nphi_norm = neigh_nphi.norm();
+              if(neigh_nphi_norm>0) neigh_nphi /= neigh_nphi_norm;
               // dir should point from i-1 towards i
               if(myid!=0 && neighborid!=0) { //2 level set functions are involved
-                (*my_nphi) *= -1.0;
+                my_nphi *= -1.0;
               } else if(neighborid==0) {
-                (*my_nphi)    *= -1.0;
-                (*neigh_nphi) *= -1.0;
+                my_nphi    *= -1.0;
+                neigh_nphi *= -1.0;
               }
-              dir = *my_nphi + *neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
-                                            //    I don't think that should happen in reality --> it would mean an
-                                            //    interface between a real node and its ghost image. Even if that
-                                            //    happens, this formula may still be ok because "nphi" at any ghost
-                                            //    cell outside physical domain should be 0.
+              dir = my_nphi + neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
+                                          //    I don't think that should happen in reality --> it would mean an
+                                          //    interface between a real node and its ghost image. Even if that
+                                          //    happens, this formula may still be ok because "nphi" at any ghost
+                                          //    cell outside physical domain should be 0.
               double dirnorm = dir.norm();
               dir = (dirnorm==0) ? Vec3D(0.0,1.0,0.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
               assert(dir[1]>0.0);
@@ -2163,30 +2165,31 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               // calculate level-set gradient at cell interface
               int my_ls_id    = (myid==0)       ? neighborid : myid;
               int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
-              Vec3D *my_nphi(NULL), *neigh_nphi(NULL);
+              Vec3D *my_nphi_ptr(NULL), *neigh_nphi_ptr(NULL);
               for(int s=0; s<nphi.size(); s++) {
-                if((*ls_mat_id)[s] == my_ls_id)     my_nphi    = &(nphi[s][k][j][i]);
-                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi = &(nphi[s][k-1][j][i]);
-                if(my_nphi && neigh_nphi) break;
+                if((*ls_mat_id)[s] == my_ls_id)     my_nphi_ptr    = &(nphi[s][k][j][i]);
+                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi_ptr = &(nphi[s][k-1][j][i]);
+                if(my_nphi_ptr && neigh_nphi_ptr) break;
               }
-              assert(my_nphi && neigh_nphi);
+              assert(my_nphi_ptr && neigh_nphi_ptr);
+              Vec3D my_nphi(*my_nphi_ptr), neigh_nphi(*neigh_nphi_ptr); //so that we don't change the original values
               // normalize the normals
-              double my_nphi_norm = my_nphi->norm();
-              if(my_nphi_norm>0) (*my_nphi) /= my_nphi_norm;
-              double neigh_nphi_norm = neigh_nphi->norm();
-              if(neigh_nphi_norm>0) (*neigh_nphi) /= neigh_nphi_norm;
+              double my_nphi_norm = my_nphi.norm();
+              if(my_nphi_norm>0) my_nphi /= my_nphi_norm;
+              double neigh_nphi_norm = neigh_nphi.norm();
+              if(neigh_nphi_norm>0) neigh_nphi /= neigh_nphi_norm;
               // dir should point from i-1 towards i
               if(myid!=0 && neighborid!=0) { //2 level set functions are involved
-                (*my_nphi) *= -1.0;
+                my_nphi *= -1.0;
               } else if(neighborid==0) {
-                (*my_nphi)    *= -1.0;
-                (*neigh_nphi) *= -1.0;
+                my_nphi    *= -1.0;
+                neigh_nphi *= -1.0;
               }
-              dir = *my_nphi + *neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
-                                            //    I don't think that should happen in reality --> it would mean an
-                                            //    interface between a real node and its ghost image. Even if that
-                                            //    happens, this formula may still be ok because "nphi" at any ghost
-                                            //    cell outside physical domain should be 0.
+              dir = my_nphi + neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
+                                          //    I don't think that should happen in reality --> it would mean an
+                                          //    interface between a real node and its ghost image. Even if that
+                                          //    happens, this formula may still be ok because "nphi" at any ghost
+                                          //    cell outside physical domain should be 0.
               double dirnorm = dir.norm();
               dir = (dirnorm==0) ? Vec3D(0.0,0.0,1.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
               assert(dir[2]>0.0);
