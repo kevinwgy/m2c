@@ -27,8 +27,7 @@ protected:
   //!< Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
-  //!< Internal variable to store the gradient of phi / level-set, and the mat. ID tracked
-  vector<SpaceVariable3D*> NPhi;
+  //!< Internal variable to store the mat. ID tracked by each level set
   vector<int> ls_mat_id;
 
   //!< Solutions of exact Riemann problems

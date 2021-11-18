@@ -42,6 +42,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
   SetupMesh(x,y,z,dx,dy,dz);
 
@@ -96,8 +97,6 @@ void SpaceOperator::SetupMesh(vector<double> &x, vector<double> &y, vector<doubl
                               vector<double> &dx, vector<double> &dy, vector<double> &dz)
 {
   //! Setup coordinates of cell centers and dx, dy, dz
-  int NX, NY, NZ;
-  coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
   //! get array to edit
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
@@ -152,8 +151,6 @@ void SpaceOperator::SetupMesh(vector<double> &x, vector<double> &y, vector<doubl
 
 void SpaceOperator::SetupMeshUniformRectangularDomain()
 {
-  int NX, NY, NZ;
-  coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
   double dx = (iod.mesh.xmax - iod.mesh.x0)/NX;
   double dy = (iod.mesh.ymax - iod.mesh.y0)/NY;
@@ -190,9 +187,8 @@ void SpaceOperator::PopulateGhostBoundaryCoordinates()
   Vec3D*** v    = (Vec3D***) coordinates.GetDataPointer();
   Vec3D*** dxyz = (Vec3D***) delta_xyz.GetDataPointer();
 
-  int nnx, nny, nnz, NX, NY, NZ;
+  int nnx, nny, nnz;
   coordinates.GetGhostedSize(&nnx, &nny, &nnz);
-  coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
   // capture the mesh info of the corners 
   double v0[3], v1[3];
@@ -283,9 +279,8 @@ void SpaceOperator::ResetGhostLayer(double* xminus, double* xplus, double* yminu
   Vec3D*** v    = (Vec3D***) coordinates.GetDataPointer();
   Vec3D*** dxyz = (Vec3D***) delta_xyz.GetDataPointer();
 
-  int nnx, nny, nnz, NX, NY, NZ;
+  int nnx, nny, nnz;
   coordinates.GetGhostedSize(&nnx, &nny, &nnz);
-  coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
   // capture the mesh info of the corners 
   double v0[3], v1[3];
@@ -401,9 +396,6 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
 {
   ghost_nodes_inner.clear();
   ghost_nodes_outer.clear();
-
-  int NX, NY, NZ;
-  coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
@@ -1166,10 +1158,6 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 {
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
 
-  int NX, NY, NZ;
-  V.GetGlobalSize(&NX, &NY, &NZ);
-//  cout << "NX = " << NX << ", NY = " << NY << endl;
-
   //! Left boundary
   if(ii0==-1) { 
     switch (iod.mesh.bc_x0) {
@@ -1451,11 +1439,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   if(!disks.size() && !rectangles.size())
     return;
 
-  int NX, NY, NZ;
-  coordinates.GetGlobalSize(&NX, &NY, &NZ);  
-
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  
 
   if(ii0==-1) { 
     if (iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET || iod.mesh.bc_x0 == MeshData::WALL) {
@@ -1864,7 +1848,7 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                           vector<SpaceVariable3D*> *NPhi)
+                                           vector<SpaceVariable3D*> *Phi)
 {
   //------------------------------------
   // Preparation: Delete previous riemann_solutions
@@ -1897,23 +1881,23 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   double*** id = (double***) ID.GetDataPointer();
 
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer(); //for debugging
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer(); 
+  Vec3D*** dxyz   = (Vec3D***)delta_xyz.GetDataPointer(); 
  
   //------------------------------------
   // Extract level set gradient data
   //------------------------------------
-  vector<Vec3D***> nphi;
-  if(NPhi && ls_mat_id) {
-    nphi.resize(NPhi->size(), NULL);
-    for(int i=0; i<nphi.size(); i++)
-      nphi[i] = (Vec3D***)((*NPhi)[i]->GetDataPointer());
+  vector<double***> phi;
+  if(Phi && ls_mat_id) {
+    phi.resize(Phi->size(), NULL);
+    for(int i=0; i<phi.size(); i++)
+      phi[i] = (*Phi)[i]->GetDataPointer();
   }
  
   //------------------------------------
   // Compute fluxes
   //------------------------------------
   Vec5D localflux1, localflux2;
-  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   // Initialize F to 0
   for(int k=kk0; k<kkmax; k++)
@@ -1959,36 +1943,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else { //LEVEL_SET or AVERAGE
 
               // calculate level-set gradient at cell interface
-              int my_ls_id    = (myid==0)       ? neighborid : myid;
-              int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
-              Vec3D *my_nphi_ptr(NULL), *neigh_nphi_ptr(NULL);
-              for(int s=0; s<nphi.size(); s++) {
-                if((*ls_mat_id)[s] == my_ls_id)     my_nphi_ptr    = &(nphi[s][k][j][i]);
-                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi_ptr = &(nphi[s][k][j][i-1]);
-                if(my_nphi_ptr && neigh_nphi_ptr) break;
-              }
-              assert(my_nphi_ptr && neigh_nphi_ptr);
-              Vec3D my_nphi(*my_nphi_ptr), neigh_nphi(*neigh_nphi_ptr); //so that we don't change the original values
-              // normalize the normals
-              double my_nphi_norm = my_nphi.norm();
-              if(my_nphi_norm>0) my_nphi /= my_nphi_norm;
-              double neigh_nphi_norm = neigh_nphi.norm();
-              if(neigh_nphi_norm>0) neigh_nphi /= neigh_nphi_norm;
-              // dir should point from i-1 towards i
-              if(myid!=0 && neighborid!=0) { //2 level set functions are involved
-                my_nphi *= -1.0;
-              } else if(neighborid==0) {
-                my_nphi    *= -1.0;
-                neigh_nphi *= -1.0;
-              }
-              dir = my_nphi + neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
-                                          //    I don't think that should happen in reality --> it would mean an
-                                          //    interface between a real node and its ghost image. Even if that
-                                          //    happens, this formula may still be ok because "nphi" at any ghost
-                                          //    cell outside physical domain should be 0.
-              double dirnorm = dir.norm();
-              dir = (dirnorm==0) ? Vec3D(1.0,0.0,0.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
-              assert(dir[0]>0.0);
+              dir = CalculateGradPhiAtCellInterface(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
 
               if(iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE) {
                 dir[0] += 1.0;
@@ -2061,36 +2016,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else { //LEVEL_SET or AVERAGE
 
               // calculate level-set gradient at cell interface
-              int my_ls_id    = (myid==0)       ? neighborid : myid;
-              int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
-              Vec3D *my_nphi_ptr(NULL), *neigh_nphi_ptr(NULL);
-              for(int s=0; s<nphi.size(); s++) {
-                if((*ls_mat_id)[s] == my_ls_id)     my_nphi_ptr    = &(nphi[s][k][j][i]);
-                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi_ptr = &(nphi[s][k][j-1][i]);
-                if(my_nphi_ptr && neigh_nphi_ptr) break;
-              }
-              assert(my_nphi_ptr && neigh_nphi_ptr);
-              Vec3D my_nphi(*my_nphi_ptr), neigh_nphi(*neigh_nphi_ptr); //so that we don't change the original values
-              // normalize the normals
-              double my_nphi_norm = my_nphi.norm();
-              if(my_nphi_norm>0) my_nphi /= my_nphi_norm;
-              double neigh_nphi_norm = neigh_nphi.norm();
-              if(neigh_nphi_norm>0) neigh_nphi /= neigh_nphi_norm;
-              // dir should point from i-1 towards i
-              if(myid!=0 && neighborid!=0) { //2 level set functions are involved
-                my_nphi *= -1.0;
-              } else if(neighborid==0) {
-                my_nphi    *= -1.0;
-                neigh_nphi *= -1.0;
-              }
-              dir = my_nphi + neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
-                                          //    I don't think that should happen in reality --> it would mean an
-                                          //    interface between a real node and its ghost image. Even if that
-                                          //    happens, this formula may still be ok because "nphi" at any ghost
-                                          //    cell outside physical domain should be 0.
-              double dirnorm = dir.norm();
-              dir = (dirnorm==0) ? Vec3D(0.0,1.0,0.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
-              assert(dir[1]>0.0);
+              dir = CalculateGradPhiAtCellInterface(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
 
               if(iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE) {
                 dir[1] += 1.0;
@@ -2163,36 +2089,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else {
 
               // calculate level-set gradient at cell interface
-              int my_ls_id    = (myid==0)       ? neighborid : myid;
-              int neigh_ls_id = (neighborid==0) ? myid       : neighborid;
-              Vec3D *my_nphi_ptr(NULL), *neigh_nphi_ptr(NULL);
-              for(int s=0; s<nphi.size(); s++) {
-                if((*ls_mat_id)[s] == my_ls_id)     my_nphi_ptr    = &(nphi[s][k][j][i]);
-                if((*ls_mat_id)[s] == neigh_ls_id)  neigh_nphi_ptr = &(nphi[s][k-1][j][i]);
-                if(my_nphi_ptr && neigh_nphi_ptr) break;
-              }
-              assert(my_nphi_ptr && neigh_nphi_ptr);
-              Vec3D my_nphi(*my_nphi_ptr), neigh_nphi(*neigh_nphi_ptr); //so that we don't change the original values
-              // normalize the normals
-              double my_nphi_norm = my_nphi.norm();
-              if(my_nphi_norm>0) my_nphi /= my_nphi_norm;
-              double neigh_nphi_norm = neigh_nphi.norm();
-              if(neigh_nphi_norm>0) neigh_nphi /= neigh_nphi_norm;
-              // dir should point from i-1 towards i
-              if(myid!=0 && neighborid!=0) { //2 level set functions are involved
-                my_nphi *= -1.0;
-              } else if(neighborid==0) {
-                my_nphi    *= -1.0;
-                neigh_nphi *= -1.0;
-              }
-              dir = my_nphi + neigh_nphi; //KW: Although in theory one of the two may be outside physical domain, 
-                                          //    I don't think that should happen in reality --> it would mean an
-                                          //    interface between a real node and its ghost image. Even if that
-                                          //    happens, this formula may still be ok because "nphi" at any ghost
-                                          //    cell outside physical domain should be 0.
-              double dirnorm = dir.norm();
-              dir = (dirnorm==0) ? Vec3D(0.0,0.0,1.0)/*use mesh-normal*/ : dir/dirnorm; //normal direction at i-1/2
-              assert(dir[2]>0.0);
+              dir = CalculateGradPhiAtCellInterface(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
 
               if(iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE) {
                 dir[2] += 1.0;
@@ -2250,9 +2147,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   // Restore Spatial Variables
   //------------------------------------
 
-  if(NPhi && ls_mat_id) {
-    for(int i=0; i<NPhi->size(); i++)
-      (*NPhi)[i]->RestoreDataPointerToLocalVector();
+  if(Phi && ls_mat_id) {
+    for(int i=0; i<Phi->size(); i++)
+      (*Phi)[i]->RestoreDataPointerToLocalVector();
   }
 
   delta_xyz.RestoreDataPointerToLocalVector(); //no changes
@@ -2270,6 +2167,212 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   F.RestoreDataPointerToLocalVector(); //NOTE: although F has been updated, there is no need of 
                                        //      cross-subdomain communications. So, no need to 
                                        //      update the global vec.
+}
+
+//-----------------------------------------------------
+
+Vec3D
+SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
+                                               int myid, int neighborid, vector<int> *ls_mat_id,
+                                               vector<double***> *phi)
+{
+
+  int my_ls    = (myid==0) ?       neighborid : myid;
+  int neigh_ls = (neighborid==0) ? myid       : neighborid;
+  bool found1(false), found2(false);
+  for(int s=0; s<ls_mat_id->size(); s++) {
+    if(!found1 && (*ls_mat_id)[s] == my_ls) {
+      my_ls = s;
+      found1 = true;
+    }
+    if(!found2 && (*ls_mat_id)[s] == neigh_ls) {
+      neigh_ls = s;
+      found2 = true;
+    }
+    if(found1 && found2)
+      break;
+  }
+  assert(found1 && found2);
+
+  Vec3D dir;
+
+  if(my_ls == neigh_ls) {// one of the two has matid = 0. only 1 level set function involved
+
+    dir = CalculateGradientAtCellInterface(d,i,j,k,coords,dxyz,(*phi)[my_ls]);
+
+    if(neighborid==0)
+      dir *= -1.0;
+
+    if(dir.norm()==0.0) //for whatever reason...
+      dir[d] = 1.0; //mesh normal
+  } 
+  else {// 2 level set functions are involved here
+
+    Vec3D nphi_1 = CalculateGradientAtCellInterface(d,i,j,k,coords,dxyz,(*phi)[my_ls]);
+    Vec3D nphi_2 = CalculateGradientAtCellInterface(d,i,j,k,coords,dxyz,(*phi)[neigh_ls]);
+
+    dir = nphi_2 - nphi_1;
+
+    double dir_norm = dir.norm();
+    if(dir_norm!=0.0)
+      dir /= dir_norm;
+    else
+      dir[d] = 1.0;
+  }
+
+  if(dir[d]<=0.0) {
+    fprintf(stderr,"*** Error: (%d,%d,%d)(%d): dir = %e %e %e, myid = %d, neighid = %d.\n", 
+            i,j,k, d, dir[0], dir[1], dir[2], myid, neighborid);
+    exit(-1);
+  }
+
+  return dir;
+
+}
+
+//-----------------------------------------------------
+
+Vec3D
+SpaceOperator::CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
+                                                Vec3D*** dxyz, double*** phi)
+{
+
+  Vec3D dir(0.0, 0.0, 0.0); 
+
+  if(d == 0) {
+  // calculate the dPhi/dx
+    
+    dir[0] = (phi[k][j][i] - phi[k][j][i-1])/(coords[k][j][i][0] - coords[k][j][i-1][0]);
+
+    double dy1, dy2;
+    if(j<0) {//[j-1] is not available
+      dy1 = (phi[k][j+1][i-1] - phi[k][j][i-1])/(coords[k][j+1][i-1][1] - coords[k][j][i-1][1]);
+      dy2 = (phi[k][j+1][i]   - phi[k][j][i])  /(coords[k][j+1][i][1]   - coords[k][j][i][1]);
+    } else if(j>=NY) {//[j+1] is not available
+      dy1 = (phi[k][j][i-1] - phi[k][j-1][i-1])/(coords[k][j][i-1][1] - coords[k][j-1][i-1][1]);
+      dy2 = (phi[k][j][i]   - phi[k][j-1][i])  /(coords[k][j][i][1]   - coords[k][j-1][i][1]);
+    } else {
+      dy1 = CentralDifferenceLocal(   phi[k][j-1][i-1],       phi[k][j][i-1],       phi[k][j+1][i-1],
+                                   coords[k][j-1][i-1][1], coords[k][j][i-1][1], coords[k][j+1][i-1][1]);
+      dy2 = CentralDifferenceLocal(   phi[k][j-1][i],         phi[k][j][i],         phi[k][j+1][i],
+                                   coords[k][j-1][i][1],   coords[k][j][i][1],   coords[k][j+1][i][1]);
+    }
+    
+    double dz1, dz2;
+    if(k<0) {//[k-1] is not available
+      dz1 = (phi[k+1][j][i-1] - phi[k][j][i-1])/(coords[k+1][j][i-1][2] - coords[k][j][i-1][2]);
+      dz2 = (phi[k+1][j][i]   - phi[k][j][i])  /(coords[k+1][j][i][2]   - coords[k][j][i][2]);
+    } else if(k>=NZ) {//[k+1] is not available
+      dz1 = (phi[k][j][i-1] - phi[k-1][j][i-1])/(coords[k][j][i-1][2] - coords[k-1][j][i-1][2]);
+      dz2 = (phi[k][j][i]   - phi[k-1][j][i])  /(coords[k][j][i][2]   - coords[k-1][j][i][2]);
+    } else {
+      dz1 = CentralDifferenceLocal(   phi[k-1][j][i-1],       phi[k][j][i-1],       phi[k+1][j][i-1],
+                                   coords[k-1][j][i-1][2], coords[k][j][i-1][2], coords[k+1][j][i-1][2]);
+      dz2 = CentralDifferenceLocal(   phi[k-1][j][i],         phi[k][j][i],         phi[k+1][j][i],
+                                   coords[k-1][j][i][2],   coords[k][j][i][2],   coords[k+1][j][i][2]);
+    } 
+
+    double x_i_minus_half = coords[k][j][i][0] - 0.5*dxyz[k][j][i][0];
+    double dx = coords[k][j][i][0] - coords[k][j][i-1][0];
+    double c1 = (coords[k][j][i][0] - x_i_minus_half)/dx;
+    double c2 = (x_i_minus_half - coords[k][j][i-1][0])/dx;
+
+    dir[1] = c1*dy1 + c2*dy2;
+    dir[2] = c1*dz1 + c2*dz2;
+
+  }
+  else if(d == 1) {
+  // calculate the dPhi/dy
+    
+    dir[1] = (phi[k][j][i] - phi[k][j-1][i])/(coords[k][j][i][1] - coords[k][j-1][i][1]);
+
+    double dx1, dx2;
+    if(i<0) {//[i-1] is not available
+      dx1 = (phi[k][j-1][i+1] - phi[k][j-1][i])/(coords[k][j-1][i+1][0] - coords[k][j-1][i][0]);
+      dx2 = (phi[k][j][i+1]   - phi[k][j][i])  /(coords[k][j][i+1][0]   - coords[k][j][i][0]);
+    } else if(i>=NX) {//[i+1] is not available
+      dx1 = (phi[k][j-1][i] - phi[k][j-1][i-1])/(coords[k][j-1][i][0] - coords[k][j-1][i-1][0]);
+      dx2 = (phi[k][j][i]   - phi[k][j][i-1])  /(coords[k][j][i][0]   - coords[k][j][i-1][0]);
+    } else {
+      dx1 = CentralDifferenceLocal(   phi[k][j-1][i-1],       phi[k][j-1][i],       phi[k][j-1][i+1],
+                                   coords[k][j-1][i-1][0], coords[k][j-1][i][0], coords[k][j-1][i+1][0]);
+      dx2 = CentralDifferenceLocal(   phi[k][j][i-1],         phi[k][j][i],         phi[k][j][i+1],
+                                   coords[k][j][i-1][0],   coords[k][j][i][0],   coords[k][j][i+1][0]);
+    }
+    
+    double dz1, dz2;
+    if(k<0) {//[k-1] is not available
+      dz1 = (phi[k+1][j-1][i] - phi[k][j-1][i])/(coords[k+1][j-1][i][2] - coords[k][j-1][i][2]);
+      dz2 = (phi[k+1][j][i]   - phi[k][j][i])  /(coords[k+1][j][i][2]   - coords[k][j][i][2]);
+    } else if(k>=NZ) {//[k+1] is not available
+      dz1 = (phi[k][j-1][i] - phi[k-1][j-1][i])/(coords[k][j-1][i][2] - coords[k-1][j-1][i][2]);
+      dz2 = (phi[k][j][i]   - phi[k-1][j][i])  /(coords[k][j][i][2]   - coords[k-1][j][i][2]);
+    } else {
+      dz1 = CentralDifferenceLocal(   phi[k-1][j-1][i],       phi[k][j-1][i],       phi[k+1][j-1][i],
+                                   coords[k-1][j-1][i][2], coords[k][j-1][i][2], coords[k+1][j-1][i][2]);
+      dz2 = CentralDifferenceLocal(   phi[k-1][j][i],         phi[k][j][i],         phi[k+1][j][i],
+                                   coords[k-1][j][i][2],   coords[k][j][i][2],   coords[k+1][j][i][2]);
+    } 
+
+    double y_j_minus_half = coords[k][j][i][1] - 0.5*dxyz[k][j][i][1];
+    double dy = coords[k][j][i][1] - coords[k][j-1][i][1];
+    double c1 = (coords[k][j][i][1] - y_j_minus_half)/dy;
+    double c2 = (y_j_minus_half - coords[k][j-1][i][1])/dy;
+
+    dir[0] = c1*dx1 + c2*dx2;
+    dir[2] = c1*dz1 + c2*dz2;
+
+  }
+  else if(d==2) {
+  // calculate the dPhi/dz
+
+    dir[2] = (phi[k][j][i] - phi[k-1][j][i])/(coords[k][j][i][2] - coords[k-1][j][i][2]);
+
+    double dx1, dx2;
+    if(i<0) {//[i-1] is not available
+      dx1 = (phi[k-1][j][i+1] - phi[k-1][j][i])/(coords[k-1][j][i+1][0] - coords[k-1][j][i][0]);
+      dx2 = (phi[k][j][i+1]   - phi[k][j][i])  /(coords[k][j][i+1][0]   - coords[k][j][i][0]);
+    } else if(i>=NX) {//[i+1] is not available
+      dx1 = (phi[k-1][j][i] - phi[k-1][j][i-1])/(coords[k-1][j][i][0] - coords[k-1][j][i-1][0]);
+      dx2 = (phi[k][j][i]   - phi[k][j][i-1])  /(coords[k][j][i][0]   - coords[k][j][i-1][0]);
+    } else {
+      dx1 = CentralDifferenceLocal(   phi[k-1][j][i-1],       phi[k-1][j][i],       phi[k-1][j][i+1],
+                                   coords[k-1][j][i-1][0], coords[k-1][j][i][0], coords[k-1][j][i+1][0]);
+      dx2 = CentralDifferenceLocal(   phi[k][j][i-1],         phi[k][j][i],         phi[k][j][i+1],
+                                   coords[k][j][i-1][0],   coords[k][j][i][0],   coords[k][j][i+1][0]);
+    }
+    
+    double dy1, dy2;
+    if(j<0) {//[j-1] is not available
+      dy1 = (phi[k-1][j+1][i] - phi[k-1][j][i])/(coords[k-1][j+1][i][1] - coords[k-1][j][i][1]);
+      dy2 = (phi[k][j+1][i]   - phi[k][j][i])  /(coords[k][j+1][i][1]   - coords[k][j][i][1]);
+    } else if(j>=NY) {//[j+1] is not available
+      dy1 = (phi[k-1][j][i] - phi[k-1][j-1][i])/(coords[k-1][j][i][1] - coords[k-1][j-1][i][1]);
+      dy2 = (phi[k][j][i]   - phi[k][j-1][i])  /(coords[k][j][i][1]   - coords[k][j-1][i][1]);
+    } else {
+      dy1 = CentralDifferenceLocal(   phi[k-1][j-1][i],       phi[k-1][j][i],       phi[k-1][j+1][i],
+                                   coords[k-1][j-1][i][1], coords[k-1][j][i][1], coords[k-1][j+1][i][1]);
+      dy2 = CentralDifferenceLocal(   phi[k][j-1][i],         phi[k][j][i],         phi[k][j+1][i],
+                                   coords[k][j-1][i][1],   coords[k][j][i][1],   coords[k][j+1][i][1]);
+    } 
+
+    double z_k_minus_half = coords[k][j][i][2] - 0.5*dxyz[k][j][i][2];
+    double dz = coords[k][j][i][2] - coords[k-1][j][i][2];
+    double c1 = (coords[k][j][i][2] - z_k_minus_half)/dz;
+    double c2 = (z_k_minus_half - coords[k-1][j][i][2])/dz;
+
+    dir[0] = c1*dx1 + c2*dx2;
+    dir[1] = c1*dy1 + c2*dy2;
+
+  }
+
+  // normalize the gradient
+  double dir_norm = dir.norm();
+  if(dir_norm!=0.0)
+    dir /= dir_norm;
+ 
+  return dir;
+
 }
 
 //-----------------------------------------------------
@@ -2374,7 +2477,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
-                                    RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *NPhi)
+                                    RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *Phi)
 {
 
 #ifdef LEVELSET_TEST
@@ -2384,7 +2487,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
-  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, NPhi);
+  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi);
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, R);

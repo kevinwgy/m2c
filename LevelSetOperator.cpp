@@ -1453,7 +1453,16 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVari
         mynorm = normal[k][j][i].norm();
         if(mynorm!=0.0)
           normal[k][j][i] /= mynorm; 
-
+/*
+        if(i==548 && j==6 && k==0) {
+          fprintf(stderr,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
+                  normal[k][j][i][2]);
+          fprintf(stderr,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
+          fprintf(stderr,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
+          fprintf(stderr,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
+          fprintf(stderr,"%e  %e  %e\n", phi[k][j-2][i-1], phi[k][j-2][i], phi[k][j-2][i+1]);
+        }
+*/
       }
 
   Phi.RestoreDataPointerToLocalVector();
@@ -1513,6 +1522,18 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
     mynorm = normal[k][j][i].norm();
     if(mynorm!=0.0)
       normal[k][j][i] /= mynorm; 
+
+
+/*
+    if(i==259 && j==0 && k==0) {
+      fprintf(stderr,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
+              normal[k][j][i][2]);
+      fprintf(stderr,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
+      fprintf(stderr,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
+      fprintf(stderr,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
+    }
+*/
+
   }
 
 

@@ -631,6 +631,10 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   if(trans.size()==0)
     return 0; //nothing to do
 
+
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
   //---------------------------------------------
   // Step 1: Check for phase transitions; Update
   //         ID and V
@@ -715,6 +719,24 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             fprintf(stderr,"Detected phase transition at (%d,%d,%d)(%d->%d). rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
                     i,j,k, myid, (*it)->toID, rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
             // ------------------------------------------------------------------------
+
+
+            // if node is next to a symmetry or wall boundary, update the ID of the ghost node (V will be updated by spo)
+            if(i==0 && (iod.mesh.bc_x0==MeshData::WALL || iod.mesh.bc_x0==MeshData::SYMMETRY))  
+              id[k][j][i-1] = id[k][j][i];
+            if(i==NX-1 && (iod.mesh.bc_xmax==MeshData::WALL || iod.mesh.bc_xmax==MeshData::SYMMETRY))
+              id[k][j][i+1] = id[k][j][i];
+         
+            if(j==0 && (iod.mesh.bc_y0==MeshData::WALL || iod.mesh.bc_y0==MeshData::SYMMETRY))  
+              id[k][j-1][i] = id[k][j][i];
+            if(j==NY-1 && (iod.mesh.bc_ymax==MeshData::WALL || iod.mesh.bc_ymax==MeshData::SYMMETRY))
+              id[k][j+1][i] = id[k][j][i];
+         
+            if(k==0 && (iod.mesh.bc_z0==MeshData::WALL || iod.mesh.bc_z0==MeshData::SYMMETRY))  
+              id[k-1][j][i] = id[k][j][i];
+            if(k==NZ-1 && (iod.mesh.bc_zmax==MeshData::WALL || iod.mesh.bc_zmax==MeshData::SYMMETRY))
+              id[k+1][j][i] = id[k][j][i];
+         
 
             counter++;
             break;
