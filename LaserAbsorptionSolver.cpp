@@ -1811,7 +1811,8 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
 }
 
 //--------------------------------------------------------------------------
-
+static bool L_is_already_set_to_zero0 = false; //to save a bit of cost
+//--------------------------------------------------------------------------
 void
 LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D &ID_, SpaceVariable3D &L_,
                                             const double t)
@@ -1822,11 +1823,15 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D
   if(!source_power_timehistory.empty()) {
     power_current = GetSourcePower(t);
     if(power_current < 1.0e-18/*eps*/) {
-      L_.SetConstantValue(0.0, true);
+      if(!L_is_already_set_to_zero0) {
+        L_.SetConstantValue(0.0, false); //use "false" to trigger "Restore...Insert" because L_ may be printed to file.
+        L_is_already_set_to_zero0 = true;
+      }
       L_initialized = false; 
       power_previous = power_current;
       return;
     }
+    L_is_already_set_to_zero0 = false;
   }
   // ------------------------------------------------------------------------------------------------------------------
 
