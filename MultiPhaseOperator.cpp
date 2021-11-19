@@ -128,26 +128,44 @@ MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariabl
   double*** tag = (double***)Tag.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
 
-  for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
+  int ls_size = Phi.size();
+  vector<double***> phi(ls_size, NULL);
+  for(int ls=0; ls<ls_size; ls++) 
+    phi[ls] = Phi[ls]->GetDataPointer();
   
-    double*** phi = (double***)Phi[ls]->GetDataPointer();
+
+  for(int ls = 0; ls<ls_size; ls++) {//loop through all the level set functions
+  
     int matid = ls2matid[ls];
 
     for(int k=kk0; k<kkmax; k++)
       for(int j=jj0; j<jjmax; j++)
         for(int i=ii0; i<iimax; i++) {
-          if(phi[k][j][i]<0) {
+
+          if(phi[ls][k][j][i]<0) {
             if(id[k][j][i] != 0) {
               overlap++;
               tag[k][j][i] = 1;
             } 
             id[k][j][i] = matid; 
           }
+          //check if this node (i,j,k) is EXACTLY at the interface of two subdomains. If yes, give it the ID
+          //of one of the two materials that has a smaller ID. (Without this check, it would get ID = 0.)
+          else if(ls_size>1 && phi[ls][k][j][i]==0) {
+            for(int other_ls=ls+1; other_ls<ls_size; other_ls++) {
+              if(phi[other_ls][k][j][i]==0) {
+                id[k][j][i] = matid;
+                break;
+              }
+            }
+          }
 
         }
-
-    Phi[ls]->RestoreDataPointerToLocalVector(); //no changes made
   }
+
+
+  for(int ls=0; ls<ls_size; ls++) 
+    Phi[ls]->RestoreDataPointerToLocalVector(); //no changes made
 
   MPI_Allreduce(MPI_IN_PLACE, &overlap, 1, MPI_INT, MPI_SUM, comm);
 
@@ -780,6 +798,140 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 
 }
 
+
+//-------------------------------------------------------------------------
+
+int
+MultiPhaseOperator::ConsolidateMultipleLevelSets(vector<SpaceVariable3D*> &Phi)
+{
+
+  int ls_size = Phi.size();
+
+  if(ls_size<=1)
+    return 0; //nothing to do
+
+  int resolved_conflicts = 0;
+
+  vector<double***> phi(ls_size, NULL);
+
+  for(int ls=0; ls<ls_size; ls++)
+    phi[ls] = Phi[ls]->GetDataPointer();
+
+
+  // loop through all the nodes
+  vector<int> boundaries;
+  vector<int> owner, inter;
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        boundaries.clear();
+
+        //----------------------------------------------------------
+        // Find subdomains that have this node next to its boundary
+        //----------------------------------------------------------
+        for(int ls=0; ls<ls_size; ls++) {
+          if((i-1>=ii0  && phi[ls][k][j][i]*phi[ls][k][j][i-1]<=0) ||
+             (i+1<iimax && phi[ls][k][j][i]*phi[ls][k][j][i+1]<=0) ||
+             (j-1>=jj0  && phi[ls][k][j][i]*phi[ls][k][j-1][i]<=0) ||
+             (j+1<jjmax && phi[ls][k][j][i]*phi[ls][k][j+1][i]<=0) ||
+             (k-1>=kk0  && phi[ls][k][j][i]*phi[ls][k-1][j][i]<=0) ||
+             (k+1<kkmax && phi[ls][k][j][i]*phi[ls][k+1][j][i]<=0))
+            boundaries.push_back(ls);
+        }
+
+        if(boundaries.size()<=1) //nothing to worry about
+          continue;
+
+        owner.clear();
+        inter.clear();
+        for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
+          if(phi[*it][k][j][i]<0) 
+            owner.push_back(*it);
+          else if(phi[*it][k][j][i]==0)
+            inter.push_back(*it);
+        }
+
+        if(owner.size()==0 && inter.size()==0)
+          continue; //this node does not belong to any of the subdomains.
+
+        if(owner.size()==1) {//great
+          continue; // do nothing
+/*
+          double new_phi = 0.0;
+          for(auto it = boundaries.begin(); it != boundaries.end(); it++)
+            new_phi += fabs(phi[*it][k][j][i]); 
+          new_phi /= boundaries.size();
+          for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
+            if(phi[*it][k][j][i]<0)
+              phi[*it][k][j][i] = -new_phi;
+            else
+              phi[*it][k][j][i] = new_phi;
+
+          }
+*/
+        }
+        else if(owner.size()==0) {// inter.size() is not 0
+          continue; // do nothing
+/*
+          double new_phi = 0.0;
+          for(auto it = boundaries.begin(); it != boundaries.end(); it++)
+            new_phi += fabs(phi[*it][k][j][i]); 
+          new_phi /= boundaries.size();
+          for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
+            if(*it==inter[0]) //you are the owner
+              phi[*it][k][j][i] = -new_phi;
+            else
+              phi[*it][k][j][i] = new_phi;
+
+          }
+*/
+        }
+        else {//owner.size()>1
+
+          //1. find a unique owner
+          int new_owner = owner[0];
+          double max_phi = fabs(phi[owner[0]][k][j][i]);
+          for(int ind=1; ind<owner.size(); ind++) {
+            if(fabs(phi[owner[ind]][k][j][i])>max_phi) {
+              new_owner = owner[ind];
+              max_phi = fabs(phi[owner[ind]][k][j][i]);
+            }
+          }
+
+          //2. get a new phi (abs. value)
+          double new_phi = 0.0;
+          for(auto it = owner.begin(); it != owner.end(); it++)
+            new_phi += fabs(phi[*it][k][j][i]); 
+          new_phi /= owner.size();
+
+          //3. update all the involved level set functions
+          for(auto it = owner.begin(); it != owner.end(); it++) {
+            if(*it==new_owner) //you are the owner
+              phi[*it][k][j][i] = -new_phi;
+            else
+              phi[*it][k][j][i] = new_phi;
+
+          }
+
+          resolved_conflicts++;
+        }
+      }
+
+
+  MPI_Allreduce(MPI_IN_PLACE, &resolved_conflicts, 1, MPI_INT, MPI_SUM, comm);
+
+  for(int ls=0; ls<Phi.size(); ls++) {
+    if(resolved_conflicts>0)
+      Phi[ls]->RestoreDataPointerAndInsert();
+    else
+      Phi[ls]->RestoreDataPointerToLocalVector();
+  }
+
+
+  return resolved_conflicts;
+
+}
 
 //-------------------------------------------------------------------------
 

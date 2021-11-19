@@ -33,8 +33,11 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
 //-----------------------------------------------------
 /** Solves the one-dimensional Riemann problem. Extension of Kamm 2015 
  * to Two Materials. See KW's notes for details
+ * Returns an integer error code
+ * 0: no errors
+ * 1: riemann solver failed to find a bracketing interval
  */
-void
+int
 ExactRiemannSolverBase::ComputeRiemannSolution(double *dir, 
                             double *Vm, int idl /*"left" state*/, 
                             double *Vp, int idr /*"right" state*/, 
@@ -97,7 +100,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
     FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol, rhor, ul, pl, 
                    trans_rare, Vrare_x0, //inputs
                    Vs, id, Vsm, Vsp/*outputs*/);
-    return;
+    return 0;
   }
 
   // -------------------------------
@@ -129,7 +132,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                      trans_rare, Vrare_x0, /*inputs*/
                      Vs, id, Vsm, Vsp /*outputs*/);
 
-    return;
+    return 1;
   }
 
   f0 = ul0 - ur0;
@@ -256,6 +259,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol2, rhor2, u2, p2, 
                    trans_rare, Vrare_x0, //inputs
                    Vs, id, Vsm, Vsp/*outputs*/);
+
+  return 0;
 
 }
 
@@ -552,7 +557,7 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
   }
 
   if(!success || i==maxIts_main) {
-    if(verbose>=0) {
+    if(verbose>=1) {
       cout << "Warning: Exact Riemann solver failed. (Unable to find a bracketing interval) " << endl;
       cout << "   left: " << std::setprecision(10) << rhol << ", " << std::setprecision(10) << ul << ", " 
                              << std::setprecision(10) << pl << " (" << idl << "); right: "

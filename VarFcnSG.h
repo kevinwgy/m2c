@@ -15,7 +15,7 @@
  *   e  : internal energy per unit mass.
  *   Pc : pressure constant. (named Pstiff below)
  *
- *   The temperature law is: de = cv*dT, where cv is assumed to be a constant
+ *   The default temperature law is de = cv*dT, where cv is assumed to be a constant
  *   For a perfect gas, this leads to dh = cp*dT, where cp = gamma*cv is the
  *   specific heat at constant pressure. For a general stiffened gas,
  *   dh =/= cp*dT! See KW's notes. (One could have assumed dh = cp*dT, but then

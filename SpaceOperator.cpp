@@ -1914,6 +1914,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   double area = 0.0;
   Int3 ind;
 
+  // Count the riemann solver errors. Note that when this occurs, (1) it may be that the Riemann problem does NOT
+  // have a solution, and (2) the solver returns an "approximate" solution (i.e. code may keep running)
+  int riemann_errors = 0; 
+  int err;
+
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
   for(int k=k0; k<kkmax; k++) {
@@ -1953,9 +1958,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             //Solve 1D Riemann problem
             if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-              riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else//linear reconstruction w/ limitor
-              riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+            if(err) 
+              riemann_errors++;
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -2026,9 +2034,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             //Solve 1D Riemann problem
             if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-              riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else
-              riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+            if(err) 
+              riemann_errors++;
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -2099,9 +2110,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             //Solve 1D Riemann problem
             if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-              riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
             else
-              riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+              err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+            if(err) 
+              riemann_errors++;
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -2143,6 +2157,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     }
   }
         
+  
+  MPI_Allreduce(MPI_IN_PLACE, &riemann_errors, 1, MPI_INT, MPI_SUM, comm);
+  if(riemann_errors>0) 
+    print("Warning: Riemann solver failed to find a bracketing interval on %d edges.\n", riemann_errors);
+
+
   //------------------------------------
   // Restore Spatial Variables
   //------------------------------------

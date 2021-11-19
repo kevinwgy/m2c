@@ -233,7 +233,12 @@ struct MieGruneisenModelData {
   double s;
   double e0;
 
-  double cv; 
+  //! parameters related to temperature
+  double cv; //!< specific heat at constant volume
+  double T0;  //!< temperature is T0 when internal energy (per mass) is e0
+
+  double cp; //!< specific heat at constant pressure
+  double h0; //!< enthalpy per specific mass at T0
 
   MieGruneisenModelData();
   ~MieGruneisenModelData() {}

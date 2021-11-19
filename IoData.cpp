@@ -486,6 +486,9 @@ MieGruneisenModelData::MieGruneisenModelData()
   e0 = 0.0;         
 
   cv = 3.90e8;          // unit: mm2/(s2.K)
+  cp = 0.0;
+  h0 = 0.0;
+  T0 = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -493,7 +496,7 @@ MieGruneisenModelData::MieGruneisenModelData()
 void MieGruneisenModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
   new ClassDouble<MieGruneisenModelData>(ca, "ReferenceDensity", this, 
                                          &MieGruneisenModelData::rho0);
@@ -505,8 +508,14 @@ void MieGruneisenModelData::setup(const char *name, ClassAssigner *father)
                                          &MieGruneisenModelData::s);
   new ClassDouble<MieGruneisenModelData>(ca, "ReferenceGamma", this, 
                                          &MieGruneisenModelData::Gamma0);
-  new ClassDouble<MieGruneisenModelData>(ca, "ReferenceInternalEnergyPerMass", this, 
+  new ClassDouble<MieGruneisenModelData>(ca, "ReferenceSpecificInternalEnergy", this, 
                                          &MieGruneisenModelData::e0);
+  new ClassDouble<MieGruneisenModelData>(ca, "SpecificHeatAtConstantPressure", this,
+                                         &MieGruneisenModelData::cp);
+  new ClassDouble<MieGruneisenModelData>(ca, "ReferenceSpecificEnthalpy", this,
+                                         &MieGruneisenModelData::h0);
+  new ClassDouble<MieGruneisenModelData>(ca, "ReferenceTemperature", this,
+                                         &MieGruneisenModelData::T0);
 
 }
 

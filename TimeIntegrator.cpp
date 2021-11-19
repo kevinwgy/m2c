@@ -382,9 +382,15 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
                                                     double time, double dt, int time_step)
 {
 
+  // if the boundaries of several material subdomains meet, make sure the different phi's are consistent
+  int resolved_conflicts = 0; //if non-zero, force reinitialization of (all) the level sets
+  if(Phi.size()>1) 
+    resolved_conflicts = mpo.ConsolidateMultipleLevelSets(Phi);
+
+
   // Reinitialize level set (frequency specified by user)
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->Reinitialize(time, dt, time_step, *Phi[i]);
+    lso[i]->Reinitialize(time, dt, time_step, *Phi[i], resolved_conflicts>0);
   }
 
 

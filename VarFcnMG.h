@@ -22,13 +22,11 @@
  *   c0     : bulk speed of sound
  *   Gamma0 : Gruneisen coefficient at ref. state
  *   s      : slope of shock Hugoniot
- *   e0     : internal energy at ref. state
+ *   e0     : internal energy at ref. state (including temperature T0)
  *
  * References: Shafquat Islam's report (01/2021), Allen Robinson's technical report (2019)
  *
- *   Note: A temperature law can be defined as e = cv*(T-T0), where cv is a constant
- *         specific heat (at constant volume), and T0 a ref. temperature
- *
+ *   Note: default temperature law is de = cv*dT or dh = cp*dT. 
  ********************************************************************************/
 
 class VarFcnMG : public VarFcnBase {
@@ -40,11 +38,18 @@ private:
   double s;
   double e0;
 
-  double cv;
-
   double rho0_c0_c0;    //!< rho0*c0*c0
   double Gamma0_over_2; //!< Gamma0/2
   double Gamma0_rho0;   //!< Gamma0*rho0
+
+  double cv; //!< specific heat at constant volume
+  double invcv;
+  double T0; //!< ref. temperature
+
+  bool use_cp; //!< whether cp (instead of cv) is used in the temperature law
+  double cp;   //!< specific heat at constant pressure
+  double invcp;
+  double h0;   //!< ref. enthalpy corresponding to T0
 
 public:
   VarFcnMG(MaterialModelData &data);
@@ -70,6 +75,14 @@ public:
 
   inline double GetBigGamma(double rho, double e) const {return Gamma0_rho0/rho;}
 
+  inline double GetTemperature(double rho, double e) const;
+
+  inline double GetReferenceTemperature() const {return T0;}
+
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const;
+
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const;
+
 };
 
 //------------------------------------------------------------------------------
@@ -90,7 +103,15 @@ VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
   s      = data.mgModel.s;
   e0     = data.mgModel.e0;
 
-  cv     = data.mgModel.cv;
+  cv = data.mgModel.cv;
+  invcv = cv==0.0 ? 0.0 : 1.0/cv;
+  T0 = data.mgModel.T0;
+
+  cp = data.mgModel.cp;
+  invcp = cp==0.0 ? 0.0 : 1.0/cp;
+  h0 = data.mgModel.h0;
+
+  use_cp = (cp>0 && cv<=0.0) ? true : false;
 
   rho0_c0_c0 = rho0*c0*c0;
   Gamma0_over_2 = 0.5*Gamma0;
@@ -138,6 +159,40 @@ double VarFcnMG::GetDensity(double p, double e) const {
   }
 }
 
+//------------------------------------------------------------------------------
+
+inline 
+double VarFcnMG::GetTemperature(double rho, double e) const {
+
+  if(use_cp) {
+    double p = GetPressure(rho, e);
+    return T0 + invcp*(e + p/rho - h0);
+  } else
+    return T0 + invcv*(e-e0);
+}
+
+//------------------------------------------------------------------------------
+
+inline
+double VarFcnMG::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const
+{
+  if(use_cp) {
+    double eta = 1.0 - rho0/rho;
+    double first_term = rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta));
+    return (h0 + cp*(T-T0) + (Gamma0_rho0*e0 - first_term)/rho)/(Gamma0_rho0/rho + 1.0);
+  } else
+    return e0 + cv*(T-T0);
+}
+
+//------------------------------------------------------------------------------
+
+inline
+double VarFcnMG::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const
+{
+  double eta = 1.0 - rho0/rho;
+  double first_term = rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta));
+  return (h + (Gamma0_rho0*e0 - first_term)/rho)/(Gamma0_rho0/rho + 1.0);
+}
 
 //------------------------------------------------------------------------------
 
