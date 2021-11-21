@@ -35,12 +35,15 @@ public:
   enum Type{ STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2} type;
 
   double rhomin,pmin;
+  double rhomax,pmax;
 
   double failsafe_density;
 
   VarFcnBase(MaterialModelData &data) {
     rhomin = data.rhomin;
     pmin = data.pmin;
+    rhomax = data.rhomax;
+    pmax = data.pmax;
     failsafe_density = data.failsafe_density;
   }
   virtual ~VarFcnBase() {}
@@ -255,6 +258,16 @@ bool VarFcnBase::ClipDensityAndPressure(double *V, double *U)
 //    if(verbose)
 //      fprintf(stdout, "clip pressure from %e to %e\n", V[4], pmin);
     V[4] = pmin;
+    clip = true;
+  }
+
+  if(V[0]>rhomax) {
+    V[0] = rhomax;
+    clip = true;
+  }
+
+  if(V[4]>pmax) {
+    V[4] = pmax;
     clip = true;
   }
 

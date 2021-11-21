@@ -297,6 +297,8 @@ struct MaterialModelData {
   enum EOS {STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2} eos;
   double rhomin;
   double pmin;
+  double rhomax;
+  double pmax;
 
   double failsafe_density; //for updating phase change -- last resort
 
@@ -562,6 +564,8 @@ struct MultiPhaseData {
                               //      latent heat is always added to the enthalpy. The option here
                               //      is about whether this operation will be done if a phase
                               //      change occurs due to the motion of material interface(s).
+
+  int resolve_isolated_cells_frequency; //!< only used when 2 or more level set functions are activated
 
   MultiPhaseData();
   ~MultiPhaseData() {}

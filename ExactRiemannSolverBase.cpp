@@ -663,8 +663,9 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
   }
 
   if(!success) {
-    fprintf(stderr,"*** Error: Failed to find the first initial guess (p0) in the 1D Riemann solver (it = %d).\n",
-                    maxIts_main);
+    fprintf(stderr,"*** Error: Failed to find the first initial guess (p0) in the 1D Riemann solver (it = %d). "
+                   "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
+                    maxIts_main, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
   }
       
@@ -689,8 +690,9 @@ myLabel:
         break;
     } 
   if(!success) {
-    fprintf(stderr,"*** Error: Failed to find the second initial guess (p1) in the 1D Riemann solver (it = %d).\n",
-                    maxIts_main);
+    fprintf(stderr,"*** Error: Failed to find the second initial guess (p1) in the 1D Riemann solver (it = %d). "
+                   "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
+                    maxIts_main, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
   }
  

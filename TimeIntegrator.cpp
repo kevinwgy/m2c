@@ -382,15 +382,16 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
                                                     double time, double dt, int time_step)
 {
 
-  // if the boundaries of several material subdomains meet, make sure the different phi's are consistent
+  // Check & fix two things: (1) cells belonging to more than 1 subdomain; (2) cells isolated between
+  // material boundaries. (2) is optional, and not done by default (frequency controlled by user).
   int resolved_conflicts = 0; //if non-zero, force reinitialization of (all) the level sets
-  if(Phi.size()>1) 
-    resolved_conflicts = mpo.ConsolidateMultipleLevelSets(Phi);
+  if(lso.size()) 
+    resolved_conflicts = mpo.ResolveConflictsInLevelSets(time_step, Phi);
 
 
   // Reinitialize level set (frequency specified by user)
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->Reinitialize(time, dt, time_step, *Phi[i], resolved_conflicts>0);
+    lso[i]->Reinitialize(time, dt, time_step, *Phi[i], resolved_conflicts>0/*"must_do"*/);
   }
 
 
@@ -423,6 +424,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
   // Solve laser radiation equation
   if(laser)
     laser->ComputeLaserRadiance(V,ID,*L,time);
+
 }
 
 //----------------------------------------------------------------------------

@@ -561,6 +561,14 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
     for(int j=myj0; j<myjmax; j++) {
       for(int i=myi0; i<myimax; i++) {
 
+        if(v[k][j][j][0]>1.0) {
+          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): %e %e %e %e %e (%d).\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
+                  coords[k][j][i][2], v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i]);
+                  
+
+          exit(-1);
+        }
+
         nClipped += (int)varFcn[id[k][j][i]]->ClipDensityAndPressure(v[k][j][i]);
 
         if(checkState) {
@@ -1902,8 +1910,18 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   // Initialize F to 0
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++) 
-      for(int i=ii0; i<iimax; i++)
-          f[k][j][i] = 0.0; //setting f[k][j][i][0] = ... = f[k][j][i][4] = 0.0;
+      for(int i=ii0; i<iimax; i++) {
+        f[k][j][i] = 0.0; //setting f[k][j][i][0] = ... = f[k][j][i][4] = 0.0;
+/*
+        if(i==339 && j==50 && k==0)
+          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): %e %e %e %e %e (%d).\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
+                  coords[k][j][i][2], v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i]);
+*/
+        if(v[k][j][i][0]>1.0) {
+          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): %e %e %e %e %e (%d).\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
+                  coords[k][j][i][2], v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i]);
+        }
+      }
 
 
   int myid;

@@ -491,10 +491,14 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
   // loop through unresolved nodes
   int i,j,k;
   double weight, sum_weight = 0.0; 
+  double sum_weight2 = 0.0; //similar, but regardless of "upwinding"
+  Vec5D vtmp;
   Vec3D v1, x1x0;
-  double v1norm;
+  double v1norm, x1x0norm;
 
   bool reset = false; //whether v[k][j][i] has been reset
+
+  int failure = 0;
 
   for(auto it = unresolved.begin(); it != unresolved.end(); it++) { 
 
@@ -503,7 +507,10 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
     i = (*it)[2];
 
     Vec3D& x0(coords[k][j][i]);
+
     sum_weight = 0.0;
+    sum_weight2 = 0.0;
+    vtmp = 0.0;
 
     //go over the neighboring nodes 
     for(int neighk = k-1; neighk <= k+1; neighk++)         
@@ -539,8 +546,10 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
           v1norm = v1.norm();
           if(v1norm != 0)
             v1 /= v1norm;
+
           x1x0 = x0 - x1; 
-          x1x0 /= x1x0.norm();
+          x1x0norm = x1x0.norm();
+          x1x0 /= x1x0norm;
 
           weight = max(0.0, x1x0*v1);
 
@@ -554,6 +563,11 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
               reset = true;
             }
           }
+
+          // add to sum_weight2, regardless of upwinding
+          vtmp += x1x0norm*v[neighk][neighj][neighi];
+          sum_weight2 += x1x0norm;
+
         }
 
 
@@ -564,6 +578,14 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
       continue;
     }
 
+
+    // if still unresolved, try to apply an averaging w/o     
+    if(sum_weight2>0) {
+      v[k][j][i] = vtmp/sum_weight2; //Done!
+      if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/o enforcing upwinding. (2nd attempt)\n",
+                          i,j,k);
+      continue;
+    }
 
     // Our last resort: keep the pressure and velocity (both normal & TANGENTIAL) at the current node, 
     // find a valid density nearby. (In this case, the solution may be different for different domain
@@ -582,7 +604,8 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
               continue; //this neighbor is outside the physical domain. Skip.
   
             if(!ID.IsHere(neighi,neighj,neighk,true/*include_ghost*/))
-              continue; //this neighbor is outside the current subdomain
+              continue; //this neighbor is outside the current subdomain (TODO: Hence, different subdomain partitions
+                        //may affect the results. This can be fixed in future)
 
             if(id[neighk][neighj][neighi] != id[k][j][i])
               continue; //this neighbor has a different ID. Skip it.
@@ -619,12 +642,23 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
 
     //Very unlikely. This means there is no neighbors within max_layer that have the same ID!!
     if(sum_weight==0) { 
-      fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). No valid "
-                     "neighbors within %d layers.\033[0m\n", 
+      fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). "
+                     "Id:%d->%d. No valid neighbors within %d layers.\033[0m\n", 
                      i,j,k, coords[k][j][i][0], coords[k][j][i][1],
-                     coords[k][j][i][2], varFcn[id[k][j][i]]->failsafe_density, max_layer);
+                     coords[k][j][i][2], varFcn[id[k][j][i]]->failsafe_density, (int)idn[k][j][i], (int)id[k][j][i], max_layer);
       v[k][j][i][0] = varFcn[id[k][j][i]]->failsafe_density;
+      failure++;
     }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &failure, 1, MPI_INT, MPI_SUM, comm);
+
+  if(failure>0) {
+    ID.RestoreDataPointerAndInsert();
+    ID.WriteToVTRFile("ID.vtr");
+    IDn.RestoreDataPointerAndInsert();
+    IDn.WriteToVTRFile("IDn.vtr");
+    exit_mpi();
   }
 
   V.RestoreDataPointerAndInsert(); //insert data & communicate with neighbor subd's
@@ -632,6 +666,7 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
   ID.RestoreDataPointerToLocalVector();
   IDn.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
+
 
 }
 
@@ -802,12 +837,12 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 //-------------------------------------------------------------------------
 
 int
-MultiPhaseOperator::ConsolidateMultipleLevelSets(vector<SpaceVariable3D*> &Phi)
+MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVariable3D*> &Phi)
 {
 
   int ls_size = Phi.size();
 
-  if(ls_size<=1)
+  if(ls_size==0)
     return 0; //nothing to do
 
   int resolved_conflicts = 0;
@@ -818,108 +853,260 @@ MultiPhaseOperator::ConsolidateMultipleLevelSets(vector<SpaceVariable3D*> &Phi)
     phi[ls] = Phi[ls]->GetDataPointer();
 
 
-  // loop through all the nodes
-  vector<int> boundaries;
-  vector<int> owner, inter;
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) {
+  // ------------------------------------------
+  // PART I: Find & resolve cells that are
+  //         covered by more than one subdomain
+  // ------------------------------------------
 
-        boundaries.clear();
+  if(ls_size>=2) {
+    // loop through all the nodes
+    vector<int> boundaries;
+    vector<int> owner, inter;
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
 
-        //----------------------------------------------------------
-        // Find subdomains that have this node next to its boundary
-        //----------------------------------------------------------
-        for(int ls=0; ls<ls_size; ls++) {
-          if((i-1>=ii0  && phi[ls][k][j][i]*phi[ls][k][j][i-1]<=0) ||
-             (i+1<iimax && phi[ls][k][j][i]*phi[ls][k][j][i+1]<=0) ||
-             (j-1>=jj0  && phi[ls][k][j][i]*phi[ls][k][j-1][i]<=0) ||
-             (j+1<jjmax && phi[ls][k][j][i]*phi[ls][k][j+1][i]<=0) ||
-             (k-1>=kk0  && phi[ls][k][j][i]*phi[ls][k-1][j][i]<=0) ||
-             (k+1<kkmax && phi[ls][k][j][i]*phi[ls][k+1][j][i]<=0))
-            boundaries.push_back(ls);
-        }
+          boundaries.clear();
 
-        if(boundaries.size()<=1) //nothing to worry about
-          continue;
-
-        owner.clear();
-        inter.clear();
-        for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
-          if(phi[*it][k][j][i]<0) 
-            owner.push_back(*it);
-          else if(phi[*it][k][j][i]==0)
-            inter.push_back(*it);
-        }
-
-        if(owner.size()==0 && inter.size()==0)
-          continue; //this node does not belong to any of the subdomains.
-
-        if(owner.size()==1) {//great
-          continue; // do nothing
-/*
-          double new_phi = 0.0;
-          for(auto it = boundaries.begin(); it != boundaries.end(); it++)
-            new_phi += fabs(phi[*it][k][j][i]); 
-          new_phi /= boundaries.size();
-          for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
-            if(phi[*it][k][j][i]<0)
-              phi[*it][k][j][i] = -new_phi;
-            else
-              phi[*it][k][j][i] = new_phi;
-
+          //----------------------------------------------------------
+          // Find subdomains that have this node next to its boundary
+          //----------------------------------------------------------
+          for(int ls=0; ls<ls_size; ls++) {
+            if((i-1>=ii0  && phi[ls][k][j][i]*phi[ls][k][j][i-1]<=0) ||
+               (i+1<iimax && phi[ls][k][j][i]*phi[ls][k][j][i+1]<=0) ||
+               (j-1>=jj0  && phi[ls][k][j][i]*phi[ls][k][j-1][i]<=0) ||
+               (j+1<jjmax && phi[ls][k][j][i]*phi[ls][k][j+1][i]<=0) ||
+               (k-1>=kk0  && phi[ls][k][j][i]*phi[ls][k-1][j][i]<=0) ||
+               (k+1<kkmax && phi[ls][k][j][i]*phi[ls][k+1][j][i]<=0))
+              boundaries.push_back(ls);
           }
-*/
-        }
-        else if(owner.size()==0) {// inter.size() is not 0
-          continue; // do nothing
-/*
-          double new_phi = 0.0;
-          for(auto it = boundaries.begin(); it != boundaries.end(); it++)
-            new_phi += fabs(phi[*it][k][j][i]); 
-          new_phi /= boundaries.size();
+
+          if(boundaries.size()<=1) //nothing to worry about
+            continue;
+
+          owner.clear();
+          inter.clear();
           for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
-            if(*it==inter[0]) //you are the owner
-              phi[*it][k][j][i] = -new_phi;
-            else
-              phi[*it][k][j][i] = new_phi;
-
+            if(phi[*it][k][j][i]<0) 
+              owner.push_back(*it);
+            else if(phi[*it][k][j][i]==0)
+              inter.push_back(*it);
           }
-*/
-        }
-        else {//owner.size()>1
 
-          //1. find a unique owner
-          int new_owner = owner[0];
-          double max_phi = fabs(phi[owner[0]][k][j][i]);
-          for(int ind=1; ind<owner.size(); ind++) {
-            if(fabs(phi[owner[ind]][k][j][i])>max_phi) {
-              new_owner = owner[ind];
-              max_phi = fabs(phi[owner[ind]][k][j][i]);
+          if(owner.size()==0 && inter.size()==0)
+            continue; //this node does not belong to any of the subdomains.
+
+          if(owner.size()==1) {//great
+            continue; // do nothing
+/*
+            double new_phi = 0.0;
+            for(auto it = boundaries.begin(); it != boundaries.end(); it++)
+              new_phi += fabs(phi[*it][k][j][i]); 
+            new_phi /= boundaries.size();
+            for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
+              if(phi[*it][k][j][i]<0)
+                phi[*it][k][j][i] = -new_phi;
+              else
+                phi[*it][k][j][i] = new_phi;
+
+            }
+*/
+          }
+          else if(owner.size()==0) {// inter.size() is not 0
+            continue; // do nothing
+/*
+            double new_phi = 0.0;
+            for(auto it = boundaries.begin(); it != boundaries.end(); it++)
+              new_phi += fabs(phi[*it][k][j][i]); 
+            new_phi /= boundaries.size();
+            for(auto it = boundaries.begin(); it != boundaries.end(); it++) {
+              if(*it==inter[0]) //you are the owner
+                phi[*it][k][j][i] = -new_phi;
+              else
+                phi[*it][k][j][i] = new_phi;
+
+            }
+*/
+          }
+          else {//owner.size()>1
+
+            //1. find a unique owner
+            int new_owner = owner[0];
+            double max_phi = fabs(phi[owner[0]][k][j][i]);
+            for(int ind=1; ind<owner.size(); ind++) {
+              if(fabs(phi[owner[ind]][k][j][i])>max_phi) {
+                new_owner = owner[ind];
+                max_phi = fabs(phi[owner[ind]][k][j][i]);
+              }
+            }
+
+            //2. get a new phi (abs. value)
+            double new_phi = 0.0;
+            for(auto it = owner.begin(); it != owner.end(); it++)
+              new_phi += fabs(phi[*it][k][j][i]); 
+            new_phi /= owner.size();
+
+            //3. update all the involved level set functions
+            for(auto it = owner.begin(); it != owner.end(); it++) {
+              if(*it==new_owner) //you are the owner
+                phi[*it][k][j][i] = -new_phi;
+              else
+                phi[*it][k][j][i] = new_phi;
+
+            }
+
+            resolved_conflicts++;
+          }
+        }
+  }
+
+
+  // ------------------------------------------
+  // PART II: (Optional) Find & resolve cells 
+  //          that are trapped between material
+  //          interfaces
+  // ------------------------------------------
+
+  if(iod.multiphase.resolve_isolated_cells_frequency>0 &&
+     time_step % iod.multiphase.resolve_isolated_cells_frequency == 0) {
+
+    int NX, NY, NZ;
+    coordinates.GetGlobalSize(&NX, &NY, &NZ);
+    
+    // loop through the domain interior
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+
+          bool background_cell = true; 
+          for(int ls=0; ls<ls_size; ls++) {
+            if(phi[ls][k][j][i]<0) {
+              background_cell = false; 
+              break; //not a background cell (ID != 0)
             }
           }
+          if(!background_cell)
+            continue;
 
-          //2. get a new phi (abs. value)
-          double new_phi = 0.0;
-          for(auto it = owner.begin(); it != owner.end(); it++)
-            new_phi += fabs(phi[*it][k][j][i]); 
-          new_phi /= owner.size();
-
-          //3. update all the involved level set functions
-          for(auto it = owner.begin(); it != owner.end(); it++) {
-            if(*it==new_owner) //you are the owner
-              phi[*it][k][j][i] = -new_phi;
-            else
-              phi[*it][k][j][i] = new_phi;
-
+          int qi = 0; //like "Qi" in Weiqi/"Go"
+          // check neighbors to see if this is an isolated cell
+          // left neighbor
+          if(i-1>=0) {
+            bool connected = true;
+            for(int ls=0; ls<ls_size; ls++)
+              if(phi[ls][k][j][i-1]<0) {
+                connected = false;
+                break;
+              } 
+            if(connected) {
+              qi++;
+              if(qi>=2)
+                continue;
+            }
           }
+  
+          // right neighbor
+          if(i+1<NX) {
+            bool connected = true;
+            for(int ls=0; ls<ls_size; ls++)
+              if(phi[ls][k][j][i+1]<0) {
+                connected = false;
+                break;
+              } 
+            if(connected) {
+              qi++;
+              if(qi>=2)
+                continue;
+            }
+          }
+ 
+          // bottom neighbor
+          if(j-1>=0) {
+            bool connected = true;
+            for(int ls=0; ls<ls_size; ls++)
+              if(phi[ls][k][j-1][i]<0) {
+                connected = false;
+                break;
+              } 
+            if(connected) {
+              qi++;
+              if(qi>=2)
+                continue;
+            }
+          }
+  
+          // top neighbor
+          if(j+1<NY) {
+            bool connected = true;
+            for(int ls=0; ls<ls_size; ls++)
+              if(phi[ls][k][j+1][i]<0) {
+                connected = false;
+                break;
+              } 
+            if(connected) {
+              qi++;
+              if(qi>=2)
+                continue;
+            }
+          }
+ 
+          // back neighbor
+          if(k-1>=0) {
+            bool connected = true;
+            for(int ls=0; ls<ls_size; ls++)
+              if(phi[ls][k-1][j][i]<0) {
+                connected = false;
+                break;
+              } 
+            if(connected) {
+              qi++;
+              if(qi>=2)
+                continue;
+            }
+          }
+  
+          // front neighbor
+          if(k+1<NZ) {
+            bool connected = true;
+            for(int ls=0; ls<ls_size; ls++)
+              if(phi[ls][k+1][j][i]<0) {
+                connected = false;
+                break;
+              } 
+            if(connected) {
+              qi++;
+              if(qi>=2)
+                continue;
+            }
+          }
+ 
+          // qi has to be 0 or 1 now
+ 
+          if(qi==1 && (time_step % 2*iod.multiphase.resolve_isolated_cells_frequency != 0))
+            continue;
 
+          // ---------------------------------------
+          // This is an isolated background cell.
+          // ---------------------------------------
+          double min_phi = DBL_MAX; 
+          int new_owner = -1;
+          for(int ls=0; ls<ls_size; ls++) {
+            if(phi[ls][k][j][i]<min_phi) {
+              new_owner = ls;
+              min_phi   = phi[ls][k][j][i];
+            }
+          }
+          assert(min_phi>=0);
+          phi[new_owner][k][j][i] = -min_phi;
+            
           resolved_conflicts++;
         }
-      }
+
+  }
 
 
   MPI_Allreduce(MPI_IN_PLACE, &resolved_conflicts, 1, MPI_INT, MPI_SUM, comm);
+
 
   for(int ls=0; ls<Phi.size(); ls++) {
     if(resolved_conflicts>0)

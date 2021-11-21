@@ -561,8 +561,10 @@ MaterialModelData::MaterialModelData()
 {
 
   eos = STIFFENED_GAS;
-  rhomin = -1.0e-14; // By default, density cannot be zero or negative
+  rhomin = 0.0; // By default, density cannot be zero or negative
   pmin = -DBL_MAX;   // By default, no clipping
+  rhomax = DBL_MAX;
+  pmax = DBL_MAX;
 
   failsafe_density = 0.0; //Giving it a nonphysical density by default (i.e. not used)
 
@@ -573,7 +575,7 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 8, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 10, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
@@ -582,6 +584,8 @@ Assigner *MaterialModelData::getAssigner()
                                  "JonesWilkinsLee", MaterialModelData::JWL);
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
   new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
+  new ClassDouble<MaterialModelData>(ca, "DensityUpperLimit", this, &MaterialModelData::rhomax);
+  new ClassDouble<MaterialModelData>(ca, "PressureUpperLimit", this, &MaterialModelData::pmax);
 
   new ClassDouble<MaterialModelData>(ca, "DensityPrescribedAtFailure", this, &MaterialModelData::failsafe_density);
 
@@ -1065,6 +1069,8 @@ MultiPhaseData::MultiPhaseData()
   riemann_normal = MESH;
 
   latent_heat_transfer = Off;
+
+  resolve_isolated_cells_frequency = -1;
 }
 
 //------------------------------------------------------------------------------
@@ -1072,7 +1078,7 @@ MultiPhaseData::MultiPhaseData()
 void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
@@ -1098,6 +1104,9 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
     (ca, "LatentHeatTransfer", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::latent_heat_transfer), 2,
      "Off", 0, "On", 1);
+
+  new ClassInt<MultiPhaseData>(ca, "ResolveIsolatedCellsFrequency", 
+        this, &MultiPhaseData::resolve_isolated_cells_frequency);
 
 }
 

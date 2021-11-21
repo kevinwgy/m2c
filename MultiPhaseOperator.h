@@ -57,7 +57,7 @@ public:
                              SpaceVariable3D &V, vector<int> &phi_updated, vector<Int3> *new_useful_nodes);
 
   //! if the boundaries of multiple material subdomains meet, ensure that the phi's are consistent
-  int ConsolidateMultipleLevelSets(vector<SpaceVariable3D*> &Phi);
+  int ResolveConflictsInLevelSets(int time_step, vector<SpaceVariable3D*> &Phi);
 
   void Destroy();
 
