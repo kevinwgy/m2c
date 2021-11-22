@@ -1912,15 +1912,18 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     for(int j=jj0; j<jjmax; j++) 
       for(int i=ii0; i<iimax; i++) {
         f[k][j][i] = 0.0; //setting f[k][j][i][0] = ... = f[k][j][i][4] = 0.0;
+
 /*
-        if(i==339 && j==50 && k==0)
+        if(i==352 && j==50 && k==0)
           fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): %e %e %e %e %e (%d).\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
                   coords[k][j][i][2], v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i]);
-*/
-        if(v[k][j][i][0]>1.0) {
+
+        if(k==0 && j>40 && (v[k][j][i][0]>1.0 || v[k][j][i][4]>6e10)) {
           fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): %e %e %e %e %e (%d).\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
                   coords[k][j][i][2], v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i]);
+          exit(-1);
         }
+*/
       }
 
 
@@ -2422,6 +2425,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
                                         SpaceVariable3D &ID)
 {
 
+  Vec5D*** v  = (Vec5D***) V.GetDataPointer();
   Vec5D*** vl = (Vec5D***) Vl.GetDataPointer();
   Vec5D*** vr = (Vec5D***) Vr.GetDataPointer();
   Vec5D*** vb = (Vec5D***) Vb.GetDataPointer();
@@ -2436,6 +2440,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
   // Verify hyperbolicity (i.e. c^2 > 0).
   //------------------------------------
   int nClipped = 0;
+  bool clipped;
   bool error = false;
   int boundary;
   int myid;
@@ -2453,41 +2458,90 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
         myid = id[k][j][i];
 
         if(boundary==0) {//interior
-          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
-          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
-          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
-          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
-          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
-          nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
-         
+          clipped = varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
+          if(clipped) { //go back to constant reconstruction
+            vl[k][j][i] = v[k][j][i];
+            nClipped++;
+          }
+          clipped = varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
+          if(clipped) {
+            vr[k][j][i] = v[k][j][i];
+            nClipped++;
+          }
+          clipped = varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
+          if(clipped) {
+            vb[k][j][i] = v[k][j][i];
+            nClipped++;
+          }
+          clipped = varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
+          if(clipped) {
+            vt[k][j][i] = v[k][j][i];
+            nClipped++;
+          }
+          clipped = varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
+          if(clipped) {
+            vk[k][j][i] = v[k][j][i];
+            nClipped++;
+          }
+          clipped = varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
+          if(clipped) {
+            vf[k][j][i] = v[k][j][i];
+            nClipped++;
+          }
+
           error = varFcn[myid]->CheckState(vl[k][j][i]) || varFcn[myid]->CheckState(vr[k][j][i]) || 
                   varFcn[myid]->CheckState(vb[k][j][i]) || varFcn[myid]->CheckState(vt[k][j][i]) ||
                   varFcn[myid]->CheckState(vk[k][j][i]) || varFcn[myid]->CheckState(vf[k][j][i]);
-        } else {//boundary face
+        } 
+        else {//boundary face
           if(i==ii0) {
-            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
+            clipped = varFcn[myid]->ClipDensityAndPressure(vr[k][j][i]);
+            if(clipped) {
+              vr[k][j][i] = v[k][j][i];
+              nClipped++;
+            }
             error = error || varFcn[myid]->CheckState(vr[k][j][i]);
           } else if (i==iimax-1) {
-            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
+            clipped = varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
+            if(clipped) {
+              vl[k][j][i] = v[k][j][i];
+              nClipped++;
+            }
             error = error || varFcn[myid]->CheckState(vl[k][j][i]);
           } else if (j==jj0) {
-            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
+            clipped = varFcn[myid]->ClipDensityAndPressure(vt[k][j][i]);
+            if(clipped) {
+              vt[k][j][i] = v[k][j][i];
+              nClipped++;
+            }
             error = error || varFcn[myid]->CheckState(vt[k][j][i]);
           } else if (j==jjmax-1) {
-            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
+            clipped = varFcn[myid]->ClipDensityAndPressure(vb[k][j][i]);
+            if(clipped) {
+              vb[k][j][i] = v[k][j][i];
+              nClipped++;
+            }
             error = error || varFcn[myid]->CheckState(vb[k][j][i]);
           } else if (k==kk0) {
-            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
+            clipped = varFcn[myid]->ClipDensityAndPressure(vf[k][j][i]);
+            if(clipped) {
+              vf[k][j][i] = v[k][j][i];
+              nClipped++;
+            }
             error = error || varFcn[myid]->CheckState(vf[k][j][i]);
           } else if (k==kkmax-1) {
-            nClipped += (int)varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
+            clipped = varFcn[myid]->ClipDensityAndPressure(vk[k][j][i]);
+            if(clipped) {
+              vk[k][j][i] = v[k][j][i];
+              nClipped++;
+            }
             error = error || varFcn[myid]->CheckState(vk[k][j][i]);
           } 
         }
 
         if(error) {
           fprintf(stderr, "\033[0;31m*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\033[0m\n", i,j,k, myid);
-          //fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+          fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
           fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
           fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
           fprintf(stderr, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
@@ -2503,6 +2557,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
   if(nClipped && verbose>0)
     print("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
  
+  V.RestoreDataPointerToLocalVector(); //no changes made
   Vl.RestoreDataPointerToLocalVector(); //no need to communicate
   Vr.RestoreDataPointerToLocalVector(); 
   Vb.RestoreDataPointerToLocalVector(); 

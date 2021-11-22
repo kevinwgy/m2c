@@ -1012,6 +1012,7 @@ void SchemesData::setup(const char *name, ClassAssigner *father)
 ExactRiemannSolverData::ExactRiemannSolverData()
 {
   maxIts_main = 200;
+  maxIts_bracket = 100;
   maxIts_shock = 200;
   numSteps_rarefaction = 100;
   tol_main = 1.0e-4; //applied to both pressure and velocity
@@ -1027,10 +1028,13 @@ ExactRiemannSolverData::ExactRiemannSolverData()
 void ExactRiemannSolverData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 9, father);
+  ClassAssigner *ca = new ClassAssigner(name, 10, father);
 
   new ClassInt<ExactRiemannSolverData>(ca, "MaxIts", this, 
                                        &ExactRiemannSolverData::maxIts_main);
+
+  new ClassInt<ExactRiemannSolverData>(ca, "MaxItsBracketing", this, 
+                                       &ExactRiemannSolverData::maxIts_bracket);
 
   new ClassInt<ExactRiemannSolverData>(ca, "MaxItsShock", this, 
                                        &ExactRiemannSolverData::maxIts_shock);
@@ -1070,7 +1074,7 @@ MultiPhaseData::MultiPhaseData()
 
   latent_heat_transfer = Off;
 
-  resolve_isolated_cells_frequency = -1;
+  levelset_correction_frequency = -1;
 }
 
 //------------------------------------------------------------------------------
@@ -1105,8 +1109,8 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::latent_heat_transfer), 2,
      "Off", 0, "On", 1);
 
-  new ClassInt<MultiPhaseData>(ca, "ResolveIsolatedCellsFrequency", 
-        this, &MultiPhaseData::resolve_isolated_cells_frequency);
+  new ClassInt<MultiPhaseData>(ca, "LevelSetCorrectionFrequency", 
+        this, &MultiPhaseData::levelset_correction_frequency);
 
 }
 

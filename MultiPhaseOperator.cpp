@@ -187,18 +187,22 @@ MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariabl
 
 //-----------------------------------------------------
 // Section 4.2.4 of Arthur Rallu's thesis
-void
+int 
 MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, 
-                        SpaceVariable3D &ID, SpaceVariable3D &V, RiemannSolutions &riemann_solutions)
+                        SpaceVariable3D &ID, SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
+                        vector<Int3> &unresolved)
 {
+
+  int unresolved_cells = 0;
+
   switch (iod.multiphase.phasechange_type) {
 
     case MultiPhaseData::RIEMANN_SOLUTION :
-      UpdateStateVariablesByRiemannSolutions(IDn, ID, V, riemann_solutions);
+      unresolved_cells = UpdateStateVariablesByRiemannSolutions(IDn, ID, V, riemann_solutions, unresolved);
       break;
 
     case MultiPhaseData::EXTRAPOLATION :
-      UpdateStateVariablesByExtrapolation(IDn, ID, V);
+      unresolved_cells = UpdateStateVariablesByExtrapolation(IDn, ID, V, unresolved);
       break;
 
     default :
@@ -206,18 +210,28 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
                   (int)iod.multiphase.phasechange_type);
   }
 
+  if(unresolved_cells>0)
+    return unresolved_cells; //Skipping whatever below. Will go back to time-integrator to "correct" phi, and
+                             //come to this function again, hopefully without unresolved cells. At that time,
+                             //the functions below will be executed.
+
 
   if(trans.size()!=0 && iod.multiphase.latent_heat_transfer==MultiPhaseData::On) 
     AddLambdaToEnthalpyAfterInterfaceMotion(IDn, ID, V); // Add stored latent_heat (Lambda) to cells that 
                                                          // changed phase due to interface motion.
+                                                         
+  return 0;
+
 }
 
 //-----------------------------------------------------
 
-void
+int
 MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn, 
-                        SpaceVariable3D &ID, SpaceVariable3D &V, RiemannSolutions &riemann_solutions)
+                        SpaceVariable3D &ID, SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
+                        vector<Int3> &still_unresolved)
 {
+
   // extract info
   double*** idn = (double***)IDn.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
@@ -255,9 +269,12 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
 
   // Fix the unresolved nodes (if any)
   int nUnresolved = unresolved.size();
+  int nStillUnresolved = 0;
   MPI_Allreduce(MPI_IN_PLACE, &nUnresolved, 1, MPI_INT, MPI_SUM, comm);
   if(nUnresolved) //some of the subdomains have unresolved nodes
-    FixUnresolvedNodes(unresolved, IDn, ID, V); 
+    nStillUnresolved = FixUnresolvedNodes(unresolved, IDn, ID, V, still_unresolved); 
+
+  return nStillUnresolved;
 
 } 
 
@@ -377,9 +394,9 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
 
 //-----------------------------------------------------
 
-void
+int
 MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn, 
-                        SpaceVariable3D &ID, SpaceVariable3D &V)
+                        SpaceVariable3D &ID, SpaceVariable3D &V, vector<Int3> &still_unresolved)
 {
   // extract info
   double*** idn = (double***)IDn.GetDataPointer();
@@ -467,18 +484,27 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
 
   // Fix the unresolved nodes (if any)
   int nUnresolved = unresolved.size();
+  int nStillUnresolved = 0;
   MPI_Allreduce(MPI_IN_PLACE, &nUnresolved, 1, MPI_INT, MPI_SUM, comm);
   if(nUnresolved) //some of the subdomains have unresolved nodes
-    FixUnresolvedNodes(unresolved, IDn, ID, V); 
+    nStillUnresolved = FixUnresolvedNodes(unresolved, IDn, ID, V, still_unresolved); 
+
+
+  return nStillUnresolved;
 
 }
 
 //-----------------------------------------------------
 
-void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
-                                            SpaceVariable3D &V)
+int
+MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
+                                       SpaceVariable3D &V, vector<Int3> &still_unresolved,
+                                       bool apply_failsafe_density) //by default, apply_failsafe_density = false
 {
+
   // Note: all the processor cores will enter this function even if only one or a few have unresolved nodes
+
+  still_unresolved.clear();
 
   // extract info
   double*** idn = (double***)IDn.GetDataPointer();
@@ -498,13 +524,15 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
 
   bool reset = false; //whether v[k][j][i] has been reset
 
-  int failure = 0;
+  int nStillUnresolved = 0;
 
   for(auto it = unresolved.begin(); it != unresolved.end(); it++) { 
 
-    k = (*it)[0];
+    k = (*it)[0]; //order is k,j,i
     j = (*it)[1];
     i = (*it)[2];
+
+    assert(idn[k][j][i] != id[k][j][i]);
 
     Vec3D& x0(coords[k][j][i]);
 
@@ -582,8 +610,8 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
     // if still unresolved, try to apply an averaging w/o     
     if(sum_weight2>0) {
       v[k][j][i] = vtmp/sum_weight2; //Done!
-      if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/o enforcing upwinding. (2nd attempt)\n",
-                          i,j,k);
+      if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/o enforcing upwinding."
+                            " (2nd attempt)\n", i,j,k);
       continue;
     }
 
@@ -642,24 +670,33 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
 
     //Very unlikely. This means there is no neighbors within max_layer that have the same ID!!
     if(sum_weight==0) { 
-      fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). "
-                     "Id:%d->%d. No valid neighbors within %d layers.\033[0m\n", 
-                     i,j,k, coords[k][j][i][0], coords[k][j][i][1],
-                     coords[k][j][i][2], varFcn[id[k][j][i]]->failsafe_density, (int)idn[k][j][i], (int)id[k][j][i], max_layer);
-      v[k][j][i][0] = varFcn[id[k][j][i]]->failsafe_density;
-      failure++;
+
+      //Treatment 1 (default): Store the (still) unresolved cells, and update Phi. Then, update material
+      //    ID and state variables again.
+      //Treatment 2: apply a constant density.
+
+      if(id[k][j][i]!=0 || apply_failsafe_density) {
+        fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). "
+                       "Id:%d->%d. No valid neighbors within %d layers.\033[0m\n", 
+                       i,j,k, coords[k][j][i][0], coords[k][j][i][1],
+                       coords[k][j][i][2], varFcn[id[k][j][i]]->failsafe_density, (int)idn[k][j][i], (int)id[k][j][i], 
+                       max_layer);
+        v[k][j][i][0] = varFcn[id[k][j][i]]->failsafe_density;
+      } else { //id[k][j][i] = 0 && not applying failsafe
+        fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e). "
+                       "Id:%d->%d. No valid neighbors within %d layers. Trying to correct the level set functions\033[0m\n", 
+                       i,j,k, coords[k][j][i][0], coords[k][j][i][1],
+                       coords[k][j][i][2], (int)idn[k][j][i], (int)id[k][j][i], max_layer);
+        still_unresolved.push_back(Int3(k,j,i)); //order: k,j,i
+        nStillUnresolved++;
+      }
     }
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &failure, 1, MPI_INT, MPI_SUM, comm);
 
-  if(failure>0) {
-    ID.RestoreDataPointerAndInsert();
-    ID.WriteToVTRFile("ID.vtr");
-    IDn.RestoreDataPointerAndInsert();
-    IDn.WriteToVTRFile("IDn.vtr");
-    exit_mpi();
-  }
+  if(!apply_failsafe_density) //check if there are cells still unresolved. If yes, it would prompt local update of level sets
+    MPI_Allreduce(MPI_IN_PLACE, &nStillUnresolved, 1, MPI_INT, MPI_SUM, comm);
+
 
   V.RestoreDataPointerAndInsert(); //insert data & communicate with neighbor subd's
 
@@ -667,6 +704,8 @@ void MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVaria
   IDn.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
 
+
+  return nStillUnresolved; //if the failsafe strategy has been applied, this will always be 0
 
 }
 
@@ -845,6 +884,14 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
   if(ls_size==0)
     return 0; //nothing to do
 
+
+  // whether perform some optional "improvements"
+  bool optional_improvements = false;
+  if(iod.multiphase.levelset_correction_frequency>0 &&
+     time_step % iod.multiphase.levelset_correction_frequency == 0)
+    optional_improvements = true;
+
+
   int resolved_conflicts = 0;
 
   vector<double***> phi(ls_size, NULL);
@@ -897,8 +944,10 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
             continue; //this node does not belong to any of the subdomains.
 
           if(owner.size()==1) {//great
-            continue; // do nothing
-/*
+
+            if(!optional_improvements)
+              continue; // do nothing
+
             double new_phi = 0.0;
             for(auto it = boundaries.begin(); it != boundaries.end(); it++)
               new_phi += fabs(phi[*it][k][j][i]); 
@@ -910,11 +959,12 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
                 phi[*it][k][j][i] = new_phi;
 
             }
-*/
           }
           else if(owner.size()==0) {// inter.size() is not 0
-            continue; // do nothing
-/*
+
+            if(!optional_improvements)
+              continue; // do nothing
+
             double new_phi = 0.0;
             for(auto it = boundaries.begin(); it != boundaries.end(); it++)
               new_phi += fabs(phi[*it][k][j][i]); 
@@ -926,7 +976,6 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
                 phi[*it][k][j][i] = new_phi;
 
             }
-*/
           }
           else {//owner.size()>1
 
@@ -967,8 +1016,7 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
   //          interfaces
   // ------------------------------------------
 
-  if(iod.multiphase.resolve_isolated_cells_frequency>0 &&
-     time_step % iod.multiphase.resolve_isolated_cells_frequency == 0) {
+  if(optional_improvements) {
 
     int NX, NY, NZ;
     coordinates.GetGlobalSize(&NX, &NY, &NZ);
@@ -1082,9 +1130,6 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
  
           // qi has to be 0 or 1 now
  
-          if(qi==1 && (time_step % 2*iod.multiphase.resolve_isolated_cells_frequency != 0))
-            continue;
-
           // ---------------------------------------
           // This is an isolated background cell.
           // ---------------------------------------
@@ -1108,7 +1153,7 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
   MPI_Allreduce(MPI_IN_PLACE, &resolved_conflicts, 1, MPI_INT, MPI_SUM, comm);
 
 
-  for(int ls=0; ls<Phi.size(); ls++) {
+  for(int ls=0; ls<ls_size; ls++) {
     if(resolved_conflicts>0)
       Phi[ls]->RestoreDataPointerAndInsert();
     else
@@ -1117,6 +1162,72 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
 
 
   return resolved_conflicts;
+
+}
+
+//-------------------------------------------------------------------------
+
+void
+MultiPhaseOperator::UpdateLevelSetsInUnresolvedCells(vector<SpaceVariable3D*> &Phi, vector<Int3> &unresolved)
+{
+
+  //Note that "unresolved" may be non-empty only for some of the processor cores / subdomains
+  //What we do here is very similar to "Part II" in function ResolveConflictsInLevelSets
+  //Currently, this only handles unresolved *background* cells (i.e. ID = 0)
+
+  int ls_size = Phi.size();
+
+  if(ls_size==0)
+    return; //nothing to do
+
+  vector<double***> phi(ls_size, NULL);
+
+  for(int ls=0; ls<ls_size; ls++)
+    phi[ls] = Phi[ls]->GetDataPointer();
+
+
+  // ---------------------------------------------------------------
+  // Resolve *background* cells that are trapped between material interfaces
+  // ---------------------------------------------------------------
+
+  int NX, NY, NZ, i, j, k;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+  for(auto it = unresolved.begin(); it != unresolved.end(); it++) {
+
+    k = (*it)[0]; //order should be k,j,i
+    j = (*it)[1];
+    i = (*it)[2];
+
+    bool background_cell = true; 
+    for(int ls=0; ls<ls_size; ls++) {
+      if(phi[ls][k][j][i]<0) {
+        background_cell = false; 
+        break; //not a background cell (ID != 0)
+      }
+    }
+    if(!background_cell)
+      continue;
+
+    // ---------------------------------------
+    // This is an "isolated" background cell.
+    // ---------------------------------------
+    double min_phi = DBL_MAX; 
+    int new_owner = -1;
+    for(int ls=0; ls<ls_size; ls++) {
+      if(phi[ls][k][j][i]<min_phi) {
+        new_owner = ls;
+        min_phi   = phi[ls][k][j][i];
+      }
+    }
+    assert(min_phi>=0);
+    phi[new_owner][k][j][i] = -min_phi;
+      
+  }
+
+
+  for(int ls=0; ls<ls_size; ls++)
+    Phi[ls]->RestoreDataPointerAndInsert();
 
 }
 

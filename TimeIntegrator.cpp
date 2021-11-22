@@ -397,9 +397,23 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
   // Update ID and V (skipped for single-material simulations)
   if(lso.size()) {
+
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
+
     mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
-    mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions); //update V
+
+    vector<Int3> unresolved;
+    int nUnresolved = mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions,
+                                                                   unresolved); //update V
+    if(nUnresolved) {//note that "unresolved" is not combined over all the subdomains, could be empty for some
+      //update phi(s) at the unresolved cells
+      mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
+      for(int i=0; i<Phi.size(); i++)
+        lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true); //will NOT change sign of phi
+      mpo.UpdateMaterialID(Phi, ID); //should only update ID of unresolved cells      
+      mpo.FixUnresolvedNodes(unresolved, IDn, ID, V, unresolved/*not used*/, true); 
+    }
+
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }

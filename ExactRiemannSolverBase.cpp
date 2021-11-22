@@ -20,6 +20,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
                             ExactRiemannSolverData &iod_riemann) : vf(vf_)
 {
   maxIts_main          = iod_riemann.maxIts_main;
+  maxIts_bracket       = iod_riemann.maxIts_bracket;
   maxIts_shock         = iod_riemann.maxIts_shock;
   numSteps_rarefaction = iod_riemann.numSteps_rarefaction;
   tol_main             = iod_riemann.tol_main; //applied to both pressure and velocity!
@@ -163,18 +164,17 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
     // 2.1: Update p using the Brent method (safeguarded secant method)
     denom = f1 - f0;
     if(denom == 0) {
-      cout << "*** Error: Division-by-zero while using the secant method to solve the Riemann problem." << endl;
-      cout << "           left state: " << rhol << ", " << ul << ", " << pl << ", " << idl << " | right: " 
+      cout << "Warning: Division-by-zero while using the secant method to solve the Riemann problem." << endl;
+      cout << "         left state: " << rhol << ", " << ul << ", " << pl << ", " << idl << " | right: " 
            << rhor << ", " << ur << ", " << pr << ", " << idr << endl;
-      cout << "           dir = " << dir[0] << "," << dir[1] << "," << dir[2]
+      cout << "         dir = " << dir[0] << "," << dir[1] << "," << dir[2]
            << ", f0 = " << f0 << ", f1 = " << f1 << endl;
-      exit(-1);
-    }
-
-    p2 = p2 - f2*(p1-p0)/denom;  // update p2
-
-    if(p2<=p0 || p2>=p1) //discard and switch to bisection
       p2 = 0.5*(p0+p1);
+    } else {
+      p2 = p2 - f2*(p1-p0)/denom;  // update p2
+      if(p2<=p0 || p2>=p1) //discard and switch to bisection
+        p2 = 0.5*(p0+p1);
+    }
 
     //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
 
@@ -482,7 +482,7 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
     p_fmin = p1;  rhol_fmin = rhol1;  rhor_fmin = rhor1;  ul_fmin = ul1;  ur_fmin = ur1;
   }
 
-  for(i=0; i<maxIts_main; i++) {
+  for(i=0; i<maxIts_bracket; i++) {
     
     f0 = ul0 - ur0;
     f1 = ul1 - ur1;
@@ -502,7 +502,7 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
       //p2 = p1 + *(p1-p0); 
     }
 
-    if(p2<min_pressure || i==int(maxIts_main/2) ) {//does not look right. reset to a small non-negative pressure
+    if(p2<min_pressure || i==int(maxIts_bracket/2) ) {//does not look right. reset to a small non-negative pressure
       p2 = 1.0e-8; 
     }
 
@@ -516,7 +516,7 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
       fprintf(stderr, "  -- p2 = %e (failed)\n", p2);
 #endif
       //move closer to [p0, p1]
-      for(int j=0; j<maxIts_main; j++) {
+      for(int j=0; j<maxIts_bracket/2; j++) {
         if(p2<p0)     
           p2 = p0 - 0.5*(p0-p2);
         else //p2>p1
@@ -556,7 +556,7 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
 
   }
 
-  if(!success || i==maxIts_main) {
+  if(!success || i==maxIts_bracket) {
     if(verbose>=1) {
       cout << "Warning: Exact Riemann solver failed. (Unable to find a bracketing interval) " << endl;
       cout << "   left: " << std::setprecision(10) << rhol << ", " << std::setprecision(10) << ul << ", " 
@@ -633,7 +633,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
 
   // 2.1. find the first one (p0)
   dp = (pl!=pr) ? fabs(pl-pr) : 0.5*pl;
-  for(int i=0; i<maxIts_main; i++) {
+  for(int i=0; i<maxIts_bracket; i++) {
     p0 = std::min(pl,pr) + 0.01*(i+1)*(i+1)*dp;
     if(p0<min_pressure)
       p0 = pressure_at_failure; 
@@ -647,7 +647,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
       break;
   }
   if(!success) {//search in the opposite direction
-    for(int i=0; i<maxIts_main; i++) {
+    for(int i=0; i<maxIts_bracket; i++) {
       p0 = std::min(pl,pr) - 0.01*(i+1)*(i+1)*dp;
       if(p0<min_pressure)
         p0 = pressure_at_failure; 
@@ -665,14 +665,14 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
   if(!success) {
     fprintf(stderr,"*** Error: Failed to find the first initial guess (p0) in the 1D Riemann solver (it = %d). "
                    "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
-                    maxIts_main, rhol, ul, pl, idl, rhor, ur, pr, idr);
+                    maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
   }
       
 myLabel:
   // 2.2. find the second one (p1)
   dp = std::min(fabs(p0-pl), fabs(p0-pr));
-  for(int i=0; i<maxIts_main; i++) {
+  for(int i=0; i<maxIts_bracket; i++) {
     p1 = p0 + 0.01*(i+1)*(i+1)*dp;
     success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
     success = success && ComputeRhoUStar(3, rhor, ur, pr, p1, idr, rhor, rhor0, rhor1, ur1);
@@ -680,7 +680,7 @@ myLabel:
       break;
   }
   if(!success) //search in the opposite direction
-    for(int i=0; i<maxIts_main; i++) {
+    for(int i=0; i<maxIts_bracket; i++) {
       p1 = p0 - 0.01*(i+1)*(i+1)*dp;
       if(p1<min_pressure)
         p1 = pressure_at_failure*1000.0; //so it is not the same as p0
@@ -692,7 +692,7 @@ myLabel:
   if(!success) {
     fprintf(stderr,"*** Error: Failed to find the second initial guess (p1) in the 1D Riemann solver (it = %d). "
                    "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
-                    maxIts_main, rhol, ul, pl, idl, rhor, ur, pr, idr);
+                    maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
   }
  

@@ -13,7 +13,7 @@ class ExactRiemannSolverBase {
 protected:
   vector<VarFcnBase*>& vf; 
 
-  int maxIts_main, maxIts_shock;
+  int maxIts_main, maxIts_bracket, maxIts_shock;
   int numSteps_rarefaction;
   double tol_main;
   double tol_shock;

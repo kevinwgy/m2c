@@ -246,7 +246,6 @@ int main(int argc, char* argv[])
     integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step); 
     //----------------------------------------------------
 
-
     out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, false/*force_write*/);
 
   }

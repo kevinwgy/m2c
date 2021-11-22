@@ -525,6 +525,7 @@ struct SchemesData {
 struct ExactRiemannSolverData {
 
   int maxIts_main;
+  int maxIts_bracket;
   int maxIts_shock;
   int numSteps_rarefaction;
   double tol_main;
@@ -565,7 +566,8 @@ struct MultiPhaseData {
                               //      is about whether this operation will be done if a phase
                               //      change occurs due to the motion of material interface(s).
 
-  int resolve_isolated_cells_frequency; //!< only used when 2 or more level set functions are activated
+  int levelset_correction_frequency; //!< frequency of eliminating small gaps or inconsistencies
+                                     //   between multiple level set functions
 
   MultiPhaseData();
   ~MultiPhaseData() {}
