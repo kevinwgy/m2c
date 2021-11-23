@@ -55,7 +55,7 @@ public:
 
   int FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
                          SpaceVariable3D &V, vector<Int3> &still_unresolved,
-                         bool apply_failsafe_density = false); 
+                         bool apply_failsafe_density); 
 
   //! detect phase transitions and update Phi, ID, and V
   int UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,

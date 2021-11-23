@@ -569,6 +569,8 @@ struct MultiPhaseData {
   int levelset_correction_frequency; //!< frequency of eliminating small gaps or inconsistencies
                                      //   between multiple level set functions
 
+  OnOff apply_failsafe_density;
+
   MultiPhaseData();
   ~MultiPhaseData() {}
 

@@ -272,7 +272,8 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
   int nStillUnresolved = 0;
   MPI_Allreduce(MPI_IN_PLACE, &nUnresolved, 1, MPI_INT, MPI_SUM, comm);
   if(nUnresolved) //some of the subdomains have unresolved nodes
-    nStillUnresolved = FixUnresolvedNodes(unresolved, IDn, ID, V, still_unresolved); 
+    nStillUnresolved = FixUnresolvedNodes(unresolved, IDn, ID, V, still_unresolved,
+                                          iod.multiphase.apply_failsafe_density==MultiPhaseData::On); 
 
   return nStillUnresolved;
 
@@ -487,7 +488,8 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
   int nStillUnresolved = 0;
   MPI_Allreduce(MPI_IN_PLACE, &nUnresolved, 1, MPI_INT, MPI_SUM, comm);
   if(nUnresolved) //some of the subdomains have unresolved nodes
-    nStillUnresolved = FixUnresolvedNodes(unresolved, IDn, ID, V, still_unresolved); 
+    nStillUnresolved = FixUnresolvedNodes(unresolved, IDn, ID, V, still_unresolved,
+                                          iod.multiphase.apply_failsafe_density==MultiPhaseData::On); 
 
 
   return nStillUnresolved;
@@ -499,7 +501,7 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
 int
 MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
                                        SpaceVariable3D &V, vector<Int3> &still_unresolved,
-                                       bool apply_failsafe_density) //by default, apply_failsafe_density = false
+                                       bool apply_failsafe_density) 
 {
 
   // Note: all the processor cores will enter this function even if only one or a few have unresolved nodes

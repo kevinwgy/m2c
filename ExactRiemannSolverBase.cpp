@@ -125,8 +125,22 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                     &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      cout << "*** Error: Riemann solver failed (really strange. software bug)." << endl;
-      exit(-1);
+      cout << "Warning: Riemann solver failed to find an initial bracketing interval (Returning initial states as solution)." << endl;
+      for(int i=0; i<5; i++) {
+        Vsm[i] = Vm[i];
+        Vsp[i] = Vp[i];
+      }
+      double u_avg = 0.5*(ul+ur);
+      if(u_avg >= 0) {
+        id = idl;
+        for(int i=0; i<5; i++)
+          Vs[i] = Vm[i];
+      } else {
+        id = idr;
+        for(int i=0; i<5; i++)
+          Vs[i] = Vp[i];
+      }
+      return 1;
     }
 
     FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol2, rhor2, 0.5*(ul2+ur2), p1,
@@ -179,6 +193,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
     //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
 
 
+try_again:
 
     // 2.2: Calculate ul2, ur2 
     success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl/*inputs*/, 
@@ -187,9 +202,15 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                   &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      fprintf(stderr,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
-              rhol, ul, pl, idl, rhor, ur, pr, idr);
-      exit(-1);
+      //fprintf(stderr,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //        rhol, ul, pl, idl, rhor, ur, pr, idr);
+      p2 = 0.5*(p2+p0); //move closer to p0
+
+      iter++;
+      if(iter<maxIts_main)
+        goto try_again;
+      else
+        break;
     }
 
     success = ComputeRhoUStar(3, rhor, ur, pr,  p2, idr/*inputs*/, 
@@ -198,9 +219,15 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                     &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      fprintf(stderr,"*** Error: Exact Riemann solver failed (2). left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
-              rhol, ul, pl, idl, rhor, ur, pr, idr);
-      exit(-1);
+      //fprintf(stderr,"*** Error: Exact Riemann solver failed (2). left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //        rhol, ul, pl, idl, rhor, ur, pr, idr);
+      p2 = 0.5*(p2+p1); //move closer to p1
+
+      iter++;
+      if(iter<maxIts_main)
+        goto try_again;
+      else
+        break;
     }
 
     f2 = ul2 - ur2;
@@ -225,7 +252,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
     err_u = fabs(f2)/std::max(cl, cr);
 
 #if PRINT_RIEMANN_SOLUTION == 1
-    cout << "Iter " << iter << ": err_p = " << err_p << ", err_u = " << err_u << "." << endl;
+    cout << "Iter " << iter << ": p-interval = [" << p0 << ", " << p1 << "], p2 = " << p2 << ", err_p = " << err_p 
+         << ", err_u = " << err_u << "." << endl;
 #endif
 
     if( (err_p < tol_main && err_u < tol_main) || (err_p < tol_main*1e-3) || (err_u < tol_main*1e-3) )
@@ -240,18 +268,6 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   }
 
 
-
-  if(iter == maxIts_main) {
-    cout << "*** Error: Exact Riemann solver failed to converge. err_p = " << err_p
-         << ", err_u = " << err_u << "." << endl;
-    cout << "    Vm = [" << Vm[0] << ", " << Vm[1] << ", " << Vm[2] << ", " << Vm[3] << ", " << Vm[4] << "] (" << idl
-         << "),  Vp = [" << Vp[0] << ", " << Vp[1] << ", " << Vp[2] << ", " << Vp[3] << ", " << Vp[4] << "] (" << idr
-         << ")" << endl;
-      
-    exit(-1);
-  }
-  
-
   // -------------------------------
   // Step 3: Find state at xi = x = 0 (for output)
   // -------------------------------
@@ -260,6 +276,20 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                    trans_rare, Vrare_x0, //inputs
                    Vs, id, Vsm, Vsp/*outputs*/);
 
+
+  if(iter == maxIts_main) {
+    if(verbose>=1) {
+      cout << "Warning: Exact Riemann solver failed to converge. err_p = " << err_p
+           << ", err_u = " << err_u << "." << endl;
+      cout << "    Vm = [" << Vm[0] << ", " << Vm[1] << ", " << Vm[2] << ", " << Vm[3] << ", " << Vm[4] << "] (" << idl
+           << "),  Vp = [" << Vp[0] << ", " << Vp[1] << ", " << Vp[2] << ", " << Vp[3] << ", " << Vp[4] << "] (" << idr
+           << ")" << endl;
+    }
+    return 1;  //failed
+  }
+  
+
+  //success!
   return 0;
 
 }
@@ -455,14 +485,14 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
   success = FindInitialFeasiblePoints(rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
                                       p0, rhol0, rhor0, ul0, ur0, p1, rhol1, rhor1, ul1, ur1/*outputs*/);
 
+  if(!success) //This should never happen (unless user's inputs have errors)!
+    return false;
+  
 #if PRINT_RIEMANN_SOLUTION == 1
   fprintf(stderr, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ur0, p1, ul1-ur1);
   fprintf(stderr, "Searching for a bracketing interval...\n");
 #endif
 
-  if(!success) //This should never happen (unless user's inputs have errors)!
-    exit(-1);
-  
   // Step 2: Starting from the two feasible points, find a bracketing interval
   //         This step may fail, which indicates a solution may not exist for arbitrary left & right states
   //         If this happens, return the point with smallest absolute value of "f"
@@ -634,7 +664,8 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
   // 2.1. find the first one (p0)
   dp = (pl!=pr) ? fabs(pl-pr) : 0.5*pl;
   for(int i=0; i<maxIts_bracket; i++) {
-    p0 = std::min(pl,pr) + 0.01*(i+1)*(i+1)*dp;
+    p0 = std::min(pl,pr) + 0.01*(i+1)*(i+1)*std::min(dp, std::min(fabs(pl),fabs(pr)));
+
     if(p0<min_pressure)
       p0 = pressure_at_failure; 
     success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
@@ -648,7 +679,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
   }
   if(!success) {//search in the opposite direction
     for(int i=0; i<maxIts_bracket; i++) {
-      p0 = std::min(pl,pr) - 0.01*(i+1)*(i+1)*dp;
+      p0 = std::min(pl,pr) - 0.01*(i+1)*(i+1)*std::min(dp, std::min(fabs(pl),fabs(pr)));
       if(p0<min_pressure)
         p0 = pressure_at_failure; 
       success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
@@ -663,9 +694,10 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
   }
 
   if(!success) {
-    fprintf(stderr,"*** Error: Failed to find the first initial guess (p0) in the 1D Riemann solver (it = %d). "
-                   "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
-                    maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
+    if(verbose>=1)
+      fprintf(stderr,"Warning: Failed to find the first initial guess (p0) in the 1D Riemann solver (it = %d). "
+                     "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
+                      maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
   }
       
@@ -690,9 +722,10 @@ myLabel:
         break;
     } 
   if(!success) {
-    fprintf(stderr,"*** Error: Failed to find the second initial guess (p1) in the 1D Riemann solver (it = %d). "
-                   "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
-                    maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
+    if(verbose>=1)
+      fprintf(stderr,"Warning: Failed to find the second initial guess (p1) in the 1D Riemann solver (it = %d). "
+                     "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
+                      maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
   }
  
@@ -814,6 +847,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     //fprintf(stderr,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
     // integration by Runge-Kutta 4
     bool done = false;
+    double loc_tol_rarefaction = tol_rarefaction*ps_0;
     for(int i=0; i<numSteps_rarefaction*5; i++) {
 
       bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
@@ -829,14 +863,14 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       dp = ps_0 - ps_1;
 
       //Check if it went too far. If so, rewind and reduce step size
-//      fprintf(stderr,"RK4 step: -- dp = %e, dp_target = %e, dp_max = %e, ps_1 - ps = %e, tol_rarefaction = %e\n",
-//              dp, dp_target, dp_max, ps_1 - ps, tol_rarefaction);
+//      fprintf(stderr,"RK4 step: -- dp = %e, dp_target = %e, dp_max = %e, ps_1 - ps = %e, loc_tol_rarefaction = %e\n",
+//              dp, dp_target, dp_max, ps_1 - ps, loc_tol_rarefaction);
 
       if(dp > dp_max) {
         drho = drho/dp*dp_target;
         continue;
       }
-      if(ps_1 - ps < -tol_rarefaction) { //went over the hill...
+      if(ps_1 - ps < -loc_tol_rarefaction) { //went over the hill...
         if(dp!=0)
           drho = drho/dp*(ps_0 - ps);
         else
@@ -867,11 +901,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       //fprintf(stderr,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
 
       // Check if we have reached the final pressure ps
-      if(fabs(ps_1 - ps) <= tol_rarefaction) {
+      if(fabs(ps_1 - ps) <= loc_tol_rarefaction) {
         rhos = rhos_1;
         us   = us_1;
       
-        if(vf[id]->CheckState(rhos,ps)) {
+        if(vf[id]->CheckState(rhos,ps,true)) { //true: silence
 #if PRINT_RIEMANN_SOLUTION == 1
           cout << "Rarefaction solver reached a nonphysical state!" << endl;         
 #endif
@@ -901,7 +935,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     }
 
     if(!done) {
-      if(vf[id]->CheckState(rhos_1,ps_1)) {
+      if(vf[id]->CheckState(rhos_1,ps_1,true)) {
 #if PRINT_RIEMANN_SOLUTION == 1
         cout << "  " << wavenumber << "-wave: rarefaction, solver failed (unphysical state: rhos = "
              << rhos_1 << ", ps = " << ps_1 << "!)" << endl;
@@ -1024,7 +1058,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     }
 
     pair<double,double> sol;
-
+    double loc_tol_shock = tol_shock*std::min(rhos0,rhos1);
 #ifndef WITHOUT_BOOST
     //*******************************************************************
     // Calling boost function for root-finding
@@ -1036,7 +1070,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       sol.first = sol.second = rhos1;
     else {
       sol = toms748_solve(hugo, rhos0, rhos1, f0, f1,
-                          [=](double r0, double r1){return r1-r0<std::min(tol_shock,0.001*(rhos1-rhos0));}, 
+                          [=](double r0, double r1){return r1-r0<std::min(loc_tol_shock,0.001*(rhos1-rhos0));}, 
                           maxit);
     }
     //*******************************************************************
@@ -1069,7 +1103,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
           rhos0 = rhos2;
           f0    = f2;
         }
-        if(rhos1-rhos0<tol_shock) {
+        if(rhos1-rhos0<loc_tol_shock) {
           sol.first  = rhos0;
           sol.second = rhos1;
           break;
@@ -1099,7 +1133,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       return false;
     }
 
-    if(vf[id]->CheckState(rhos,ps))
+    if(vf[id]->CheckState(rhos,ps,true)) //true: silence
       return false; //nonphysical...
 
     us = (wavenumber==1) ? u - sqrt(du) : u + sqrt(du);

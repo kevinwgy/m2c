@@ -96,20 +96,21 @@ public:
     exit(-1); return 0.0;}
 
   //checks that the Euler equations are still hyperbolic
-  virtual bool CheckState(double rho, double p) const{
+  virtual bool CheckState(double rho, double p, bool silence = false) const{
     if(m2c_isnan(rho) || m2c_isnan(p)) {
-      fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n\033[0m", rho, p);
+      if(!silence)
+        fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n\033[0m", rho, p);
       return true;
     }
     if(rho <= 0.0) {
-      if(verbose>1)
+      if(!silence && verbose>1)
         fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
       return true;
     }
     double e = GetInternalEnergyPerUnitMass(rho,p);
     double c2 = GetDpdrho(rho, e) + p/rho*GetBigGamma(rho, e);
     if(c2<=0){
-      if(verbose>1)
+      if(!silence && verbose>1)
         fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
       return true;
     }
@@ -117,9 +118,10 @@ public:
   }
 
   //checks that the Euler equations are still hyperbolic
-  virtual bool CheckState(double *V) const{
+  virtual bool CheckState(double *V, bool silence = false) const{
     if(m2c_isnan(V[0]) || m2c_isnan(V[1]) || m2c_isnan(V[2]) || m2c_isnan(V[3]) || m2c_isnan(V[4])) {
-      fprintf(stderr, "\033[0;31m*** Error: CheckState failed. V = %e %e %e %e %e\n\033[0m", V[0], V[1], V[2], V[3], V[4]);
+      if(!silence)
+        fprintf(stderr, "\033[0;31m*** Error: CheckState failed. V = %e %e %e %e %e\n\033[0m", V[0], V[1], V[2], V[3], V[4]);
       return true;
     }
     return CheckState(V[0], V[4]); 

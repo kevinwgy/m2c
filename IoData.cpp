@@ -566,7 +566,7 @@ MaterialModelData::MaterialModelData()
   rhomax = DBL_MAX;
   pmax = DBL_MAX;
 
-  failsafe_density = 0.0; //Giving it a nonphysical density by default (i.e. not used)
+  failsafe_density = 1.0e-10; //a small positive number
 
 }
 
@@ -1014,10 +1014,10 @@ ExactRiemannSolverData::ExactRiemannSolverData()
   maxIts_main = 200;
   maxIts_bracket = 100;
   maxIts_shock = 200;
-  numSteps_rarefaction = 100;
+  numSteps_rarefaction = 200;
   tol_main = 1.0e-4; //applied to both pressure and velocity
-  tol_shock = 1.0e-9; //a density tolerance
-  tol_rarefaction = 1.0e-3; //a pressure tolerance
+  tol_shock = 1.0e-12; //a density tolerance (non-D)
+  tol_rarefaction = 1.0e-12; //a pressure tolerance (non-D)
   min_pressure = -1.0e8;
   failure_threshold = 0.2;
   pressure_at_failure = 1.0e-8;
@@ -1075,6 +1075,8 @@ MultiPhaseData::MultiPhaseData()
   latent_heat_transfer = Off;
 
   levelset_correction_frequency = -1;
+
+  apply_failsafe_density = On;
 }
 
 //------------------------------------------------------------------------------
@@ -1082,7 +1084,7 @@ MultiPhaseData::MultiPhaseData()
 void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
@@ -1111,6 +1113,12 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 
   new ClassInt<MultiPhaseData>(ca, "LevelSetCorrectionFrequency", 
         this, &MultiPhaseData::levelset_correction_frequency);
+
+
+  new ClassToken<MultiPhaseData>
+    (ca, "ApplyFailSafeDensity", this,
+     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::apply_failsafe_density), 2,
+     "Off", 0, "On", 1);
 
 }
 
