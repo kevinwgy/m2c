@@ -37,6 +37,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vk(comm_, &(dm_all_.ghosted1_5dof)),
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
+    Tag(comm_, &(dm_all_.ghosted1_1dof)),
     symm(NULL), visco(NULL), smooth(NULL)
 {
   
@@ -89,6 +90,7 @@ void SpaceOperator::Destroy()
   Vk.Destroy();
   Vf.Destroy();
   Utmp.Destroy();
+  Tag.Destroy();
 }
 
 //-----------------------------------------------------
@@ -1859,7 +1861,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Reconstruction w/ slope limiters.
   //------------------------------------
-  rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID);
+  if(Phi && Phi->size()>0 && iod.multiphase.conRec_depth>0) {
+    TagNodesOutsideConRecDepth(*Phi, Tag, iod.multiphase.conRec_depth);
+    rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID, &Tag, false); //false: apply const rec within depth
+  } else
+    rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID); 
 
   //------------------------------------
   // Check reconstructed states (clip & check)
@@ -2200,6 +2206,45 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   F.RestoreDataPointerToLocalVector(); //NOTE: although F has been updated, there is no need of 
                                        //      cross-subdomain communications. So, no need to 
                                        //      update the global vec.
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &Tag0, double depth)
+{
+
+  assert(depth>0);
+
+  int ls_size = Phi.size();
+  assert(ls_size>0);
+
+  vector<double***> phi(ls_size, NULL);
+  for(int ls=0; ls<ls_size; ls++)
+    phi[ls] = Phi[ls]->GetDataPointer(); 
+
+  double*** tag = Tag0.GetDataPointer();
+
+  // loop through subdomain interior
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        tag[k][j][i] = 1;
+
+        for(int ls=0; ls<ls_size; ls++) {
+          if(fabs(phi[ls][k][j][i])<depth) {
+            tag[k][j][i] = 0;
+            break;
+          }
+        }
+      }
+
+  for(int ls=0; ls<ls_size; ls++)
+    Phi[ls]->RestoreDataPointerToLocalVector();
+
+  Tag0.RestoreDataPointerToLocalVector(); //modified, but no need to communicate (Reconstructor only checks
+                                          //this tag within subdomain interior.)
 }
 
 //-----------------------------------------------------

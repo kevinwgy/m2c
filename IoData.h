@@ -555,6 +555,8 @@ struct MultiPhaseData {
 
   enum ReconstructionAtInterface {CONSTANT = 0, LINEAR = 1} recon;
 
+  double conRec_depth; //!< depth (fabs(phi)) where constant reconstruction is applied (default: 0)
+
   enum PhaseChangeType {RIEMANN_SOLUTION = 0, EXTRAPOLATION = 1} phasechange_type;
 
   enum RiemannNormal {LEVEL_SET = 0, MESH = 1, AVERAGE = 2} riemann_normal;

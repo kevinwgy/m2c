@@ -51,8 +51,12 @@ class SpaceOperator
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;
 
-  //! For temporary variable
+  //! For temporary variable (5D)
   SpaceVariable3D Utmp;
+
+  //! internal variable for temporary use (1D)
+  SpaceVariable3D Tag;
+
 
 public:
   SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -130,6 +134,9 @@ private:
   // Calculate the gradient of any variable phi at cell interface. 
   Vec3D CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
                                          Vec3D*** dxyz, double*** phi);
+
+
+  void TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &Tag0, double depth);
 
   // Utility
   inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {

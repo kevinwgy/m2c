@@ -1077,6 +1077,8 @@ MultiPhaseData::MultiPhaseData()
   levelset_correction_frequency = -1;
 
   apply_failsafe_density = On;
+
+  conRec_depth = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -1084,7 +1086,7 @@ MultiPhaseData::MultiPhaseData()
 void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 8, father);
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
@@ -1119,6 +1121,9 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
     (ca, "ApplyFailSafeDensity", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::apply_failsafe_density), 2,
      "Off", 0, "On", 1);
+
+  new ClassDouble<MultiPhaseData>(ca, "ConstantReconstructionDepth", 
+        this, &MultiPhaseData::conRec_depth);
 
 }
 

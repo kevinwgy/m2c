@@ -62,7 +62,8 @@ public:
     * performed within this function. */
   void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVariable3D &Vr, 
            SpaceVariable3D &Vb, SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
-           SpaceVariable3D *ID = NULL, SpaceVariable3D *Selected = NULL);
+           SpaceVariable3D *ID = NULL, SpaceVariable3D *Selected = NULL,
+           bool do_nothing_if_not_selected = true);
 
   /** This function applies reconstruction directly to the input variable U. In other words, no
     * conversions are done inside the function.*/

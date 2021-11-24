@@ -266,7 +266,7 @@ void Reconstructor::Destroy()
  *  performed within this function. */
 void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVariable3D &Vr,
            SpaceVariable3D &Vb, SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
-           SpaceVariable3D *ID, SpaceVariable3D *Selected)
+           SpaceVariable3D *ID, SpaceVariable3D *Selected, bool do_nothing_if_not_selected)
 {
 
   //! Constant reconstruction is trivial.
@@ -353,13 +353,14 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
         //---------------------------
         // If node is not selected, skip
         //---------------------------
-        if(sel && !sel[k][j][i])
+        if(sel && do_nothing_if_not_selected && !sel[k][j][i])
           continue;
 
         //---------------------------
-        // If node is 'fixed', trivial
+        // If node is 'fixed', trivial (const. rec.)
         //---------------------------
-        if(fixed && fixed[k][j][i]) {
+        if((fixed && fixed[k][j][i]) ||
+           (sel && !sel[k][j][i])) {
           for(int dof=0; dof<nDOF; dof++) {
             vl[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
             vr[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
@@ -664,7 +665,7 @@ RETRY:
     jj = gp->image_ijk[1];
     kk = gp->image_ijk[2];
     
-    if(sel && !sel[k][j][i])
+    if(sel && do_nothing_if_not_selected && !sel[k][j][i])
       continue;
 
     // check boundary condition
