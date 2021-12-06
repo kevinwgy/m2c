@@ -1910,18 +1910,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     for(int j=jj0; j<jjmax; j++) 
       for(int i=ii0; i<iimax; i++) {
         f[k][j][i] = 0.0; //setting f[k][j][i][0] = ... = f[k][j][i][4] = 0.0;
-
-/*
-        if(i==352 && j==50 && k==0)
-          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): %e %e %e %e %e (%d).\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
-                  coords[k][j][i][2], v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i]);
-
-        if(k==0 && j>40 && (v[k][j][i][0]>1.0 || v[k][j][i][4]>6e10)) {
-          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): %e %e %e %e %e (%d).\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1],
-                  coords[k][j][i][2], v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i]);
-          exit(-1);
-        }
-*/
       }
 
 
@@ -1981,8 +1969,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else//linear reconstruction w/ limitor
               err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
-            if(err) 
+            if(err)  {
               riemann_errors++;
+              //fprintf(stderr,"Riemann failed (%d->%d,%d,%d). left: %e %e %e %e %e (%d), right: %e %e %e %e %e (%d), Vsm = %e %e %e %e %e, Vsp = %e %e %e %e %e\n", i-1,i,j,k, v[k][j][i-1][0], v[k][j][i-1][1], v[k][j][i-1][2], v[k][j][i-1][3], v[k][j][i-1][4], (int)id[k][j][i-1],
+              //v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i], Vsm[0], Vsm[1], Vsm[2], Vsm[3], Vsm[4], Vsp[0], Vsp[1], Vsp[2], Vsp[3], Vsp[4]);
+            }
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -1990,7 +1981,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             varFcn[myid]->ClipDensityAndPressure(Vsp);
             varFcn[myid]->CheckState(Vsp);
 
-            if(riemann_solutions) {//store Riemann solution for "phase-change update"
+            if(riemann_solutions && !err) {//store Riemann solution for "phase-change update" 
               ind[0] = k; ind[1] = j; ind[2] = i;
               riemann_solutions->left[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
               ind[2] = i-1;
@@ -2057,8 +2048,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else
               err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
-            if(err) 
+            if(err) {
               riemann_errors++;
+              //fprintf(stderr,"Riemann failed between (%d,%d,%d) and (%d,%d,%d).\n", i,j-1,k, i,j,k);
+            }
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -2067,7 +2060,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             varFcn[myid]->CheckState(Vsp);
 
 
-            if(riemann_solutions) {//store Riemann solution for "phase-change update"
+            if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
               ind[0] = k; ind[1] = j; ind[2] = i;
               riemann_solutions->bottom[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
               ind[1] = j-1;
@@ -2133,8 +2126,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             else
               err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
 
-            if(err) 
+            if(err) {
               riemann_errors++;
+              //fprintf(stderr,"Riemann failed between (%d,%d,%d) and (%d,%d,%d).\n", i,j,k-1, i,j,k);
+            }
 
             //Clip Riemann solution and check it
             varFcn[neighborid]->ClipDensityAndPressure(Vsm);
@@ -2143,7 +2138,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             varFcn[myid]->CheckState(Vsp);
 
 
-            if(riemann_solutions) {//store Riemann solution for "phase-change update"
+            if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
               ind[0] = k; ind[1] = j; ind[2] = i;
               riemann_solutions->back[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
               ind[0] = k-1;

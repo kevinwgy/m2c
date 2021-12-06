@@ -79,10 +79,10 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 
 
   // Declare variables in the "star region"
-  double p0, ul0, ur0, rhol0, rhor0;
-  double p1, ul1, ur1, rhol1, rhor1; //Secand Method ("k-1","k" in Kamm, (19))
-  double p2, ul2, ur2, rhol2, rhor2; // "k+1"
-  double f0, f1, f2; //difference between ul and ur
+  double p0(DBL_MIN), ul0(0.0), ur0(0.0), rhol0(DBL_MIN), rhor0(DBL_MIN);
+  double p1(DBL_MIN), ul1(0.0), ur1(0.0), rhol1(DBL_MIN), rhor1(DBL_MIN); //Secand Method ("k-1","k" in Kamm, (19))
+  double p2(DBL_MIN), ul2(0.0), ur2(0.0), rhol2(DBL_MIN), rhor2(DBL_MIN); // "k+1"
+  double f0(0.0), f1(0.0), f2(0.0); //difference between ul and ur
 
 
   // -------------------------------
@@ -485,8 +485,10 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
   success = FindInitialFeasiblePoints(rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
                                       p0, rhol0, rhor0, ul0, ur0, p1, rhol1, rhor1, ul1, ur1/*outputs*/);
 
-  if(!success) //This should never happen (unless user's inputs have errors)!
+  if(!success) {//This should never happen (unless user's inputs have errors)!
+    p0 = p1 = pressure_at_failure;
     return false;
+  }
   
 #if PRINT_RIEMANN_SOLUTION == 1
   fprintf(stderr, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ur0, p1, ul1-ur1);
@@ -680,7 +682,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
   if(!success) {//search in the opposite direction
     for(int i=0; i<maxIts_bracket; i++) {
       p0 = std::min(pl,pr) - 0.01*(i+1)*(i+1)*std::min(dp, std::min(fabs(pl),fabs(pr)));
-      if(p0<min_pressure)
+      if(p0<min_pressure || i==(int)(maxIts_bracket/2)) //not right... set to a small pos. pressure
         p0 = pressure_at_failure; 
       success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
                                 rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
