@@ -1317,6 +1317,8 @@ IcData::IcData()
 {
   user_specified_ic = "";
 
+  rbf = MULTIQUADRIC;
+
   type = NONE;
 
   for(int i=0; i<SIZE; i++)
@@ -1327,9 +1329,13 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
+
+  new ClassToken<IcData> (ca, "InterpolationFunction", this,
+        reinterpret_cast<int IcData::*>(&IcData::rbf), 4, "Multiquadric", 0, 
+        "InverseMultiquadric", 1, "ThinPlateSpline", 2, "Gaussian", 3);
 
   multiInitialConditions.setup("GeometricEntities");
 }

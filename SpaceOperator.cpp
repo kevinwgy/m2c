@@ -831,14 +831,27 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
             double fd[numPoints];
             double *rbf_weight, *interp;
 
+            //choose a radial basis function
+            void (*phi)(int, double[], double, double[]); //a function pointer
+            switch (iod.ic.rbf) {
+              case IcData::MULTIQUADRIC :
+                phi = MathTools::phi1;  break;
+              case IcData::INVERSE_MULTIQUADRIC :
+                phi = MathTools::phi2;  break;
+              case IcData::THIN_PLATE_SPLINE :
+                phi = MathTools::phi3;  break;
+              case IcData::GAUSSIAN :
+                phi = MathTools::phi4;  break;
+              default : 
+                phi = MathTools::phi1;  break;
+            }
+
             if(iod.ic.specified[IcData::DENSITY]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::DENSITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
-                                                 MathTools::phi1, //multiquadric RBF
-                                                 fd);
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
               interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             MathTools::phi1, rbf_weight,
+                                             phi, rbf_weight,
                                              1, pnode);
               v[k][j][i][0] = interp[0];
 
@@ -852,11 +865,9 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
             if(iod.ic.specified[IcData::VELOCITY]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::VELOCITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
-                                                 MathTools::phi1, //multiquadric RBF
-                                                 fd);
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
               interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             MathTools::phi1, rbf_weight,
+                                             phi, rbf_weight,
                                              1, pnode);
               v[k][j][i][1] = interp[0]*dir[0]; 
               v[k][j][i][2] = interp[0]*dir[1]; 
@@ -869,11 +880,9 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
             if(iod.ic.specified[IcData::RADIALVELOCITY]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::RADIALVELOCITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
-                                                 MathTools::phi1, //multiquadric RBF
-                                                 fd);
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
               interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             MathTools::phi1, rbf_weight,
+                                             phi, rbf_weight,
                                              1, pnode);
               Vec3D dir2 = coords[k][j][i] - x0 - pnode[0]*dir;
               if(dir2.norm()>0)
@@ -889,11 +898,9 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
             if(iod.ic.specified[IcData::PRESSURE]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::PRESSURE][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
-                                                 MathTools::phi1, //multiquadric RBF
-                                                 fd);
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
               interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             MathTools::phi1, rbf_weight,
+                                             phi, rbf_weight,
                                              1, pnode);
               v[k][j][i][4] = interp[0];
 
@@ -904,11 +911,9 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
             if(iod.ic.specified[IcData::MATERIALID]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::MATERIALID][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0,
-                                                 MathTools::phi1, //multiquadric RBF
-                                                 fd);
+              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
               interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             MathTools::phi1, rbf_weight,
+                                             phi, rbf_weight,
                                              1, pnode);
               id[k][j][i] = std::round(interp[0]);
 

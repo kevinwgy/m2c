@@ -686,11 +686,17 @@ struct BcsData {
 
 struct IcData {
 
+  //-----------------------------------------------------------------------
   //! initial condition specified using simple geometric entities (e.g., point, plane,)
   MultiInitialConditionsData multiInitialConditions;
+  //-----------------------------------------------------------------------
 
+  //-----------------------------------------------------------------------
   //! user-specified file
   const char *user_specified_ic;
+
+  enum RadialBasisFunction {MULTIQUADRIC = 0, INVERSE_MULTIQUADRIC = 1, 
+                            THIN_PLATE_SPLINE = 2, GAUSSIAN = 3} rbf; //radial basis function for interpolation
 
   enum Type {NONE = 0, PLANAR = 1, CYLINDRICAL = 2, SPHERICAL = 3, 
              GENERALCYLINDRICAL = 4} type;
@@ -708,6 +714,7 @@ struct IcData {
   vector<double> user_data[SIZE];
 
   vector<double> user_data2[SIZE]; //!< for radial variation 
+  //-----------------------------------------------------------------------
 
   IcData();
   ~IcData() {}
