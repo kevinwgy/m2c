@@ -991,12 +991,29 @@ struct OutputData {
 
 //------------------------------------------------------------------------------
 
+struct ConcurrentProgramsData {
+
+  enum OnOff {Off = 0, On = 1};
+
+  OnOff aeros;
+
+  ConcurrentProgramsData();
+  ~ConcurrentProgramsData() {} 
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 class IoData {
 
   char *cmdFileName;
   FILE *cmdFilePtr;
 
 public:
+
+  ConcurrentProgramsData concurrent;
 
   MeshData mesh;
 

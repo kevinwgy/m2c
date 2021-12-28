@@ -2383,6 +2383,23 @@ Assigner* LinePlot::getAssigner()
 
 //------------------------------------------------------------------------------
 
+ConcurrentProgramsData::ConcurrentProgramsData()
+{
+  aeros = Off;
+}
+
+//------------------------------------------------------------------------------
+
+void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassToken<ConcurrentProgramsData>(ca, "AeroS", this,
+                               reinterpret_cast<int ConcurrentProgramsData::*>(&ConcurrentProgramsData::aeros), 2,
+                               "Off", 0, "On", 1);
+} 
+
+//------------------------------------------------------------------------------
 
 IoData::IoData(int argc, char** argv)
 {
@@ -2450,6 +2467,9 @@ void IoData::readCmdFile()
 
 void IoData::setupCmdFileVariables()
 {
+
+  concurrent.setup("ConcurrentPrograms");
+
   eqs.setup("Equations");
   eqs.setup("NavierStokesEquations");
 
