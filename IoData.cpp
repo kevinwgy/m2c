@@ -2383,9 +2383,75 @@ Assigner* LinePlot::getAssigner()
 
 //------------------------------------------------------------------------------
 
+EmbeddedSurfaceData::EmbeddedSurfaceData()
+{
+  filename = "";
+  thermal  = Adiabatic;
+  heat_source = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *EmbeddedSurfaceData::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
+
+  new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
+
+  new ClassToken<EmbeddedSurfaceData> (ca, "ThermalBoundaryCondition", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::filename), 3,
+     "Adiabatic", 0, "Isothermal", 1, "Source", 2);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "HeatSource", this, &EmbeddedSurfaceData::heat_source);
+
+}
+
+//------------------------------------------------------------------------------
+
+EmbeddedSurfacesData::EmbeddedSurfacesData()
+{
+
+}
+
+//------------------------------------------------------------------------------
+
+void EmbeddedSurfacesData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  surfaces.setup("Surface");
+}
+
+//------------------------------------------------------------------------------
+
+AerosCouplingData::AerosCouplingData()
+{
+  fsi_algo = None;
+  fracture = Off;
+}
+
+//------------------------------------------------------------------------------
+
+void AerosCouplingData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+
+  new ClassToken<AerosCouplingData> (ca, "FSIAlgorithm", this,
+     reinterpret_cast<int AerosCouplingData::*>(&AerosCouplingData::fsi_algo), 3,
+     "None", 0, "C0", 1, "A6", 2);
+
+  new ClassToken<AerosCouplingData> (ca, "Fracture", this,
+     reinterpret_cast<int AerosCouplingData::*>(&AerosCouplingData::fracture), 2,
+     "Off", 0, "On");
+
+}
+
+//------------------------------------------------------------------------------
+
 ConcurrentProgramsData::ConcurrentProgramsData()
 {
-  aeros = Off;
+
 }
 
 //------------------------------------------------------------------------------
@@ -2393,10 +2459,7 @@ ConcurrentProgramsData::ConcurrentProgramsData()
 void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 {
   ClassAssigner *ca = new ClassAssigner(name, 1, father);
-
-  new ClassToken<ConcurrentProgramsData>(ca, "AeroS", this,
-                               reinterpret_cast<int ConcurrentProgramsData::*>(&ConcurrentProgramsData::aeros), 2,
-                               "Off", 0, "On", 1);
+  aeros.setup("AeroS");
 } 
 
 //------------------------------------------------------------------------------
@@ -2469,6 +2532,8 @@ void IoData::setupCmdFileVariables()
 {
 
   concurrent.setup("ConcurrentPrograms");
+
+  embedded.setup("EmbeddedSurfaces");
 
   eqs.setup("Equations");
   eqs.setup("NavierStokesEquations");

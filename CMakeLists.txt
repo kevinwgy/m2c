@@ -69,6 +69,9 @@ add_executable(m2c
 Main.cpp
 IoData.cpp
 SpaceVariable.cpp
+ConcurrentProgramsHandler.cpp
+AerosMessenger.cpp
+EmbeddedSurface.cpp
 CustomCommunicator.cpp
 ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp

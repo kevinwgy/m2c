@@ -991,11 +991,53 @@ struct OutputData {
 
 //------------------------------------------------------------------------------
 
+struct EmbeddedSurfaceData {
+
+  const char *filename; //!< file for nodal coordinates and elements
+  
+  enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
+
+  double heat_source;
+
+  EmbeddedSurfaceData();
+  ~EmbeddedSurfaceData() {}
+
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct EmbeddedSurfacesData {
+
+  ObjectMap<EmbeddedSurface> surfaces;
+
+  EmbeddedSurfacesData();
+  ~EmbeddedSurfaceData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct AerosCouplingData {
+
+  enum FSICouplingAlgorithm {NONE = 0, C0 = 1, A6 = 2} fsi_algo;
+  enum Fracture {OFF = 0, ON = 1} fracture;
+
+  AerosCouplingData();
+  ~AerosCouplingData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ConcurrentProgramsData {
 
-  enum OnOff {Off = 0, On = 1};
-
-  OnOff aeros;
+  AerosCouplingData aeros;
 
   ConcurrentProgramsData();
   ~ConcurrentProgramsData() {} 
@@ -1014,6 +1056,8 @@ class IoData {
 public:
 
   ConcurrentProgramsData concurrent;
+
+  EmbeddedSurfacesData embedded;
 
   MeshData mesh;
 

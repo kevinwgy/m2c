@@ -28,11 +28,6 @@ int main(int argc, char* argv[])
 {
   clock_t start_time = clock(); //for timing purpose only
 
-  //! Initialize PETSc and MPI 
-  PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
-  MPI_Comm comm = PETSC_COMM_WORLD; //be default, this is MPI_COMM_WORLD
-  printHeader(argc, argv);
-
   print("\033[0;32m==========================================\033[0m\n");
   print("\033[0;32m                 START                    \033[0m\n"); 
   print("\033[0;32m==========================================\033[0m\n");
@@ -41,14 +36,22 @@ int main(int argc, char* argv[])
   //! Read user's input file
   IoData iod(argc, argv);
   verbose = iod.output.verbose;
-  domain_diagonal = sqrt(pow(iod.mesh.xmax - iod.mesh.x0, 2) +
-                         pow(iod.mesh.ymax - iod.mesh.y0, 2) +
-                         pow(iod.mesh.zmax - iod.mesh.z0, 2));
+
+  //! Initialize MPI with or without concurrent programs
+  
+  
+  //! Initialize PETSc and MPI 
+  PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
+  MPI_Comm comm = PETSC_COMM_WORLD; //be default, this is MPI_COMM_WORLD
+  printHeader(argc, argv);
 
   //! Calculate mesh coordinates
   vector<double> xcoords, dx, ycoords, dy, zcoords, dz;
   MeshGenerator meshgen;
   meshgen.ComputeMeshCoordinatesAndDeltas(iod.mesh, xcoords, ycoords, zcoords, dx, dy, dz);
+  domain_diagonal = sqrt(pow(iod.mesh.xmax - iod.mesh.x0, 2) +
+                         pow(iod.mesh.ymax - iod.mesh.y0, 2) +
+                         pow(iod.mesh.zmax - iod.mesh.z0, 2));
   
   //! Setup PETSc data array (da) structure for nodal variables
   DataManagers3D dms(comm, xcoords.size(), ycoords.size(), zcoords.size());
