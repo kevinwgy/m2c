@@ -17,15 +17,24 @@ class ConcurrentProgramsHandler {
 
   bool coupled; //!< whether M2C is coupled to (i.e. running concurrently w/) any other programs
 
-  int M2C_Comm_Tag; //!< the id ("color") of M2C in the MPI split
+  int m2c_color; //!< the id ("color") of M2C in the MPI split
+  int maxcolor; //!< the total number of "colors" (must be the same in all concurrent programs)
 
   MPI_Comm* global_comm; //!< the global communicator
-  MPI_Comm* m2c_comm; //!< the communicator for M2C
+  int global_size, global_rank;
 
+  MPI_Comm* m2c_comm; //!< the communicator for M2C
+  int m2c_size, m2c_rank;
+
+  // the communicators between m2c and each of the other programs
+  std::vector<MPI_Comm*> c;
+ 
+  // other concurrent/coupled programs
   AerosMessenger *aeros; //!< takes care of communications w/ AERO-S
-  MPI_Comm* aeros_comm;
+  MPI_Comm* aeros_comm;  //!< this is just c[aeros_color]
 
   //! TODO: other software/programs can be added later
+
   
 public:
 
@@ -46,7 +55,7 @@ public:
 
 private:
 
-  void Split(int color, int maxcolor, vector<MPI_Comm*> &c);
+  void SetupCommunicators(); //!< called by the constructor
 
 };
 

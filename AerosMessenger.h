@@ -1,7 +1,37 @@
 #ifndef _AEROS_MESSENGER_H_
 #define _AEROS_MESSENGER_H_
 
+#include<mpi.h>
+#include<IoData.h>
+#include<Vector3D.h>
 
+// -----------------------------------------------------------
+// Class AerosMessenger is responsible for communicating with
+// the AERO-S solver, e.g. for fluid-structure interaction
+// simulations
+// -----------------------------------------------------------
+
+class AerosMessenger {
+
+  AerosCouplingData &iod_aeros;
+
+  MPI_Comm &m2c_comm; //!< This is the M2C communicator
+  MPI_Comm &joint_comm; //!< This is the joint communicator of M2C and AERO-S
+
+  int m2c_rank, m2c_size, joint_comm, joint_size; 
+
+  EmbeddedSurface *surface;
+
+
+public:
+
+  AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_);
+  ~AerosMessenger();
+
+  void Destroy();
+
+
+};
 
 You should have a reference to an EmbeddedSurface, and make operations such as send / receive forces and xxx
 
