@@ -1010,7 +1010,7 @@ struct EmbeddedSurfaceData {
 
 struct EmbeddedSurfacesData {
 
-  ObjectMap<EmbeddedSurface> surfaces;
+  ObjectMap<EmbeddedSurfaceData> surfaces;
 
   EmbeddedSurfacesData();
   ~EmbeddedSurfaceData() {}

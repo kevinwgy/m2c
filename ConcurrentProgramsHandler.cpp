@@ -8,7 +8,7 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm &glo
 {
 
   // check if M2C is coupled with any other programs 
-  int aeros_color;
+  int aeros_color = -1;
   if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
     coupled = true;
     //The following parameters are the same as "FLUID_ID", "STRUCT_ID" and "MAX_CODES" in AERO-S
