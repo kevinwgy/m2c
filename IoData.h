@@ -1088,6 +1088,7 @@ public:
   void readCmdLine(int, char**);
   void setupCmdFileVariables();
   void readCmdFile();
+  void finalize();
 
 };
 #endif

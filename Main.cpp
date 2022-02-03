@@ -1,5 +1,6 @@
 #include <time.h>
 #include <petscdmda.h> //PETSc
+#include <ConcurrentProgramsHandler.h>
 #include <MeshGenerator.h>
 #include <Output.h>
 #include <VarFcnSG.h>
@@ -20,6 +21,7 @@ using std::cout;
 using std::endl;
 int verbose;
 double domain_diagonal;
+MPI_Comm m2c_comm;
 
 /*************************************
  * Main Function
@@ -28,22 +30,32 @@ int main(int argc, char* argv[])
 {
   clock_t start_time = clock(); //for timing purpose only
 
+  //! Initialize MPI 
+  MPI_Init(NULL,NULL); //called together with all concurrent programs -> MPI_COMM_WORLD
+
+  //! Print header (global proc #1, assumed to be a M2C proc)
+  m2c_comm = MPI_COMM_WORLD; //temporary, just for the next few lines of code
+  printHeader(argc, argv);
   print("\033[0;32m==========================================\033[0m\n");
   print("\033[0;32m                 START                    \033[0m\n"); 
   print("\033[0;32m==========================================\033[0m\n");
   print("\n");
 
-  //! Read user's input file
+  //! Read user's input file (read the parameters)
   IoData iod(argc, argv);
   verbose = iod.output.verbose;
 
-  //! Initialize MPI with or without concurrent programs
-  
-  
-  //! Initialize PETSc and MPI 
+  //! Partition MPI, if there are concurrent programs
+  MPI_Comm comm; //this is going to be the M2C communicator
+  ConcurrentProgramsHandler multiprog(iod, MPI_COMM_WORLD, comm);
+  m2c_comm = comm; //correct it
+ 
+  //! Initialize PETSc
+  PETSC_COMM_WORLD = comm;
   PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
-  MPI_Comm comm = PETSC_COMM_WORLD; //be default, this is MPI_COMM_WORLD
-  printHeader(argc, argv);
+
+  //! Finalize IoData (read additional files and check for errors)
+  iod.finalize();
 
   //! Calculate mesh coordinates
   vector<double> xcoords, dx, ycoords, dy, zcoords, dz;
@@ -292,13 +304,15 @@ int main(int argc, char* argv[])
   }
 
   dms.DestroyAllDataManagers();
-  PetscFinalize();
 
   delete integrator;
   delete ff;
 
   for(int i=0; i<vf.size(); i++)
     delete vf[i];
+
+  PetscFinalize();
+  MPI_Finalize();
 
   return 0;
 }

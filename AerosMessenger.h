@@ -18,9 +18,16 @@ class AerosMessenger {
   MPI_Comm &m2c_comm; //!< This is the M2C communicator
   MPI_Comm &joint_comm; //!< This is the joint communicator of M2C and AERO-S
 
-  int m2c_rank, m2c_size, joint_comm, joint_size; 
+  int m2c_rank, m2c_size, joint_rank, joint_size; 
 
-  EmbeddedSurface *surface;
+  int numAerosProcs;
+  int bufsize; //!< number of DOFs per node (6)
+
+  int nNodes, totalNodes;
+  int nElems, totalElems;
+  int elemType; //!< 3 or 4
+  TriangulatedSurface *surface; //!< the embedded surface
+  CrackingSurface *cracking; //!< activated only if cracking is considered in the structure code
 
 
 public:

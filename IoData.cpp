@@ -2466,6 +2466,8 @@ void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 
 IoData::IoData(int argc, char** argv)
 {
+  //Should NOT call functions in Utils (e.g., print(), exit_mpi()) because the
+  //M2C communicator may have not been properly set up.
   readCmdLine(argc, argv);
   readCmdFile();
 }
@@ -2475,8 +2477,8 @@ IoData::IoData(int argc, char** argv)
 void IoData::readCmdLine(int argc, char** argv)
 {
   if(argc==1) {
-    print_error("*** Error: Input file not provided!\n");
-    exit_mpi();
+    fprintf(stderr,"\033[0;31m*** Error: Input file not provided!\n\033[0m");
+    exit(-1);
   }
   cmdFileName = argv[1];
 }
@@ -2493,17 +2495,23 @@ void IoData::readCmdFile()
   yyCmdfin = cmdFilePtr = fopen(cmdFileName, "r");
 
   if (!cmdFilePtr) {
-    print_error("*** Error: could not open \'%s\'\n", cmdFileName);
-    exit_mpi();
+    fprintf(stderr,"\033[0;31m*** Error: could not open \'%s\'\n\033[0m", cmdFileName);
+    exit(-1);
   }
 
   int error = yyCmdfparse();
   if (error) {
-    print_error("*** Error: command file contained parsing errors\n");
+    fprintf(stderr,"\033[0;31m*** Error: command file contained parsing errors.\n\033[0m");
     exit(error);
   }
   fclose(cmdFilePtr);
+}
 
+//------------------------------------------------------------------------------
+// This function is supposed to be called after creating M2C communicator. So, 
+// functions in Utils can be used.
+void IoData::finalize()
+{
   //Check spatial domain (for spherical and cylindrical)
   mesh.check();
 

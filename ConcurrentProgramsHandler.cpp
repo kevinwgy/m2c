@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------
 
-ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm &global_comm_, MPI_Comm &comm_)
+ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm global_comm_, MPI_Comm &comm_)
                          : iod_concurrent(iod_.concurrent), global_comm(&global_comm_), 
                            m2c_comm(&global_comm_), aeros_comm(NULL) 
 {
@@ -27,7 +27,7 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm &glo
   // create messengers
   if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
     aeros_comm = c[aeros_color];
-    aeros = new AerosMessenger(iod_, m2c_comm_, aeros_comm); 
+    aeros = new AerosMessenger(iod_, *m2c_comm, *aeros_comm); 
   }
 
   // outputs the m2c communicator

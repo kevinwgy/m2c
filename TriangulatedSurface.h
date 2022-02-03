@@ -15,6 +15,7 @@ struct TriangulatedSurface {
 
   bool degenerate; //!< line segments in 2D (x-y)
 
+  vector<Vec3D> X0;    //point in 2D: z-coord = 0
   vector<Vec3D> X;    //point in 2D: z-coord = 0
   vector<Int3> elems; //line segment is recognized as a triangle with node2 = node3
 

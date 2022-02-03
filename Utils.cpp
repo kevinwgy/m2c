@@ -7,19 +7,22 @@
 #include <cmath> //floor
 using std::cout;
 using std::endl;
+
+extern MPI_Comm m2c_comm;
+
 //--------------------------------------------------
 // MPI Rank 0 will print to stdout
 void print(const char format[],...)
 {
   int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_rank(m2c_comm, &rank);
   if(!rank) {
     va_list Argp;
     va_start(Argp, format);
     vprintf(format, Argp);
     va_end(Argp);
   }
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(m2c_comm);
   return;
 }
 
@@ -44,7 +47,7 @@ void print(MPI_Comm& comm, const char format[],...)
 void print_error(const char format[],...)
 {
   int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_rank(m2c_comm, &rank);
 
   if(!rank) {
 
@@ -58,7 +61,7 @@ void print_error(const char format[],...)
     vprintf(format_colored, Argp);
     va_end(Argp);
   }
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(m2c_comm);
   return;
 }
 
@@ -91,7 +94,7 @@ void print_error(MPI_Comm& comm, const char format[],...)
 void print(int i, const char format[],...)
 {
   int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+  MPI_Comm_rank(m2c_comm,&rank);
 
   if(rank == i) {
     va_list Argp;
@@ -100,7 +103,7 @@ void print(int i, const char format[],...)
     va_end(Argp);
   }
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(m2c_comm);
   return;
 }
 */
@@ -127,7 +130,7 @@ void print(MPI_Comm& comm, int i, const char format[],...)
 void print(FILE* fd, const char format[],...)
 {
   int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+  MPI_Comm_rank(m2c_comm,&rank);
 
   if(!rank) {
     va_list Argp;
@@ -136,7 +139,7 @@ void print(FILE* fd, const char format[],...)
     va_end(Argp);
   }
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(m2c_comm);
   return;
 }
 
@@ -185,8 +188,8 @@ const string getCurrentDateTime()
 void printHeader(int argc, char *argv[])
 {
   int size, rank;
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(m2c_comm, &size);
+  MPI_Comm_rank(m2c_comm, &rank);
   if(!rank) {
     cout << endl;
     cout << "\033[0;36m                                      _..._      \033[0m" << endl;
@@ -213,7 +216,7 @@ void printHeader(int argc, char *argv[])
     cout << endl;
     cout.flush();
   }
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(m2c_comm);
   return;
 }
 
@@ -221,7 +224,7 @@ void printHeader(int argc, char *argv[])
 // Terminate program properly
 void exit_mpi()
 {
-  MPI_Finalize();
+//  MPI_Finalize(); //This would not work if there are concurrent programs (other than M2C)
   exit(-1);
 }
 

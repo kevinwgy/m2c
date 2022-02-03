@@ -227,7 +227,6 @@ double*** SpaceVariable3D::GetDataPointer()
 {
   if(!dm) return NULL;
 
-  int grank; MPI_Comm_rank(MPI_COMM_WORLD, &grank);
   auto ierr = DMDAVecGetArray(*dm, localVec, &array);
   //CHKERRQ(ierr);
   return array;

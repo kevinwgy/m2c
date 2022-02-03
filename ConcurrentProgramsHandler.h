@@ -31,7 +31,8 @@ class ConcurrentProgramsHandler {
  
   // other concurrent/coupled programs
   AerosMessenger *aeros; //!< takes care of communications w/ AERO-S
-  MPI_Comm* aeros_comm;  //!< this is just c[aeros_color]
+  MPI_Comm* aeros_comm;  //!< this is just c[aeros_color], a communicator that includes
+                         //!< M2C and AERO-S processes
 
   //! TODO: other software/programs can be added later
 
@@ -39,7 +40,7 @@ class ConcurrentProgramsHandler {
 public:
 
   //! The constructor calls MPI_Comm_split together with all the concurrent programs
-  ConcurrentProgramsHandler(IoData &iod_, MPI_Comm &global_comm_, MPI_Comm &comm_); 
+  ConcurrentProgramsHandler(IoData &iod_, MPI_Comm global_comm_, MPI_Comm &comm_); 
   ~ConcurrentProgramsHandler();
 
   void Destroy();

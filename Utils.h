@@ -12,6 +12,7 @@ using std::string;
  **************************
 */
 //--------------------------------------------------
+class xxx I AM HERE
 //! MPI Rank 0 will print to stdout
 void print(const char format[],...);
 void print(MPI_Comm& comm, const char format[],...);
