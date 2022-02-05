@@ -71,7 +71,8 @@ IoData.cpp
 SpaceVariable.cpp
 ConcurrentProgramsHandler.cpp
 AerosMessenger.cpp
-EmbeddedSurface.cpp
+TriangulatedSurface.cpp
+CrackingSurface.cpp
 CustomCommunicator.cpp
 ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp

@@ -4,6 +4,7 @@
 #include<mpi.h>
 #include<IoData.h>
 #include<Vector3D.h>
+#include<CrackingSurface.h>
 
 // -----------------------------------------------------------
 // Class AerosMessenger is responsible for communicating with
@@ -18,7 +19,7 @@ class AerosMessenger {
   MPI_Comm &m2c_comm; //!< This is the M2C communicator
   MPI_Comm &joint_comm; //!< This is the joint communicator of M2C and AERO-S
 
-  int m2c_rank, m2c_size, joint_rank, joint_size; 
+  int m2c_rank, m2c_size;
 
   int numAerosProcs;
   int bufsize; //!< number of DOFs per node (6)
@@ -38,12 +39,14 @@ public:
   void Destroy();
 
 
+protected:
+
+  void GetEmbeddedWetSurfaceInfo(int &eType, bool &crack, int &nStNodes, int &nStElems);
+  void GetEmbeddedWetSurface(int nNodes, Vec3D *nodes, int nElems, int *elems, int eType);
+  void GetInitialCrackingSetup(int &totalStNodes, int &totalStElems);
+  int  SplitQuads(int *quads, int nStElems, vector<Int3> &Tria);
 };
 
-You should have a reference to an EmbeddedSurface, and make operations such as send / receive forces and xxx
-
-
-Main should create and own a bunch of embedded surfaces. Time stepper may also get a reference.
 
 
 
