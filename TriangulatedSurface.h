@@ -15,25 +15,29 @@ struct TriangulatedSurface {
 
   bool degenerate; //!< line segments in 2D (x-y)
 
-  vector<Vec3D> X0;    //point in 2D: z-coord = 0
-  vector<Vec3D> X;    //point in 2D: z-coord = 0
+  vector<Vec3D> X0;   //!< Original config. (for points in 2D: z-coord = 0)
+  vector<Vec3D> X;    //!< Current config. (for point in 2D: z-coord = 0)
+  vector<Vec3D> Udot; //!< Velocity vector
+
   vector<Int3> elems; //line segment is recognized as a triangle with node2 = node3
 
   vector<Vec3D> elemNorm;
   vector<set<int> > node2node;
   vector<set<int> > node2elem;
 
-  TriangulatedSurface(vector<Vec3D> &X_, vector<Int3>& e_) : X(X_), elems(e_) {
-    degenerate = false;
+  TriangulatedSurface(bool degen_ = false) : degenerate(degen_) { }
+
+  TriangulatedSurface(vector<Vec3D> &X_, vector<Int3>& e_, bool degen_ = false) 
+      : degenerate(degen_), X(X_), elems(e_) {
     BuildConnectivity();
     BuildElementNormals();
   }
 
   ~TriangulatedSurface() {} 
 
-private:
   void BuildConnectivity();
   void BuildElementNormals();
+
 };
 
 #endif

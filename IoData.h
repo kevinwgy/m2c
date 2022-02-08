@@ -1023,7 +1023,7 @@ struct EmbeddedSurfacesData {
 
 struct AerosCouplingData {
 
-  enum FSICouplingAlgorithm {NONE = 0, C0 = 1, A6 = 2} fsi_algo;
+  enum FSICouplingAlgorithm {NONE = 0, BY_AEROS = 1, C0 = 2, A6 = 3} fsi_algo;
   enum Fracture {OFF = 0, ON = 1} fracture;
 
   AerosCouplingData();

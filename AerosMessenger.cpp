@@ -8,10 +8,20 @@
 #define NEGO_NUM_TAG 10000
 #define NEGO_BUF_TAG 10001
 
+#define INFO_TAG 3000
+
+#define CRACK_TAG1 22
+#define CRACK_TAG2 33
+#define CRACK_TAG3 44
+#define CRACK_TAG4 55
+
+#define SUBCYCLING_TAG 777
+
 //---------------------------------------------------------------
 
 AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_) 
-              : iod_aeros(iod_.concurrent.aeros), m2c_comm(m2c_comm_), joint_comm(joint_comm_)
+              : iod_aeros(iod_.concurrent.aeros), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
+                surface(), cracking(NULL), numStrNodes(NULL)
 {
 
   MPI_Comm_rank(m2c_comm, &m2c_rank);
@@ -52,6 +62,7 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
   nNodes     = nStNodes;
   surface.X.resize(totalNodes, Vec3D(0.0));
   surface.X0.resize(totalNodes, Vec3D(0.0));
+  surface.Udot.resize(totalNodes, Vec3D(0.0));
 
   // allocate memory for the element topology list
   int tmpTopo[nStElems][4];
@@ -81,9 +92,31 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
   for(int i = 0; i < nNodes; i++)
     X[i] = X0[i];
 
+  if(m2c_rank==0)
+    matchNodes.resize(totalNodes, 0);
+
   Negotiate(); // Following the AERO-F/S function name, although misleading
 
+  GetInfo(); // Get algorithm number, dt, and tmax
+
+  if(cracking) {
+    GetInitialCrack();
+    cracking->setNewCrackingFlag(false);
+  }
+
+  structureSubcycling = (algNum == 22) ? GetStructSubcyclingInfo() : 0;
 } 
+
+//---------------------------------------------------------------
+
+AerosMessenger::~AerosMessenger()
+{
+  if(numStrNodes)
+    delete [] numStrNodes;
+
+  if(cracking)
+    delete cracking;
+}
 
 //---------------------------------------------------------------
 
@@ -173,26 +206,256 @@ AerosMessenger::SplitQuads(int *quads, int nStElems, vector<Int3> &Tria)
 void
 AerosMessenger::Negotiate()
 {
-  int numCPUMatchedNodes = m2c_rank? 0 : totalNodes;
 
-  for (int proc = 0; proc < numAerosProcs; proc++) {
+  int numCPUMatchedNodes = m2c_rank ? 0 : totalNodes;
 
-    MPI_Isend(&numCPUMatchedNodes, 1, MPI_INT, proc, NEGO_NUM_TAG, joint_comm, xxx);
-
+  vector<int> ibuffer;
+  if(numCPUMatchedNodes>0) {
+    ibuffer.resize(numCPUMatchedNodes);
+    for(int i=0; i<numCPUMatchedNodes; i++)
+      ibuffer[i] = i; //trivial for M2C/Embedded boundary. (non-trivial in AERO-F/S w/ ALE)
   }
 
+  // send the matched node numbers of this fluid CPU to all the structure CPUs
+  vector<MPI_Request> send_requests;
+  for (int proc = 0; proc < numAerosProcs; proc++) {
+    send_requests.push_back(MPI_Request());
+    MPI_Isend(&numCPUMatchedNodes, 1, MPI_INT, proc, NEGO_NUM_TAG, 
+              joint_comm, &(send_requests[send_requests.size()-1]));
+    if(numCPUMatchedNodes>0)
+      MPI_Isend(ibuffer.data(), numCPUMatchedNodes, MPI_INT, proc, NEGO_BUF_TAG, 
+                joint_comm, &(send_requests[send_requests.size()-1]));
+  }
+  MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+
+  // receive the list of matched nodes that each structure CPU contains
+  if(numCPUMatchedNodes > 0) {
+    numStrNodes = new int[numAerosProcs][2];
+    int pos = 0;
+    for(int proc = 0; proc < numAerosProcs; ++proc) {
+      MPI_Recv(&numStrNodes[proc][0], 1, MPI_INT, proc, NEGO_NUM_TAG, joint_comm, MPI_STATUS_IGNORE);
+      if(numStrNodes[proc][0] > 0) {
+        MPI_Recv(ibuffer, numStrNodes[proc][0], MPI_INT, proc, NEGO_BUF_TAG, joint_comm, MPI_STATUS_IGNORE);
+        for(int i = 0; i < numStrNodes[proc][0]; ++i) {
+          int idx = ibuffer[i];
+          matchNodes[idx] = pos; //pos == i  (TODO: KW thinks idx is also equal to pos...)
+          pos++;
+        }
+      }
+    }
+    if(pos != numCPUMatchedNodes) {
+      fprintf(stderr, "\033[0;31m*** Error (proc %d): wrong number of matched nodes (%d instead of %d).\n\033[0m",
+              m2c_rank, pos, numCPUMatchedNodes);
+      exit(-1);
+    }
+
+    numStrNodes[0][1] = 0;
+    for(int proc = 1; proc < numAerosProcs; ++proc) {
+      numStrNodes[proc][1] = numStrNodes[proc - 1][1] + numStrNodes[proc - 1][0];
+    }
+  }
+  
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::GetInfo()
+{
+
+  double info[5];
+  if(m2c_rank == 0) {
+    MPI_Recv(info, 5, MPI_DOUBLE, MPI_ANY_SOURCE, INFO_TAG, joint_comm, MPI_STATUS_IGNORE);
+  }
+  MPI_Bcast(info, 5, MPI_DOUBLE, 0, m2c_comm);
+
+  algNum = int(info[0]);
+  dt     = info[1];
+  tmax   = info[2];
+
+  int rstrt = int(info[3]); //not used
+  int smode = int(info[4]); //not used
+
+  if(algNum == 6) {
+    tmax -= 0.5 * dt;
+  }
+  if(algNum == 20) {
+    tmax -= 0.5 * dt;
+  }
+  if(algNum == 21) {
+    tmax += 0.5 * dt;
+  }
+  if(algNum == 22) {
+    tmax += 0.5 * dt;
+  }
+
+  // check for consistency in algorithm number
+  if(iod_aeros.fsi_algo == AerosCouplingData::A6)
+    assert(algNum == 6);
+  if(iod_aeros.fsi_algo == AerosCouplingData::C0)
+    assert(algNum == 22);
 
 }
 
 //---------------------------------------------------------------
 
+void
+AerosMessenger::GetInitialCrack()
+{
+  int numConnUpdate, numLSUpdate, newNodes;
+  bool need2update = GetNewCrackingStats(numConnUpdate, numLSUpdate, newNodes); // inputs will be modified
+  if(!need2update) {
+    return;
+  }
 
+  // get initial phantom nodes.
+  GetInitialPhantomNodes(newNodes, surface.X, nNodes);
 
+  // NOTE: nNodes will be updated in "getNewCracking"
+  // get initial phantom elements (topo change)
+  GetNewCracking(numConnUpdate, numLSUpdate, newNodes);
+}
 
+//---------------------------------------------------------------
 
+bool
+AerosMessenger::GetNewCrackingStats(int& numConnUpdate, int& numLSUpdate, int& newNodes)
+{
+  int size = 4;
+  int nNew[size];
 
+  if(m2c_rank == 0)
+    MPI_Recv(nNew, size, MPI_INT, MPI_ANY_SOURCE, CRACK_TAG1, joint_comm, MPI_STATUS_IGNORE);
 
+  MPI_Bcast(nNew, 4, MPI_INT, 0, m2c_comm);
 
+  numConnUpdate = nNew[1];
+  numLSUpdate = nNew[2];
+  newNodes = nNew[3];
+
+  return nNew[0] > 0;
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::GetInitialPhantomNodes(int newNodes, vector<Vec3D>& xyz, int nNodes)
+{
+  int size = newNodes*3;
+
+  double coords[size];
+
+  if(m2c_rank == 0) {
+    // assume the correct ordering: nNodes, nNodes+1, ..., nNodes+newNodes-1
+    MPI_Recv(coords, size, MPI_DOUBLE, MPI_ANY_SOURCE, CRACK_TAG4, joint_comm, MPI_STATUS_IGNORE);
+  }
+
+  MPI_Bcast(coords, size, MPI_DOUBLE, 0, m2c_comm);
+
+  for(int i = 0; i < newNodes; i++)
+    for(int j = 0; j < 3; j++) {
+      xyz[nNodes + i][j] = coords[i * 3 + j];
+    }
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::GetNewCracking(int numConnUpdate, int numLSUpdate, int newNodes)
+{
+
+  if(numConnUpdate < 1) {
+    return;
+  }
+
+  int phantElems[5 * numConnUpdate]; // elem id and node id
+  double phi[4 * numLSUpdate];
+  int phiIndex[numLSUpdate];
+  int new2old[std::max(1, newNodes * 2)]; // in the case of element deletion, newNodes might be 0
+
+  GetNewCrackingCore(numConnUpdate, numLSUpdate, phantElems, phi, phiIndex, new2old, newNodes);
+
+  if(elemType != 4) {
+    print_error("*** Error: only support quadrangle elements for cracking!\n");
+    exit_mpi();
+  }
+
+  nNodes += newNodes;
+  nElems += cracking->updateCracking(numConnUpdate, numLSUpdate, phantElems, phi, phiIndex, Tria, nNodes, new2old, newNodes);
+
+  if(nElems != cracking->usedTrias()) {
+    print_error("*** Error: inconsistency in the number of used triangles. (Software bug.)\n");
+    exit_mpi();
+  }
+
+  if(m2c_rank == 0 && newNodes) 
+    numStrNodes[0][0] = nNodes; //TODO: Assuming only talking to one structure proc??
+
+}
+
+//---------------------------------------------------------------
+
+int 
+AerosMessenger::GetNewCracking()
+{
+  int newNodes, numConnUpdate, numLSUpdate;
+  bool need2update = GetNewCrackingStats(numConnUpdate, numLSUpdate, newNodes); // inputs will be modified
+  if(!need2update) {
+    assert(numConnUpdate == 0);
+    return 0;
+  }
+  GetNewCracking(numConnUpdate, numLSUpdate, newNodes);
+  return numConnUpdate;
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::GetNewCrackingCore(int numConnUpdate, int numLSUpdate, int *phantoms, double *phi, int *phiIndex, 
+                                   int *new2old, int newNodes)
+{
+
+  int integer_pack_size = 5 * numConnUpdate + numLSUpdate + 2 * newNodes;
+  int integer_pack[integer_pack_size]; // KW: This should be a short array since there will not be many new cracked elements in
+                                       //     one time-step. Therefore it should be OK to create and destroy it repeatedly.
+
+  if(m2c_rank == 0) {
+    MPI_Recv(integer_pack, integer_pack_size, MPI_INT, MPI_ANY_SOURCE, CRACK_TAG2, joint_comm, MPI_STATUS_IGNORE);
+  }
+  MPI_Bcast(integer_pack, integer_pack_size, MPI_INT, 0, m2c_comm);
+
+  for(int i = 0; i < 5 * numConnUpdate; i++) {
+    phantoms[i] = integer_pack[i];
+    assert(integer_pack[i] >= 0);
+  }
+  for(int i = 0; i < numLSUpdate; i++) {
+    phiIndex[i] = integer_pack[5 * numConnUpdate + i];
+  }
+  for(int i = 0; i < newNodes; i++) {
+    new2old[2 * i] = integer_pack[5 * numConnUpdate + numLSUpdate + 2 * i];
+    new2old[2 * i + 1] = integer_pack[5 * numConnUpdate + numLSUpdate + 2 * i + 1];
+  }
+
+  if(m2c_rank == 0) {
+    MPI_Recv(phi, 4*numLSUpdate, MPI_DOUBLE, MPI_ANY_SOURCE, CRACK_TAG3, joint_comm, MPI_STATUS_IGNORE);
+  }
+  MPI_Bcast(phi, 4*numLSUpdate, MPI_DOUBLE, 0, m2c_comm);
+
+}
+
+//---------------------------------------------------------------
+
+int
+AerosMessenger::getSubcyclingInfo()
+{
+  double info;
+  if(m2c_rank == 0) {
+    MPI_Recv(&info, 1, MPI_DOUBLE, MPI_ANY_SOURCE, SUBCYCLING_TAG, joint_comm, MPI_STATUS_IGNORE);
+  }
+  MPI_Bcast(&info, 1, MPI_DOUBLE, 0, m2c_comm);
+
+  return (int)info;
+}
 
 //---------------------------------------------------------------
 
