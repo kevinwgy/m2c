@@ -16,6 +16,7 @@
 #include <GradientCalculatorCentral.h>
 #include <LaserAbsorptionSolver.h>
 #include <IonizationOperator.h>
+#include <TriangulatedSurface.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -45,9 +46,13 @@ int main(int argc, char* argv[])
   IoData iod(argc, argv);
   verbose = iod.output.verbose;
 
+  //! Embedded Surfaces (if not used, this would be an empty vector)
+  vector<TriangulatedSurface> embedded_surfaces;
+  vector<vector<Vec3D> > F; //force
+
   //! Partition MPI, if there are concurrent programs
   MPI_Comm comm; //this is going to be the M2C communicator
-  ConcurrentProgramsHandler multiprog(iod, MPI_COMM_WORLD, comm);
+  ConcurrentProgramsHandler concurrent_programs(iod, MPI_COMM_WORLD, comm);
   m2c_comm = comm; //correct it
  
   //! Initialize PETSc
@@ -56,6 +61,19 @@ int main(int argc, char* argv[])
 
   //! Finalize IoData (read additional files and check for errors)
   iod.finalize();
+
+  //! Initialize messengers (for concurrent programs)
+  if(concurrent_programs.coupled()) {
+    embedded_surfaces.push_back();
+    F.push_back();
+    concurrent_programs.InitializeMessengers(&embedded_surfaces[0], &F[0]);
+  }
+
+  //! Load other embedded surfaces (provided through user inputs)
+  for(auto it  = iod.embed_surfaces.surfaces.dataMap.begin(); 
+           it != iod.embed_surfaces.surfaces.dataMap.end(); it++) {
+    I AM HERE
+  }
 
   //! Calculate mesh coordinates
   vector<double> xcoords, dx, ycoords, dy, zcoords, dz;

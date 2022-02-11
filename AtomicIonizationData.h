@@ -6,13 +6,13 @@
 #include<boost/math/interpolators/cubic_b_spline.hpp>  //spline interpolation
 #include<mpi.h>
 
-//----------------------------------------------------------------
-// Class AtomicIonizationData stores the atomic ionization parameters
-// (excitation energy, ionization energy, etc.) for a chemical
-// element. It is also responsible for computing the energy partition 
-// function, by interpolation (faster, but requires storage and setup) 
-// or on-the-fly (slower, w/o overhead)
-//----------------------------------------------------------------
+/***********************************************************************
+ * Class AtomicIonizationData stores the atomic ionization parameters
+ * (excitation energy, ionization energy, etc.) for a chemical
+ * element. It is also responsible for computing the energy partition 
+ * function, by interpolation (faster, but requires storage and setup) 
+ * or on-the-fly (slower, w/o overhead)
+***********************************************************************/
 
 class AtomicIonizationData { 
 

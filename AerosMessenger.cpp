@@ -1,13 +1,17 @@
 #include<AerosMessenger.h>
 
+#define SUGGEST_DT_TAG 444
 #define WET_SURF_TAG1 555
 #define WET_SURF_TAG2 666
 #define WET_SURF_TAG3 888
 #define WET_SURF_TAG4 999
+#define SUBCYCLING_TAG 777
 
 #define NEGO_NUM_TAG 10000
 #define NEGO_BUF_TAG 10001
 
+#define FORCE_TAG 1000
+#define DISP_TAG 2000
 #define INFO_TAG 3000
 
 #define CRACK_TAG1 22
@@ -15,13 +19,14 @@
 #define CRACK_TAG3 44
 #define CRACK_TAG4 55
 
-#define SUBCYCLING_TAG 777
 
+using std::vector;
 //---------------------------------------------------------------
 
-AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_) 
+AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_, TriangulatedSurface &surf_,
+                               vector<Vec3D> &F_)
               : iod_aeros(iod_.concurrent.aeros), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
-                surface(), cracking(NULL), numStrNodes(NULL)
+                surface(surf_), F(F_), cracking(NULL), numStrNodes(NULL)
 {
 
   MPI_Comm_rank(m2c_comm, &m2c_rank);
@@ -63,6 +68,8 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
   surface.X.resize(totalNodes, Vec3D(0.0));
   surface.X0.resize(totalNodes, Vec3D(0.0));
   surface.Udot.resize(totalNodes, Vec3D(0.0));
+  F.resize(totalNodes, Vec3D(0.0));
+  temp_buffer.resize(2*bufsize*totalNodes, 0.0); //a long temporary buffer, can be used for anything
 
   // allocate memory for the element topology list
   int tmpTopo[nStElems][4];
@@ -92,8 +99,8 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
   for(int i = 0; i < nNodes; i++)
     X[i] = X0[i];
 
-  if(m2c_rank==0)
-    matchNodes.resize(totalNodes, 0);
+//  if(m2c_rank==0)
+//    matchNodes.resize(totalNodes, 0);
 
   Negotiate(); // Following the AERO-F/S function name, although misleading
 
@@ -117,6 +124,12 @@ AerosMessenger::~AerosMessenger()
   if(cracking)
     delete cracking;
 }
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::Destroy()
+{ }
 
 //---------------------------------------------------------------
 
@@ -238,7 +251,8 @@ AerosMessenger::Negotiate()
         MPI_Recv(ibuffer, numStrNodes[proc][0], MPI_INT, proc, NEGO_BUF_TAG, joint_comm, MPI_STATUS_IGNORE);
         for(int i = 0; i < numStrNodes[proc][0]; ++i) {
           int idx = ibuffer[i];
-          matchNodes[idx] = pos; //pos == i  (TODO: KW thinks idx is also equal to pos...)
+//          matchNodes[idx] = pos; //pos == i  (TODO: KW thinks idx is also equal to pos...)
+          assert(idx==i);
           pos++;
         }
       }
@@ -446,7 +460,7 @@ AerosMessenger::GetNewCrackingCore(int numConnUpdate, int numLSUpdate, int *phan
 //---------------------------------------------------------------
 
 int
-AerosMessenger::getSubcyclingInfo()
+AerosMessenger::GetStructSubcyclingInfo()
 {
   double info;
   if(m2c_rank == 0) {
@@ -459,6 +473,90 @@ AerosMessenger::getSubcyclingInfo()
 
 //---------------------------------------------------------------
 
+void
+AerosMessenger::SendForce()
+{
+  //IMPORTANT: Assuming that the force has been assembled on Proc 0
+  if(m2c_rank == 0) {
 
+    vector<MPI_Request> send_requests;
 
+    for(int proc = 0; proc < numAerosProcs; proc++) {
+      if(numStrNodes[proc][0] > 0) {
+        int size = 3*numStrNodes[proc][0];
+        double *localBuffer = (double*)F.data() + 3*numStrNodes[proc][1];
+
+        send_requests.push_back(MPI_Request());
+        MPI_Isend(localBuffer, size, MPI_DOUBLE, proc, FORCE_TAG, 
+              joint_comm, &(send_requests[send_requests.size()-1]));
+      }
+    }
+    MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+
+  }
+
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::GetDisplacementAndVelocity()
+{
+  if(m2c_rank == 0) {
+
+    assert(bufsize==6);
+
+    // get disp and velo to temp_buffer
+    for(int proc = 0; proc < numAerosProcs; proc++) {
+      if(numStrNodes[proc][0] > 0) {
+        int size = bufsize*numStrNodes[proc][0]; 
+        int first_index =  bufsize*numStrNodes[proc][1];
+
+        double *localBuffer = temp_buffer.data() + first_index;
+
+        MPI_Recv(localBuffer, size, MPI_DOUBLE, proc, DISP_TAG, joint_comm, MPI_STATUS_IGNORE);
+      }
+    }
+
+    // apply disp and velo to surface and Udot
+    for(int i=0; i<nNodes; i++) {
+      for(int j=0; j<3; j++)
+        surface.X[i][j] = surface.X0[i][j] + temp_buffer[bufsize*i+j];
+      for(int j=0; j<3; j++)
+        Udot[i][j] = temp_buffer[buffer*i+3+j];
+      if(algNum==6) {//A6
+        for(int j=0; j<3; j++)
+          surface.X[i][j] += 0.5*dt*Udot[i][j];
+      }
+    }
+  }
+
+  
+  //broadcast surface and Udot
+  MPI_Bcast((double*)surface.X.data(), 3*nNodes, MPI_DOUBLE, 0, m2c_comm);
+  MPI_Bcast((double*)Udot.data(), 3*nNodes, MPI_DOUBLE, 0, m2c_comm);
+
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::SendM2CSuggestedTimeStep(double dtf0)
+{
+  if(m2c_rank == 0) {
+
+    vector<MPI_Request> send_requests;
+
+    for(int proc = 0; proc < numAerosProcs; proc++) {
+      if(numStrNodes[proc][0] > 0) {
+        send_requests.push_back(MPI_Request());
+        MPI_Isend(&dtf0, 1, MPI_DOUBLE, proc, SUGGEST_DT_TAG, 
+              joint_comm, &(send_requests[send_requests.size()-1]));
+      }
+    }
+    MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+  }
+}
+
+//---------------------------------------------------------------
 

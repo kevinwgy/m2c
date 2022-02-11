@@ -73,6 +73,7 @@ ConcurrentProgramsHandler.cpp
 AerosMessenger.cpp
 TriangulatedSurface.cpp
 CrackingSurface.cpp
+EmbeddedBoundaryOperator.cpp
 CustomCommunicator.cpp
 ExactRiemannSolverBase.cpp
 MultiPhaseOperator.cpp

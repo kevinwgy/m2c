@@ -3,8 +3,6 @@
 #include <Vector3D.h>
 #include <set>
 #include <vector>
-using std::set;
-using std::vector;
 
 /*****************************************************************************
  * A utility class to store a triangulated surface (including the degenerate 
@@ -15,19 +13,19 @@ struct TriangulatedSurface {
 
   bool degenerate; //!< line segments in 2D (x-y)
 
-  vector<Vec3D> X0;   //!< Original config. (for points in 2D: z-coord = 0)
-  vector<Vec3D> X;    //!< Current config. (for point in 2D: z-coord = 0)
-  vector<Vec3D> Udot; //!< Velocity vector
+  std::vector<Vec3D> X0;   //!< Original config. (for points in 2D: z-coord = 0)
+  std::vector<Vec3D> X;    //!< Current config. (for point in 2D: z-coord = 0)
+  std::vector<Vec3D> Udot; //!< Velocity vector
 
-  vector<Int3> elems; //line segment is recognized as a triangle with node2 = node3
+  std::vector<Int3> elems; //line segment is recognized as a triangle with node2 = node3
 
-  vector<Vec3D> elemNorm;
-  vector<set<int> > node2node;
-  vector<set<int> > node2elem;
+  std::vector<Vec3D> elemNorm;
+  std::vector<std::set<int> > node2node;
+  std::vector<std::set<int> > node2elem;
 
   TriangulatedSurface(bool degen_ = false) : degenerate(degen_) { }
 
-  TriangulatedSurface(vector<Vec3D> &X_, vector<Int3>& e_, bool degen_ = false) 
+  TriangulatedSurface(std::vector<Vec3D> &X_, std::vector<Int3>& e_, bool degen_ = false) 
       : degenerate(degen_), X(X_), elems(e_) {
     BuildConnectivity();
     BuildElementNormals();

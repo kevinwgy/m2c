@@ -10,11 +10,11 @@
 #include<MeshMatcher.h>
 #include<tuple>
 
-//------------------------------------------------------------
-// Class LaserAbsorptionSolver is responsible for solving the
-// laser radiation equation and coupling it with the Navier-
-// Stokes equations.
-//------------------------------------------------------------
+/**************************************************************
+* Class LaserAbsorptionSolver is responsible for solving the
+* laser radiation equation and coupling it with the Navier-
+* Stokes equations.
+**************************************************************/
 
 //! Structure of nodal status
 struct NodalLaserInfo {

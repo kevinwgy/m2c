@@ -1,4 +1,6 @@
 #include <TriangulatedSurface.h>
+using std::set;
+using std::vector;
 
 //----------------------------------------------------
 

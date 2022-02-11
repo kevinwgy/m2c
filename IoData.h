@@ -1057,7 +1057,7 @@ public:
 
   ConcurrentProgramsData concurrent;
 
-  EmbeddedSurfacesData embedded;
+  EmbeddedSurfacesData embed_surfaces;
 
   MeshData mesh;
 

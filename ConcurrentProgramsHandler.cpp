@@ -24,15 +24,26 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
   if(coupled)
     SetupCommunicators();
 
-  // create messengers
+  // create inter-communicators 
   if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
-
     aeros_comm = c[aeros_color];
-    aeros = new AerosMessenger(iod_, m2c_comm, aeros_comm); 
   }
 
   // outputs the m2c communicator
   comm_ = m2c_comm;
+}
+
+//---------------------------------------------------------
+
+void
+ConcurrentProgramsHandler::InitializeMessengers(TriangulatedSurface *surf_, vector<Vec3D> *F_) //for AERO-S messengers
+{
+  if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
+
+    assert(surf_); //cannot be NULL
+    assert(F_); //cannot be NULL
+    aeros = new AerosMessenger(iod_, m2c_comm, aeros_comm, *surf_, *F_); 
+  }
 }
 
 //---------------------------------------------------------

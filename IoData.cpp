@@ -2541,7 +2541,7 @@ void IoData::setupCmdFileVariables()
 
   concurrent.setup("ConcurrentPrograms");
 
-  embedded.setup("EmbeddedSurfaces");
+  embed_surfaces.setup("EmbeddedSurfaces");
 
   eqs.setup("Equations");
   eqs.setup("NavierStokesEquations");

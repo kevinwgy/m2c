@@ -4,11 +4,14 @@
 #include<IoData.h>
 #include<SpaceVariable.h>
 #include<mpi.h>
-//--------------------------------------------------------------
-// Class ConcurrentProgramsHandler is responsible for splitting the MPI
-// communicator among multiple programs and sending/receiving data
-// to/from other programs that are coupled with M2C
-//--------------------------------------------------------------
+/***********************************************************************
+* Class ConcurrentProgramsHandler is responsible for splitting the MPI
+* communicator among multiple programs and sending/receiving data
+* to/from other programs that are coupled with M2C.
+* This class is largely a wrapper in the sense that the the
+* actually communications between M2C and other programs are
+* performed in the "messenger" classes (e.g., AerosMessenger).
+***********************************************************************/
 
 //! Concurrent programs handler
 class ConcurrentProgramsHandler {
@@ -43,9 +46,11 @@ public:
   ConcurrentProgramsHandler(IoData &iod_, MPI_Comm global_comm_, MPI_Comm &comm_); 
   ~ConcurrentProgramsHandler();
 
+  void InitializeMessengers(TriangulatedSurface *surf_, vector<Vec3D> *F_);
+
   void Destroy();
 
-  void Init1(double *in, double *out);
+  void InitialCommunication(int *int_inputs, double *dbl_inputs, int *int_outputs, double *out);
   void Init2(double *in, double *out);
 
   void Update1(double *in, double *out);
@@ -53,6 +58,8 @@ public:
 
   void Finalize1(double *in, double *out);
   void Finalize2(double *in, double *out);
+
+  bool Coupled() {return coupled;}
 
 private:
 
