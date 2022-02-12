@@ -3,10 +3,10 @@
 #include<Vector3D.h>
 #include<vector>
 
-//----------------------------------------------------------------
-// Class EmbeddedSurface stores information about a dynamic 
-// surface embedded in the computational domain.
-//----------------------------------------------------------------
+/*****************************************************************
+ * Class EmbeddedSurface stores information about a dynamic 
+ * surface embedded in the computational domain.
+ ****************************************************************/
 
 class EmbeddedSurface {
 

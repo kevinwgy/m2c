@@ -49,13 +49,22 @@ public:
                  std::vector<Vec3D> &F_);
   ~AerosMessenger();
 
-  double GetTimeStep() {return dt;}
+  double GetTimeStepSize() {return dt;}
   double GetMaxTime() {return tmax;}
   bool   Cracking()   {return cracking==NULL ? false : true;}
 
   CrackingSurface *GetPointerToCrackingSurface() {return cracking;} 
 
   int StructSubcycling() {return structureSubcycling;}
+
+  //! Exchange data w/ AERO-S (called at the beginning of the first time step)
+  void FirstExchange();
+
+  //! Exchange data w/ AERO-S (called at every time step)
+  void Exchange();
+
+  //! Exchange data w/ AERO-S (called at the last time step)
+  void FinalExchange();
 
 protected:
 

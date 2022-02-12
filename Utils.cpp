@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <cstring>
 #include <cmath> //floor
+#include <unistd.h> //sleep
 using std::cout;
 using std::endl;
 
@@ -76,6 +77,52 @@ void print_error(MPI_Comm& comm, const char format[],...)
 
     char format_colored[strlen(format)+40] = "";
     strcat(format_colored, "\033[0;31m");
+    strcat(format_colored, format);
+    strcat(format_colored, "\033[0m");
+
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format_colored, Argp);
+    va_end(Argp);
+  }
+  MPI_Barrier(comm);
+  return;
+}
+
+//--------------------------------------------------
+// MPI Rank 0 will print to stdout in purple color
+void print_error(const char format[],...)
+{
+  int rank;
+  MPI_Comm_rank(m2c_comm, &rank);
+
+  if(!rank) {
+
+    char format_colored[strlen(format)+40] = "";
+    strcat(format_colored, "\033[0;35m");
+    strcat(format_colored, format);
+    strcat(format_colored, "\033[0m");
+
+    va_list Argp;
+    va_start(Argp, format);
+    vprintf(format_colored, Argp);
+    va_end(Argp);
+  }
+  MPI_Barrier(m2c_comm);
+  return;
+}
+
+//--------------------------------------------------
+// MPI Rank 0 will print to stdout in purple color
+void print_error(MPI_Comm& comm, const char format[],...)
+{
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+
+  if(!rank) {
+
+    char format_colored[strlen(format)+40] = "";
+    strcat(format_colored, "\033[0;35m");
     strcat(format_colored, format);
     strcat(format_colored, "\033[0m");
 
@@ -214,9 +261,16 @@ void printHeader(int argc, char *argv[])
       cout << " " << argv[i];
     cout << endl;
     cout << endl;
+    cout << "\033[0;32m==========================================\033[0m" << endl;
+    cout << "\033[0;32m                 START                    \033[0m" << endl;
+    cout << "\033[0;32m==========================================\033[0m" << endl;
+    cout << endl;
     cout.flush();
-  }
-  MPI_Barrier(m2c_comm);
+  } else 
+    sleep(0.1); //wait until the message gets printed to the screen
+
+  //MPI_Barrier(m2c_comm); //not friendly to concurrent programs
+  //
   return;
 }
 

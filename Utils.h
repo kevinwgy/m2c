@@ -20,6 +20,10 @@ void print(MPI_Comm& comm, const char format[],...);
 void print_error(const char format[],...);
 void print_error(MPI_Comm& comm, const char format[],...);
 //--------------------------------------------------
+//! MPI Rank 0 will print to stdout in purple color
+void print_warning(const char format[],...);
+void print_warning(MPI_Comm& comm, const char format[],...);
+//--------------------------------------------------
 //! MPI Rank i will print to stdout
 //void print(int i, const char format[],...);
 void print(MPI_Comm& comm, int i, const char format[],...);

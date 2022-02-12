@@ -68,7 +68,7 @@ void TimeIntegratorFE::Destroy()
 
 void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L,
-                                          double time, double dt, int time_step)
+                                          double time, double dt, int time_step, int subcycle, double dts)
 {
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
@@ -102,7 +102,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   // -------------------------------------------------------------------------------
   // End-of-step tasks
   // -------------------------------------------------------------------------------
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, dt, time_step);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -144,7 +144,8 @@ void TimeIntegratorRK2::Destroy()
 //----------------------------------------------------------------------------
 
 void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                            vector<SpaceVariable3D*>& Phi, SpaceVariable3D* L, double time, double dt, int time_step)
+                            vector<SpaceVariable3D*>& Phi, SpaceVariable3D* L, double time, double dt, 
+                            int time_step, int subcycle, double dts)
 {
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
@@ -217,7 +218,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //***************************************************
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, dt, time_step);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -261,7 +262,7 @@ void TimeIntegratorRK3::Destroy()
 void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                            vector<SpaceVariable3D*>& Phi, 
                                            SpaceVariable3D* L, double time, 
-                                           double dt, int time_step)
+                                           double dt, int time_step, int subcycle, double dts)
 { 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
@@ -371,7 +372,7 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, dt, time_step);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -379,19 +380,21 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 void
 TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
                                                     vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
-                                                    double time, double dt, int time_step)
+                                                    double time, int time_step, int subcycle, double dts)
 {
 
   // Check & fix two things: (1) cells belonging to more than 1 subdomain; (2) cells isolated between
   // material boundaries. (2) is optional, and not done by default (frequency controlled by user).
   int resolved_conflicts = 0; //if non-zero, force reinitialization of (all) the level sets
-  if(lso.size()) 
+  if(lso.size() && subcycle==0)  //only consider doing this in the first subcycle (if subcycling)
     resolved_conflicts = mpo.ResolveConflictsInLevelSets(time_step, Phi);
 
 
   // Reinitialize level set (frequency specified by user)
-  for(int i=0; i<Phi.size(); i++) {
-    lso[i]->Reinitialize(time, dt, time_step, *Phi[i], resolved_conflicts>0/*"must_do"*/);
+  if(subcycle==0) {
+    for(int i=0; i<Phi.size(); i++) {
+      lso[i]->Reinitialize(time, dts, time_step, *Phi[i], resolved_conflicts>0/*"must_do"*/);
+    }
   }
 
 
@@ -409,7 +412,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
       //update phi(s) at the unresolved cells
       mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
       for(int i=0; i<Phi.size(); i++)
-        lso[i]->Reinitialize(time, dt, time_step, *Phi[i], true); //will NOT change sign of phi
+        lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true); //will NOT change sign of phi
       mpo.UpdateMaterialID(Phi, ID); //should only update ID of unresolved cells      
       mpo.FixUnresolvedNodes(unresolved, IDn, ID, V, unresolved/*not used*/, true); 
     }
@@ -433,7 +436,8 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
   }
 
   // Apply smoothing to U (if specified by user)
-  spo.ApplySmoothingFilter(time, dt, time_step, V, ID);
+  if(subcycle==0) //only consider doing this in the first subcycle
+    spo.ApplySmoothingFilter(time, dts, time_step, V, ID);
 
   // Solve laser radiation equation
   if(laser)

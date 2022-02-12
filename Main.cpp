@@ -17,6 +17,7 @@
 #include <LaserAbsorptionSolver.h>
 #include <IonizationOperator.h>
 #include <TriangulatedSurface.h>
+#include <EmbeddedBoundaryOperator.h>
 #include <set>
 using std::cout;
 using std::endl;
@@ -37,43 +38,35 @@ int main(int argc, char* argv[])
   //! Print header (global proc #1, assumed to be a M2C proc)
   m2c_comm = MPI_COMM_WORLD; //temporary, just for the next few lines of code
   printHeader(argc, argv);
-  print("\033[0;32m==========================================\033[0m\n");
-  print("\033[0;32m                 START                    \033[0m\n"); 
-  print("\033[0;32m==========================================\033[0m\n");
-  print("\n");
 
   //! Read user's input file (read the parameters)
   IoData iod(argc, argv);
   verbose = iod.output.verbose;
-
-  //! Embedded Surfaces (if not used, this would be an empty vector)
-  vector<TriangulatedSurface> embedded_surfaces;
-  vector<vector<Vec3D> > F; //force
 
   //! Partition MPI, if there are concurrent programs
   MPI_Comm comm; //this is going to be the M2C communicator
   ConcurrentProgramsHandler concurrent_programs(iod, MPI_COMM_WORLD, comm);
   m2c_comm = comm; //correct it
  
+  //! Finalize IoData (read additional files and check for errors)
+  iod.finalize();
+
   //! Initialize PETSc
   PETSC_COMM_WORLD = comm;
   PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
 
-  //! Finalize IoData (read additional files and check for errors)
-  iod.finalize();
+  //! Initialize Embedded Boundary Operator, if needed
+  EmbeddedBoundaryOperator *embed = NULL;
+  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
+    embed = new EmbeddedBoundaryOperator(iod, true); 
+    concurrent_programs.InitializeMessengers(embed->GetPointerToSurface(0),
+                                             embed->GetPointerToForcesOnSurface(0));
+  } else if(iod.embed_surfaces.surfaces.dataMap.size() != 0)
+    embed = new EmbeddedBoundaryOperator(iod, false);
 
-  //! Initialize messengers (for concurrent programs)
-  if(concurrent_programs.coupled()) {
-    embedded_surfaces.push_back();
-    F.push_back();
-    concurrent_programs.InitializeMessengers(&embedded_surfaces[0], &F[0]);
-  }
-
-  //! Load other embedded surfaces (provided through user inputs)
-  for(auto it  = iod.embed_surfaces.surfaces.dataMap.begin(); 
-           it != iod.embed_surfaces.surfaces.dataMap.end(); it++) {
-    I AM HERE
-  }
+  //! Track the embedded boundaries
+  if(embed)
+    embed->TrackSurfaces();
 
   //! Calculate mesh coordinates
   vector<double> xcoords, dx, ycoords, dy, zcoords, dz;
@@ -151,6 +144,10 @@ int main(int argc, char* argv[])
 
   //! Impose initial condition
   spo.SetInitialCondition(V, ID);
+
+  //! Compute force on embedded surfaces (if any) using initial state
+  if(embed) 
+    embed->ComputeForces(V, ID);
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -257,33 +254,83 @@ int main(int argc, char* argv[])
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 
-  while(t<iod.ts.maxTime && time_step<iod.ts.maxIts) {
+  if(concurrent.Coupled()) {
+    concurrent.CommunicateBeforeTimeStepping(); //KW: nothing at the moment (not used by AERO-S)
+    concurrent.FirstExchange();
+    if(embed)
+      embed->TrackUpdatedSurfaceFromOtherSolver();
+  }
+
+  // find maxTime, and dts (meaningful only with concurrent programs)
+  double tmax = iod.ts.maxTime;
+  double dts = 0.0;
+  if(concurrent.Coupled()) {
+    dts =  concurrent.GetTimeStepSize();
+    tmax = std::max(iod.ts.maxTime, concurrent.GetMaxTime());
+  }
+
+  while(t<tmax && time_step<iod.ts.maxIts) {
+
+    double dtleft = dts;
 
     time_step++;
+    int subcycle = 0;
 
-    // Compute time step size
-    spo.ComputeTimeStepSize(V, ID, dt, cfl); 
+    do { //subcycling w.r.t. concurrent programs
 
-    if(t+dt >= iod.ts.maxTime) { //update dt at the LAST time step so it terminates at maxTime
-      cfl *= (iod.ts.maxTime - t)/dt;
-      dt = iod.ts.maxTime - t;
+      // Compute time step size
+      spo.ComputeTimeStepSize(V, ID, dt, cfl); 
+
+      if(concurrent.Coupled() && dt>dtleft) { //reduce dt to match the structure
+        cfl *= dtleft/dt;
+        dt = dtleft;
+      }
+
+      if(t+dt >= tmax) { //update dt at the LAST time step so it terminates at tmax
+        cfl *= (tmax - t)/dt;
+        dt = tmax - t;
+      }
+
+      if(!concurrent.Coupled())
+        dts = dt;
+ 
+      if(subcycle==0)
+        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, 
+              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+      else
+        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, 
+              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+
+      //----------------------------------------------------
+      // Move forward by one time-step: Update V, Phi, and ID
+      //----------------------------------------------------
+      t      += dt;
+      dtleft -= dt;
+      integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 
+      //----------------------------------------------------
+
+    } while (cocnurrent.Coupled() && dtleft != 0.0);
+
+    if(embed) 
+      embed->ComputeForces(V, ID);
+
+    if(concurrent.Coupled()) {
+      if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
+        concurrent.Exchange();
+        dts =  concurrent.GetTimeStepSize();
+        tmax = std::max(iod.ts.maxTime, concurrent.GetMaxTime());
+      } else //last time-step
+        concurrent.FinalExchange();
+
+      if(embed)
+        embed->TrackUpdatedSurfaceFromOtherSolver();
     }
-    
-    print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, 
-          ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
-    //----------------------------------------------------
-    // Move forward by one time-step: Update V, Phi, and ID
-    //----------------------------------------------------
-    t += dt;
-    integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step); 
-    //----------------------------------------------------
-
-    out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, false/*force_write*/);
+    out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);
 
   }
 
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
+  out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, true/*force_write*/);
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");
@@ -301,6 +348,8 @@ int main(int argc, char* argv[])
   if(L)     {L->Destroy(); delete L;}
 
   if(ion) {ion->Destroy(); delete ion;}
+
+  if(embed) {embed->Destroy(); delete embed;}
 
   //! Detroy the levelsets
   for(int ls = 0; ls<lso.size(); ls++) {
@@ -336,3 +385,4 @@ int main(int argc, char* argv[])
 }
 
 //--------------------------------------------------------------
+

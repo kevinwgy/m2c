@@ -995,6 +995,9 @@ struct EmbeddedSurfaceData {
 
   const char *filename; //!< file for nodal coordinates and elements
   
+  enum Type {None = 0, Wall = 1, Symmetry = 2, DirectState = 3, MassFlow = 4, PorousWall = 5,
+             Size = 6} type;
+             
   enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
 
   double heat_source;

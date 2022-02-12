@@ -1,21 +1,96 @@
 #include<EmbeddedBoundaryOperator.h>
+#include<deque>
+#include<list>
+#include<utility>
 
+using std::string;
+using std::map;
+using std::vector;
+
+//------------------------------------------------------------------------------------------------
+
+EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(IoData &iod_, bool surface_from_other_solver) 
+                        : iod(iod_), hasSurfFromOtherSolver(surface_from_other_solver)
+{
+  // count surfaces from files
+  int counter = iod.embed_surfaces.surfaces.dataMap.size();
+
+  // get the correct size of surfaces and F
+  if(surface_from_other_solver) {
+    surfaces.resize(counter+1);
+    F.resize(counter+1);
+  } else {
+    surfaces.resize(counter);
+    F.resize(counter);
+  }
+
+  // read surfaces from files
+  for(auto it = iod.embed_surfaces.surfaces.dataMap.begin();
+           it != iod.embed_surfaces.surfaces.dataMap.end(); it++) {
+
+    int index = it->first;
+    if(index<0 || index>=counter) {
+      print_error("*** Error: Detected error in the indices of embedded surfaces (id = %d).\n", index);
+      exit_mpi();
+    }
+    if(surface_from_other_solver)
+      index++;
+
+    // currently, these parameters are not used in M2C.
+    map<int, EmbeddedSurfaceData::Type> &boundaryConditionsMap;
+    string nodeSetName; 
+    vector<int> faceIDs;
+    int *surfaceID = NULL;
+    int *faceID = NULL;
+    int numStNodes(0), numStElems(0), maxFaceID(0); 
+    
+    ReadMeshFile(it->second->filename, nodeSetName, boundaryConditionsMap, faceIDs, numStNodes,
+                 numStElems, surface[index].X, surfaceID, surface[index].elems, faceID, maxFaceID);
+
+    surface[index].X0 = surface[index].X;
+
+    // delete
+    if(surfaceID) delete [] surfaceID;
+    if(faceID)    delete [] faceID; 
+
+  }
+
+  print("- Activted the Embedded Boundary Method. Detected %d surfaces (%d from concurrent programs).\n",
+        surfaces.size(), surfaces.size() - counter); 
+
+}
+
+//------------------------------------------------------------------------------------------------
+
+EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
+{ }
+
+//------------------------------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryOperator::readMeshFile(char *filename, std::string& nodeSetName,
-                                std::map<int, BoundaryData::Type>& boundaryConditionsMap, std::vector<int>& faceIDs,
-                                int& numStNodes, int& numStElems, Vec<Vec3D>& Xs, int *&surfaceID, int (*&stElem)[3],
-                                int *&faceID, int& maxFaceID) {
+EmbeddedBoundaryOperator::Destroy()
+{ }
 
+//------------------------------------------------------------------------------------------------
+
+// copied from AERO-F. Originally written by KW, extended by other students
+void
+EmbeddedBoundaryOperator::ReadMeshFile(char *filename, string& nodeSetName,
+                                map<int, BoundaryData::Type>& boundaryConditionsMap, vector<int>& faceIDs,
+                                int& numStNodes, int& numStElems, vector<Vec3D> &Xs, int *&surfaceID, vector<Int3> &stElem,
+                                int *&faceID, int& maxFaceID) 
 {
   // read data from the solid surface input file.
   FILE *topFile;
   topFile = fopen(filename, "r");
   if(topFile == NULL) {
-    com->fprintf(stderr, "*** Error: embedded structure surface mesh doesn't exist: %s\n", filename);
-    exit(1);
+    print_error("*** Error: embedded structure surface mesh doesn't exist (%s).\n", filename);
+    exit_mpi();
   }
+ 
+  int MAXLINE = 500;
   char line[MAXLINE], key1[MAXLINE], key2[MAXLINE], copyForType[MAXLINE];
+
   // load the nodes and initialize all node-based variables.
   // load solid nodes at t=0
   int num0 = 0;
@@ -27,8 +102,9 @@ EmbeddedBoundaryOperator::readMeshFile(char *filename, std::string& nodeSetName,
   std::deque<std::pair<int, Vec3D>> nodeList;
   std::deque<std::array<int, 4>> elemList; // surface ID + three node IDs
   int maxIndex = 0, maxElem = -1;
-  if(iod.embed.verbose) { com->barrier(); com->fprintf(stderr, "Reading embedded surface from \'%s\'\n", filename); }
+
   while(fgets(line, MAXLINE, topFile) != 0) {
+
     sscanf(line, "%s", key1);
     bool skip = false;
     if(strcmp(key1, "Nodes") == 0) {
@@ -61,31 +137,17 @@ EmbeddedBoundaryOperator::readMeshFile(char *filename, std::string& nodeSetName,
         // read the name of the file and detects keyword for type
         if(strstr(copyForType, "symmetry") != NULL) {
           if(boundaryConditionsMap.count(surfaceid) != 0) {
-            com->fprintf(stderr, "*** Error: two embedded surfaces have the same id (%d)\n", surfaceid);
-            exit(1);
+            print_error("*** Error: two embedded surfaces have the same id (%d)\n", surfaceid);
+            exit_mpi();
           }
-          boundaryConditionsMap[surfaceid] = BoundaryData::SYMMETRYPLANE;
+          boundaryConditionsMap[surfaceid] = EmbeddedSurfaceData::Symmetry;
         }
         else if(strstr(copyForType, "porouswall") != NULL) {
           if(boundaryConditionsMap.count(surfaceid) != 0) {
-            com->fprintf(stderr, "*** Error: two embedded surfaces have the same id (%d)\n", surfaceid);
-            exit(1);
+            print_error("*** Error: two embedded surfaces have the same id (%d)\n", surfaceid);
+            exit_mpi();
           }
-          boundaryConditionsMap[surfaceid] = BoundaryData::POROUSWALL;
-        }
-        else if(strstr(copyForType, "actuatordisk") != NULL) {
-          if(boundaryConditionsMap.count(surfaceid) != 0) {
-            com->fprintf(stderr, "*** Error: two embedded surfaces have the same id (%d)\n", surfaceid);
-            exit(1);
-          }
-          boundaryConditionsMap[surfaceid] = BoundaryData::ACTUATORDISK;
-        }
-        else if(strstr(copyForType, "outlet") != NULL) {
-          if(boundaryConditionsMap.count(surfaceid) != 0) {
-            com->fprintf(stderr, "*** Error: two embedded surfaces have the same id (%d)\n", surfaceid);
-            exit(1);
-          }
-          boundaryConditionsMap[surfaceid] = BoundaryData::OUTLET;
+          boundaryConditionsMap[surfaceid] = BoundaryData::PorousWall;
         }
         else {
           faceIDs.push_back(surfaceid);
@@ -96,12 +158,9 @@ EmbeddedBoundaryOperator::readMeshFile(char *filename, std::string& nodeSetName,
       if(type_read == 1) {
         sscanf(line, "%d %lf %lf %lf", &num1, &x1, &x2, &x3);
         if(num1 < 1) {
-          com->fprintf(stderr, "*** Error: detected a node with index %d in the embedded surface file!\n", num1);
-          exit(-1);
+          print_error("*** Error: detected a node with index %d in the embedded surface file!\n", num1);
+          exit_mpi();
         }
-        x1 /= XScale;
-        x2 /= XScale;
-        x3 /= XScale;
         if(num1 > maxIndex) {
           maxIndex = num1;
         }
@@ -115,9 +174,9 @@ EmbeddedBoundaryOperator::readMeshFile(char *filename, std::string& nodeSetName,
   }
   numStNodes = int(nodeList.size());
   if(numStNodes != maxIndex) {
-    com->fprintf(stderr, "*** Error: the node set of the embedded surface has gaps: max index = %d, number of ndes = %d",
+    print_error("*** Error: the node set of the embedded surface has gaps: max index = %d, number of nodes = %d.",
                  maxIndex, numStNodes);
-    exit(-1);
+    exit_mpi();
   }
   numStElems = int(elemList.size());
   // feed data to Xs
@@ -130,7 +189,7 @@ EmbeddedBoundaryOperator::readMeshFile(char *filename, std::string& nodeSetName,
     surfaceID[it1->first - 1] = 0;
   }
   nodeList.clear();
-  stElem = new int[numStElems][3];
+  stElem.resize(numStElems);
   faceID = new int[numStElems];
   maxFaceID = 0;
   auto it2 = elemList.begin();
@@ -148,3 +207,43 @@ EmbeddedBoundaryOperator::readMeshFile(char *filename, std::string& nodeSetName,
   elemList.clear();
   fclose(topFile);
 }
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
+{
+  print_warning("Warning: EmbeddedBoundaryOperator::ComputeForces has not been implemented.\n");
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::TrackSurfaces()
+{
+  print_warning("Warning: EmbeddedBoundaryOperator::TrackSurfaces has not been implemented.\n");
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::TrackUpdatedSurfaceFromOtherSolver()
+{
+  print_warning("Warning: EmbeddedBoundaryOperator::TrackUpdatedSurfaceFromOtherSolver has not been implemented.\n");
+}
+
+//------------------------------------------------------------------------------------------------
+
+
+
+
+//------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+

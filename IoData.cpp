@@ -2386,6 +2386,7 @@ Assigner* LinePlot::getAssigner()
 EmbeddedSurfaceData::EmbeddedSurfaceData()
 {
   filename = "";
+  type = None;
   thermal  = Adiabatic;
   heat_source = 0.0;
 }

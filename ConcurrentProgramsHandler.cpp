@@ -4,7 +4,7 @@
 
 ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm global_comm_, MPI_Comm &comm_)
                          : iod_concurrent(iod_.concurrent), global_comm(global_comm_), 
-                           m2c_comm(global_comm_), aeros_comm() 
+                           m2c_comm(global_comm_), aeros_comm(), aeros(NULL)
 {
 
   // check if M2C is coupled with any other programs 
@@ -29,8 +29,19 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
     aeros_comm = c[aeros_color];
   }
 
+  // time-step size suggested by other solvers, will be updated
+  dt = 0.0;
+  tmax = 0.0;
+
   // outputs the m2c communicator
   comm_ = m2c_comm;
+}
+
+//---------------------------------------------------------
+
+ConcurrentProgramsHandler::~ConcurrentProgramsHandler()
+{
+  if(aeros) delete aeros;
 }
 
 //---------------------------------------------------------
@@ -43,6 +54,9 @@ ConcurrentProgramsHandler::InitializeMessengers(TriangulatedSurface *surf_, vect
     assert(surf_); //cannot be NULL
     assert(F_); //cannot be NULL
     aeros = new AerosMessenger(iod_, m2c_comm, aeros_comm, *surf_, *F_); 
+
+    dt = aeros->GetTimeStepSize();
+    tmax = aeros->GetMaxTime();
   }
 }
 
@@ -89,17 +103,60 @@ ConcurrentProgramsHandler::SetupCommunicators(int m2c_color, int maxcolor)
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::Init1(double *in, double *out)
-{
-  if(aeros)
-
-}
-
-//---------------------------------------------------------
-
-void
 ConcurrentProgramsHandler::Destroy()
 {
   for(int i=0; i<c.size(); i++)
     MPI_Comm_free(&c[i]);
 }
+
+//---------------------------------------------------------
+
+void
+ConcurrentProgramsHandler::CommunicateBeforeTimeStepping()
+{
+  //nothing at the moment (AERO-S does not need this)
+}
+
+//---------------------------------------------------------
+
+void
+ConcurrentProgramsHandler::FirstExchange()
+{
+  if(aeros) {
+    aeros->FirstExchange();
+    dt = aeros->GetTimeStepSize();
+    tmax = aeros->GetMaxTime();
+  }
+}
+
+//---------------------------------------------------------
+
+void
+ConcurrentProgramsHandler::Exchange()
+{
+  if(aeros) {
+    aeros->Exchange();
+    dt = aeros->GetTimeStepSize();
+    tmax = aeros->GetMaxTime();
+  }
+}
+
+//---------------------------------------------------------
+
+void
+ConcurrentProgramsHandler::FinalExchange()
+{
+  if(aeros) {
+    aeros->FinalExchange();
+    dt = aeros->GetTimeStepSize();
+    tmax = aeros->GetMaxTime();
+  }
+}
+
+//---------------------------------------------------------
+
+
+//---------------------------------------------------------
+
+
+

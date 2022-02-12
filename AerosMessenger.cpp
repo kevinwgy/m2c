@@ -290,24 +290,25 @@ AerosMessenger::GetInfo()
   int rstrt = int(info[3]); //not used
   int smode = int(info[4]); //not used
 
-  if(algNum == 6) {
-    tmax -= 0.5 * dt;
-  }
-  if(algNum == 20) {
-    tmax -= 0.5 * dt;
-  }
-  if(algNum == 21) {
-    tmax += 0.5 * dt;
-  }
-  if(algNum == 22) {
-    tmax += 0.5 * dt;
-  }
-
   // check for consistency in algorithm number
   if(iod_aeros.fsi_algo == AerosCouplingData::A6)
     assert(algNum == 6);
   if(iod_aeros.fsi_algo == AerosCouplingData::C0)
     assert(algNum == 22);
+
+  if(algNum != 6 && algNum != 22) {
+    print_error("*** Error: Detected unsupported FSI algorithm from Aero-S (%d).\n", algNum);
+    exit_mpi();
+  }
+
+  if(algNum == 6) {
+    tmax -= 0.5 * dt;
+    print("- Coupled with AERO-S using the A6 algorithm (Note: Assuming a fixed time-step size in AERO-S).\n");
+  }
+  if(algNum == 22) {
+    tmax += 0.5 * dt;
+    print("- Coupled with AERO-S using the C0 algorithm.\n");
+  }
 
 }
 
@@ -395,7 +396,8 @@ AerosMessenger::GetNewCracking(int numConnUpdate, int numLSUpdate, int newNodes)
   }
 
   nNodes += newNodes;
-  nElems += cracking->updateCracking(numConnUpdate, numLSUpdate, phantElems, phi, phiIndex, Tria, nNodes, new2old, newNodes);
+  nElems += cracking->updateCracking(numConnUpdate, numLSUpdate, phantElems, phi, phiIndex, surface.elems, 
+                                     nNodes, new2old, newNodes);
 
   if(nElems != cracking->usedTrias()) {
     print_error("*** Error: inconsistency in the number of used triangles. (Software bug.)\n");
@@ -557,6 +559,69 @@ AerosMessenger::SendM2CSuggestedTimeStep(double dtf0)
     MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
   }
 }
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::FirstExchange()
+{
+  if(algNum == 6) //A6
+    FirstExchangeForA6();
+  else if(algNum == 22)
+    FirstExchangeForC0();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::Exchange()
+{
+  if(algNum == 6) //A6
+    ExchangeForA6();
+  else if(algNum == 22)
+    ExchangeForC0();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::FinalExchange()
+{
+  if(algNum == 6) //A6
+    FinalExchangeForA6();
+  else if(algNum == 22)
+    FinalExchangeForC0();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::FirstExchangeForA6()
+{
+  dt *= 0.5;
+  GetDisplacementAndVelocity();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::ExchangeForA6()
+{
+  
+}
+
+//---------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
 
 //---------------------------------------------------------------
 
