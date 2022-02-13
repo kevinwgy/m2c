@@ -255,8 +255,7 @@ int main(int argc, char* argv[])
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 
   if(concurrent.Coupled()) {
-    concurrent.CommunicateBeforeTimeStepping(); //KW: nothing at the moment (not used by AERO-S)
-    concurrent.FirstExchange();
+    concurrent.CommunicateBeforeTimeStepping(); 
     if(embed)
       embed->TrackUpdatedSurfaceFromOtherSolver();
   }
@@ -314,14 +313,18 @@ int main(int argc, char* argv[])
     if(embed) 
       embed->ComputeForces(V, ID);
 
+    //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
     if(concurrent.Coupled()) {
       if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
-        concurrent.Exchange();
-        dts =  concurrent.GetTimeStepSize();
-        tmax = std::max(iod.ts.maxTime, concurrent.GetMaxTime());
+        if(it==0)
+          concurrent.FirstExchange();
+        else
+          concurrent.Exchange();
       } else //last time-step
         concurrent.FinalExchange();
 
+      dts =  concurrent.GetTimeStepSize();
+      tmax = std::max(iod.ts.maxTime, concurrent.GetMaxTime());
       if(embed)
         embed->TrackUpdatedSurfaceFromOtherSolver();
     }

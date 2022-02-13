@@ -21,8 +21,10 @@
 
 
 using std::vector;
-//---------------------------------------------------------------
 
+//---------------------------------------------------------------
+// TODO(KW): When I or someone has time, should re-visit the different coupling algorithms (C0, A6, etc.).
+//
 AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_, TriangulatedSurface &surf_,
                                vector<Vec3D> &F_)
               : iod_aeros(iod_.concurrent.aeros), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
@@ -40,7 +42,7 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
   assert(m2c_size == joint_size)
 
   MPI_Comm_remote_size(joint_comm, &numAerosProcs);
-  fprintf(stderr,"I am [%d][%d]. AERO-S running on %d procs.\n", m2c_rank, joint_rank, numAerosProcs);
+  fprintf(stderr,"I am [%d][%d]. Aero-S running on %d procs.\n", m2c_rank, joint_rank, numAerosProcs);
 
   //----------------------
   // copied from AERO-F/DynamicNodalTransfer.cpp (written by KW in grad school...)
@@ -111,7 +113,8 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
     cracking->setNewCrackingFlag(false);
   }
 
-  structureSubcycling = (algNum == 22) ? GetStructSubcyclingInfo() : 0;
+  structureSubcycling = (algNum == 22) ? GetStructSubcyclingInfo() : 0; 
+  //currently, M2C does not support "structure subcycling".
 } 
 
 //---------------------------------------------------------------
@@ -303,11 +306,11 @@ AerosMessenger::GetInfo()
 
   if(algNum == 6) {
     tmax -= 0.5 * dt;
-    print("- Coupled with AERO-S using the A6 algorithm (Note: Assuming a fixed time-step size in AERO-S).\n");
+    print("- Coupled with Aero-S using the A6 algorithm (Note: Assuming a fixed time-step size in Aero-S).\n");
   }
   if(algNum == 22) {
     tmax += 0.5 * dt;
-    print("- Coupled with AERO-S using the C0 algorithm.\n");
+    print("- Coupled with Aero-S using the C0 algorithm.\n");
   }
 
 }
@@ -481,6 +484,8 @@ AerosMessenger::SendForce()
   //IMPORTANT: Assuming that the force has been assembled on Proc 0
   if(m2c_rank == 0) {
 
+    //TODO: Need to take care of "staggering"
+    //
     vector<MPI_Request> send_requests;
 
     for(int proc = 0; proc < numAerosProcs; proc++) {
@@ -563,12 +568,31 @@ AerosMessenger::SendM2CSuggestedTimeStep(double dtf0)
 //---------------------------------------------------------------
 
 void
+AerosMessenger::CommunicateBeforeTimeStepping()
+{
+  if(algNum == 6) //A6
+    CommunicateBeforeTimeSteppingForA6();
+  else if(algNum == 22)
+    CommunicateBeforeTimeSteppingForC0();
+  else {
+    print_error("*** Error: Detected unsupported Aero-S algNum: %d.\n", algNum);
+    exit_mpi();
+  }
+}
+
+//---------------------------------------------------------------
+
+void
 AerosMessenger::FirstExchange()
 {
   if(algNum == 6) //A6
     FirstExchangeForA6();
   else if(algNum == 22)
     FirstExchangeForC0();
+  else {
+    print_error("*** Error: Detected unsupported Aero-S algNum: %d.\n", algNum);
+    exit_mpi();
+  }
 }
 
 //---------------------------------------------------------------
@@ -580,6 +604,10 @@ AerosMessenger::Exchange()
     ExchangeForA6();
   else if(algNum == 22)
     ExchangeForC0();
+  else {
+    print_error("*** Error: Detected unsupported Aero-S algNum: %d.\n", algNum);
+    exit_mpi();
+  }
 }
 
 //---------------------------------------------------------------
@@ -591,12 +619,16 @@ AerosMessenger::FinalExchange()
     FinalExchangeForA6();
   else if(algNum == 22)
     FinalExchangeForC0();
+  else {
+    print_error("*** Error: Detected unsupported Aero-S algNum: %d.\n", algNum);
+    exit_mpi();
+  }
 }
 
 //---------------------------------------------------------------
 
 void
-AerosMessenger::FirstExchangeForA6()
+AerosMessenger::CommunicateBeforeTimeSteppingForA6()
 {
   dt *= 0.5;
   GetDisplacementAndVelocity();
@@ -605,12 +637,88 @@ AerosMessenger::FirstExchangeForA6()
 //---------------------------------------------------------------
 
 void
-AerosMessenger::ExchangeForA6()
+AerosMessenger::FirstExchangeForA6()
 {
-  
+  //nothing special
+  ExchangeForA6(); 
 }
 
 //---------------------------------------------------------------
+
+void
+AerosMessenger::ExchangeForA6()
+{
+  SendForce();  
+
+  if(cracking)
+    GetNewCracking();
+
+  GetDisplacementAndVelocity();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::FinalExchangeForA6()
+{
+  SendForce();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::CommunicateBeforeTimeSteppingForC0()
+{
+  GetDisplacementAndVelocity();
+
+  SendForce();
+
+  GetInfo(); //get dt, tmax
+
+  dt *= 0.5;
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::FirstExchangeForC0()
+{
+  GetInfo(); //get dt, tmax
+
+  if(cracking)
+    GetNewCracking();
+
+  GetDisplacementAndVelocity();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::ExchangeForC0()
+{
+  SendForce();  
+
+  GetInfo();
+
+  if(cracking)
+    GetNewCracking();
+
+  GetDisplacementAndVelocity();
+}
+
+//---------------------------------------------------------------
+
+void
+AerosMessenger::FinalExchangeForC0()
+{
+  SendForce();
+  dt = 0.0;
+}
+
+//---------------------------------------------------------------
+
+
+
 
 
 

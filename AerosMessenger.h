@@ -37,7 +37,7 @@ class AerosMessenger {
   CrackingSurface *cracking; //!< activated only if cracking is considered in the structure code
   std::vector<Vec3D> &F;
 
-  double dt, tmax; //!< dt and tmax in AERO-S
+  double dt, tmax; //!< dt, tmax suggested by AERO-S. May be different from those in AERO-S (Staggering)
   int algNum; //!< algo number received from AERO-S
   int structureSubcycling;
 
@@ -57,10 +57,13 @@ public:
 
   int StructSubcycling() {return structureSubcycling;}
 
-  //! Exchange data w/ AERO-S (called at the beginning of the first time step)
+  //! Exchange data w/ AERO-S (called before the first time step)
+  void CommunicateBeforeTimeStepping();
+
+  //! Exchange data w/ AERO-S (called at the first time step)
   void FirstExchange();
 
-  //! Exchange data w/ AERO-S (called at every time step)
+  //! Exchange data w/ AERO-S (called at every time step except first and last)
   void Exchange();
 
   //! Exchange data w/ AERO-S (called at the last time step)
@@ -84,8 +87,15 @@ protected:
                           int *new2old, int newNodes);
   int  GetStructSubcyclingInfo();
 
-  
-  void GetTimeInfo(); //!< get/update dt and tmax from AERO-S
+  //! functions call by data-exchange functions
+  void CommunicateBeforeTimeSteppingForA6();
+  void FirstExchangeForA6();
+  void ExchangeForA6();
+  void FinalExchangeForA6();
+  void CommunicateBeforeTimeSteppingForC0();
+  void FirstExchangeForC0();
+  void ExchangeForC0();
+  void FinalExchangeForC0();
 };
 
 

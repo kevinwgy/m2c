@@ -114,7 +114,11 @@ ConcurrentProgramsHandler::Destroy()
 void
 ConcurrentProgramsHandler::CommunicateBeforeTimeStepping()
 {
-  //nothing at the moment (AERO-S does not need this)
+  if(aeros) {
+    aeros->CommunicateBeforeTimeStepping();
+    dt = aeros->GetTimeStepSize();
+    tmax = aeros->GetMaxTime();
+  }
 }
 
 //---------------------------------------------------------

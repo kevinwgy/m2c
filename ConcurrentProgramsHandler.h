@@ -13,11 +13,10 @@
 * - This class is largely a wrapper in the sense that the the
 *   actually communications between M2C and other programs are
 *   performed in the "messenger" classes (e.g., AerosMessenger).
-* - This class and the messengers only ensure proper communications,
-*   in other words, that the simulation would not "hang" there due to
-*   miscommunication w/ other concurrent programs. They are not responsible
-*   for preparing the correct data for communication. This should be done
-*   by other classes who owns or creates the data needed for communication.
+* - This class and the messengers only ensure proper communications.
+*   They are not responsible for preparing the correct data (except for 
+*   taking care of "staggering"). This should be done by other classes 
+*   who owns or creates the data needed for communication.
 ***********************************************************************/
 
 //! Concurrent programs handler
@@ -65,9 +64,9 @@ public:
   double GetMaxTime() {return tmax;}
 
   //! The main functions that handle communications
-  void CommunicateBeforeTimeStepping();
-  void FirstExchange(); //!< called at the beginning of the 1st time step
-  void Exchange(); //!< called every time step
+  void CommunicateBeforeTimeStepping(); //!< called before the 1st time step
+  void FirstExchange(); //!< called at the the 1st time step
+  void Exchange(); //!< called every time step (except 1st and last)
   void FinalExchange(); //!< at the last time step
 
 private:
