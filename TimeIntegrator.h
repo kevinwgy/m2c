@@ -77,7 +77,7 @@ public:
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
-                          double dt, int time_step);
+                          double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
 
@@ -108,7 +108,7 @@ public:
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
-                          double dt, int time_step);
+                          double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 
 
@@ -139,7 +139,7 @@ public:
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
-                          double dt, int time_step);
+                          double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
 

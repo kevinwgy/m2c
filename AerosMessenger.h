@@ -45,9 +45,10 @@ class AerosMessenger {
 
 public:
 
-  AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_, TriangulatedSurface &surf_, 
-                 std::vector<Vec3D> &F_);
+  AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_, 
+                 TriangulatedSurface &surf_, std::vector<Vec3D> &F_);
   ~AerosMessenger();
+  void Destroy();
 
   double GetTimeStepSize() {return dt;}
   double GetMaxTime() {return tmax;}
@@ -55,7 +56,9 @@ public:
 
   CrackingSurface *GetPointerToCrackingSurface() {return cracking;} 
 
+  //! Functions for structure/AERO-S subcycling (not supported at present)
   int StructSubcycling() {return structureSubcycling;}
+  void SendM2CSuggestedTimeStep(double dtf0);
 
   //! Exchange data w/ AERO-S (called before the first time step)
   void CommunicateBeforeTimeStepping();
@@ -96,15 +99,12 @@ protected:
   void FirstExchangeForC0();
   void ExchangeForC0();
   void FinalExchangeForC0();
+
+  //! functions call by the above exchange functions
+  void GetDisplacementAndVelocity();
+  void SendForce();
+
 };
-
-
-
-
-
-
-
-
 
 
 

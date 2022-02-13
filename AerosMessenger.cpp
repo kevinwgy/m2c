@@ -1,4 +1,5 @@
 #include<AerosMessenger.h>
+#include<cassert>
 
 #define SUGGEST_DT_TAG 444
 #define WET_SURF_TAG1 555
@@ -25,9 +26,9 @@ using std::vector;
 //---------------------------------------------------------------
 // TODO(KW): When I or someone has time, should re-visit the different coupling algorithms (C0, A6, etc.).
 //
-AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_, TriangulatedSurface &surf_,
-                               vector<Vec3D> &F_)
-              : iod_aeros(iod_.concurrent.aeros), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
+AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_, 
+                               TriangulatedSurface &surf_, vector<Vec3D> &F_)
+              : iod_aeros(iod_aeros_), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
                 surface(surf_), F(F_), cracking(NULL), numStrNodes(NULL)
 {
 
@@ -39,7 +40,7 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
   MPI_Comm_rank(joint_comm, &joint_rank);
   MPI_Comm_size(joint_comm, &joint_size);
   assert(m2c_rank == joint_rank);
-  assert(m2c_size == joint_size)
+  assert(m2c_size == joint_size);
 
   MPI_Comm_remote_size(joint_comm, &numAerosProcs);
   fprintf(stderr,"I am [%d][%d]. Aero-S running on %d procs.\n", m2c_rank, joint_rank, numAerosProcs);
@@ -79,14 +80,14 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
     case 3: // all triangles
       totalElems = totalStElems;
       nElems     = nStElems;
-      surface.elems.resize(totalElems, Int3D(0));
-      GetEmbeddedWetSurface(nNodes, X0.data(), nElems, (int*)surface.elems.data(), elemType);
+      surface.elems.resize(totalElems, Int3(0));
+      GetEmbeddedWetSurface(nNodes, surface.X0.data(), nElems, (int*)surface.elems.data(), elemType);
       break;
     case 4: // quadrangles include triangles represented as degenerated quadrangles.
-      GetEmbeddedWetSurface(nNodes, X0.data(), nStElems, (int*)tmpTopo, elemType);
+      GetEmbeddedWetSurface(nNodes, surface.X0.data(), nStElems, (int*)tmpTopo, elemType);
       if(cracking) {
         totalElems = totalStElems * 2;
-        surface.elems.resize(totalElems, Int3D(0));
+        surface.elems.resize(totalElems, Int3(0));
         nElems = cracking->splitQuads((int*)tmpTopo, nStElems, (int*)surface.elems.data());
       }
       else {
@@ -99,7 +100,7 @@ AerosMessenger::AerosMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &join
       exit_mpi();
   }
   for(int i = 0; i < nNodes; i++)
-    X[i] = X0[i];
+    surface.X[i] = surface.X0[i];
 
 //  if(m2c_rank==0)
 //    matchNodes.resize(totalNodes, 0);
@@ -251,7 +252,7 @@ AerosMessenger::Negotiate()
     for(int proc = 0; proc < numAerosProcs; ++proc) {
       MPI_Recv(&numStrNodes[proc][0], 1, MPI_INT, proc, NEGO_NUM_TAG, joint_comm, MPI_STATUS_IGNORE);
       if(numStrNodes[proc][0] > 0) {
-        MPI_Recv(ibuffer, numStrNodes[proc][0], MPI_INT, proc, NEGO_BUF_TAG, joint_comm, MPI_STATUS_IGNORE);
+        MPI_Recv(ibuffer.data(), numStrNodes[proc][0], MPI_INT, proc, NEGO_BUF_TAG, joint_comm, MPI_STATUS_IGNORE);
         for(int i = 0; i < numStrNodes[proc][0]; ++i) {
           int idx = ibuffer[i];
 //          matchNodes[idx] = pos; //pos == i  (TODO: KW thinks idx is also equal to pos...)
@@ -530,10 +531,10 @@ AerosMessenger::GetDisplacementAndVelocity()
       for(int j=0; j<3; j++)
         surface.X[i][j] = surface.X0[i][j] + temp_buffer[bufsize*i+j];
       for(int j=0; j<3; j++)
-        Udot[i][j] = temp_buffer[buffer*i+3+j];
+        surface.Udot[i][j] = temp_buffer[bufsize*i+3+j];
       if(algNum==6) {//A6
         for(int j=0; j<3; j++)
-          surface.X[i][j] += 0.5*dt*Udot[i][j];
+          surface.X[i][j] += 0.5*dt*surface.Udot[i][j];
       }
     }
   }
@@ -541,7 +542,7 @@ AerosMessenger::GetDisplacementAndVelocity()
   
   //broadcast surface and Udot
   MPI_Bcast((double*)surface.X.data(), 3*nNodes, MPI_DOUBLE, 0, m2c_comm);
-  MPI_Bcast((double*)Udot.data(), 3*nNodes, MPI_DOUBLE, 0, m2c_comm);
+  MPI_Bcast((double*)surface.Udot.data(), 3*nNodes, MPI_DOUBLE, 0, m2c_comm);
 
 }
 

@@ -1,4 +1,5 @@
 #include <ConcurrentProgramsHandler.h>
+#include <cassert>
 
 //---------------------------------------------------------
 
@@ -53,7 +54,7 @@ ConcurrentProgramsHandler::InitializeMessengers(TriangulatedSurface *surf_, vect
 
     assert(surf_); //cannot be NULL
     assert(F_); //cannot be NULL
-    aeros = new AerosMessenger(iod_, m2c_comm, aeros_comm, *surf_, *F_); 
+    aeros = new AerosMessenger(iod_concurrent.aeros, m2c_comm, aeros_comm, *surf_, *F_); 
 
     dt = aeros->GetTimeStepSize();
     tmax = aeros->GetMaxTime();
@@ -63,7 +64,7 @@ ConcurrentProgramsHandler::InitializeMessengers(TriangulatedSurface *surf_, vect
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::SetupCommunicators(int m2c_color, int maxcolor)
+ConcurrentProgramsHandler::SetupCommunicators()
 {
 
   MPI_Comm_rank(global_comm, &global_rank);

@@ -37,7 +37,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(IoData &iod_, bool surface_fr
       index++;
 
     // currently, these parameters are not used in M2C.
-    map<int, EmbeddedSurfaceData::Type> &boundaryConditionsMap;
+    map<int, EmbeddedSurfaceData::Type> boundaryConditionsMap;
     string nodeSetName; 
     vector<int> faceIDs;
     int *surfaceID = NULL;
@@ -45,9 +45,9 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(IoData &iod_, bool surface_fr
     int numStNodes(0), numStElems(0), maxFaceID(0); 
     
     ReadMeshFile(it->second->filename, nodeSetName, boundaryConditionsMap, faceIDs, numStNodes,
-                 numStElems, surface[index].X, surfaceID, surface[index].elems, faceID, maxFaceID);
+                 numStElems, surfaces[index].X, surfaceID, surfaces[index].elems, faceID, maxFaceID);
 
-    surface[index].X0 = surface[index].X;
+    surfaces[index].X0 = surfaces[index].X;
 
     // delete
     if(surfaceID) delete [] surfaceID;
@@ -75,10 +75,10 @@ EmbeddedBoundaryOperator::Destroy()
 
 // copied from AERO-F. Originally written by KW, extended by other students
 void
-EmbeddedBoundaryOperator::ReadMeshFile(char *filename, string& nodeSetName,
-                                map<int, BoundaryData::Type>& boundaryConditionsMap, vector<int>& faceIDs,
-                                int& numStNodes, int& numStElems, vector<Vec3D> &Xs, int *&surfaceID, vector<Int3> &stElem,
-                                int *&faceID, int& maxFaceID) 
+EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, string& nodeSetName,
+                                map<int, EmbeddedSurfaceData::Type>& boundaryConditionsMap, vector<int>& faceIDs,
+                                int& numStNodes, int& numStElems, vector<Vec3D> &Xs, int *&surfaceID, 
+                                vector<Int3> &stElem, int *&faceID, int& maxFaceID) 
 {
   // read data from the solid surface input file.
   FILE *topFile;
@@ -147,7 +147,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(char *filename, string& nodeSetName,
             print_error("*** Error: two embedded surfaces have the same id (%d)\n", surfaceid);
             exit_mpi();
           }
-          boundaryConditionsMap[surfaceid] = BoundaryData::PorousWall;
+          boundaryConditionsMap[surfaceid] = EmbeddedSurfaceData::PorousWall;
         }
         else {
           faceIDs.push_back(surfaceid);

@@ -1,4 +1,5 @@
 #include <CrackingSurface.h>
+#include <Vector3D.h>
 
 #include <cstdlib>
 #include <fstream>

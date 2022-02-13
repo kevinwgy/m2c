@@ -91,7 +91,7 @@ void print_error(MPI_Comm& comm, const char format[],...)
 
 //--------------------------------------------------
 // MPI Rank 0 will print to stdout in purple color
-void print_error(const char format[],...)
+void print_warning(const char format[],...)
 {
   int rank;
   MPI_Comm_rank(m2c_comm, &rank);
@@ -114,7 +114,7 @@ void print_error(const char format[],...)
 
 //--------------------------------------------------
 // MPI Rank 0 will print to stdout in purple color
-void print_error(MPI_Comm& comm, const char format[],...)
+void print_warning(MPI_Comm& comm, const char format[],...)
 {
   int rank;
   MPI_Comm_rank(comm, &rank);

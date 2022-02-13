@@ -3,7 +3,9 @@
 
 #include<TriangulatedSurface.h>
 #include<IoData.h>
-#include<SpaceVariables.h>
+#include<SpaceVariable.h>
+#include<cassert>
+#include<map>
 
 /******************************************************************
  * Class EmbeddedBoundaryOperator stores data related to one or
@@ -44,12 +46,12 @@ public:
 
 private:
 
-  void ReadMeshFile(char *filename, std::string& nodeSetName,
-                    std::map<int, BoundaryData::Type>& boundaryConditionsMap, 
+  void ReadMeshFile(const char *filename, std::string& nodeSetName,
+                    std::map<int, EmbeddedSurfaceData::Type>& boundaryConditionsMap, 
                     std::vector<int>& faceIDs, int& numStNodes, int& numStElems, 
-                    Vec<Vec3D>& Xs, int *&surfaceID, int (*&stElem)[3], int *&faceID, int& maxFaceID);
+                    std::vector<Vec3D>& Xs, int *&surfaceID, vector<Int3> &stElem, int *&faceID, int& maxFaceID);
 
-}
+};
 
 
 

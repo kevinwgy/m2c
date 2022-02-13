@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
 
   //! Partition MPI, if there are concurrent programs
   MPI_Comm comm; //this is going to be the M2C communicator
-  ConcurrentProgramsHandler concurrent_programs(iod, MPI_COMM_WORLD, comm);
+  ConcurrentProgramsHandler concurrent(iod, MPI_COMM_WORLD, comm);
   m2c_comm = comm; //correct it
  
   //! Finalize IoData (read additional files and check for errors)
@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
   EmbeddedBoundaryOperator *embed = NULL;
   if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
     embed = new EmbeddedBoundaryOperator(iod, true); 
-    concurrent_programs.InitializeMessengers(embed->GetPointerToSurface(0),
+    concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
                                              embed->GetPointerToForcesOnSurface(0));
   } else if(iod.embed_surfaces.surfaces.dataMap.size() != 0)
     embed = new EmbeddedBoundaryOperator(iod, false);
@@ -308,7 +308,7 @@ int main(int argc, char* argv[])
       integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 
       //----------------------------------------------------
 
-    } while (cocnurrent.Coupled() && dtleft != 0.0);
+    } while (concurrent.Coupled() && dtleft != 0.0);
 
     if(embed) 
       embed->ComputeForces(V, ID);
@@ -316,7 +316,7 @@ int main(int argc, char* argv[])
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
     if(concurrent.Coupled()) {
       if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
-        if(it==0)
+        if(time_step==0)
           concurrent.FirstExchange();
         else
           concurrent.Exchange();

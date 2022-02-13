@@ -1016,7 +1016,7 @@ struct EmbeddedSurfacesData {
   ObjectMap<EmbeddedSurfaceData> surfaces;
 
   EmbeddedSurfacesData();
-  ~EmbeddedSurfaceData() {}
+  ~EmbeddedSurfacesData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 

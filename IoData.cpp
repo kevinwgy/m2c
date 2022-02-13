@@ -2396,16 +2396,21 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 4, nullAssigner);
 
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
 
+  new ClassToken<EmbeddedSurfaceData> (ca, "BoundaryCondition", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::type), 6,
+     "None", 0, "Wall", 1, "Symmetry", 2, "DirectState", 3, "MassFlow", 4, "PorousWall", 5);
+
   new ClassToken<EmbeddedSurfaceData> (ca, "ThermalBoundaryCondition", this,
-     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::filename), 3,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::thermal), 3,
      "Adiabatic", 0, "Isothermal", 1, "Source", 2);
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "HeatSource", this, &EmbeddedSurfaceData::heat_source);
 
+  return ca;
 }
 
 //------------------------------------------------------------------------------
@@ -2421,15 +2426,15 @@ void EmbeddedSurfacesData::setup(const char *name, ClassAssigner *father)
 {
   ClassAssigner *ca = new ClassAssigner(name, 1, father);
 
-  surfaces.setup("Surface");
+  surfaces.setup("Surface", ca);
 }
 
 //------------------------------------------------------------------------------
 
 AerosCouplingData::AerosCouplingData()
 {
-  fsi_algo = None;
-  fracture = Off;
+  fsi_algo = NONE;
+  fracture = OFF;
 }
 
 //------------------------------------------------------------------------------

@@ -6,6 +6,8 @@
 #include <fstream>
 #include <vector>
 
+struct Int3;
+
 /*****************************************************************************************
  * Classes for handling FSI w/ fracture (copied from AERO-F, written by KW in grad school)
  ****************************************************************************************/
