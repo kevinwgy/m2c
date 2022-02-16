@@ -102,6 +102,8 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        TemperatureNS(comm_, &(dm_all_.ghosted1_1dof))
 {
 
+  L_initialized = false;
+
   // Check input parameters
   CheckForInputErrors();
 
@@ -1751,10 +1753,10 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
     l[k][j][i] = it->second.Evaluate(l);
 
     if(l[k][j][i]<lmin) {
-      l[k][j][i] = lmin;
       if(verbose >= OutputData::MEDIUM)
         fprintf(stderr,"Warning: [%d] Radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                 mpi_rank, i,j,k, l[k][j][i], lmin);
+      l[k][j][i] = lmin;
     }
 //    fprintf(stderr,"[%d] GN1 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
   }
