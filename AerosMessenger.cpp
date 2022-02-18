@@ -23,6 +23,8 @@
 
 using std::vector;
 
+extern int verbose;
+
 //---------------------------------------------------------------
 // TODO(KW): When I or someone has time, should re-visit the different coupling algorithms (C0, A6, etc.).
 //
@@ -43,7 +45,7 @@ AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm
   assert(m2c_size == joint_size);
 
   MPI_Comm_remote_size(joint_comm, &numAerosProcs);
-  fprintf(stderr,"I am [%d][%d]. Aero-S running on %d procs.\n", m2c_rank, joint_rank, numAerosProcs);
+  //fprintf(stderr,"I am [%d]. Aero-S running on %d procs.\n", m2c_rank, numAerosProcs);
 
   //----------------------
   // copied from AERO-F/DynamicNodalTransfer.cpp (written by KW in grad school...)
@@ -116,6 +118,28 @@ AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm
 
   structureSubcycling = (algNum == 22) ? GetStructSubcyclingInfo() : 0; 
   //currently, M2C does not support "structure subcycling".
+
+  if(algNum == 6)
+    print("- Coupled with Aero-S (running on %d processors) using the A6 algorithm "
+          "(Assuming fixed time-step in Aero-S).\n", numAerosProcs);
+  else if(algNum == 22)
+    print("- Coupled with Aero-S (running on %d processors) using the C0 algorithm.\n", numAerosProcs);
+
+
+
+//debug
+/*
+  if(m2c_rank==0) {
+    vector<Vec3D> &x(surface.X);
+    for(int i=0; i<x.size(); i++)
+      fprintf(stderr,"%d %e %e %e.\n", i, x[i][0], x[i][1], x[i][2]);
+    vector<Int3> &e(surface.elems);
+    for(int i=0; i<e.size(); i++)
+      fprintf(stderr,"%d %d %d %d.\n", i, e[i][0], e[i][1], e[i][2]);
+  }
+  MPI_Barrier(m2c_comm);
+  exit_mpi();
+*/
 } 
 
 //---------------------------------------------------------------
@@ -150,6 +174,9 @@ AerosMessenger::GetEmbeddedWetSurfaceInfo(int &eType, bool &crack, int &nStNodes
   crack    = info[1] ? true : false;
   nStNodes = info[2]; 
   nStElems = info[3];
+
+  print("- Embedded Surface from Aero-S: Number of Nodes/Elements: %d/%d, Element Type = %d, Fracture = %d.\n", 
+        nStNodes, nStElems, eType, (int)crack);
 }
 
 //---------------------------------------------------------------
@@ -166,6 +193,9 @@ AerosMessenger::GetEmbeddedWetSurface(int nNodes, Vec3D *nodes, int nElems, int 
     MPI_Recv(elems, nElems*eType, MPI_INT, MPI_ANY_SOURCE, WET_SURF_TAG3, joint_comm, MPI_STATUS_IGNORE);
 
   MPI_Bcast(elems, nElems*eType, MPI_INT, 0, m2c_comm);
+
+  if(verbose>=1)
+    print("- Received nodes and elements of embedded surface from Aero-S.\n");
 }
 
 //---------------------------------------------------------------
@@ -181,6 +211,8 @@ AerosMessenger::GetInitialCrackingSetup(int &totalStNodes, int &totalStElems)
   
   totalStNodes = info[0];
   totalStElems = info[1];
+
+  print("- Received fracture info from Aero-S: total nodes/elements = %d/%d.\n", totalStNodes, totalStElems);
 }
 
 //---------------------------------------------------------------
@@ -307,13 +339,13 @@ AerosMessenger::GetInfo()
 
   if(algNum == 6) {
     tmax -= 0.5 * dt;
-    print("- Coupled with Aero-S using the A6 algorithm (Note: Assuming a fixed time-step size in Aero-S).\n");
   }
   if(algNum == 22) {
     tmax += 0.5 * dt;
-    print("- Coupled with Aero-S using the C0 algorithm.\n");
   }
 
+  if(verbose>1) 
+    print("- Received from Aero-S: dt = %e, tmax(+/-0.5dt) = %e.\n", dt, tmax);
 }
 
 //---------------------------------------------------------------
@@ -411,6 +443,10 @@ AerosMessenger::GetNewCracking(int numConnUpdate, int numLSUpdate, int newNodes)
   if(m2c_rank == 0 && newNodes) 
     numStrNodes[0][0] = nNodes; //TODO: Assuming only talking to one structure proc??
 
+
+  if(newNodes!=0 && verbose>=1) {
+    print("- Received %d new nodes from Aero-S (due to fracture).\n", newNodes);
+  }
 }
 
 //---------------------------------------------------------------

@@ -2434,23 +2434,17 @@ void EmbeddedSurfacesData::setup(const char *name, ClassAssigner *father)
 AerosCouplingData::AerosCouplingData()
 {
   fsi_algo = NONE;
-  fracture = OFF;
 }
 
 //------------------------------------------------------------------------------
 
 void AerosCouplingData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
 
   new ClassToken<AerosCouplingData> (ca, "FSIAlgorithm", this,
      reinterpret_cast<int AerosCouplingData::*>(&AerosCouplingData::fsi_algo), 4,
      "None", 0, "ByAeroS", 1, "C0", 2, "A6", 3);
-
-  new ClassToken<AerosCouplingData> (ca, "Fracture", this,
-     reinterpret_cast<int AerosCouplingData::*>(&AerosCouplingData::fracture), 2,
-     "Off", 0, "On");
-
 }
 
 //------------------------------------------------------------------------------

@@ -55,7 +55,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(IoData &iod_, bool surface_fr
 
   }
 
-  print("- Activted the Embedded Boundary Method. Detected %d surfaces (%d from concurrent programs).\n",
+  print("- Activated the Embedded Boundary Method. Detected %d surface(s) (%d from concurrent program(s)).\n",
         surfaces.size(), surfaces.size() - counter); 
 
 }
