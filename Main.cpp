@@ -265,7 +265,7 @@ int main(int argc, char* argv[])
   double dts = 0.0;
   if(concurrent.Coupled()) {
     dts =  concurrent.GetTimeStepSize();
-    tmax = std::max(iod.ts.maxTime, concurrent.GetMaxTime());
+    tmax = concurrent.GetMaxTime(); //std::max(iod.ts.maxTime, concurrent.GetMaxTime());
   }
 
   while(t<tmax && time_step<iod.ts.maxIts) {
@@ -293,7 +293,7 @@ int main(int argc, char* argv[])
       if(!concurrent.Coupled())
         dts = dt;
  
-      if(subcycle==0)
+      if(dts<=dt)
         print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, 
               ((double)(clock()-start_time))/CLOCKS_PER_SEC);
       else
@@ -306,6 +306,7 @@ int main(int argc, char* argv[])
       t      += dt;
       dtleft -= dt;
       integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 
+      subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 
     } while (concurrent.Coupled() && dtleft != 0.0);
@@ -324,7 +325,7 @@ int main(int argc, char* argv[])
         concurrent.FinalExchange();
 
       dts =  concurrent.GetTimeStepSize();
-      tmax = std::max(iod.ts.maxTime, concurrent.GetMaxTime());
+      tmax = concurrent.GetMaxTime();
       if(embed)
         embed->TrackUpdatedSurfaceFromOtherSolver();
     }
