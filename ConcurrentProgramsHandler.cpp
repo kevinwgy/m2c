@@ -73,6 +73,7 @@ ConcurrentProgramsHandler::SetupCommunicators()
   MPI_Comm_split(global_comm, m2c_color + 1, global_rank, &m2c_comm);
   MPI_Comm_rank(m2c_comm, &m2c_rank);
   MPI_Comm_size(m2c_comm, &m2c_size);
+  assert(m2c_rank<m2c_size); //rank must be 0 -- (size-1)
 
   c.resize(maxcolor);
 

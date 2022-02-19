@@ -18,11 +18,13 @@
 #include <IonizationOperator.h>
 #include <TriangulatedSurface.h>
 #include <EmbeddedBoundaryOperator.h>
+#include <SpecialToolsDriver.h>
 #include <set>
 using std::cout;
 using std::endl;
 int verbose;
 double domain_diagonal;
+clock_t start_time;
 MPI_Comm m2c_comm;
 
 /*************************************
@@ -30,7 +32,7 @@ MPI_Comm m2c_comm;
  ************************************/
 int main(int argc, char* argv[])
 {
-  clock_t start_time = clock(); //for timing purpose only
+  start_time = clock(); //for timing purpose only
 
   //! Initialize MPI 
   MPI_Init(NULL,NULL); //called together with all concurrent programs -> MPI_COMM_WORLD
@@ -51,9 +53,17 @@ int main(int argc, char* argv[])
   //! Finalize IoData (read additional files and check for errors)
   iod.finalize();
 
-  //! Initialize PETSc
-  PETSC_COMM_WORLD = comm;
-  PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
+
+  /*************************************
+   * Special Tools (Skipping the rest)
+   ************************************/
+  if(iod.special_tools.type != SpecialToolsData::NONE) {
+    SpecialToolsDriver special_tools_driver(iod, comm, concurrent);
+    special_tools_driver.Run();
+    return 0;
+  }
+  /*************************************/
+
 
   //! Initialize Embedded Boundary Operator, if needed
   EmbeddedBoundaryOperator *embed = NULL;
@@ -67,18 +77,6 @@ int main(int argc, char* argv[])
   //! Track the embedded boundaries
   if(embed)
     embed->TrackSurfaces();
-
-  //! Calculate mesh coordinates
-  vector<double> xcoords, dx, ycoords, dy, zcoords, dz;
-  MeshGenerator meshgen;
-  meshgen.ComputeMeshCoordinatesAndDeltas(iod.mesh, xcoords, ycoords, zcoords, dx, dy, dz);
-  domain_diagonal = sqrt(pow(iod.mesh.xmax - iod.mesh.x0, 2) +
-                         pow(iod.mesh.ymax - iod.mesh.y0, 2) +
-                         pow(iod.mesh.zmax - iod.mesh.z0, 2));
-  
-  //! Setup PETSc data array (da) structure for nodal variables
-  DataManagers3D dms(comm, xcoords.size(), ycoords.size(), zcoords.size());
-
   //! Initialize VarFcn (EOS, etc.) 
 
   std::vector<VarFcnBase *> vf;
@@ -122,6 +120,21 @@ int main(int argc, char* argv[])
     exit_mpi();
   }
 
+  //! Calculate mesh coordinates
+  vector<double> xcoords, dx, ycoords, dy, zcoords, dz;
+  MeshGenerator meshgen;
+  meshgen.ComputeMeshCoordinatesAndDeltas(iod.mesh, xcoords, ycoords, zcoords, dx, dy, dz);
+  domain_diagonal = sqrt(pow(iod.mesh.xmax - iod.mesh.x0, 2) +
+                         pow(iod.mesh.ymax - iod.mesh.y0, 2) +
+                         pow(iod.mesh.zmax - iod.mesh.z0, 2));
+  
+  //! Initialize PETSc
+  PETSC_COMM_WORLD = comm;
+  PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
+
+  //! Setup PETSc data array (da) structure for nodal variables
+  DataManagers3D dms(comm, xcoords.size(), ycoords.size(), zcoords.size());
+
   //! Initialize space operator
   SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
 
@@ -144,10 +157,6 @@ int main(int argc, char* argv[])
 
   //! Impose initial condition
   spo.SetInitialCondition(V, ID);
-
-  //! Compute force on embedded surfaces (if any) using initial state
-  if(embed) 
-    embed->ComputeForces(V, ID);
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -236,6 +245,7 @@ int main(int argc, char* argv[])
   }
 
 
+
   /*************************************
    * Main Loop 
    ************************************/
@@ -250,6 +260,10 @@ int main(int argc, char* argv[])
 
   if(laser) //initialize L (otherwise the initial output will only have 0s)
     laser->ComputeLaserRadiance(V, ID, *L, t);
+
+  //! Compute force on embedded surfaces (if any) using initial state
+  if(embed) 
+    embed->ComputeForces(V, ID);
 
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
@@ -343,8 +357,11 @@ int main(int argc, char* argv[])
   print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
   print("\n");
 
+
+
   //! finalize 
   //! In general, "Destroy" should be called for classes that store Petsc DMDA data (which need to be "destroyed").
+  
   V.Destroy();
   ID.Destroy();
 

@@ -20,6 +20,7 @@ struct TriangulatedSurface {
   std::vector<Int3> elems; //line segment is recognized as a triangle with node2 = node3
 
   std::vector<Vec3D> elemNorm;
+  std::vector<double> elemArea;
   std::vector<std::set<int> > node2node;
   std::vector<std::set<int> > node2elem;
 
@@ -34,7 +35,7 @@ struct TriangulatedSurface {
   ~TriangulatedSurface() {} 
 
   void BuildConnectivity();
-  void BuildElementNormals();
+  void BuildElementNormals(); //also produces area
 
 };
 

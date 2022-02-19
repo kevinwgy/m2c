@@ -31,6 +31,9 @@ void TriangulatedSurface::BuildElementNormals()
   elemNorm.clear();
   elemNorm.resize(nElems);
 
+  elemArea.clear();
+  elemArea.resize(nElems);
+
   int n1, n2, n3;
   Vec3D dx2, dx3;
 
@@ -53,9 +56,10 @@ void TriangulatedSurface::BuildElementNormals()
 
     double nrm = elemNorm[i].norm();
     // normalize the normal.
-    if(nrm > 0.0)
+    if(nrm > 0.0) {
       elemNorm[i] /= nrm;
-    else {
+      elemArea[i] = 0.5*nrm;
+    } else {
       fprintf(stderr, "*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
       exit(-1);
     }

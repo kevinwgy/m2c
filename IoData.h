@@ -1050,6 +1050,39 @@ struct ConcurrentProgramsData {
 
 //------------------------------------------------------------------------------
 
+struct TransientInputData {
+
+  const char* metafile;
+  const char* snapshot_file_prefix; 
+  const char* snapshot_file_suffix; 
+  
+  enum BasisFunction {MULTIQUADRIC = 0, INVERSE_MULTIQUADRIC = 1, 
+                      THIN_PLATE_SPLINE = 2, GAUSSIAN = 3, SIZE = 4} basis; //basis function for interpolation
+  int numPoints; //number of points for (unstructured) interpolation
+
+  TransientInputData();
+  ~TransientInputData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct SpecialToolsData {
+
+  enum Type {NONE = 0, DYNAMIC_LOAD_CALCULATION = 1, SIZE = 2} type;
+  
+  TransientInputData transient_input;
+
+  SpecialToolsData();
+  ~SpecialToolsData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
 class IoData {
 
   char *cmdFileName;
@@ -1080,6 +1113,8 @@ public:
   TsData ts;
 
   OutputData output;
+
+  SpecialToolsData special_tools;
 
 public:
 

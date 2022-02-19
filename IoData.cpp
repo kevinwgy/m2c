@@ -2464,6 +2464,59 @@ void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+TransientInputData::TransientInputData()
+{
+  metafile = "";
+  snapshot_file_prefix = "";
+  snapshot_file_suffix = "";
+
+  basis = INVERSE_MULTIQUADRIC;
+  numPoints = 8;
+}
+
+//------------------------------------------------------------------------------
+
+void TransientInputData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  
+  new ClassStr<TransientInputData>(ca, "MetaFile", this, &TransientInputData::metafile);
+
+  new ClassStr<TransientInputData>(ca, "SnapshotFilePrefix", this, 
+          &TransientInputData::snapshot_file_prefix);
+
+  new ClassStr<TransientInputData>(ca, "SnapshotFileSuffix", this, 
+          &TransientInputData::snapshot_file_suffix);
+
+  new ClassToken<TransientInputData> (ca, "SpatialInterpolationBasis", this,
+     reinterpret_cast<int TransientInputData::*>(&TransientInputData::basis), 4,
+     "Multiquadric", 0, "InverseMultiquadric", 1, "ThinPlateSpline", 2, "Gaussian", 3);
+
+  new ClassInt<TransientInputData>(ca, "NumberOfBasisPoints", this, &TransientInputData::numPoints);
+}
+
+//------------------------------------------------------------------------------
+
+SpecialToolsData::SpecialToolsData()
+{
+  type = NONE;
+}
+
+//------------------------------------------------------------------------------
+
+void SpecialToolsData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+
+  new ClassToken<SpecialToolsData> (ca, "Type", this,
+     reinterpret_cast<int SpecialToolsData::*>(&SpecialToolsData::type), 2,
+     "None", 0, "DynamicLoadCalculation", 1);
+
+  transient_input.setup("TransientInputData");
+} 
+
+//------------------------------------------------------------------------------
+
 IoData::IoData(int argc, char** argv)
 {
   //Should NOT call functions in Utils (e.g., print(), exit_mpi()) because the
@@ -2564,6 +2617,9 @@ void IoData::setupCmdFileVariables()
   multiphase.setup("MultiPhase");
 
   output.setup("Output");
+
+  special_tools.setup("SpecialTools");
+
 }
 
 //------------------------------------------------------------------------------

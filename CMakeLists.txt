@@ -98,6 +98,8 @@ SahaEquationSolver.cpp
 AtomicIonizationData.cpp
 EmbeddedBoundaryFormula.cpp
 TimeIntegrator.cpp
+SpecialToolsDriver.cpp
+DynamicLoadCalculator.cpp
 Utils.cpp)
 
 # link to libraries
