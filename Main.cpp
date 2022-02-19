@@ -54,15 +54,15 @@ int main(int argc, char* argv[])
   iod.finalize();
 
 
-  /*************************************
-   * Special Tools (Skipping the rest)
-   ************************************/
+  /********************************************************
+   *                   Special Tools                      *
+   *******************************************************/
   if(iod.special_tools.type != SpecialToolsData::NONE) {
     SpecialToolsDriver special_tools_driver(iod, comm, concurrent);
     special_tools_driver.Run();
     return 0;
   }
-  /*************************************/
+  /*******************************************************/
 
 
   //! Initialize Embedded Boundary Operator, if needed
@@ -331,7 +331,7 @@ int main(int argc, char* argv[])
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
     if(concurrent.Coupled()) {
       if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
-        if(time_step==0)
+        if(time_step==1)
           concurrent.FirstExchange();
         else
           concurrent.Exchange();

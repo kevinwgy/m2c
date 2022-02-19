@@ -2,6 +2,9 @@
 #define _DYNAMIC_LOAD_CALCULATOR_H_
 
 #include<ConcurrentProgramsHandler.h>
+#include<KDTree.h>
+
+struct TriangulatedSurface;
 
 /**********************************************
  * class DynamicLoadCalculator is a special
@@ -30,6 +33,10 @@ class DynamicLoadCalculator
   //! Pair of time and the file label between prefix and suffix
   std::vector<std::pair<double,std::string> > stamp;
 
+  //! Internal variables storing the snapshots currently stored in memory
+  double t0, t1;
+  vector<vector<double> > S0, S1;
+  KDTree<PointIn3D,3> *tree0, *tree1; 
 
 public:
 
@@ -42,8 +49,10 @@ private:
 
   void RunForAeroS();
 
+  void ComputeForces(TriangulatedSurface *surface, vector<Vec3D> *force, double t);
+
   void ReadMetaFile(std::string filename);
-  void ReadSnapshot(std::string filename);
+  void ReadSnapshot(std::string filename, std::vector<std::vector<double> >& S);
 
   void BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3> *tree);
   void InterpolateInSpace(vector<vector<double> >& S, KDTree<PointIn3D,3>* tree,

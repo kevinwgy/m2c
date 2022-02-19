@@ -1,5 +1,5 @@
 #include<DynamicLoadCalculator.h>
-#include<KDTree.h>
+#include<EmbeddedBoundaryOperator.h>
 #include<rbf_interp_2d.hpp>
 //#include<bits/stdc++.h> //std::sort
 //#include<time.h>
@@ -13,13 +13,19 @@ extern clock_t start_time; //time computation started (in Main.cpp)
 
 DynamicLoadCalculator::DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_, 
                                              ConcurrentProgramsHandler &concurrent_)
-                     : comm(comm_), iod(iod_), concurrent(concurrent_)
+                     : comm(comm_), iod(iod_), concurrent(concurrent_),
+                       tree0(NULL), tree1(NULL)
 { }
 
 //-----------------------------------------------------------------
 
 DynamicLoadCalculator::~DynamicLoadCalculator()
-{ }
+{ 
+  if(tree0)
+    delete tree0;
+  if(tree1)
+    delete tree1;
+}
 
 //-----------------------------------------------------------------
 
@@ -36,7 +42,7 @@ DynamicLoadCalculator::Run()
   suffix = string(iod.special_tools.transient_input.snapshot_file_suffix);
   ReadMetaFile(string(iod.special_tools.transient_input.metafile));
 
-  if(concurrent.aeros != NULL)
+  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
     RunForAeroS();
   else {
     print_error("*** Error: No concurrent program specified.\n");
@@ -45,7 +51,7 @@ DynamicLoadCalculator::Run()
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");
-  print("\033[0;32m            NORMAL TERMINATION            \033[0m\n", t);
+  print("\033[0;32m            NORMAL TERMINATION            \033[0m\n");
   print("\033[0;32m==========================================\033[0m\n");
   print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
   print("\n");
@@ -59,16 +65,53 @@ DynamicLoadCalculator::RunForAeroS()
 
   // Initialize Embedded Boundary Operator
   EmbeddedBoundaryOperator *embed = NULL;
-  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
-    embed = new EmbeddedBoundaryOperator(iod, true);
-    concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
-                                    embed->GetPointerToForcesOnSurface(0));
-  }
-  assert(embed); //shouldn't be NULL...
+  embed = new EmbeddedBoundaryOperator(iod, true);
+  concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
+                                  embed->GetPointerToForcesOnSurface(0));
   
+  // Get pointer to embedded surface and force vector
+  TriangulatedSurface *surface = embed->GetPointerToSurface(0);
+  vector<Vec3D>       *force   = embed->GetPointerToForcesOnSurface(0);
+
+  // ---------------------------------------------------
+  // Main time loop (mimics the time loop in Main.cpp
+  // ---------------------------------------------------
+  double t = 0.0;
+  int time_step = 0; 
+  ComputeForces(surface, force, t);
+
+  concurrent.CommunicateBeforeTimeStepping();
+  double tmax = concurrent.GetTimeStepSize();
+  double dt   = concurrent.GetMaxTime();
+
+  while(t<tmax) {
+
+    time_step++;
+
+    if(t+dt >= tmax)
+      dt = tmax - t;
+
+    //---------------------------------
+    // Move forward by one time-step
+    //---------------------------------
+    t += dt;
+    ComputeForces(surface, force, t); 
+
+    if(t<tmax) {
+      if(time_step==1)
+        concurrent.FirstExchange();
+      else
+        concurrent.Exchange();
+    } else //last time-step
+      concurrent.FinalExchange();
+
+    dt   = concurrent.GetTimeStepSize();
+    tmax = concurrent.GetMaxTime();
+  }
 
 
-
+  if(embed)
+    delete embed;
 }
 
 //-----------------------------------------------------------------
@@ -116,9 +159,9 @@ DynamicLoadCalculator::ReadMetaFile(string filename)
     else if(!(word.compare(0,4,"Coordinate",0,4) &&
               word.compare(0,4,"COORDINATE",0,4) &&
               word.compare(0,4,"coordinate",0,4))) {
-      column2var[column]   = COORDINATE;
-      column2var[column+1] = COORDINATE;
-      column2var[column+2] = COORDINATE;
+      column2var[column]   = COORDINATES;
+      column2var[column+1] = COORDINATES;
+      column2var[column+2] = COORDINATES;
       var2column[COORDINATES] = column; 
       column += 3;
     } 
@@ -177,8 +220,8 @@ DynamicLoadCalculator::ReadMetaFile(string filename)
 
   //Sort by first component (i.e. time)
   std::sort(stamp.begin(), stamp.end());
-  tmin = stamp.front.first();
-  tmax = stamp.back.first();
+  tmin = stamp.front().first;
+  tmax = stamp.back().first;
 
   input.close();
 
@@ -249,10 +292,12 @@ DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,
   vector<PointIn3D> p;
   p.resize(N);
   int ix = var2column[COORDINATES];
-  for(int i=0; i<N; i++)
-    p[i] = Vec3D(S[i][ix],S[i][ix+1],S[i][ix+2]);
+  for(int i=0; i<N; i++) {
+    Vec3D xyz(S[i][ix],S[i][ix+1],S[i][ix+2]);
+    p[i] = PointIn3D(i, xyz);
+  }
 
-  tree = new KDTree<PointIn3D, 3>(N, p);
+  tree = new KDTree<PointIn3D, 3>(N, p.data());
 } 
 
 //-----------------------------------------------------------------
@@ -332,7 +377,7 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
                         pnode[0], pnode[1], pnode[2], nFound, cutoff);
         exit(-1);
       }
-      nFound = tree.findCandidatesWithin(pnode, candidates, maxCand, cutoff);
+      nFound = tree->findCandidatesWithin(pnode, candidates, maxCand, cutoff);
       if(nFound==0)              cutoff *= 4.0;
       else if(nFound<numPoints)  cutoff *= 1.5*sqrt((double)numPoints/(double)nFound);
       else if(nFound>maxCand)    cutoff /= 1.5*sqrt((double)nFound/(double)maxCand);
@@ -369,17 +414,23 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
       interp = MathTools::rbf_interp(3, numPoints, xd, r0, phi, rbf_weight, 1, pnode);
 
       output[var_dim*index + dim] = interp[0]; 
+
+      delete [] rbf_weight;
+      delete [] interp;
     }
+
     index++;
 
-    delete [] rbf_weight;
-    delete [] interp;
   }
 
 
   //communication
-  MPI_Allgatherv(MPI_IN_PLACE, var_dim*my_block_size, MPI_DOUBLE, output, var_dim*counts, 
-                 var_dim*displacements, MPI_DOUBLE, comm);
+  for(int i=0; i<mpi_size; i++) {
+    counts[i] *= var_dim;
+    displacements[i] *= var_dim;
+  }
+  MPI_Allgatherv(MPI_IN_PLACE, var_dim*my_block_size, MPI_DOUBLE, output, counts, 
+                 displacements, MPI_DOUBLE, comm);
 
 
   delete [] counts;
@@ -400,4 +451,24 @@ DynamicLoadCalculator::InterpolateInTime(double t1, double* input1, double t2, d
 }
 
 //-----------------------------------------------------------------
+
+void
+DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D> *force, double t)
+{
+/* I AM HERE */
+}
+
+
+
+
+
+
+
+//-----------------------------------------------------------------
+
+
+
+
+
+
 
