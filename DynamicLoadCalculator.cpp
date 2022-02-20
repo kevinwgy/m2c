@@ -6,6 +6,7 @@
 
 using std::string;
 using std::vector;
+using std::shared_ptr;
 
 extern clock_t start_time; //time computation started (in Main.cpp)
 
@@ -14,17 +15,14 @@ extern clock_t start_time; //time computation started (in Main.cpp)
 DynamicLoadCalculator::DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_, 
                                              ConcurrentProgramsHandler &concurrent_)
                      : comm(comm_), iod(iod_), concurrent(concurrent_),
-                       tree0(NULL), tree1(NULL)
+                       S0(NULL), S1(NULL), tree0(NULL), tree1(NULL), id0(-INT_MAX), id1(-INT_MAX)
 { }
 
 //-----------------------------------------------------------------
 
 DynamicLoadCalculator::~DynamicLoadCalculator()
 { 
-  if(tree0)
-    delete tree0;
-  if(tree1)
-    delete tree1;
+  //the smart pointers ("shared_ptr") are deleted automatically
 }
 
 //-----------------------------------------------------------------
@@ -72,6 +70,10 @@ DynamicLoadCalculator::RunForAeroS()
   // Get pointer to embedded surface and force vector
   TriangulatedSurface *surface = embed->GetPointerToSurface(0);
   vector<Vec3D>       *force   = embed->GetPointerToForcesOnSurface(0);
+
+  // Allocate memory for the (internal) force vector
+  F0.resize(surface->X.size(), Vec3D(0.0));
+  F1.resize(surface->X.size(), Vec3D(0.0)); //note that X may contain unused nodes (e.g., in fracture)
 
   // ---------------------------------------------------
   // Main time loop (mimics the time loop in Main.cpp
@@ -280,6 +282,7 @@ DynamicLoadCalculator::ReadSnapshot(string filename, vector<vector<double> >& S)
 
   S.resize(r);
 } 
+
 //-----------------------------------------------------------------
 
 void
@@ -304,10 +307,12 @@ DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,
 
 void
 DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<PointIn3D,3>* tree,
-                                          vector<Vec3D>& X, Var var, int var_dim,
+                                          vector<Vec3D>& X, int active_nodes, Var var, int var_dim,
                                           double* output)
 {
-  //assuming "output" has the right size
+  //active_nodes is the number of nodes (in X) that need force. May be different from X.size() in case of fracture
+  //do NOT use "X.size()"!
+  //assuming "output" has the right size (active_nodes x var_dim, or bigger)
   
   assert(tree);
   assert(var2column.find(var) != var2column.end());
@@ -331,8 +336,8 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
   MPI_Comm_rank(comm, &mpi_rank);
   MPI_Comm_size(comm, &mpi_size);
 
-  int block_size = floor((double)X.size()/(double)mpi_size); 
-  int remainder = X.size() - block_size*mpi_size;
+  int block_size = floor((double)active_nodes/(double)mpi_size); 
+  int remainder = active_nodes - block_size*mpi_size;
 
   int* counts = new int[mpi_size];
   int* displacements = new int[mpi_size];
@@ -455,14 +460,76 @@ DynamicLoadCalculator::InterpolateInTime(double t1, double* input1, double t2, d
 void
 DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D> *force, double t)
 {
-/* I AM HERE */
+  
+  // find the time interval
+  int k0(-1), k1(-1);
+  if(t<tmin) {
+    k0 = k1 = 0;
+    print_warning("- Warning: Calculating forces at %e by const extrapolation "
+                  "(outside data interval [%e,%e]).\n", t, tmin, tmax);
+  }
+  else if(t>tmax) {
+    k0 = k1 = stamp.size() - 1;
+    print_warning("- Warning: Calculating forces at %e by const extrapolation "
+                  "(outside data interval [%e,%e]).\n", t, tmin, tmax);
+  }
+  else {
+    for(int k=1; k<stamp.size(); k++) {
+      if(t<stamp[k].first) {
+        k0 = k-1;
+        k1 = k;
+        break;
+      }
+    }
+  }
+  assert(k0>=0 && k1>=0);
+
+  // check if need to be build new tree(s)  
+  if(k0 != id0) {
+    if(k0 == id1) {
+      id0   = id1;
+      S0    = S1;
+      tree0 = tree1;
+    }
+    else { //read data from file
+
+      S0.reset(new vector<vector<double> >);
+      string file_to_read = prefix + stamp[k0].second + suffix;
+      ReadSnapshot(file_to_read, *S0);
+
+      KDTree<PointIn3D,3> *tr(NULL);
+      BuildKDTree(*S0, tr);
+      tree0.reset(tr);
+
+      id0 = k0;
+    }
+  } 
+  if(k1 != id1) { //read data from file
+
+      S1.reset(new vector<vector<double> >);
+      string file_to_read = prefix + stamp[k1].second + suffix;
+      ReadSnapshot(file_to_read, *S1);
+
+      KDTree<PointIn3D,3> *tr(NULL);
+      BuildKDTree(*S1, tr);
+      tree1.reset(tr);
+
+      id1 = k1;
+  }
+
+  // at this point, id0 = k0, id1 = k1
+
+  // interpolate, first in space, then in time
+  if(var2column.find(FORCE) != var2column.end()) {
+
+    InterpolateInSpace(*S0, tree0.get(), surface->X, surface->active_nodes, FORCE, 3, (double*)F0.data());
+    InterpolateInSpace(*S1, tree1.get(), surface->X, surface->active_nodes, FORCE, 3, (double*)F1.data());
+    InterpolateInTime(stamp[id0].first, (double*)F0.data(), stamp[id1].first, (double*)F1.data(),
+                      t, (double*)(force->data()), 3*surface->active_nodes);
+
+  }
+
 }
-
-
-
-
-
-
 
 //-----------------------------------------------------------------
 

@@ -1,4 +1,6 @@
 #include <MeshGenerator.h>
+using std::pair;
+using std::vector;
 
 //-----------------------------------------------------
 

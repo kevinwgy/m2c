@@ -10,6 +10,7 @@
 
 using std::min;
 using std::max;
+using std::pair;
 
 extern double domain_diagonal;
 //-----------------------------------------------------

@@ -3,6 +3,7 @@
 
 #include<ConcurrentProgramsHandler.h>
 #include<KDTree.h>
+#include<memory> //shared_ptr
 
 struct TriangulatedSurface;
 
@@ -34,9 +35,10 @@ class DynamicLoadCalculator
   std::vector<std::pair<double,std::string> > stamp;
 
   //! Internal variables storing the snapshots currently stored in memory
-  double t0, t1;
-  vector<vector<double> > S0, S1;
-  KDTree<PointIn3D,3> *tree0, *tree1; 
+  int id0, id1;
+  std::shared_ptr<std::vector<std::vector<double> > > S0, S1; //!< use smart pointers (automatically deleted)
+  std::shared_ptr<KDTree<PointIn3D,3> > tree0, tree1; 
+  std::vector<Vec3D> F0, F1; //!< interpolated forces (using S0 and S1)
 
 public:
 
@@ -49,14 +51,14 @@ private:
 
   void RunForAeroS();
 
-  void ComputeForces(TriangulatedSurface *surface, vector<Vec3D> *force, double t);
+  void ComputeForces(TriangulatedSurface *surface, std::vector<Vec3D> *force, double t);
 
   void ReadMetaFile(std::string filename);
   void ReadSnapshot(std::string filename, std::vector<std::vector<double> >& S);
 
-  void BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3> *tree);
-  void InterpolateInSpace(vector<vector<double> >& S, KDTree<PointIn3D,3>* tree,
-                          vector<Vec3D>& X, Var var, int var_dim, double* output);
+  void BuildKDTree(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3> *tree);
+  void InterpolateInSpace(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3>* tree,
+                          std::vector<Vec3D>& X, int active_nodes, Var var, int var_dim, double* output);
   void InterpolateInTime(double t1, double* input1, double t2, double* input2,
                          double t, double* output, int size);
 };

@@ -10,8 +10,6 @@
 #include <Utils.h>
 
 using std::map;
-using std::pair;
-using std::vector;
 
 /*********************************************************************
  * class IoData reads and processes the input data provided by the user
@@ -711,9 +709,9 @@ struct IcData {
 
   int specified[SIZE];  //!< 0~unspecified, 1~specified
 
-  vector<double> user_data[SIZE];
+  std::vector<double> user_data[SIZE];
 
-  vector<double> user_data2[SIZE]; //!< for radial variation 
+  std::vector<double> user_data2[SIZE]; //!< for radial variation 
   //-----------------------------------------------------------------------
 
   IcData();

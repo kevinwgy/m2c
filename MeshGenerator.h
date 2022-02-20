@@ -2,7 +2,6 @@
 #define _MESH_GENENERATOR_H_
 
 #include <IoData.h>
-
 /*********************************************************************************
  * class MeshGenerator is responsible for calculating the nodal positions 
  * and cell sizes of a uniform or non-uniform Cartesian grid. (EXCLUDING
@@ -25,15 +24,15 @@ public:
 
   //! Function that calculate nodal positions and cell sizes (dx,dy,dz)
   void ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
-                                       vector<double> &x, vector<double> &y,
-                                       vector<double> &z, vector<double> &dx,
-                                       vector<double> &dy, vector<double> &dz);
+                                       std::vector<double> &x, std::vector<double> &y,
+                                       std::vector<double> &z, std::vector<double> &dx,
+                                       std::vector<double> &dy, std::vector<double> &dz);
 
 protected:
   //! Internal functions
-  void ComputeMesh1DUniform(double x0, double xmax, double Nx, vector<double> &x, vector<double> &dy);
-  void ComputeMesh1DNonUniform(double x0, double xmax, vector<pair<double,double> > &xpoints,
-                               vector<double> &x, vector<double> &dx);
+  void ComputeMesh1DUniform(double x0, double xmax, double Nx, std::vector<double> &x, std::vector<double> &dy);
+  void ComputeMesh1DNonUniform(double x0, double xmax, std::vector<std::pair<double,double> > &xpoints,
+                               std::vector<double> &x, std::vector<double> &dx);
 };
 
 

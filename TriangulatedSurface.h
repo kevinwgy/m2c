@@ -17,17 +17,23 @@ struct TriangulatedSurface {
   std::vector<Vec3D> X;    //!< Current config. (for point in 2D: z-coord = 0)
   std::vector<Vec3D> Udot; //!< Velocity vector
 
-  std::vector<Int3> elems; //line segment is recognized as a triangle with node2 = node3
+  std::vector<Int3> elems; //!< line segment is recognized as a triangle with node2 = node3
+
+  //! number of active nodes and elements (not equal to the size of X0, elems in case of fracture)
+  int active_nodes;
+  int active_elems;
 
   std::vector<Vec3D> elemNorm;
   std::vector<double> elemArea;
   std::vector<std::set<int> > node2node;
   std::vector<std::set<int> > node2elem;
 
-  TriangulatedSurface(bool degen_ = false) : degenerate(degen_) { }
+  TriangulatedSurface(bool degen_ = false) : degenerate(degen_), active_nodes(0), active_elems(0) { }
 
   TriangulatedSurface(std::vector<Vec3D> &X_, std::vector<Int3>& e_, bool degen_ = false) 
       : degenerate(degen_), X(X_), elems(e_) {
+    active_nodes = X.size();
+    active_elems = elems.size();
     BuildConnectivity();
     BuildElementNormals();
   }

@@ -104,6 +104,9 @@ AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm
   for(int i = 0; i < nNodes; i++)
     surface.X[i] = surface.X0[i];
 
+  surface.active_nodes = nNodes;
+  surface.active_elems = nElems;
+
 //  if(m2c_rank==0)
 //    matchNodes.resize(totalNodes, 0);
 
@@ -434,6 +437,10 @@ AerosMessenger::GetNewCracking(int numConnUpdate, int numLSUpdate, int newNodes)
   nNodes += newNodes;
   nElems += cracking->updateCracking(numConnUpdate, numLSUpdate, phantElems, phi, phiIndex, surface.elems, 
                                      nNodes, new2old, newNodes);
+
+  //update info stored in Triangulated surface
+  surface.active_nodes = nNodes;
+  surface.active_elems = nElems; 
 
   if(nElems != cracking->usedTrias()) {
     print_error("*** Error: inconsistency in the number of used triangles. (Software bug.)\n");

@@ -116,9 +116,9 @@ double VarFcnJWL::GetDensity(double p, double e) const
   double f_hi    = equation(rho_hi);
   boost::uintmax_t maxit = 500;
   double tol = 1e-8;
-  pair<double,double> sol = toms748_solve(equation, rho_low, rho_hi, f_low, f_hi,
-                                          [=](double r0, double r1){return r1-r0<tol;},
-                                          maxit);
+  std::pair<double,double> sol = toms748_solve(equation, rho_low, rho_hi, f_low, f_hi,
+                                              [=](double r0, double r1){return r1-r0<tol;},
+                                              maxit);
   //*******************************************************************
 
   return 0.5*(sol.first + sol.second);
