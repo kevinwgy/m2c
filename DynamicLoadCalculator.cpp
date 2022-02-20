@@ -104,13 +104,13 @@ DynamicLoadCalculator::RunForAeroS()
         concurrent.FirstExchange();
       else
         concurrent.Exchange();
-    } else //last time-step
-      concurrent.FinalExchange();
+    } 
 
     dt   = concurrent.GetTimeStepSize();
-    tmax = concurrent.GetMaxTime();
+    tmax = concurrent.GetMaxTime(); //set to a small number at final time-step
   }
 
+  concurrent.FinalExchange();
 
   if(embed)
     delete embed;
