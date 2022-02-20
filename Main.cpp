@@ -335,11 +335,11 @@ int main(int argc, char* argv[])
           concurrent.FirstExchange();
         else
           concurrent.Exchange();
-      } else //last time-step
-        concurrent.FinalExchange();
+      } 
 
       dts =  concurrent.GetTimeStepSize();
-      tmax = concurrent.GetMaxTime();
+      tmax = concurrent.GetMaxTime(); //at final time-step, tmax is set to a very small number
+
       if(embed)
         embed->TrackUpdatedSurfaceFromOtherSolver();
     }
@@ -347,6 +347,9 @@ int main(int argc, char* argv[])
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);
 
   }
+
+  if(concurrent.Coupled())
+    concurrent.FinalExchange();
 
   out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, true/*force_write*/);
 

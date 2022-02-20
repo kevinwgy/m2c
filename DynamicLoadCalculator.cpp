@@ -528,6 +528,10 @@ DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D>
                       t, (double*)(force->data()), 3*surface->active_nodes);
 
   }
+  else {
+    print_error("*** Error: Currently, can only interpolate force by user-specified force.\n");
+    exit_mpi();
+  }
 
 }
 
