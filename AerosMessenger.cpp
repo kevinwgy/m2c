@@ -1,5 +1,6 @@
 #include<AerosMessenger.h>
 #include<cassert>
+#include<climits>
 
 #define SUGGEST_DT_TAG 444
 #define WET_SURF_TAG1 555
@@ -107,9 +108,6 @@ AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm
   surface.active_nodes = nNodes;
   surface.active_elems = nElems;
 
-//  if(m2c_rank==0)
-//    matchNodes.resize(totalNodes, 0);
-
   Negotiate(); // Following the AERO-F/S function name, although misleading
 
   GetInfo(); // Get algorithm number, dt, and tmax
@@ -199,6 +197,12 @@ AerosMessenger::GetEmbeddedWetSurface(int nNodes, Vec3D *nodes, int nElems, int 
 
   if(verbose>=1)
     print("- Received nodes and elements of embedded surface from Aero-S.\n");
+
+  if(m2c_rank==0) {
+    for(int i=0; i<nNodes; i++) {
+      fprintf(stderr,"%d  %e %e %e\n", i, nodes[i][0], nodes[i][1], nodes[i][2]);
+    }
+  }
 }
 
 //---------------------------------------------------------------
@@ -282,24 +286,41 @@ AerosMessenger::Negotiate()
 
   // receive the list of matched nodes that each structure CPU contains
   if(numCPUMatchedNodes > 0) {
+
+    local2pack.resize(totalNodes,-INT_MAX);
+
     numStrNodes = new int[numAerosProcs][2];
-    int pos = 0;
     for(int proc = 0; proc < numAerosProcs; ++proc) {
       MPI_Recv(&numStrNodes[proc][0], 1, MPI_INT, proc, NEGO_NUM_TAG, joint_comm, MPI_STATUS_IGNORE);
+      fprintf(stderr,"Got %d from proc %d.\n", numStrNodes[proc][0], proc);
+
       if(numStrNodes[proc][0] > 0) {
         MPI_Recv(ibuffer.data(), numStrNodes[proc][0], MPI_INT, proc, NEGO_BUF_TAG, joint_comm, MPI_STATUS_IGNORE);
+
+        pack2local.reserve(pack2local.size() + numStrNodes[proc][0]);
+
         for(int i = 0; i < numStrNodes[proc][0]; ++i) {
           int idx = ibuffer[i];
-//          matchNodes[idx] = pos; //pos == i  (TODO: KW thinks idx is also equal to pos...)
-          assert(idx==i);
-          pos++;
+          assert(idx>=0 && idx<totalNodes);
+
+          pack2local.push_back(idx);
+          local2pack[idx] = pack2local.size()-1;
         }
       }
     }
-    if(pos != numCPUMatchedNodes) {
+
+    if(pack2local.size() != numCPUMatchedNodes) {
       fprintf(stderr, "\033[0;31m*** Error (proc %d): wrong number of matched nodes (%d instead of %d).\n\033[0m",
-              m2c_rank, pos, numCPUMatchedNodes);
+              m2c_rank, (int)pack2local.size(), numCPUMatchedNodes);
       exit(-1);
+    }
+
+    for(auto it = local2pack.begin(); it != local2pack.end(); it++) {
+      if(*it < 0) {
+        fprintf(stderr, "\033[0;31m*** Error (proc %d): found unmatched node (local id: %d).\n\033[0m",
+              m2c_rank, (int)(it - local2pack.begin()));
+        exit(-1);
+      }
     }
 
     numStrNodes[0][1] = 0;
@@ -530,12 +551,19 @@ AerosMessenger::SendForce()
 
     //TODO: Need to take care of "staggering"
     //
+
+    for(int i=0; i<pack2local.size(); i++) {
+      for(int j=0; j<3; j++)
+        temp_buffer[3*i+j] = F[pack2local[i]][j];
+    }
+
     vector<MPI_Request> send_requests;
 
     for(int proc = 0; proc < numAerosProcs; proc++) {
       if(numStrNodes[proc][0] > 0) {
         int size = 3*numStrNodes[proc][0];
-        double *localBuffer = (double*)F.data() + 3*numStrNodes[proc][1];
+
+        double *localBuffer = temp_buffer.data() + 3*numStrNodes[proc][1];
 
         send_requests.push_back(MPI_Request());
         MPI_Isend(localBuffer, size, MPI_DOUBLE, proc, FORCE_TAG, 
@@ -571,10 +599,11 @@ AerosMessenger::GetDisplacementAndVelocity()
 
     // apply disp and velo to surface and Udot
     for(int i=0; i<nNodes; i++) {
+      int id = local2pack[i];
       for(int j=0; j<3; j++)
-        surface.X[i][j] = surface.X0[i][j] + temp_buffer[bufsize*i+j];
+        surface.X[i][j] = surface.X0[i][j] + temp_buffer[bufsize*id+j];
       for(int j=0; j<3; j++)
-        surface.Udot[i][j] = temp_buffer[bufsize*i+3+j];
+        surface.Udot[i][j] = temp_buffer[bufsize*id+3+j];
       if(algNum==6) {//A6
         for(int j=0; j<3; j++)
           surface.X[i][j] += 0.5*dt*surface.Udot[i][j];

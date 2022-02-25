@@ -27,7 +27,8 @@ class AerosMessenger {
 
   int numAerosProcs;
   int (*numStrNodes)[2];  //!< numStrNodes[AEROS-proc-num][0]: the num of nodes; [1]: index of first node
-//  std::vector<int> matchNodes; //!< AERO-S node id -> local (surface) node id
+  std::vector<int> pack2local; //!< [id. in AERO-S package]  -> [node number in surface] 
+  std::vector<int> local2pack; //!< [node number in surface] -> [id. in AERO-S package]
   int bufsize; //!< number of DOFs per node (6)
 
   int nNodes, totalNodes;

@@ -158,9 +158,9 @@ DynamicLoadCalculator::ReadMetaFile(string filename)
       var2column[NODE_NUMBER] = column; 
       column += 1;
     } 
-    else if(!(word.compare(0,4,"Coordinate",0,4) &&
-              word.compare(0,4,"COORDINATE",0,4) &&
-              word.compare(0,4,"coordinate",0,4))) {
+    else if(!(word.compare(0,4,"Coordinates",0,4) &&
+              word.compare(0,4,"COORDINATES",0,4) &&
+              word.compare(0,4,"coordinates",0,4))) {
       column2var[column]   = COORDINATES;
       column2var[column+1] = COORDINATES;
       column2var[column+2] = COORDINATES;
@@ -286,7 +286,7 @@ DynamicLoadCalculator::ReadSnapshot(string filename, vector<vector<double> >& S)
 //-----------------------------------------------------------------
 
 void
-DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3> *tree)
+DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3>* &tree)
 {
   if(tree)
     delete tree; //build a new tree
@@ -350,6 +350,9 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
   int my_block_size = counts[mpi_rank];  
 
 
+  fprintf(stderr,"[%d] my_start_id = %d, my_block_size = %d.\n", mpi_rank, my_start_id, my_block_size);
+  MPI_Barrier(comm);
+  
   //choose a radial basis function for interpolation
   void (*phi)(int, double[], double, double[]); //a function pointer
   switch (iod.special_tools.transient_input.basis) {
@@ -372,6 +375,8 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
 
     Vec3D& pnode(X[index]);
 
+    fprintf(stderr,"pnode = %e %e %e.\n", pnode[0], pnode[1], pnode[2]);
+    exit(-1);
     // find sample points using KDTree
     int nFound = 0, counter = 0;
     while(nFound<numPoints || nFound>maxCand) {
