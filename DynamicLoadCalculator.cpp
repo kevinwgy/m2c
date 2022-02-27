@@ -83,8 +83,8 @@ DynamicLoadCalculator::RunForAeroS()
   ComputeForces(surface, force, t);
 
   concurrent.CommunicateBeforeTimeStepping();
-  double tmax = concurrent.GetTimeStepSize();
-  double dt   = concurrent.GetMaxTime();
+  double dt   = concurrent.GetTimeStepSize();
+  double tmax = concurrent.GetMaxTime();
 
   while(t<tmax) {
 
@@ -97,6 +97,9 @@ DynamicLoadCalculator::RunForAeroS()
     // Move forward by one time-step
     //---------------------------------
     t += dt;
+    print("Step %d: t = %e, dt = %e. Computation time: %.4e s.\n", time_step, t, dt,
+              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+ 
     ComputeForces(surface, force, t); 
 
     if(t<tmax) {
@@ -286,14 +289,15 @@ DynamicLoadCalculator::ReadSnapshot(string filename, vector<vector<double> >& S)
 //-----------------------------------------------------------------
 
 void
-DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3>* &tree)
+DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3>* &tree, vector<PointIn3D>& p)
 {
   if(tree)
     delete tree; //build a new tree
 
   int N = S.size();
-  vector<PointIn3D> p;
+
   p.resize(N);
+
   int ix = var2column[COORDINATES];
   for(int i=0; i<N; i++) {
     Vec3D xyz(S[i][ix],S[i][ix+1],S[i][ix+2]);
@@ -350,9 +354,10 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
   int my_block_size = counts[mpi_rank];  
 
 
-  fprintf(stderr,"[%d] my_start_id = %d, my_block_size = %d.\n", mpi_rank, my_start_id, my_block_size);
-  MPI_Barrier(comm);
-  
+  //fprintf(stderr,"[%d] my_start_id = %d, my_block_size = %d.\n", mpi_rank, my_start_id, my_block_size);
+  //MPI_Barrier(comm);
+ 
+
   //choose a radial basis function for interpolation
   void (*phi)(int, double[], double, double[]); //a function pointer
   switch (iod.special_tools.transient_input.basis) {
@@ -375,8 +380,6 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
 
     Vec3D& pnode(X[index]);
 
-    fprintf(stderr,"pnode = %e %e %e.\n", pnode[0], pnode[1], pnode[2]);
-    exit(-1);
     // find sample points using KDTree
     int nFound = 0, counter = 0;
     while(nFound<numPoints || nFound>maxCand) {
@@ -392,7 +395,6 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
       else if(nFound<numPoints)  cutoff *= 1.5*sqrt((double)numPoints/(double)nFound);
       else if(nFound>maxCand)    cutoff /= 1.5*sqrt((double)nFound/(double)maxCand);
     }
-
 
     //figure out the actual points for interpolation (numPoints)
     vector<pair<double,int> > dist2node;
@@ -503,7 +505,7 @@ DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D>
       ReadSnapshot(file_to_read, *S0);
 
       KDTree<PointIn3D,3> *tr(NULL);
-      BuildKDTree(*S0, tr);
+      BuildKDTree(*S0, tr, tree0_data);
       tree0.reset(tr);
 
       id0 = k0;
@@ -516,7 +518,7 @@ DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D>
       ReadSnapshot(file_to_read, *S1);
 
       KDTree<PointIn3D,3> *tr(NULL);
-      BuildKDTree(*S1, tr);
+      BuildKDTree(*S1, tr, tree1_data);
       tree1.reset(tr);
 
       id1 = k1;

@@ -769,7 +769,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
         xy[i] = Vec2D(iod.ic.user_data[IcData::COORDINATE][i], iod.ic.user_data[IcData::RADIALCOORDINATE][i]);
         p[i]  = PointIn2D(i, xy[i]);
       }
-      KDTree<PointIn2D,2/*dim*/> tree(N, p);
+      KDTree<PointIn2D,2/*dim*/> tree(N, p); //"tree" uses "p" and changes its ordering. "p" cannot be deleted before "tree"
       print("    o Constructed a KDTree (K=2) to store the data points.\n");
 
       int numPoints = 15; //this is the number of points for interpolation

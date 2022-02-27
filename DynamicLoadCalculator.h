@@ -38,6 +38,7 @@ class DynamicLoadCalculator
   int id0, id1;
   std::shared_ptr<std::vector<std::vector<double> > > S0, S1; //!< use smart pointers (automatically deleted)
   std::shared_ptr<KDTree<PointIn3D,3> > tree0, tree1; 
+  std::vector<PointIn3D> tree0_data, tree1_data;
   std::vector<Vec3D> F0, F1; //!< interpolated forces (using S0 and S1)
 
 public:
@@ -56,7 +57,7 @@ private:
   void ReadMetaFile(std::string filename);
   void ReadSnapshot(std::string filename, std::vector<std::vector<double> >& S);
 
-  void BuildKDTree(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3>* &tree);
+  void BuildKDTree(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3>* &tree, std::vector<PointIn3D> &tree_data);
   void InterpolateInSpace(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3>* tree,
                           std::vector<Vec3D>& X, int active_nodes, Var var, int var_dim, double* output);
   void InterpolateInTime(double t1, double* input1, double t2, double* input2,

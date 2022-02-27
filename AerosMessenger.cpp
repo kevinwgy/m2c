@@ -198,11 +198,13 @@ AerosMessenger::GetEmbeddedWetSurface(int nNodes, Vec3D *nodes, int nElems, int 
   if(verbose>=1)
     print("- Received nodes and elements of embedded surface from Aero-S.\n");
 
+/*
   if(m2c_rank==0) {
     for(int i=0; i<nNodes; i++) {
       fprintf(stderr,"%d  %e %e %e\n", i, nodes[i][0], nodes[i][1], nodes[i][2]);
     }
   }
+*/
 }
 
 //---------------------------------------------------------------
@@ -292,7 +294,7 @@ AerosMessenger::Negotiate()
     numStrNodes = new int[numAerosProcs][2];
     for(int proc = 0; proc < numAerosProcs; ++proc) {
       MPI_Recv(&numStrNodes[proc][0], 1, MPI_INT, proc, NEGO_NUM_TAG, joint_comm, MPI_STATUS_IGNORE);
-      fprintf(stderr,"Got %d from proc %d.\n", numStrNodes[proc][0], proc);
+      //fprintf(stderr,"Got %d from proc %d.\n", numStrNodes[proc][0], proc);
 
       if(numStrNodes[proc][0] > 0) {
         MPI_Recv(ibuffer.data(), numStrNodes[proc][0], MPI_INT, proc, NEGO_BUF_TAG, joint_comm, MPI_STATUS_IGNORE);
@@ -468,8 +470,11 @@ AerosMessenger::GetNewCracking(int numConnUpdate, int numLSUpdate, int newNodes)
     exit_mpi();
   }
 
+  if(newNodes!=0)
+    assert(numAerosProcs==1); //I think this is a current limitation
+
   if(m2c_rank == 0 && newNodes) 
-    numStrNodes[0][0] = nNodes; //TODO: Assuming only talking to one structure proc??
+    numStrNodes[0][0] = nNodes; //Assuming only talking to one structure proc?
 
 
   if(newNodes!=0 && verbose>=1) {
@@ -552,9 +557,11 @@ AerosMessenger::SendForce()
     //TODO: Need to take care of "staggering"
     //
 
+    // prepare package
     for(int i=0; i<pack2local.size(); i++) {
       for(int j=0; j<3; j++)
         temp_buffer[3*i+j] = F[pack2local[i]][j];
+    //  fprintf(stderr,"temp_buffer[%d] = %e %e %e.\n", i, temp_buffer[3*i], temp_buffer[3*i+1], temp_buffer[3*i+2]);
     }
 
     vector<MPI_Request> send_requests;
