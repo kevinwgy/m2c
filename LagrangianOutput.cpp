@@ -95,6 +95,12 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
     goto END_OF_OUTPUT;
   
   //Only Proc #0 writes
+  
+  if(!(strcmp(iod_lag.disp,"") || strcmp(iod_lag.sol,""))) {
+    fprintf(stderr,"\033[0;31m*** Error: Missing output file names.\n\033[0m");
+    exit(-1);
+  }
+
   if(strcmp(iod_lag.disp,"")) {
 
     assert(X0.size() == X.size());
@@ -125,7 +131,8 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
 
     fclose(disp_file);
   } 
-  else if(strcmp(iod_lag.sol,"")) {
+
+  if(strcmp(iod_lag.sol,"")) {
 
     char outname[512];
     sprintf(outname, "%s%s", iod_lag.prefix, iod_lag.sol);
@@ -149,10 +156,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
     AppendResultToFile(sol_file, t, F.size(), 3, (double*)F.data());
 
   } 
-  else {
-    fprintf(stderr,"\033[0;31m*** Error: Missing output file names.\n\033[0m");
-    exit(-1);
-  }
+
 
 END_OF_OUTPUT:
 
