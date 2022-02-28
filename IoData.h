@@ -1048,6 +1048,26 @@ struct ConcurrentProgramsData {
 
 //------------------------------------------------------------------------------
 
+struct LagrangianMeshOutputData {
+
+  int frequency;
+  double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
+
+  const char* prefix; //!< path
+
+  const char* orig_config; //!< original mesh
+  const char* disp; //!< displacement
+  const char* sol; //!< solution
+
+  LagrangianMeshOutputData();
+  ~LagrangianMeshOutputData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct TransientInputData {
 
   const char* metafile;
@@ -1057,6 +1077,8 @@ struct TransientInputData {
   enum BasisFunction {MULTIQUADRIC = 0, INVERSE_MULTIQUADRIC = 1, 
                       THIN_PLATE_SPLINE = 2, GAUSSIAN = 3, SIZE = 4} basis; //basis function for interpolation
   int numPoints; //number of points for (unstructured) interpolation
+
+  LagrangianMeshOutputData output;
 
   TransientInputData();
   ~TransientInputData() {}

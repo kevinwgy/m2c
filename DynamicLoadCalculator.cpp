@@ -1,8 +1,6 @@
 #include<DynamicLoadCalculator.h>
 #include<EmbeddedBoundaryOperator.h>
 #include<rbf_interp_2d.hpp>
-//#include<bits/stdc++.h> //std::sort
-//#include<time.h>
 
 using std::string;
 using std::vector;
@@ -14,7 +12,8 @@ extern clock_t start_time; //time computation started (in Main.cpp)
 
 DynamicLoadCalculator::DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_, 
                                              ConcurrentProgramsHandler &concurrent_)
-                     : comm(comm_), iod(iod_), concurrent(concurrent_),
+                     : comm(comm_), iod(iod_), concurrent(concurrent_), 
+                       lagout(comm_, iod_.special_tools.transient_input.output),
                        S0(NULL), S1(NULL), tree0(NULL), tree1(NULL), id0(-INT_MAX), id1(-INT_MAX)
 { }
 
@@ -78,13 +77,16 @@ DynamicLoadCalculator::RunForAeroS()
   // ---------------------------------------------------
   // Main time loop (mimics the time loop in Main.cpp
   // ---------------------------------------------------
-  double t = 0.0;
+  double t = 0.0, dt = 0.0, tmax = 0.0;
   int time_step = 0; 
   ComputeForces(surface, force, t);
 
+  lagout.OutputTriangulatedMesh(surface->X0, surface->elems);
+  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, true);
+
   concurrent.CommunicateBeforeTimeStepping();
-  double dt   = concurrent.GetTimeStepSize();
-  double tmax = concurrent.GetMaxTime();
+  dt   = concurrent.GetTimeStepSize();
+  tmax = concurrent.GetMaxTime();
 
   while(t<tmax) {
 
@@ -111,9 +113,13 @@ DynamicLoadCalculator::RunForAeroS()
 
     dt   = concurrent.GetTimeStepSize();
     tmax = concurrent.GetMaxTime(); //set to a small number at final time-step
+
+    lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, false);
   }
 
   concurrent.FinalExchange();
+
+  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, true);
 
   if(embed)
     delete embed;

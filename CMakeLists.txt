@@ -100,6 +100,7 @@ EmbeddedBoundaryFormula.cpp
 TimeIntegrator.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
+LagrangianOutput.cpp
 Utils.cpp
 MathTools/r8lib.cpp
 MathTools/rbf_interp_2d.cpp)

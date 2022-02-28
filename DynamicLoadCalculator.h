@@ -2,6 +2,7 @@
 #define _DYNAMIC_LOAD_CALCULATOR_H_
 
 #include<ConcurrentProgramsHandler.h>
+#include<LagrangianOutput.h>
 #include<KDTree.h>
 #include<memory> //shared_ptr
 
@@ -22,6 +23,8 @@ class DynamicLoadCalculator
   MPI_Comm& comm;
   IoData& iod;
   ConcurrentProgramsHandler& concurrent;
+
+  LagrangianOutput lagout;
 
   //! Information about transient input data
   std::string prefix, suffix;

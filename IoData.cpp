@@ -2464,6 +2464,36 @@ void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+LagrangianMeshOutputData::LagrangianMeshOutputData()
+{
+  frequency = 0;
+  frequency_dt = -1.0;
+
+  prefix = "";
+
+  orig_config = "";
+  disp = "";
+  sol  = "";
+}
+
+//------------------------------------------------------------------------------
+
+void LagrangianMeshOutputData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  
+  new ClassInt<LagrangianMeshOutputData>(ca, "Frequency", this, &LagrangianMeshOutputData::frequency);
+  new ClassDouble<LagrangianMeshOutputData>(ca, "TimeInterval", this, &LagrangianMeshOutputData::frequency_dt);
+
+  new ClassStr<LagrangianMeshOutputData>(ca, "Prefix", this, &LagrangianMeshOutputData::prefix);
+  new ClassStr<LagrangianMeshOutputData>(ca, "Mesh", this, &LagrangianMeshOutputData::orig_config);
+
+  new ClassStr<LagrangianMeshOutputData>(ca, "Displacement", this, &LagrangianMeshOutputData::disp);
+  new ClassStr<LagrangianMeshOutputData>(ca, "Solution", this, &LagrangianMeshOutputData::sol);
+}
+
+//------------------------------------------------------------------------------
+
 TransientInputData::TransientInputData()
 {
   metafile = "";
@@ -2478,7 +2508,7 @@ TransientInputData::TransientInputData()
 
 void TransientInputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
   
   new ClassStr<TransientInputData>(ca, "MetaFile", this, &TransientInputData::metafile);
 
@@ -2493,6 +2523,8 @@ void TransientInputData::setup(const char *name, ClassAssigner *father)
      "Multiquadric", 0, "InverseMultiquadric", 1, "ThinPlateSpline", 2, "Gaussian", 3);
 
   new ClassInt<TransientInputData>(ca, "NumberOfBasisPoints", this, &TransientInputData::numPoints);
+
+  output.setup("Output");
 }
 
 //------------------------------------------------------------------------------

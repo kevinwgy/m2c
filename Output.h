@@ -25,7 +25,7 @@ class Output
   SpaceVariable3D scalar;   
   SpaceVariable3D vector3;
 
-  int iFrame; // frame id.
+  int iFrame; //!< frame id.
 
   double last_snapshot_time; //!< latest time when solution snapshot is written to file
 
