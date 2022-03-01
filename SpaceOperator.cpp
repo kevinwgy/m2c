@@ -795,20 +795,35 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
  
             //RBF interpolation w/ KDTree
             int nFound = 0, counter = 0;
+            double low_cut = 0.0, high_cut = DBL_MAX;
             while(nFound<numPoints || nFound>maxCand) {
               if(++counter>2000) {
                 fprintf(stderr,"*** Error: Cannot find required number of sample points for "
-                               "interpolation (by RBF) after 2000 iterations. "
+                               "interpolation (by RBF) after %d iterations. "
                                "Coord(3D):%e %e %e  | Coord(2D):%e %e. "
                                "Candidates: %d, cutoff = %e.\n", 
-                               coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2],
+                               counter, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2],
                                pnode[0], pnode[1], nFound, cutoff);
                 exit(-1);
               }
               nFound = tree.findCandidatesWithin(pnode, candidates, maxCand, cutoff);
+
+              if(nFound<numPoints) {
+                low_cut = std::max(low_cut, cutoff);
+                if(high_cut>0.5*DBL_MAX)
+                  cutoff *= 4.0;
+                else
+                  cutoff = 0.5*(low_cut + high_cut);
+              }
+              else if(nFound>maxCand) {
+                high_cut = std::min(high_cut, cutoff);
+                cutoff = 0.5*(low_cut + high_cut);
+              }
+/*
               if(nFound==0)              cutoff *= 4.0;
               else if(nFound<numPoints)  cutoff *= 1.5*sqrt((double)numPoints/(double)nFound);
               else if(nFound>maxCand)    cutoff /= 1.5*sqrt((double)nFound/(double)maxCand);
+*/
             }
 
             //figure out the actual points for interpolation (numPoints)

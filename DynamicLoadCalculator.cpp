@@ -1,6 +1,7 @@
 #include<DynamicLoadCalculator.h>
 #include<EmbeddedBoundaryOperator.h>
 #include<rbf_interp_2d.hpp>
+#include<cfloat> //DBL_MAX
 
 using std::string;
 using std::vector;
@@ -381,6 +382,7 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
 
 
   // interpolation
+  int maxIt = 1000;
   int index = my_start_id;
   for(int i=0; i<my_block_size; i++) {
 
@@ -388,18 +390,37 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
 
     // find sample points using KDTree
     int nFound = 0, counter = 0;
+    double low_cut = 0.0, high_cut = DBL_MAX;
     while(nFound<numPoints || nFound>maxCand) {
-      if(++counter>1000) {
+      if(++counter>maxIt) {
         fprintf(stderr,"*** Error: Cannot find required number of sample points for "
-                       "interpolation (by RBF) after 2000 iterations. "
+                       "interpolation (by RBF) after %d iterations. "
                        "Coord(3D):%e %e %e, Candidates: %d, cutoff = %e.\n",
-                        pnode[0], pnode[1], pnode[2], nFound, cutoff);
+                        counter, pnode[0], pnode[1], pnode[2], nFound, cutoff);
+        for(int i=0; i<std::min(nFound,maxCand); i++)
+          fprintf(stderr,"%d  %d  %e  %e  %e  d = %e.\n", i, candidates[i].id, candidates[i].x[0],
+                  candidates[i].x[1], candidates[i].x[2], (candidates[i].x-pnode).norm());
         exit(-1);
       }
       nFound = tree->findCandidatesWithin(pnode, candidates, maxCand, cutoff);
-      if(nFound==0)              cutoff *= 4.0;
+
+      if(nFound<numPoints) {
+        low_cut = std::max(low_cut, cutoff);
+        if(high_cut>0.5*DBL_MAX)
+          cutoff *= 4.0;
+        else
+          cutoff = 0.5*(low_cut + high_cut); 
+      }
+      else if(nFound>maxCand) {
+        high_cut = std::min(high_cut, cutoff);
+        cutoff = 0.5*(low_cut + high_cut); 
+      }
+    
+/*
+      if(nFound==0) cutoff *= 4.0;
       else if(nFound<numPoints)  cutoff *= 1.5*sqrt((double)numPoints/(double)nFound);
       else if(nFound>maxCand)    cutoff /= 1.5*sqrt((double)nFound/(double)maxCand);
+*/
     }
 
     //figure out the actual points for interpolation (numPoints)
