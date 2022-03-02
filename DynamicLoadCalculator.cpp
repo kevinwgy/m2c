@@ -380,7 +380,10 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
       phi = MathTools::phi2;  break; //Inverse multi-quadric
   }
 
-
+/*
+  double cutoffs[2000];
+  int founds[2000];
+*/
   // interpolation
   int maxIt = 1000;
   int index = my_start_id;
@@ -400,10 +403,18 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
         for(int i=0; i<std::min(nFound,maxCand); i++)
           fprintf(stderr,"%d  %d  %e  %e  %e  d = %e.\n", i, candidates[i].id, candidates[i].x[0],
                   candidates[i].x[1], candidates[i].x[2], (candidates[i].x-pnode).norm());
+
+        fprintf(stderr,"low_cut = %e, high_cut = %e.\n", low_cut, high_cut);
+ //       for(int i=0; i<counter-1; i++)
+ //         fprintf(stderr,"%d  %d  %e.\n", i, founds[i], cutoffs[i]);
+
         exit(-1);
       }
       nFound = tree->findCandidatesWithin(pnode, candidates, maxCand, cutoff);
-
+/*
+      cutoffs[counter-1] = cutoff;
+      founds[counter-1] = nFound;
+*/ 
       if(nFound<numPoints) {
         low_cut = std::max(low_cut, cutoff);
         if(high_cut>0.5*DBL_MAX)

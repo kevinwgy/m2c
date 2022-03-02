@@ -2524,7 +2524,7 @@ void TransientInputData::setup(const char *name, ClassAssigner *father)
 
   new ClassInt<TransientInputData>(ca, "NumberOfBasisPoints", this, &TransientInputData::numPoints);
 
-  output.setup("Output");
+  output.setup("Output", ca); //there is another "Output", must provide "ca" to distinguish
 }
 
 //------------------------------------------------------------------------------
