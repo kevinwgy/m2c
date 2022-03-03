@@ -32,7 +32,9 @@ public:
 
   void PrintStarRelations(double rhol, double ul, double pl, int idl,
                           double rhor, double ur, double pr, int idr,
-                          double pmin, double pmax, double dp);
+                          double pmin, double pmax, double dp,
+                          size_t& It_1wave, size_t& It_3wave,
+                          std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3);
 
 #if PRINT_RIEMANN_SOLUTION == 1
   vector<vector<double> > sol1d;
@@ -60,32 +62,41 @@ protected: //internal functions
     double rho, p, e, ps, es, pavg, one_over_rho;
   };
 
-  bool FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,
+  bool FindInitialInterval(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3,
+           double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
 
-  bool FindInitialFeasiblePoints(double rhol, double ul, double pl, double el, double cl, int idl,
+  bool FindInitialFeasiblePoints(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3,
+           double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
 
-  int FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul,
-           double pl, double el, double cl, int idl,
+  int FindInitialFeasiblePointsByAcousticTheory(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3, /*for acceleration*/
+           double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
 
   virtual bool ComputeRhoUStar(int wavenumber /*1 or 3*/,
+                   size_t& It_wave /* for acceleration, count how many times this function has been invoked for either 1-wave or 3-wave */,
+		   std::vector<std::vector<double>>& integrationPath /*3 by n, first index: 1-pressure, 2-density, 3-velocity*/,
                    double rho, double u, double p, double ps, int id/*inputs*/,
                    double rhos0, double rhos1/*initial guesses for Hugo. eq.*/,
                    double &rhos, double &us/*outputs*/,
                    bool *trans_rare = NULL, double *Vrare_x0 = NULL/*filled only if found tran rf*/);
 
-  virtual bool Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
+  virtual bool Rarefaction_OneStepRK4_ODEtest(int wavenumber/*1 or 3*/, int id,
                    double rho_0, double u_0, double p_0 /*start state*/,
                    double drho /*step size*/,
                    double &rho, double &u, double &p, double &xi /*output*/);
+
+  virtual bool Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
+                            double rho_0, double u_0, double p_0 /*start state*/, 
+                            double dp /*step size*/,
+                            double &rho, double &u, double &p, double &xi /*output*/);
 
   void FinalizeSolution(double *dir, double *Vm, double *Vp,
            double rhol, double ul, double pl, int idl,

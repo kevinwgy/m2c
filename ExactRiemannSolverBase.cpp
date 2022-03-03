@@ -2,6 +2,11 @@
 #include<array>
 #include<utility> //std::pair
 #include<bits/stdc++.h> //std::swap
+#include<iostream>
+#include<fstream>
+#include<string>
+
+#include <chrono> // for timing
 
 #ifndef WITHOUT_BOOST
 #include<boost/math/tools/roots.hpp>
@@ -12,7 +17,15 @@ using std::pair;
 using std::cout;
 using std::endl;
 
+// for timing
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::milliseconds;
+
 extern int verbose;
+//extern std::ofstream testFile1;
+//extern std::ofstream testFile3;
 
 //-----------------------------------------------------
 
@@ -46,6 +59,12 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                             double *Vsm /*left 'star' solution*/,
                             double *Vsp /*right 'star' solution*/)
 {
+  std::vector<std::vector<double>> integrationPath1(3, vector<double> (2.*numSteps_rarefaction, 0.) ); // first index: 1-pressure, 2-density, 3-velocity
+  std::vector<std::vector<double>> integrationPath3(3, vector<double> (2.*numSteps_rarefaction, 0.) );
+  
+  size_t It_1wave = 0;
+  size_t It_3wave = 0;  
+
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
   double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
@@ -108,7 +127,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   // Step 1: Initialization
   //         (find initial interval [p0, p1])
   // -------------------------------
-  success = FindInitialInterval(rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
+  success = FindInitialInterval(It_1wave, It_3wave, integrationPath1, integrationPath3,
+                                rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
                                 p0, rhol0, rhor0, ul0, ur0,
                                 p1, rhol1, rhor1, ul1, ur1/*outputs*/);
   /* our convention is that p0 < p1 */
@@ -119,9 +139,9 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 #if PRINT_RIEMANN_SOLUTION == 1
     sol1d.clear();
 #endif
-    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol0, rhol0*1.1, rhol2, ul2,
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p1, idl, rhol0, rhol0*1.1, rhol2, ul2,
                   &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
-    success = success && ComputeRhoUStar(3, rhor, ur, pr, p1, idr, rhor0, rhol0*1.1, rhor2, ur2,
+    success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p1, idr, rhor0, rhol0*1.1, rhor2, ur2,
                     &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
@@ -196,7 +216,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 try_again:
 
     // 2.2: Calculate ul2, ur2 
-    success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl/*inputs*/, 
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p2, idl/*inputs*/, 
                   rhol0, rhol1/*initial guesses for Hugo. eq.*/,
                   rhol2, ul2/*outputs*/, 
                   &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
@@ -213,7 +233,7 @@ try_again:
         break;
     }
 
-    success = ComputeRhoUStar(3, rhor, ur, pr,  p2, idr/*inputs*/, 
+    success = ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr,  p2, idr/*inputs*/, 
                     rhor0, rhor1/*initial guesses for Hugo. erq.*/,
                     rhor2, ur2/*outputs*/,
                     &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
@@ -472,7 +492,8 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 //----------------------------------------------------------------------------------
 //! find a bracketing interval [p0, p1] (f0*f1<=0)
 bool
-ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,
+ExactRiemannSolverBase::FindInitialInterval(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3,
+                            double rhol, double ul, double pl, double el, double cl, int idl,
                             double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
                             double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
                             double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/)
@@ -482,7 +503,8 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
   bool success = true;
 
   // Step 1: Find two feasible points (This step should never fail)
-  success = FindInitialFeasiblePoints(rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
+  success = FindInitialFeasiblePoints(It_1wave, It_3wave, integrationPath1, integrationPath3, /*store data for acceleration*/
+                                      rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
                                       p0, rhol0, rhor0, ul0, ur0, p1, rhol1, rhor1, ul1, ur1/*outputs*/);
 
   if(!success) {//This should never happen (unless user's inputs have errors)!
@@ -538,9 +560,9 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
       p2 = 1.0e-8; 
     }
 
-    success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
     // compute the 3-wave only if the 1-wave is succeeded
-    success = success && ComputeRhoUStar(3, rhor, ur, pr,  p2, idr, rhor0, rhor1, rhor2, ur2);
+    success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr,  p2, idr, rhor0, rhor1, rhor2, ur2);
 
     if(!success) {
 
@@ -554,9 +576,9 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
         else //p2>p1
           p2 = p1 + 0.5*(p2-p1);
 
-        success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
+        success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
         // compute the 3-wave only if the 1-wave is succeeded
-        success = success && ComputeRhoUStar(3, rhor, ur, pr,  p2, idr, rhor0, rhor1, rhor2, ur2);
+        success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr,  p2, idr, rhor0, rhor1, rhor2, ur2);
 
 
         if(success)
@@ -608,9 +630,9 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
       ur0   = ur1   = ur_fmin;
     } else { //it could be that the Riemann problem has no solution!
       p2 = pressure_at_failure;
-      success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
+      success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
       // compute the 3-wave only if the 1-wave is succeeded
-      success = success && ComputeRhoUStar(3, rhor, ur, pr,  p2, idr, rhor0, rhor1, rhor2, ur2);
+      success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr,  p2, idr, rhor0, rhor1, rhor2, ur2);
       if(success) {
         if(verbose >= 1)
           cout << "*** Prescribed solution: rhols = " << rhol2 << ", ps = " << p2 << ", us = ("
@@ -641,7 +663,8 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
 //----------------------------------------------------------------------------------
 
 bool
-ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double pl, double el, double cl, int idl,
+ExactRiemannSolverBase::FindInitialFeasiblePoints(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3,
+                            double rhol, double ul, double pl, double el, double cl, int idl,
                             double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
                             double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0, 
                             double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/)
@@ -651,7 +674,8 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
   bool success = true;
 
   // Method 1: Use the acoustic theory (Eqs. (20)-(22) of Kamm) to find p0, p1
-  found = FindInitialFeasiblePointsByAcousticTheory(rhol, ul, pl, el, cl, idl, 
+  found = FindInitialFeasiblePointsByAcousticTheory(It_1wave, It_3wave, integrationPath1, integrationPath3,
+              rhol, ul, pl, el, cl, idl, 
               rhor, ur, pr, er, cr, idr, /*inputs*/
               p0, rhol0, rhor0, ul0, ur0, p1, rhol1, rhor1, ul1, ur1/*outputs*/);
 
@@ -670,10 +694,10 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
 
     if(p0<min_pressure)
       p0 = pressure_at_failure; 
-    success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p0, idl, 
                               rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
                               rhol0, ul0);
-    success = success && ComputeRhoUStar(3, rhor, ur, pr, p0, idr, 
+    success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p0, idr, 
                                          rhor, (p0>pr) ? rhor*1.1 : rhor*0.9,
                                          rhor0, ur0);
     if(success)
@@ -684,10 +708,10 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
       p0 = std::min(pl,pr) - 0.01*(i+1)*(i+1)*std::min(dp, std::min(fabs(pl),fabs(pr)));
       if(p0<min_pressure || i==(int)(maxIts_bracket/2)) //not right... set to a small pos. pressure
         p0 = pressure_at_failure; 
-      success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
+      success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p0, idl, 
                                 rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
                                 rhol0, ul0);
-      success = success && ComputeRhoUStar(3, rhor, ur, pr, p0, idr, 
+      success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p0, idr, 
                                            rhor, (p0>pr) ? rhor*1.1 : rhor*0.9,
                                            rhor0, ur0);
       if(success)
@@ -708,8 +732,8 @@ myLabel:
   dp = std::min(fabs(p0-pl), fabs(p0-pr));
   for(int i=0; i<maxIts_bracket; i++) {
     p1 = p0 + 0.01*(i+1)*(i+1)*dp;
-    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
-    success = success && ComputeRhoUStar(3, rhor, ur, pr, p1, idr, rhor, rhor0, rhor1, ur1);
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
+    success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p1, idr, rhor, rhor0, rhor1, ur1);
     if(success)
       break;
   }
@@ -718,8 +742,8 @@ myLabel:
       p1 = p0 - 0.01*(i+1)*(i+1)*dp;
       if(p1<min_pressure)
         p1 = pressure_at_failure*1000.0; //so it is not the same as p0
-      success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
-      success = success && ComputeRhoUStar(3, rhor, ur, pr, p1, idr, rhor, rhor0, rhor1, ur1);
+      success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
+      success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p1, idr, rhor, rhor0, rhor1, ur1);
       if(success)
         break;
     } 
@@ -746,8 +770,8 @@ myLabel:
 //----------------------------------------------------------------------------------
 
 int
-ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, 
-                            double pl, double el, double cl, int idl,
+ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3, /*for acceleration*/ 
+                            double rhol, double ul, double pl, double el, double cl, int idl,
                             double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
                             double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0, 
                             double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/)
@@ -760,13 +784,13 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, d
   double Cr = rhor*cr; //acoustic impedance
   p0 = (Cr*pl + Cl*pr + Cl*Cr*(ul - ur))/(Cl + Cr);
 
-  success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/,
+  success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p0, idl/*inputs*/,
                 rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
                 rhol0, ul0/*outputs*/);
   if(!success)
     return found;
 
-  success = ComputeRhoUStar(3, rhor, ur, pr, p0, idr/*inputs*/,
+  success = ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p0, idr/*inputs*/,
                 rhor, (p0>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
                 rhor0, ur0/*outputs*/);
   if(!success)
@@ -782,13 +806,13 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, d
   if(fabs(p1 - p0)/tmp<1.0e-8)
     p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
 
-  success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
+  success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p1, idl/*inputs*/,
                 rhol, rhol0/*initial guesses for Hugo. eq.*/,
                 rhol1, ul1/*outputs*/);
   if(!success)
     return found;
 
-  success = ComputeRhoUStar(3, rhor, ur, pr, p1, idr/*inputs*/,
+  success = ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p1, idr/*inputs*/,
                 rhor, rhor0/*initial guesses for Hugo. eq.*/,
                 rhor1, ur1/*outputs*/);
   if(!success)
@@ -803,6 +827,8 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, d
 //! Connect the left/right initial state with the left/right star state (the 1-wave or 3-wave)
 bool  //true: success  | false: failure
 ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
+                                        size_t& It_wave, /* for acceleration, count how many times this function has been invoked for either 1-wave or 3-wave */
+                                        std::vector<std::vector<double>>& integrationPath /*3 by n, first index: 1-pressure, 2-density, 3-velocity*/,
                                         double rho, double u, double p, double ps, int id/*inputs*/,
                                         double rhos0, double rhos1/*initial guesses for Hugo. eq.*/,
                                         double &rhos, double &us/*outputs*/, 
@@ -820,14 +846,16 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     // initialize drho based on linear approximation
     double e = vf[id]->GetInternalEnergyPerUnitMass(rho,p);
     double dpdrho = vf[id]->GetDpdrho(rho,e);
-    double drho_op1 = (p-ps)/dpdrho; //use EOS
+    double drho_op1 = (p-ps)/dpdrho/numSteps_rarefaction; //use EOS
     double drho_op2 = rho/(numSteps_rarefaction*2.5); //initial step size
-    double drho = std::min(drho_op1, drho_op2);
+    double drho_target = std::min(drho_op1, drho_op2);
+    double drho_max = 1.25 * drho_target;
 
     // prepare for numerical integration
     double rhos_0 = rho, us_0 = u, ps_0 = p, xi_0; //start point of each step
     double rhos_1 = rho, us_1 = u, ps_1 = p, xi_1; //end point of each step
-    double dp;
+    double drho = drho_target;
+    double dp = std::min(dp_target, drho_target * dpdrho);
 
     double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
 
@@ -839,6 +867,28 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     } else
       c = sqrt(c);
 
+#if PRINT_RIEMANN_SOLUTION == 1    
+      std::cout << wavenumber << "-wave: It# " << It_wave << std::endl;
+#endif
+
+/*    for (size_t j = 0; j < integrationPath1[0].size(); j++) {
+      std::cout << integrationPath1[0][j] << ", " << integrationPath1[1][j] << ", " << integrationPath1[2][j] << std::endl;
+    }
+*/
+    size_t index0 = 0;
+    if (It_wave > 0) {
+	    for (size_t j = 0; j < integrationPath[0].size(); j++) {
+		    if (integrationPath[0][j] < ps) {
+			    index0 = j-1;
+			    break;
+		    }
+	    }
+	    ps_0 = integrationPath[0][index0];
+	    rhos_0 = integrationPath[1][index0];
+	    us_0 = integrationPath[2][index0];
+    } 
+    dp = std::min(dp, ps_0 - ps);
+ 
     double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
     xi_0 = xi;
 
@@ -851,34 +901,32 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     bool done = false;
     double loc_tol_rarefaction = tol_rarefaction*ps_0;
     for(int i=0; i<numSteps_rarefaction*5; i++) {
+      
+      if (It_wave == 0) {
+          integrationPath[0][i] = ps_0;
+          integrationPath[1][i] = rhos_0;
+          integrationPath[2][i] = us_0; 
+      } 
+      
 
+/*
+      if (wavenumber == 1) {
+        testFile1 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
+      } 
+      else {
+        testFile3 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
+      }      
+*/
       bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
-                             rhos_0, us_0, ps_0 /*start state*/, drho /*step size*/,
-                             rhos_1, us_1, ps_1, xi_1 /*output: end state*/); 
+                             rhos_0, us_0, ps_0 /*start state*/, dp /*step size*/,
+                             rhos_1, us_1, ps_1, xi_1 /*output: end state*/);
+                             
 //      fprintf(stderr,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
 //              rhos_0, us_0, ps_0, drho, rhos_1, us_1, ps_1, ps, success);
       if(!success) {
-        drho /= 2.0;
+        dp /= 2.0;
         continue;
       }
-
-      dp = ps_0 - ps_1;
-
-      //Check if it went too far. If so, rewind and reduce step size
-//      fprintf(stderr,"RK4 step: -- dp = %e, dp_target = %e, dp_max = %e, ps_1 - ps = %e, loc_tol_rarefaction = %e\n",
-//              dp, dp_target, dp_max, ps_1 - ps, loc_tol_rarefaction);
-
-      if(dp > dp_max) {
-        drho = drho/dp*dp_target;
-        continue;
-      }
-      if(ps_1 - ps < -loc_tol_rarefaction) { //went over the hill...
-        if(dp!=0)
-          drho = drho/dp*(ps_0 - ps);
-        else
-          drho /= 2.0;
-        continue;
-      } 
 
 #if PRINT_RIEMANN_SOLUTION == 1
       sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1, (double)id});
@@ -903,7 +951,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       //fprintf(stderr,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
 
       // Check if we have reached the final pressure ps
-      if(fabs(ps_1 - ps) <= loc_tol_rarefaction) {
+      if(fabs(ps_1 - ps) <= 1.e-14) {
         rhos = rhos_1;
         us   = us_1;
       
@@ -918,6 +966,24 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
 #endif
         done = true;
+
+	if (It_wave == 0) {
+		integrationPath[0][i+1] = ps_1;
+		integrationPath[1][i+1] = rhos_1;
+		integrationPath[2][i+1] = us_1; 
+	}  
+	It_wave = It_wave + 1;
+        
+/*         
+        if (wavenumber == 1) {
+	  testFile1 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
+          testFile1.close();
+        }
+        else {
+          testFile3 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
+          testFile3.close();
+        }
+*/
         break; //done!
       }
 
@@ -926,9 +992,9 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       //
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
 
-      drho = std::min( drho/dp*std::min(dp_target,ps_1-ps), //don't go beyond ps
-                       drho*4.0); //don't increase too much in one step
-       
+      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps
+                       dp*4.0); //don't increase too much in one step
+      //dp = std::min(drho_target/drho*dp, dp); 
       rhos_0 = rhos_1;
       us_0   = us_1;
       ps_0   = ps_1;
@@ -1158,9 +1224,126 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 }
 
 //----------------------------------------------------------------------------------
-
 bool
 ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
+                            double rho_0, double u_0, double p_0 /*start state*/, 
+                            double dp /*step*/,
+                            double &rho, double &u, double &p, double &xi /*output*/)
+{
+  bool test = false;
+  double testErr = 1.e-6;
+
+  dp = -dp; // dp is positive when passed in. It is actually negative if we follow Kamm's paper 
+            // Equations (36 - 42)
+  
+  double e_0 = vf[id]->GetInternalEnergyPerUnitMass(rho_0, p_0);
+  double c_0_square = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
+
+  if(rho_0<=0 || c_0_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(0)." 
+//            " rho = %e, p = %e, e = %e, id = %d.\n",
+//            c_0_square, rho_0, p_0, e_0, id);
+    return false;
+  } 
+
+  double c_0 = sqrt(c_0_square);
+
+  double rho_1 = rho_0 + 0.5*dp/c_0_square;
+  double p_1 = p_0 + 0.5*dp;
+  double e_1 = vf[id]->GetInternalEnergyPerUnitMass(rho_1, p_1);
+  double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
+
+  if(rho_1<=0 || c_1_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
+//                   " rho = %e, p = %e, e = %e, id = %d.\n",
+//                   c_1_square, rho_1, p_1, e_1, id);
+	  return false;
+  } 
+
+  double c_1 = sqrt(c_1_square);
+                             
+  double rho_2 = rho_0 + 0.5*dp/c_1_square;
+  double p_2 = p_1;
+  double e_2 = vf[id]->GetInternalEnergyPerUnitMass(rho_2, p_2);
+  double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
+
+  if(rho_2<=0 || c_2_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(2)." 
+//               " rho = %e, p = %e, e = %e, id = %d.\n",
+//                c_2_square, rho_2, p_2, e_2, id);
+    return false;
+  }
+
+  double c_2 = sqrt(c_2_square); 
+  
+  double rho_3 = rho_0 + dp/c_2_square;
+  double p_3 = p_0 + dp;
+  double e_3 = vf[id]->GetInternalEnergyPerUnitMass(rho_3, p_3);
+  double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
+
+  if(rho_3<=0 || c_3_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(3)." 
+//                " rho = %e, p = %e, e = %e, id = %d.\n",
+//                c_3_square, rho_3, p_3, e_3, id);
+    return false;
+  }  
+ 
+  double c_3 = sqrt(c_3_square);
+
+  // calculate the outputs
+  //
+  double drho = 1.0/6.0*dp*(1./c_0_square + 2.0*(1./c_1_square+1./c_2_square) + 1./c_3_square);
+  double du = 1.0/6.0*drho*( c_0/rho_0 + 2.0*(c_1/rho_1 + c_2/rho_2) + c_3/rho_3);
+
+  rho = rho_0 + drho;
+  p = p_0 + dp;
+  u = (wavenumber == 1) ? u_0 - du : u_0 + du; 
+ 
+  double e = vf[id]->GetInternalEnergyPerUnitMass(rho, p);
+  double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
+
+  //std::cout << std::setw(16) << p << std::setw(16) << rho << std::endl;
+
+  if(rho<=0 || c<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(final)." 
+//               " rho = %e, p = %e, e = %e, id = %d.\n",
+//               c, rho, p, e, id);
+    return false;
+  } else
+ 
+  c = sqrt(c);
+  
+  xi = (wavenumber == 1) ? u - c : u + c;
+ 
+
+//------------------------------------------------------------
+//                Test integration in rho
+//------------------------------------------------------------
+  if (test) {
+    double rhoNew, uNew, pNew, xiNew;
+	    bool successTest = Rarefaction_OneStepRK4_ODEtest(wavenumber/*1 or 3*/, id, 
+                     	    rho_0, u_0, p_0 /*start state*/, -drho /*step size*/,
+                            rhoNew, uNew, pNew, xiNew /*output:end state*/);
+	    if (!successTest) {
+		    //std::cout << "Test for integration rho failed" << std::endl;
+                    return false;
+	    } else if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
+                    return false;
+		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
+		    std::cout << "rho = " << rho << ", u = " << u << ", p = " << p << std::endl;
+		    std::cout << "rhoNew = " << rhoNew << ", uNew = " << uNew << ", pNew = " << pNew << std::endl;   
+	    }
+            if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
+		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
+	    }	
+  }
+ 
+  return true;
+}
+
+//-----------------------------------------------------------------------------------------------------------
+bool
+ExactRiemannSolverBase::Rarefaction_OneStepRK4_ODEtest(int wavenumber/*1 or 3*/, int id,
                             double rho_0, double u_0, double p_0 /*start state*/, 
                             double drho /*step size*/,
                             double &rho, double &u, double &p, double &xi /*output*/)
@@ -1172,7 +1355,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c_0_square = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
 
   if(rho_0<=0 || c_0_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(0)." 
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(0)." 
 //            " rho = %e, p = %e, e = %e, id = %d.\n",
 //            c_0_square, rho_0, p_0, e_0, id);
     return false;
@@ -1186,7 +1369,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
 
   if(rho_1<=0 || c_1_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(1)." 
 //                   " rho = %e, p = %e, e = %e, id = %d.\n",
 //                   c_1_square, rho_1, p_1, e_1, id);
     return false;
@@ -1200,7 +1383,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
 
   if(rho_2<=0 || c_2_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(2)." 
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(2)." 
 //            " rho = %e, p = %e, e = %e, id = %d.\n",
 //            c_2_square, rho_2, p_2, e_2, id);
     return false;
@@ -1214,7 +1397,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
 
   if(rho_3<=0 || c_3_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(3)." 
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(3)." 
 //            " rho = %e, p = %e, e = %e, id = %d.\n",
 //            c_3_square, rho_3, p_3, e_3, id);
     return false;
@@ -1235,7 +1418,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
 
   if(rho<=0 || c<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(final)." 
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(final)." 
 //            " rho = %e, p = %e, e = %e, id = %d.\n",
 //            c, rho, p, e, id);
     return false;
@@ -1252,7 +1435,9 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
 void
 ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, int idl,
                                            double rhor, double ur, double pr, int idr,
-                                           double pmin, double pmax, double dp)
+                                           double pmin, double pmax, double dp,
+                                           size_t& It_1wave, size_t& It_3wave,
+                                           std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3)
 {
 
   vector<std::array<double,3> > left; //(p*, rhol*, ul*)
@@ -1264,7 +1449,7 @@ ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, in
 
   while(true) {
 
-    success = ComputeRhoUStar(1, rhol, ul, pl, ps, idl/*inputs*/,
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, ps, idl/*inputs*/,
                   rhol, (ps>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
                   rhols, uls/*outputs*/);
     if(success)
@@ -1273,7 +1458,7 @@ ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, in
       fprintf(stderr," -- ComputeRhoUStar(1) failed. left state: %e %e %e (%d), ps = %e.\n",
               rhol, ul, pl, idl, ps);
     
-    success = ComputeRhoUStar(3, rhor, ur, pr, ps, idr/*inputs*/,
+    success = ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, ps, idr/*inputs*/,
                   rhor, (ps>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
                   rhors, urs/*outputs*/);
     if(success)
