@@ -774,7 +774,7 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
 
       int numPoints = 15; //this is the number of points for interpolation
       int maxCand = numPoints*20;
-      PointIn2D candidates[maxCand]; 
+      PointIn2D candidates[maxCand*10]; //maxCand may be temporarily increased for fail-safe
 
 
       // tentative cutoff distance --- will be adjusted
@@ -819,11 +819,20 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
                 high_cut = std::min(high_cut, cutoff);
                 cutoff = 0.5*(low_cut + high_cut);
               }
-/*
-              if(nFound==0)              cutoff *= 4.0;
-              else if(nFound<numPoints)  cutoff *= 1.5*sqrt((double)numPoints/(double)nFound);
-              else if(nFound>maxCand)    cutoff /= 1.5*sqrt((double)nFound/(double)maxCand);
-*/
+
+              if((high_cut - low_cut)/high_cut<1e-6) { //fail-safe
+                nFound = tree.findCandidatesWithin(pnode, candidates, 10*maxCand, high_cut);
+                if(nFound>10*maxCand) {
+                  fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points at any"
+                                 " cutoff distance.\n\033[0m");
+                  exit(-1);
+                }
+
+                assert(nFound>=numPoints);
+                fprintf(stderr,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
+                               "(node: %e %e).\n\033[0m", nFound, high_cut, pnode[0], pnode[1]);
+                break;
+              }
             }
 
             //figure out the actual points for interpolation (numPoints)
