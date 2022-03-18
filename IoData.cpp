@@ -2431,6 +2431,22 @@ void EmbeddedSurfacesData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+EmbeddedBoundaryMethodData::EmbeddedBoundaryMethodData()
+{
+
+}
+
+//------------------------------------------------------------------------------
+
+void EmbeddedBoundaryMethodData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  embed_surfaces.setup("EmbeddedSurfaces");
+}
+
+//------------------------------------------------------------------------------
+
 AerosCouplingData::AerosCouplingData()
 {
   fsi_algo = NONE;
@@ -2626,7 +2642,7 @@ void IoData::setupCmdFileVariables()
 
   concurrent.setup("ConcurrentPrograms");
 
-  embed_surfaces.setup("EmbeddedSurfaces");
+  ebm.setup("EmbeddedBoundaryMethod");
 
   eqs.setup("Equations");
   eqs.setup("NavierStokesEquations");

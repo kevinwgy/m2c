@@ -1022,6 +1022,19 @@ struct EmbeddedSurfacesData {
 
 //------------------------------------------------------------------------------
 
+struct EmbeddedBoundaryMethodData {
+
+  EmbeddedSurfacesData embed_surfaces;
+
+  EmbeddedBoundaryMethodData();
+  ~EmbeddedBoundaryMethodData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+  
+};
+
+//------------------------------------------------------------------------------
+
 struct AerosCouplingData {
 
   enum FSICouplingAlgorithm {NONE = 0, BY_AEROS = 1, C0 = 2, A6 = 3} fsi_algo;
@@ -1112,7 +1125,7 @@ public:
 
   ConcurrentProgramsData concurrent;
 
-  EmbeddedSurfacesData embed_surfaces;
+  EmbeddedBoundaryMethodData ebm;
 
   MeshData mesh;
 

@@ -13,7 +13,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(IoData &iod_, bool surface_fr
                         : iod(iod_), hasSurfFromOtherSolver(surface_from_other_solver)
 {
   // count surfaces from files
-  int counter = iod.embed_surfaces.surfaces.dataMap.size();
+  int counter = iod.ebm.embed_surfaces.surfaces.dataMap.size();
 
   // get the correct size of surfaces and F
   if(surface_from_other_solver) {
@@ -25,8 +25,8 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(IoData &iod_, bool surface_fr
   }
 
   // read surfaces from files
-  for(auto it = iod.embed_surfaces.surfaces.dataMap.begin();
-           it != iod.embed_surfaces.surfaces.dataMap.end(); it++) {
+  for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
+           it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
 
     int index = it->first;
     if(index<0 || index>=counter) {

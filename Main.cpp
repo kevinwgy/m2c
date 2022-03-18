@@ -70,8 +70,8 @@ int main(int argc, char* argv[])
   if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
     embed = new EmbeddedBoundaryOperator(iod, true); 
     concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
-                                             embed->GetPointerToForcesOnSurface(0));
-  } else if(iod.embed_surfaces.surfaces.dataMap.size() != 0)
+                                    embed->GetPointerToForcesOnSurface(0));
+  } else if(iod.ebm.embed_surfaces.surfaces.dataMap.size() != 0)
     embed = new EmbeddedBoundaryOperator(iod, false);
 
   //! Track the embedded boundaries
