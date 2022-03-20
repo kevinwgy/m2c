@@ -5,10 +5,17 @@
 
 /***********************************************************
  * class ClosestTriangle is a utility class that finds the 
- * signed distance from a point to a set of triangles
- * (e.g., an embedded structure). This class was
+ * signed distance from a point to a set of triangles that
+ * for a CLOSED SURFACE (e.g., an embedded structure). This class was
  * originally written by KW and ML around 2009. See
  * Wang et al., IJNMF, 2012 (The projection-based method).
+ * Usage: It is usually not efficient nor necessary to run
+ * "checkTriangle" over all the triangles, as some of triangles
+ * may be very far from the point. It is usually a good idea
+ * to create a tree structure (e.g., KDTree) to store the
+ * triangles, and use it to pre-select the triangles that
+ * are relatively close to the point (e.g., using a bounding
+ * box). Then, run "checkTriange" over these selected triangles.
  **********************************************************/
 namespace GeoTools {
 

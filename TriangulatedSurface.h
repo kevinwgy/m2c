@@ -43,6 +43,8 @@ struct TriangulatedSurface {
   void BuildConnectivity();
   void BuildElementNormals(); //also produces area
 
+  bool CheckSurfaceClosedness(); I AM HERE
+
 };
 
 #endif
