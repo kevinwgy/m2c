@@ -2383,6 +2383,23 @@ Assigner* LinePlot::getAssigner()
 
 //------------------------------------------------------------------------------
 
+SurfaceTrackerData::SurfaceTrackerData()
+{
+  surface_thickness = 1.0e-8;
+}
+
+//------------------------------------------------------------------------------
+
+void SurfaceTrackerData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassDouble<SurfaceTrackerData>(ca, "SurfaceThickness", this, 
+                                      &SurfaceTrackerData::surface_thickness);
+}
+
+//------------------------------------------------------------------------------
+
 EmbeddedSurfaceData::EmbeddedSurfaceData()
 {
   filename = "";
@@ -2396,7 +2413,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 4, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
 
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
 
@@ -2410,6 +2427,8 @@ Assigner *EmbeddedSurfaceData::getAssigner()
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "HeatSource", this, &EmbeddedSurfaceData::heat_source);
 
+  tracker.setup("SurfaceTracker", ca);
+  
   return ca;
 }
 

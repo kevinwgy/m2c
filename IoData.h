@@ -989,6 +989,18 @@ struct OutputData {
 
 //------------------------------------------------------------------------------
 
+struct SurfaceTrackerData {
+
+  double surface_thickness;
+
+  SurfaceTrackerData();
+  ~SurfaceTrackerData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
 struct EmbeddedSurfaceData {
 
   const char *filename; //!< file for nodal coordinates and elements
@@ -999,6 +1011,8 @@ struct EmbeddedSurfaceData {
   enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
 
   double heat_source;
+
+  SurfaceTrackerData tracker;
 
   EmbeddedSurfaceData();
   ~EmbeddedSurfaceData() {}
