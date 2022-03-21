@@ -1,7 +1,5 @@
 #include<ClosestTriange.h>
 
-namespace GeoTools {
-
 //----------------------------------------------------------------------------
 
 ClosestTriangle::ClosestTriangle(int (*nd)[3], Vec3D *sX, Vec3D *sN, set<int> *n2n, set<int> *n2e) {
@@ -475,58 +473,3 @@ void ClosestTriangle::checkEdgeForTester(Vec3D xt, int trId, int ip1, int ip2, i
 
 //----------------------------------------------------------------------------
 
-double ClosestTriangle::piercing(Vec3D x0, int tria, double xi[3])
-{
-  const double tol = 1.0e-12;
-
-  double dist;
-  dist = std::abs( project(x0, tria, xi[0], xi[1]) );
-
-  xi[2] = 1.0 - xi[0] - xi[1];
-
-  if(xi[0] >= tol && xi[1] >= tol && xi[2] >= tol) // projection point is within triangle
-    return dist;
-
-  dist = 1.0e16;
-  for(int i=0; i<3; ++i) { //check edges
-    if(xi[i] < tol) {
-      int p1 = triNodes[tria][(i+1)%3];
-      int p2 = triNodes[tria][(i+2)%3];
-      double alpha;
-      double d2l = std::abs(edgeProject(x0, p1, p2, alpha)); //project to edge p1-p2
-
-      if(alpha >= tol && alpha <= 1.0 - tol) { //along edge
-        if(dist > d2l) {
-          dist        = d2l;
-          xi[i]       = 0.0;
-          xi[(i+1)%3] = 1.0-alpha;
-          xi[(i+2)%3] = alpha;
-        }
-      }
-      else {
-        if(alpha < tol) {
-          double d2p = (x0 - structX[p1]).norm(); //distance to point
-          if(dist > d2p) {
-            dist        = d2p;
-            xi[i]       = 0.0;
-            xi[(i+2)%3] = 0.0;
-            xi[(i+1)%3] = 1.0;
-          }
-        }
-        else if(alpha > 1.0-tol) {
-          double d2p = (x0 - structX[p2]).norm();
-          if(dist > d2p) {
-            dist        = d2p;
-            xi[i]       = 0.0;
-            xi[(i+1)%3] = 0.0;
-            xi[(i+2)%3] = 1.0;
-          }
-        }
-      }
-    }
-  }
-  return dist;
-}
-
-
-} //end of namespace

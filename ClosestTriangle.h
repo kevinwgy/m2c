@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _CLOSEST_TRIANGLE_H_
+#define _CLOSEST_TRIANGLE_H_
 
 #include <Vector3D.h>
 #include <map>
@@ -17,8 +18,6 @@
  * are relatively close to the point (e.g., using a bounding
  * box). Then, run "checkTriange" over these selected triangles.
  **********************************************************/
-namespace GeoTools {
-
 class ClosestTriangle {
 
   int (*triNodes)[3];
@@ -56,8 +55,6 @@ protected:
   void checkEdgeForTester(Vec3D xt, int trId, int ip1, int ip2, int p3, double trDist, int &nn1, int &nn2,
                           double &mindist, int &myMode, int &bestTriangle, const double eps) const;
 
-  double piercing(Vec3D x0, int tria, double xi[3]);
-
 public:
 
   ClosestTriangle(int (*triNodes)[3], Vec3D *structX, Vec3D *sN, set<int> *n2n, set<int> *n2e);
@@ -79,8 +76,8 @@ public:
 };
 
 
-} //end of namespace
 
+#endif
 
 
 

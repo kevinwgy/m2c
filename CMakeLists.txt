@@ -102,8 +102,11 @@ SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
 LagrangianOutput.cpp
 Utils.cpp
+ClosestTriangle.cpp
 MathTools/r8lib.cpp
-MathTools/rbf_interp_2d.cpp)
+MathTools/rbf_interp_2d.cpp
+GeoTools/Intersections.cpp)
+
 
 # link to libraries
 target_link_libraries(m2c petsc mpi parser)

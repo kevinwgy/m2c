@@ -32,10 +32,6 @@ void print(MPI_Comm& comm, int i, const char format[],...);
 void print(FILE* fd, const char format[],...);
 void print(MPI_Comm& comm, FILE* fd, const char format[],...);
 //--------------------------------------------------
-//! Check for NAN
-template <class T>
-inline int m2c_isnan(const T& t) {return (t != t);}
-//--------------------------------------------------
 //! Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const string getCurrentDateTime();
 //--------------------------------------------------

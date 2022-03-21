@@ -41,9 +41,12 @@ struct TriangulatedSurface {
   ~TriangulatedSurface() {} 
 
   void BuildConnectivity();
-  void BuildElementNormals(); //also produces area
+  void BuildElementNormals(); //!< also produces area
 
-  bool CheckSurfaceClosedness(); I AM HERE
+  bool CheckSurfaceOrientation(); //!<  check whether all the elements have consistent normal directions
+  bool CheckSurfaceClosedness(); //!< check whether this is a closed surface
+  bool CheckSurfaceOrientationAndClosedness(); //!< more efficient that calling the above two functions seperately
+
 
 };
 

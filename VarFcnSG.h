@@ -74,7 +74,7 @@ public:
 
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + Pstiff < 0 (Not p + gamma*Pstiff). 
   inline bool CheckState(double rho, double p, bool silence = false) const{
-    if(m2c_isnan(rho) || m2c_isnan(p)) {
+    if(!isfinite(rho) || !isfinite(p)) {
       if(!silence)
         fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);
       return true;

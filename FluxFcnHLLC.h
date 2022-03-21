@@ -202,7 +202,7 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
   // estimates of min and max wave speeds
   double Sm = 0.0, Sp = 0.0;
   ComputeMinMaxWaveSpeedsByRoeAverage(dir, Vm, Vp, id, Sm, Sp);
-  if(m2c_isnan(Sm) || m2c_isnan(Sp)) {
+  if(!isfinite(Sm) || !isfinite(Sp)) {
     fprintf(stderr, "*** Error: id = %d, Vm = %e %e %e %e %e, Vp = %e %e %e %e %e\n", id, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4],
             Vp[0], Vp[1], Vp[2], Vp[3], Vp[4]);
   }
