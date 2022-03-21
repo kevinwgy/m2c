@@ -1,5 +1,6 @@
 #pragma once
 #include <Vector3D.h>
+#include <cassert>
 
 /**************************************************************************
  * This file declares some basic geometry tools
@@ -75,7 +76,7 @@ inline double GetShortestDistanceFromPointToLineSegment(Vec3D& x0, Vec3D& xA, Ve
   if(alpha>1.0) {
     dist = (x0-xB).norm();
     alpha = 1.0; 
-  } else if (alpha<0.0 || !isfinite(alpha)/*xA=xB*/) {
+  } else if (alpha<0.0 || !std::isfinite(alpha)/*xA=xB*/) {
     dist = (x0-xA).norm();
     alpha = 0.0;
   }
@@ -121,40 +122,7 @@ inline double GetNormalAndAreaOfTriangle(Vec3D& xA, Vec3D& xB, Vec3D& xC,
  *     This is the case even if you explicitly specify "dir".
  */
 double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi[3],
-                                  double* area = NULL, Vec3D* dir = NULL)
-{
-  double dist, areaPBC, areaPCA;
-  Vec3D xp;
-
-  if(area && dir) {
-
-    //calculate the projection.
-    dist = (x0-xA)*(*dir);
-    xp = x0 - dist*(*dir);
-
-    //calculate barycentric coords.
-    areaPBC = (((xB-xp)^(xC-xp))*(*dir));
-    areaPCA = (((xC-xp)^(xA-xp))*(*dir));
-
-  } else {
-    Vec3D mydir;
-    double areaABC = GetNormalAndAreaOfTriangle(xA, xB, xC, mydir);
-
-    //calculate the projection.
-    dist = (x0-xA)*mydir;
-    xp = x0 - dist*mydir;
-
-    areaPBC = (((xB-xp)^(xC-xp))*mydir);
-    areaPCA = (((xC-xp)^(xA-xp))*mydir);
-  }
-
-  //calculate barycentric coords.
-  xi[0] = areaPBC/areaABC;
-  xi[1] = areaPCA/areaABC;
-  xi[2] = 1.0 - xi[0] - xi[1];
-
-  return dist;
-}
+                           double* area = NULL, Vec3D* dir = NULL);
 
 /**************************************************************************
  * Project a point onto a triangle, that is, find the closest point on the triangle
@@ -181,63 +149,8 @@ double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi
  *       This is the case even if you explicitly specify "dir".
  */
 double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi[3],
-                                  double* area = NULL, Vec3D* dir = NULL, 
-                                  bool return_signed_distance = false)
-{
-  
-  double xi[3];
-  double dist = ProjectPointToPlane(x0, xA, xB, xC, xi, area, dir);
-  int sign = dist>=0 ? 1 : -1; //NOTE: if the point is exactly on the plane, sign = 1
-
-
-  dist = abs(dist); // from now all, dist is unsigned distance
-
-  if(xi[0] >= 0.0 && xi[1] >= 0.0 && xi[2] >= 0.0) // projection point is within triangle
-    return return_signed_distance ? sign*dist : dist;
-
-  dist = DBL_MAX;
-  double d2p[3] = {-1.0, -1.0, -1.0}; //dist to xA, xB, xC
-  Vec3D *nodes_ptr[3] = {&xA, &xB, xC};
-  double alpha(0.0), d2l(0.0);
-  int p1, p2;
-  for(int i=0; i<3; i++) { //check the edges
-    if(xi[i]<0) {
-      p1 = (i+1)%3;
-      p2 = (i+2)%3;
-      d2l = ProjectPointToLine(x0, *nodes_ptr[p1], *nodes_ptr[p2], alpha);
-      if(alpha >= 0.0 && alpha <= 1.0) { //along edge
-        dist   = d2l;
-        xi[i]  = 0.0;
-        xi[p1] = 1.0-alpha;
-        xi[p2] = alpha;
-        return return_signed_distance ? sign*dist : dist;
-      } 
-      else if(alpha < 0.0) {
-        if(d2p[p1]<0)
-          d2p[p1] = (x0 - *nodes_ptr[p1]).norm(); //dist to point
-        if(d2p[p1] < dist) {
-          dist   = d2p[p1];
-          xi[i]  = 0.0;
-          xi[p1] = 1.0;
-          xi[p2] = 0.0;
-        }
-      }
-      else { //alpha > 1.0
-        if(d2p[p2]<0)
-          d2p[p2] = (x0 - *nodes_ptr[p2]).norm(); //dist to point
-        if(d2p[p2] < dist) {
-          dist   = d2p[p2];
-          xi[i]  = 0.0;
-          xi[p1] = 0.0;
-          xi[p2] = 1.0;
-        }  
-      }
-    }
-  }
-
-  return return_signed_distance ? sign*dist : dist;
-
-}
+                              double* area = NULL, Vec3D* dir = NULL, 
+                              bool return_signed_distance = false);
 
 /**************************************************************************
  * Find if the distance from a point to a triangle is less than "half_thickness"
@@ -249,71 +162,7 @@ double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double
  *     dir (optional) -- unit normal direction of the triangle
  */
 bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double half_thickness,
-                                double* area = NULL, Vec3D* dir = NULL)
-{
-  assert(half_thickness>=0.0);
-
-  double areaABC;
-  Vec3D mydir;
-  if(area && dir) {
-    areaABC = *area;
-    mydir = *dir;
-  } else
-    areaABC = GetNormalAndAreaOfTriangle(xA, xB, xC, mydir);
-
-  double dist = (x0-xA)*mydir;
-
-  if(fabs(dist)>half_thickness)
-    return false; //distance from point to plane is already greater than half_thickness
-  
-  Vec3D xp = x0 - dist*mydir;
-
-  double areaPBC = (((xB-xp)^(xC-xp))*mydir);
-  double areaPCA = (((xC-xp)^(xA-xp))*mydir);
-
-  //calculate barycentric coords.
-  double xi[3];
-  xi[0] = areaPBC/areaABC;
-  xi[1] = areaPCA/areaABC;
-  xi[2] = 1.0 - xi[0] - xi[1];
-
-  if(xi[0]>=0.0 && xi[1]>=0.0 && xi[2]>=0.0)
-    return true;
-
-  // copying part of the code in ProjectPointToTriangle
-  dist = DBL_MAX;
-  double d2p[3] = {-1.0, -1.0, -1.0}; //dist to xA, xB, xC
-  Vec3D *nodes_ptr[3] = {&xA, &xB, xC};
-  double alpha(0.0), d2l(0.0);
-  int p1, p2;
-  for(int i=0; i<3; i++) { //check the edges
-    if(xi[i]<0) {
-      p1 = (i+1)%3;
-      p2 = (i+2)%3;
-      d2l = ProjectPointToLine(x0, *nodes_ptr[p1], *nodes_ptr[p2], alpha);
-      if(d2l>half_thickness)
-        return false;
-      if(alpha >= 0.0 && alpha <= 1.0) { //along edge
-        return true;
-      }
-      else if(alpha < 0.0) {
-        if(d2p[p1]<0)
-          d2p[p1] = (x0 - *nodes_ptr[p1]).norm(); //dist to point
-        if(d2p[p1] < dist)
-          dist   = d2p[p1];
-      }
-      else { //alpha > 1.0
-        if(d2p[p2]<0)
-          d2p[p2] = (x0 - *nodes_ptr[p2]).norm(); //dist to point
-        if(d2p[p2] < dist) 
-          dist   = d2p[p2];
-      }
-    }
-  }
-
-  assert(dist<=half_thickness);
-  return true;
-}
+                                double* area = NULL, Vec3D* dir = NULL);
 
 /**************************************************************************
  * Trilinear interpolation

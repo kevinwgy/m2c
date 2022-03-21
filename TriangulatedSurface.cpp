@@ -1,4 +1,6 @@
 #include <TriangulatedSurface.h>
+#include <map>
+#include <cassert>
 using std::set;
 using std::vector;
 using std::map;

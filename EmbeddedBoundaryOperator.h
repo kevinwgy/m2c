@@ -24,7 +24,8 @@ class EmbeddedBoundaryOperator {
   vector<TriangulatedSurface> surfaces; //embedded surfaces
   vector<vector<Vec3D> > F; //forces
 
-  vector<IntersectionI AM HERE
+//  SurfaceTracker tracker;
+ 
 public:
    
   EmbeddedBoundaryOperator(IoData &iod_, bool surface_from_other_solver = false);

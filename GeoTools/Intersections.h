@@ -15,9 +15,9 @@ bool RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray
                            bool D_normalized = false); //!< input: whether D is normalized)
 
 // for axis-aligned directions
-bool RayIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2 (z-axis)
-                           Vec3D& V0, Vec3D& V1, Vec3D& V2,
-                           double* d, Vec3D* xp, Vec3D* baryCoords, bool D_normalized = false);
+bool AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2 (z-axis)
+                            Vec3D& V0, Vec3D& V1, Vec3D& V2,
+                            double* d, Vec3D* xp, Vec3D* baryCoords);
 
 //! Moller-Trumbore intersection algorithm (Moller and Trumbore, 1997)
 bool LineSegmentIntersectsTriangle(Vec3D X0, Vec3D X1, //!< vertices of line segment

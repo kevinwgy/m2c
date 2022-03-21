@@ -1,5 +1,3 @@
-#pragma once
-
 #include <Intersections.h>
 #include <cassert>
 #include <cfloat> //DBL_MAX
@@ -82,9 +80,9 @@ RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray
 
 // for axis-aligned directions
 bool
-RayIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2 (z-axis)
-                      Vec3D& V0, Vec3D& V1, Vec3D& V2,
-                      double* d, Vec3D* xp, Vec3D* baryCoords)
+AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2 (z-axis)
+                       Vec3D& V0, Vec3D& V1, Vec3D& V2,
+                       double* d, Vec3D* xp, Vec3D* baryCoords)
 {
   const double INTERSECTIONS_EPSILON = 1.0e-18;
 
@@ -112,7 +110,7 @@ RayIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2 
     q2 = Q[1];
   }
   else {
-    fprintf(stderr,"*** Error: In RayIntersectsTriangle, dir must be 0, 1, or 2. Found %d.\n", dir);
+    fprintf(stderr,"*** Error: In AxisIntersectsTriangle, dir must be 0, 1, or 2. Found %d.\n", dir);
     exit(-1);
   }
 
@@ -198,12 +196,12 @@ bool
 LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2 (z-axis)
                               double len, //!< length of the line segment (along dir)
                               Vec3D& V0, Vec3D& V1, Vec3D& V2,
-                              double* d, Vec3D* xp, Vec3D* baryCoords);
+                              double* d, Vec3D* xp, Vec3D* baryCoords)
 {
   assert(len>0);
 
   double t(0.0);
-  bool intersect = RayIntersectsTriangle(O, dir, V0, V1, V2, &t, xp, baryCoords);
+  bool intersect = AxisIntersectsTriangle(O, dir, V0, V1, V2, &t, xp, baryCoords);
 
   if(d) *d = t;
 

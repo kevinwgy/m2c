@@ -97,7 +97,7 @@ public:
 
   //checks that the Euler equations are still hyperbolic
   virtual bool CheckState(double rho, double p, bool silence = false) const{
-    if(!isfinite(rho) || !isfinite(p)) {
+    if(!std::isfinite(rho) || !std::isfinite(p)) {
       if(!silence)
         fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n\033[0m", rho, p);
       return true;
@@ -119,7 +119,7 @@ public:
 
   //checks that the Euler equations are still hyperbolic
   virtual bool CheckState(double *V, bool silence = false) const{
-    if(!isfinite(V[0]) || !isfinite(V[1]) || !isfinite(V[2]) || !isfinite(V[3]) || !isfinite(V[4])) {
+    if(!std::isfinite(V[0]) || !std::isfinite(V[1]) || !std::isfinite(V[2]) || !std::isfinite(V[3]) || !std::isfinite(V[4])){
       if(!silence)
         fprintf(stderr, "\033[0;31m*** Error: CheckState failed. V = %e %e %e %e %e\n\033[0m", V[0], V[1], V[2], V[3], V[4]);
       return true;

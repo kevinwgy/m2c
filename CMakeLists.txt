@@ -105,6 +105,7 @@ Utils.cpp
 ClosestTriangle.cpp
 MathTools/r8lib.cpp
 MathTools/rbf_interp_2d.cpp
+GeoTools/GeoTools.cpp
 GeoTools/Intersections.cpp)
 
 

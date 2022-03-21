@@ -1,4 +1,7 @@
-#include<ClosestTriange.h>
+#include<ClosestTriangle.h>
+#include<iostream>
+using std::set;
+using std::map;
 
 //----------------------------------------------------------------------------
 
@@ -104,8 +107,8 @@ void ClosestTriangle::checkVertex(int ip1, int trId, double trDist) {
   // If this node is already our best solution
   if(n1 == ip1 && n2 < 0) {
     if(nPairs == maxNPairs) {
-      std::cerr << "WARNING: On the embedded structure surface, detected too many (>" << maxNPairs << ") peripheral triangles to a node!" << std::endl;
-      throw "Too many peripheral triangles";
+      std::cerr << "Warning: On the embedded structure surface, detected too many (>" << maxNPairs <<
+                   ") peripheral triangles to a node!" << std::endl;
     }
     periTri[nPairs++] = trId;
     int repeated1, repeated2;
@@ -245,8 +248,10 @@ int ClosestTriangle::registerNodes(int ip1, int trId, int& repeated1, int& repea
           repeated_node |= 1 << 1;
           repeated2 = 1;
         }
-    } else
-      fprintf(stderr,"ERROR (for debug): node %d doesn't belong to triangle %d!\n", ip1+1, trId+1);
+    } else {
+      fprintf(stderr,"*** Error (software bug): node %d doesn't belong to triangle %d!\n", ip1+1, trId+1);
+      exit(-1);
+    }
 
     return repeated_node;
 }

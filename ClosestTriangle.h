@@ -3,6 +3,7 @@
 
 #include <Vector3D.h>
 #include <map>
+#include <set>
 
 /***********************************************************
  * class ClosestTriangle is a utility class that finds the 
@@ -23,8 +24,8 @@ class ClosestTriangle {
   int (*triNodes)[3];
   Vec3D *structX;
   Vec3D *structNorm;
-  set<int> *node2node;
-  set<int> *node2elem;
+  std::set<int> *node2node;
+  std::set<int> *node2elem;
 
 protected:
   bool fail;
@@ -57,8 +58,8 @@ protected:
 
 public:
 
-  ClosestTriangle(int (*triNodes)[3], Vec3D *structX, Vec3D *sN, set<int> *n2n, set<int> *n2e);
-  ~ClosestTriange() {}
+  ClosestTriangle(int (*triNodes)[3], Vec3D *structX, Vec3D *sN, std::set<int> *n2n, std::set<int> *n2e);
+  ~ClosestTriangle() {}
 
   void start(Vec3D x);
   void checkTriangle(int trId);
