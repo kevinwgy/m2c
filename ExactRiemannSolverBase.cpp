@@ -59,8 +59,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                             double *Vsm /*left 'star' solution*/,
                             double *Vsp /*right 'star' solution*/)
 {
-  std::vector<std::vector<double>> integrationPath1(3, vector<double> (2.*numSteps_rarefaction, 0.) ); // first index: 1-pressure, 2-density, 3-velocity
-  std::vector<std::vector<double>> integrationPath3(3, vector<double> (2.*numSteps_rarefaction, 0.) );
+  std::vector<std::vector<double>> integrationPath1(3, vector<double> (5.*numSteps_rarefaction, 0.) ); // first index: 1-pressure, 2-density, 3-velocity
+  std::vector<std::vector<double>> integrationPath3(3, vector<double> (5.*numSteps_rarefaction, 0.) );
   
   size_t It_1wave = 0;
   size_t It_3wave = 0;  
@@ -73,7 +73,12 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
   double pr    = Vp[4];
   //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
-
+  
+#if PRINT_RIEMANN_SOLUTION == 1
+    std::cout << "Left State (rho, u, p): " << rhol << ", " << ul << ", " << pl << "." << std::endl;
+    std::cout << "Right State (rho, u, p): " << rhor << ", " << ur << ", " << pr << "." << std::endl;
+#endif
+  
   double el = vf[idl]->GetInternalEnergyPerUnitMass(rhol, pl);
   double cl = vf[idl]->ComputeSoundSpeedSquare(rhol, el);
 
@@ -307,6 +312,10 @@ try_again:
     }
     return 1;  //failed
   }
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    std::cout << "Star State: (rhols, rhors, us, ps): " << rhol2 << ", " << rhor2 << ", " << u2 << ", " << p2 << "." << std::endl;
+#endif
   
 
   //success!
@@ -875,6 +884,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       std::cout << integrationPath1[0][j] << ", " << integrationPath1[1][j] << ", " << integrationPath1[2][j] << std::endl;
     }
 */
+
     size_t index0 = 0;
     if (It_wave > 0) {
 	    for (size_t j = 0; j < integrationPath[0].size(); j++) {
@@ -964,6 +974,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
 #if PRINT_RIEMANN_SOLUTION == 1
         cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
+        cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
 #endif
         done = true;
 
@@ -1248,8 +1259,8 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
 
   double c_0 = sqrt(c_0_square);
 
-  double rho_1 = rho_0 + 0.5*dp/c_0_square;
-  double p_1 = p_0 + 0.5*dp;
+  double rho_1 = rho_0 + 0.2*dp/c_0_square;
+  double p_1 = p_0 + 0.2*dp;
   double e_1 = vf[id]->GetInternalEnergyPerUnitMass(rho_1, p_1);
   double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
 
@@ -1262,8 +1273,8 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
 
   double c_1 = sqrt(c_1_square);
                              
-  double rho_2 = rho_0 + 0.5*dp/c_1_square;
-  double p_2 = p_1;
+  double rho_2 = rho_0 + 3./40.*dp/c_0_square + 9./40.*dp/c_1_square;
+  double p_2 = p_1 + 3./10.*dp;
   double e_2 = vf[id]->GetInternalEnergyPerUnitMass(rho_2, p_2);
   double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
 
@@ -1276,8 +1287,8 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
 
   double c_2 = sqrt(c_2_square); 
   
-  double rho_3 = rho_0 + dp/c_2_square;
-  double p_3 = p_0 + dp;
+  double rho_3 = rho_0 + 3./10.*dp/c_0_square - 9./10.*dp/c_1_square + 6./5.*dp/c_2_square;
+  double p_3 = p_0 + 3./5.*dp;
   double e_3 = vf[id]->GetInternalEnergyPerUnitMass(rho_3, p_3);
   double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
 
@@ -1290,10 +1301,40 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
  
   double c_3 = sqrt(c_3_square);
 
+  double rho_4 = rho_0 - 11./54.*dp/c_0_square + 2.5*dp/c_1_square - 70./27.*dp/c_2_square + 35./27.*dp/c_3_square;
+  double p_4 = p_0 + dp;
+  double e_4 = vf[id]->GetInternalEnergyPerUnitMass(rho_4, p_4);
+  double c_4_square = vf[id]->ComputeSoundSpeedSquare(rho_4, e_4);
+
+  if (rho_4<=0 || c_4_square<0) {
+    return false;
+  }
+
+  double c_4 = sqrt(c_4_square);
+
+  double rho_5 = rho_0 + 1631./55296.*dp/c_0_square + 175./512.*dp/c_1_square + 575./13824.*dp/c_2_square + 44275./110592.*dp/c_3_square + 253./4096.*dp/c_4_square;
+  double p_5 = p_0 + 7./8.*dp;
+  double e_5 = vf[id]->GetInternalEnergyPerUnitMass(rho_5, p_5);
+  double c_5_square = vf[id]->ComputeSoundSpeedSquare(rho_5, e_5);
+
+  if (rho_5<=0 || c_5_square<0) {
+    return false;
+  }
+
+  double c_5 = sqrt(c_5_square);
+
   // calculate the outputs
   //
-  double drho = 1.0/6.0*dp*(1./c_0_square + 2.0*(1./c_1_square+1./c_2_square) + 1./c_3_square);
-  double du = 1.0/6.0*drho*( c_0/rho_0 + 2.0*(c_1/rho_1 + c_2/rho_2) + c_3/rho_3);
+  double drho = (37./378./c_0_square + 250./621./c_2_square + 125./594./c_3_square + 512./1771./c_5_square) * dp;
+  double drho_err = (2825./27648./c_0_square + 18575./48384./c_2_square + 13525./55296./c_3_square + 277./14336./c_4_square + 0.25/c_5_square) * dp;
+  double du = (37./378./c_0/rho_0 + 250./621./c_2/rho_2 + 125./594./c_3/rho_3 + 512./1771./c_5/rho_5) * dp;
+  double du_err = (2825./27648./c_0/rho_0 + 18575./48384./c_2/rho_2 + 13525./55296./c_3/rho_3 + 277./14336./c_4/rho_4 + 0.25/c_5/rho_5) * dp;
+
+  double rhoErr = drho_err - drho;
+  double uErr = du_err - du;
+
+//  std::cout << "absolute rhoErr = " << rhoErr << std::endl;
+//  std::cout << "absolute uErr = " << uErr << std::endl;
 
   rho = rho_0 + drho;
   p = p_0 + dp;
