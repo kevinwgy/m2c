@@ -884,7 +884,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       std::cout << integrationPath1[0][j] << ", " << integrationPath1[1][j] << ", " << integrationPath1[2][j] << std::endl;
     }
 */
-/*
+
     size_t index0 = 0;
     if (It_wave > 0) {
 	    for (size_t j = 0; j < integrationPath[0].size(); j++) {
@@ -898,7 +898,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	    us_0 = integrationPath[2][index0];
     } 
     dp = std::min(dp, ps_0 - ps);
-*/ 
+ 
     double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
     xi_0 = xi;
 
@@ -911,13 +911,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     bool done = false;
     double uErr = 0;
     for(int i=0; i<numSteps_rarefaction*20; i++) {
-/*
+
       if (It_wave == 0) {
           integrationPath[0][i] = ps_0;
           integrationPath[1][i] = rhos_0;
           integrationPath[2][i] = us_0; 
       }
-*/ 
+ 
 /*
       if (wavenumber == 1) {
         testFile1 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
@@ -977,13 +977,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
 #endif
         done = true;
-/*
+
 	if (It_wave == 0) {
 		integrationPath[0][i+1] = ps_1;
 		integrationPath[1][i+1] = rhos_1;
 		integrationPath[2][i+1] = us_1; 
 	}  
-*/	It_wave = It_wave + 1;
+	It_wave = It_wave + 1;
         
 /*         
         if (wavenumber == 1) {
@@ -1018,7 +1018,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
         dpTemp = std::min(dpTemp, 10*dp);
       }
-      //std::cout << "Step " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErrScaled = " << uErrScaled << ", factor = " << safety*pow( fabs(errBar/uErrScaled) , 0.2 ) << "." << std::endl;
+      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErrScaled = " << uErrScaled << ", factor = " << safety*pow( fabs(errBar/uErrScaled) , 0.2 ) << "." << std::endl;
       dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
 
 //      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps
