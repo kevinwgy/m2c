@@ -96,7 +96,8 @@ protected: //internal functions
   virtual bool Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                             double rho_0, double u_0, double p_0 /*start state*/, 
                             double dp /*step size*/,
-                            double &rho, double &u, double &p, double &xi /*output*/);
+                            double &rho, double &u, double &p, double &xi /*output*/,
+                            double & uErr /*output: absolute error in us*/);
 
   void FinalizeSolution(double *dir, double *Vm, double *Vp,
            double rhol, double ul, double pl, int idl,
