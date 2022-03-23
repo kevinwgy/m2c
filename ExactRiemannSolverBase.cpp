@@ -896,8 +896,9 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	    ps_0 = integrationPath[0][index0];
 	    rhos_0 = integrationPath[1][index0];
 	    us_0 = integrationPath[2][index0];
-    } 
-    dp = std::min(dp, ps_0 - ps);
+	    //dp = std::min(dp, ps_0 - ps);
+	    dp = ps_0 - ps;
+    }
  
     double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
     xi_0 = xi;
@@ -995,6 +996,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
           testFile3.close();
         }
 */
+       // std::cout << "RKstep " << i << ": dp = " << dp << ", ps_0 - ps = " << ps_0 - ps << ", uErrScaled = " << uErr/c << "." << std::endl;
         break; //done!
       }
 
@@ -1002,8 +1004,9 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       // Adjust step size, then update state
       //
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
-
-      double uErrScaled = uErr / c;
+    
+      double tiny = 1.e-14;
+      double uErrScaled = uErr / (c+tiny);
      // std::cout << "uErrScaled = " << uErrScaled << "." << std::endl;
       double dpTemp = 0;
       double safety = 0.9;
@@ -1018,7 +1021,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
         dpTemp = std::min(dpTemp, 10*dp);
       }
-      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErrScaled = " << uErrScaled << ", factor = " << safety*pow( fabs(errBar/uErrScaled) , 0.2 ) << "." << std::endl;
+      //std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErrScaled = " << uErrScaled << ", factor = " << safety*pow( fabs(errBar/uErrScaled) , 0.2 ) << "." << std::endl;
       dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
 
 //      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps

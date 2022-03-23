@@ -6,7 +6,7 @@
 /*****************************************************************************************
  * Base class for solving one-dimensional, single- or two-material Riemann problems
  *****************************************************************************************/
-#define PRINT_RIEMANN_SOLUTION 1
+#define PRINT_RIEMANN_SOLUTION 0
 
 class ExactRiemannSolverBase {
 
