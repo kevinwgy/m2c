@@ -26,6 +26,7 @@ int verbose;
 double domain_diagonal;
 clock_t start_time;
 MPI_Comm m2c_comm;
+int MAX_STEP_NUMBER = 0;
 
 /*************************************
  * Main Function
@@ -358,6 +359,7 @@ int main(int argc, char* argv[])
   print("\033[0;32m   NORMAL TERMINATION (t = %e)  \033[0m\n", t); 
   print("\033[0;32m==========================================\033[0m\n");
   print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+  print("MAX_STEP_NUMBER: %u.\n", MAX_STEP_NUMBER);
   print("\n");
 
 

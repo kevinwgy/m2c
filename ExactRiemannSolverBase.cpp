@@ -23,6 +23,7 @@ using std::chrono::duration_cast;
 using std::chrono::duration;
 using std::chrono::milliseconds;
 
+extern int MAX_STEP_NUMBER;
 extern int verbose;
 //extern std::ofstream testFile1;
 //extern std::ofstream testFile3;
@@ -59,8 +60,9 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                             double *Vsm /*left 'star' solution*/,
                             double *Vsp /*right 'star' solution*/)
 {
-  std::vector<std::vector<double>> integrationPath1(3, vector<double> (5.*numSteps_rarefaction, 0.) ); // first index: 1-pressure, 2-density, 3-velocity
-  std::vector<std::vector<double>> integrationPath3(3, vector<double> (5.*numSteps_rarefaction, 0.) );
+  size_t moreSteps = 10;
+  std::vector<std::vector<double>> integrationPath1(3, vector<double> (moreSteps*numSteps_rarefaction, 0.) ); // first index: 1-pressure, 2-density, 3-velocity
+  std::vector<std::vector<double>> integrationPath3(3, vector<double> (moreSteps*numSteps_rarefaction, 0.) );
   
   size_t It_1wave = 0;
   size_t It_3wave = 0;  
@@ -910,8 +912,9 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     //fprintf(stderr,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
     // integration by Runge-Kutta 4
     bool done = false;
-    double uErr = 0;
-    for(int i=0; i<numSteps_rarefaction*20; i++) {
+    double uErr = 0.;
+    double rhoErr = 0.;
+    for(int i=0; i<numSteps_rarefaction*10; i++) {
 
       if (It_wave == 0) {
           integrationPath[0][i] = ps_0;
@@ -930,7 +933,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
                              rhos_0, us_0, ps_0 /*start state*/, dp /*step size*/,
                              rhos_1, us_1, ps_1, xi_1 /*output: end state*/,
-                             uErr /*output: absolute error in us*/);
+                             uErr, rhoErr /*output: absolute error in us*/);
                              
 //      fprintf(stderr,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
 //              rhos_0, us_0, ps_0, drho, rhos_1, us_1, ps_1, ps, success);
@@ -996,7 +999,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
           testFile3.close();
         }
 */
-       // std::cout << "RKstep " << i << ": dp = " << dp << ", ps_0 - ps = " << ps_0 - ps << ", uErrScaled = " << uErr/c << "." << std::endl;
+#if PRINT_RIEMANN_SOLUTION == 1
+        std::cout << "RKstep " << i << ": dp = " << dp << ", ps_0 - ps = " << ps_0 - ps << ", uErr = " << uErr << "." << std::endl;
+#endif
+        MAX_STEP_NUMBER = std::max(i, MAX_STEP_NUMBER);
+        //std::cout << "MAX_STEP_NUMBER = " << MAX_STEP_NUMBER << std::endl;
         break; //done!
       }
 
@@ -1006,11 +1013,12 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
     
       double tiny = 1.e-14;
+      double errBar = tol_rarefaction; 
       double uErrScaled = uErr / (c+tiny);
+      double rhoErrScaled = rhoErr / std::min( std::min(rhos1, rhos0), 0.001*fabs(rhos1-rhos0)/errBar);
      // std::cout << "uErrScaled = " << uErrScaled << "." << std::endl;
       double dpTemp = 0;
       double safety = 0.9;
-      double errBar = tol_rarefaction; 
       if (uErrScaled > errBar) { 
         dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.25 );
         dpTemp = std::max(dpTemp, 0.2*dp);
@@ -1021,7 +1029,10 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
         dpTemp = std::min(dpTemp, 10*dp);
       }
-      //std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErrScaled = " << uErrScaled << ", factor = " << safety*pow( fabs(errBar/uErrScaled) , 0.2 ) << "." << std::endl;
+#if PRINT_RIEMANN_SOLUTION == 1
+      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErr = " << uErr << ", uErrScaled = " << uErrScaled << "." << std::endl;
+      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", rhoErr = " << rhoErr << ", rhoErrScaled = " << rhoErrScaled << std::endl;
+#endif
       dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
 
 //      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps
@@ -1260,7 +1271,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                             double rho_0, double u_0, double p_0 /*start state*/, 
                             double dp /*step*/,
                             double &rho, double &u, double &p, double &xi /*output*/,
-                            double & uErr /*output*/)
+                            double & uErr, double & rhoErr /*output*/)
 {
   bool test = false;
   double testErr = 1.e-6;
@@ -1351,7 +1362,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double du = (37./378./c_0/rho_0 + 250./621./c_2/rho_2 + 125./594./c_3/rho_3 + 512./1771./c_5/rho_5) * dp;
   double du_err = (2825./27648./c_0/rho_0 + 18575./48384./c_2/rho_2 + 13525./55296./c_3/rho_3 + 277./14336./c_4/rho_4 + 0.25/c_5/rho_5) * dp;
 
-  //double rhoErr = drho_err - drho;
+  rhoErr = fabs(drho_err - drho);
   uErr = fabs(du_err - du);
 
 //  std::cout << "absolute uErr = " << uErr << std::endl;

@@ -97,7 +97,7 @@ protected: //internal functions
                             double rho_0, double u_0, double p_0 /*start state*/, 
                             double dp /*step size*/,
                             double &rho, double &u, double &p, double &xi /*output*/,
-                            double & uErr /*output: absolute error in us*/);
+                            double & uErr, double & rhoErr /*output: absolute error in us*/);
 
   void FinalizeSolution(double *dir, double *Vm, double *Vp,
            double rhol, double ul, double pl, int idl,
