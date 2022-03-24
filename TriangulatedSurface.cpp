@@ -8,7 +8,7 @@ using std::pair;
 
 //----------------------------------------------------
 
-void TriangulatedSurface::BuildConnectivity()
+void TriangulatedSurface::BuildConnectivities()
 {
   int nNodes = X.size();
   int nElems = elems.size();
@@ -24,11 +24,19 @@ void TriangulatedSurface::BuildConnectivity()
       node2node[elems[i][j]].insert(elems[i][(j+2)%3]);
       node2elem[elems[i][j]].insert(i);
     }
+
+  elem2elem.clear();
+  elem2elem.resize(nElems);
+  for(int i=0; i<nElems; i++)
+    for(int j=0; j<3; j++)
+      for(auto it = node2elem[elems[i][j]].begin(); it != node2elem[elems[i][j]].end(); it++)
+        elem2elem[i].insert(*it); //no risk of duplicates, as elem2elem[i] is a "set"
+
 }
 
 //----------------------------------------------------
 
-void TriangulatedSurface::BuildElementNormals()
+void TriangulatedSurface::CalculateNormalsAndAreas()
 {
   int nElems = elems.size();
 

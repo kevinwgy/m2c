@@ -27,6 +27,7 @@ struct TriangulatedSurface {
   std::vector<double> elemArea;
   std::vector<std::set<int> > node2node;
   std::vector<std::set<int> > node2elem;
+  std::vector<std::set<int> > elem2elem;
 
   TriangulatedSurface(bool degen_ = false) : degenerate(degen_), active_nodes(0), active_elems(0) { }
 
@@ -34,14 +35,14 @@ struct TriangulatedSurface {
       : degenerate(degen_), X(X_), elems(e_) {
     active_nodes = X.size();
     active_elems = elems.size();
-    BuildConnectivity();
-    BuildElementNormals();
+    BuildConnectivities();
+    CalculateNormalsAndAreas();
   }
 
   ~TriangulatedSurface() {} 
 
-  void BuildConnectivity();
-  void BuildElementNormals(); //!< also produces area
+  void BuildConnectivities();
+  void CalculateNormalsAndAreas(); //!< calculate the normal and area of each element
 
   bool CheckSurfaceOrientation(); //!<  check whether all the elements have consistent normal directions
   bool CheckSurfaceClosedness(); //!< check whether this is a closed surface
