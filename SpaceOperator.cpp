@@ -15,6 +15,13 @@ using std::min;
 using std::map;
 using namespace GeoTools;
 
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::milliseconds;
+
+extern int MAX_STEP_NUMBER;
+extern double FLUX_TIME;
 extern int verbose;
 //-----------------------------------------------------
 
@@ -1948,6 +1955,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
+  auto time_1 = high_resolution_clock::now();
   for(int k=k0; k<kkmax; k++) {
     for(int j=j0; j<jjmax; j++) {
       for(int i=i0; i<iimax; i++) {
@@ -2190,8 +2198,18 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
       }
     }
   }
-        
   
+  auto time_2 = high_resolution_clock::now();
+  duration<double, std::milli> thisCycle = time_2 - time_1;
+  double cycle_time = thisCycle.count();
+
+  //fprintf(stdout, "Before: cycle_time = %e.\n", cycle_time);
+  MPI_Allreduce(MPI_IN_PLACE, &cycle_time, 1, MPI_DOUBLE, MPI_MAX, comm);
+  //fprintf(stdout, "After: cycle_time = %e.\n", cycle_time);
+  FLUX_TIME = FLUX_TIME + cycle_time;      
+
+  MPI_Allreduce(MPI_IN_PLACE, &MAX_STEP_NUMBER, 1, MPI_INT, MPI_MAX, comm);
+ 
   MPI_Allreduce(MPI_IN_PLACE, &riemann_errors, 1, MPI_INT, MPI_SUM, comm);
   if(riemann_errors>0) 
     print("Warning: Riemann solver failed to find a bracketing interval or to converge on %d edge(s).\n", riemann_errors);

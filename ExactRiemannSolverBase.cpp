@@ -980,6 +980,10 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
         cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
 #endif
+        if (It_wave > 0 && i > 1) {
+          std::cout << "It# " << It_wave << ": " << i << " steps." << std::endl;
+          exit(1);
+        }
         done = true;
 
 	if (It_wave == 0) {

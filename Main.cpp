@@ -22,17 +22,34 @@
 #include <set>
 using std::cout;
 using std::endl;
+// for timing
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::milliseconds;
+
+
+
+
 int verbose;
 double domain_diagonal;
 clock_t start_time;
 MPI_Comm m2c_comm;
-int MAX_STEP_NUMBER = 0;
+
+int MAX_STEP_NUMBER;
+double FLUX_TIME;
+
 
 /*************************************
  * Main Function
  ************************************/
 int main(int argc, char* argv[])
 {
+  MAX_STEP_NUMBER = 0;
+  FLUX_TIME = 0.;
+
+
+
   start_time = clock(); //for timing purpose only
 
   //! Initialize MPI 
@@ -309,11 +326,9 @@ int main(int argc, char* argv[])
         dts = dt;
  
       if(dts<=dt)
-        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, 
-              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d: t = %e, dt = %e, cfl = %.4e. Max step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, t, dt, cfl, MAX_STEP_NUMBER, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
       else
-        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, 
-              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Max step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, MAX_STEP_NUMBER, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
       //----------------------------------------------------
       // Move forward by one time-step: Update V, Phi, and ID
@@ -359,7 +374,6 @@ int main(int argc, char* argv[])
   print("\033[0;32m   NORMAL TERMINATION (t = %e)  \033[0m\n", t); 
   print("\033[0;32m==========================================\033[0m\n");
   print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
-  print("MAX_STEP_NUMBER: %u.\n", MAX_STEP_NUMBER);
   print("\n");
 
 
