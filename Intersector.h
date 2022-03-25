@@ -31,6 +31,12 @@ class Intersector {
     int dir; //!< the direction of the edge (0~x, 1~y, 2~z)
     int tid; //!< id of the triangle that it intersects
     double xi[3]; //!< barycentric coords of the intersection point within the triangle it intersects
+
+    IntersectionPoint(int i, int j, int k, int dir_, int tid_, double* xi_)
+      : n0(Int3(i,j,k)), dir(dir_), tid(tid_) {xi[0] = xi_[0]; xi[1] = xi_[1]; xi[2] = xi_[2];}
+
+    IntersectionPoint &operator=(const IntersectionPoint& p2) {
+      n0 = p2.n0;  dir = p2.dir;  tid = p2.tid;  for(int i=0; i<3; i++) xi[i] = p2.xi[i]; return *this;}
   };
 
   //! Utility class to find and store bounding boxes for triangles
@@ -81,30 +87,41 @@ class Intersector {
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
   int NX, NY, NZ; //!< global size (number of cells in the real domain)
 
-  SpaceVariable3D BBmin, BBmax; /**< the min and max coords of nodal bounding boxes. Only for nodes
-                                     in the physical domain. For each node, the BB contains the 
-                                     node itself and all the edges that connect the node with other
+  SpaceVariable3D BBmin, BBmax; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
+                                     in the physical domain. For each node, the BB contains the \n
+                                     node itself and all the edges that connect the node with other \n
                                      nodes IN THE PHYSICAL DOMAIN.*/
   Vec3D subD_bbmin, subD_bbmax; //!< bounding box of the subdomain
+
+  SpaceVariable3D TMP; //!< For temporary use.
 
   /************************
    * Results
    ************************/
+  //! "CandidatesIndex" and "candidates" account for internal ghost nodes, but not ghost nodes outside physical domain.
   SpaceVariable3D CandidatesIndex; //!< index in the vector "candidates" (-1 means no candidates)
   std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates;
 
-  SpaceVariable3D XX; //!< edge-surface intersections. XX[k][j][i][0]: left-edge, [1]: bottom-edge, [2]: back-edge
-                      //!< considers all the edges for which BOTH vertices are within the physical domain 
-                      //!< -1: no intersection.
-                      //!< >=0: intersection. The value is its index in intersections (below)
-  SpaceVariable3D Phi; //!< unsigned distance to the interface
+  //! XForward/XBackward stores edge-surface intersections where at least one vertex of the edge is inside the subdomain.
+  SpaceVariable3D XForward; /**< Edge-surface intersections. X[k][j][i][0]: left-edge, [1]: bottom-edge, [2]: back-edge \n
+                                 considers all the edges for which BOTH vertices are within the physical domain \n
+                                 -1: no intersection. \n
+                                 >=0: intersection. The value is its index in intersections (below) \n */
+  SpaceVariable3D XBackward; /**< An edge may intersect multiple triangles. We store two of them, those closest to the \n
+                                  two vertices. XForward stores the one that is closest to the left/bottom/back vertex. \n
+                                  XBackward stores the one that is closest to the right/top/front vertex. */
+
+  //! Phi and Sign communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
+  SpaceVariable3D Phi; //!< unsigned distance from each node to the interface
   SpaceVariable3D Sign; //!< -1 (inside), 0 (occluded), or 1 (outside)
                         //!< (-1 is only relevant for closed surfaces with consistent element-orientation)
 
+  //! "intersections" stores edge-surface intersections where at least one vertex of the edge is inside the subdomain
   std::vector<IntersectionPoint> intersections;
      
-  std::vector<Int3> occluded;
-  std::vector<Int3> fisrtLayer; //!< includes occluded nodes
+  //! "occluded" and "firstLayer" account for the internal ghost nodes.
+  std::set<Int3> occluded;
+  std::set<Int3> fisrtLayer; //!< includes occluded nodes
 
 public:
 
@@ -127,6 +144,29 @@ private:
   void FindNodalCandidates(); //!< find nearby triangles for each node based on bounding boxes and KDTree
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
+
+
+  //! Utility functions
+  //
+  //! Use a tree to find candidates. maxCand may change, tmp may be reallocated (if size is insufficient)
+  inline int FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec3D bbmax, 
+                                 MyTriangles* tmp, int& maxCand) {
+    int found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
+    if(found>maxCand) {
+      maxCand = found; delete [] tmp;  tmp = new MyTriangle[maxCand];
+      found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
+    }
+    return found; 
+  }
+
+  //! Check if a point is occluded by a set of triangles (thickened)
+  bool IsPointOccludedByTriangles(Vec3D &coords, MyTriangle* tri, int nTri, double my_half_thickness);
+
+  //! Find the intersections of an edge with a set of triangles. Returns the number of intersections.
+  int FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir/*0~x,1~y,2~z*/, 
+                                         double len, MyTriangles* tri, int nTri, 
+                                         IntersectionPoint &xf, double &x0_2_xf,
+                                         IntersectionPoint &xb, double &x0_2_xb); //!< 2 points, maybe the same
 
 };
 

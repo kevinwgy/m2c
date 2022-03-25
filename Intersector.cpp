@@ -1,5 +1,6 @@
 #include<Intersector.h>
 #include<GeoTools.h>
+using std::pair;
 using std::vector;
 
 //-------------------------------------------------------------------------
@@ -13,14 +14,17 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
              BBmin(comm_, &(dms_.ghosted1_3dof)),
              BBmax(comm_, &(dms_.ghosted1_3dof)),
+             TMP(comm_, &(dms_.ghosted1_1dof)),
              CandidatesIndex(comm_, &(dms_.ghosted1_1dof)),
-             XX(comm_, &(dms_.ghosted1_3dof)),
+             XForward(comm_, &(dms_.ghosted1_3dof)),
+             XBackward(comm_, &(dms_.ghosted1_3dof)),
              Phi(comm_, &(dms_.ghosted1_1dof)),
              Sign(comm_, &(dms_.ghosted1_1dof))
 {
 
   CandidatesIndex.SetConstantValue(-1, true);
-  XX.SetConstantValue(-1, true);
+  XForward.SetConstantValue(-1, true);
+  XBackward.SetConstantValue(-1, true);
 
   half_thickness = 0.5*iod_surface.tracker.surface_thickness;
 
@@ -46,6 +50,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
 
   closed_surface = surface.CheckSurfaceOrientationAndClosedness();
 
+  surface.CalculateNormalsAndAreas();
+
   //build nodal bounding boxes
   BuildNodalBoundingBoxes();
 
@@ -66,7 +72,10 @@ Intersector::Destroy()
 {
   BBmin.Destroy();
   BBmax.Destroy();
-  XX.Destroy();
+  TMP.Destroy();
+  CandidatesIndex.Destroy();
+  XForward.Destroy();
+  XBackward.Destroy();
   Phi.Destroy();
   Sign.Destroy();
 }
@@ -104,6 +113,7 @@ Intersector::BuildNodalBoundingBoxes()
 
       }
 
+  //subD_bb includes the ghost boundary
   subD_bbmin[0] = coords[kk0][jj0][ii0][0]             - tol*(coords[k0][j0][i0][0]           - coords[k0][j0][i0-1][0]);
   subD_bbmax[0] = coords[kkmax-1][jjmax-1][iimax-1][0] + tol*(coords[kmax-1][jmax-1][imax][0] - coords[kmax-1][jmax-1][imax-1][0]);
   subD_bbmin[1] = coords[kk0][jj0][ii0][1]             - tol*(coords[k0][j0][i0][1]           - coords[k0][j0-1][i0][1]);
@@ -162,18 +172,16 @@ Intersector::FindNodalCandidates()
 
   MyTriangle *tmp = new MyTriange[nMaxCand];
   
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
+  // Work on all nodes inside the physical domain, including internal ghost layer
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        if(coordinates.OutsidePhysicalDomain(i,j,k))
+          continue;
 
         // find candidates
-        int nFound = tree.findCandidatesInBox(bbmin[k][j][i], bbmax[k][j][i], tmp, nMaxCand);
-        if(nFound>nMaxCand) { //re-do w/ a bigger nMaxCand
-          nMaxCand = nFound;
-          delete [] tmp;
-          tmp = new MyTriangle[nMaxCand];
-          tree.findCandidatesInBox(bbmin[k][j][i], bbmax[k][j][i], tmp, nMaxCand);
-        }
+        int nFound = FindCandidatesInBox(tree, bbmin[k][j][i], bbmax[k][j][i], tmp, nMaxCand);
 
         // update candidates and CandidatesIndex
         if(nFound==0) {
@@ -204,25 +212,36 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 {
 
   Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
-  Vec3D*** xx      = (Vec3D***) XX.GetDataPointer();
+  Vec3D*** xf      = (Vec3D***) XForward.GetDataPointer();
+  Vec3D*** xb      = (Vec3D***) XBackward.GetDataPointer();
   double*** candid = with_nodal_cands ? CandidatesIndex.GetDataPointer() : NULL;
   double*** sign   = Sign.GetDataPointer();
   
+  double*** layer  = TMP.GetDataPointer();
+
+  //Clear previous values
+  intersections.clear();
+  occluded.clear();
+  firstLayer.clear();
 
   //Preparation
   Vec3D tol(half_thickness*5, half_thickness*5, half_thickness*5); //a tolerance, more than enough
 
   int max_left   = 500; //will increase if necessary
-  int max_bottom = 500; //will increase if necessary
-  int max_back   = 500; //will increase if necessary
+  int max_bottom = 500; 
+  int max_back   = 500; 
 
   MyTriangle *tmp_left = new MyTriangle[max_left];
   int found_left;
   MyTriangle *tmp_bottom = new MyTriangle[max_bottom];
   int found_bottom;
-  MyTriangle *tmp_back= new MyTriangle[max_back];
+  MyTriangle *tmp_back = new MyTriangle[max_back];
   int found_back;
 
+  IntersectionPoint xp0, xp1;
+  double d0(0.0), d1(0.0);
+
+  // We only deal with edges whose vertices are both in the real domain
   for(int k=k0; k<kkmax; k++)
     for(int j=j0; j<jjmax; j++)
       for(int i=i0; i<iimax; i++) {
@@ -233,77 +252,124 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         // start with assuming it is outside
         sign[k][j][i] = 1;
 
+        // start with a meaningless layer number
+        layer[k][j][i] = -1;
+
+
         if(candid && k<kmax && j<jmax && i<imax && //candid has a valid value @ i,j,k
-           candid[k][j][i] < 0)  //no nodal candidates
+           candid[k][j][i] < 0)  //no nodal candidates, intersection impossible
           continue;
  
 
+        //--------------------------------------------
+        // Find candidates for left/bottom/back edges
+        //--------------------------------------------
         found_left = found_bottom = found_back = 0;
 
         if(i-1>=0) { //the edge [k][j][i-1] -> [k][j][i] is inside the physical domain
-
           if(candid && k<kmax && j<jmax && //candid has a valid value @ i-1,j,k
-             candid[k][j][i-1] < 0) //no nodal candidates
-            goto SKIP_LEFT;
-
-          found_left = tree.findCandidatesInBox(coords[k][j][i-1] - tol, coords[k][j][i] + tol, 
-                                                tmp_left, max_left);
-          if(found_left>max_left) { //re-do w/ a bigger max 
-            max_left = found_left;
-            delete [] tmp_left;
-            tmp_left = new MyTriangle[max_left];
-            tree.findCandidatesInBox(coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
-          }
+             candid[k][j][i-1] < 0) {
+            //DO NOTHING. No nodal candidates
+          } else
+            found_left = FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
         }
-
-        SKIP_LEFT:
 
         if(j-1>=0) { //the edge [k][j-1][i] -> [k][j][i] is inside the physical domain
-
           if(candid && k<kmax && i<imax && //candid has a valid value @ i,j-1,k
-             candid[k][j-1][i] < 0) //no nodal candidates
-            goto SKIP_BOTTOM;
-
-          found_bottom = tree.findCandidatesInBox(coords[k][j-1][i] - tol, coords[k][j][i] + tol, 
-                                                  tmp_bottom, max_bottom);
-          if(found_bottom>max_bottom) { //re-do w/ a bigger max
-            max_bottom = found_bottom;
-            delete [] tmp_bottom;
-            tmp_bottom = new MyTriangle[max_bottom];
-            tree.findCandidatesInBox(coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
-          }
+             candid[k][j-1][i] < 0) {
+            //DO NOTHING. No nodal candidates
+          } else
+            found_bottom = FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
         }
-
-        SKIP_BOTTOM:
 
         if(k-1>=0) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
-
           if(candid && j<jmax && i<imax && //candid has a valid value @ i,j,k-1
-             candid[k-1][j][i] < 0) //no nodal candidates
-            goto SKIP_BACK;
-
-          found_back = tree.findCandidatesInBox(coords[k-1][j][i] - tol, coords[k][j][i] + tol, 
-                                                tmp_back, max_back);
-          if(found_back>max_back) { //re-do w/ a bigger max
-            max_back = found_back;
-            delete [] tmp_back;
-            tmp_back = new MyTriangle[max_back];
-            tree.findCandidatesInBox(coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
-          }
-        }
-
-        SKIP_BACK:
-
-        // check if (i,j,k) is occluded
-        if(found_left>0) {
-          GeoTools::IsPointInThickenedTriangle(...) I AM HERE!!!
-
+             candid[k-1][j][i] < 0) {
+            //DO NOTHING. No nodal candidates
+          } else
+            found_back = FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
         }
 
 
-        // find intersection
+        //--------------------------------------------
+        // Check if (i,j,k) is occluded
+        //--------------------------------------------
+        if ((found_left>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_left,   found_left,   half_thickness)) ||
+            (found_bottom>0 && IsPointOccludedByTriangles(coords[k][j][i], tmp_bottom, found_bottom, half_thickness)) ||
+            (found_back>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_back,   found_back,   half_thickness))) {
+          sign[k][j][i] = 0;
+          layer[k][j][i] = 0;
+        }
+
+        //--------------------------------------------
+        // Find intersections (left, bottom, and back edges)
+        //--------------------------------------------
+        // left
+        int count = FindEdgeIntersectionsWithTriangles(coords[k][j][i-1], i-1, j, k, 0, 
+                        coords[k][j][i][0] - coords[k][j][i-1][0], tmp_left, found_left, xp0, d0, xp1, d1);
+        if(count==0) {
+          xf[k][j][i][0] = xb[k][j][i][0] = -1;
+        } else if(count==1) {
+          intersections.push_back(xp0);
+          xf[k][j][i][0] = xb[k][j][i][0] = intersections.size() - 1;
+        } else {//more than one intersections
+          intersections.push_back(xp0);
+          xf[k][j][i][0] = intersections.size() - 1;
+          intersections.push_back(xp1);
+          xb[k][j][i][0] = intersections.size() - 1;
+        }
+
+        // bottom 
+        count = FindEdgeIntersectionsWithTriangles(coords[k][j-1][i], i, j-1, k, 1, 
+                    coords[k][j][i][1] - coords[k][j-1][i][1], tmp_bottom, found_bottom, xp0, d0, xp1, d1);
+        if(count==0) {
+          xf[k][j][i][1] = xb[k][j][i][1] = -1;
+        } else if(count==1) {
+          intersections.push_back(xp0);
+          xf[k][j][i][1] = xb[k][j][i][1] = intersections.size() - 1;
+        } else {//more than one intersections
+          intersections.push_back(xp0);
+          xf[k][j][i][1] = intersections.size() - 1;
+          intersections.push_back(xp1);
+          xb[k][j][i][1] = intersections.size() - 1;
+        }
+
+        // back 
+        count = FindEdgeIntersectionsWithTriangles(coords[k-1][j][i], i, j, k-1, 2, 
+                    coords[k][j][i][2] - coords[k-1][j][i][2], tmp_back, found_back, xp0, d0, xp1, d1);
+        if(count==0) {
+          xf[k][j][i][2] = xb[k][j][i][2] = -1;
+        } else if(count==1) {
+          intersections.push_back(xp0);
+          xf[k][j][i][2] = xb[k][j][i][2] = intersections.size() - 1;
+        } else {//more than one intersections
+          intersections.push_back(xp0);
+          xf[k][j][i][2] = intersections.size() - 1;
+          intersections.push_back(xp1);
+          xb[k][j][i][2] = intersections.size() - 1;
+        }
+
       }
 
+
+  Sign.RestoreDataPointerAndInsert();
+  TMP.RestoreDataPointerAndInsert();
+
+  I AM HERE 
+  // Need to make sure all edges connected to occluded nodes have intersections
+  for(int k=k0; k<kkmax; k++)
+    for(int j=j0; j<jjmax; j++)
+      for(int i=i0; i<iimax; i++) {
+ 
+        if(coordinates.OutsidePhysicalDomain(i,j,k)) //this node is out of physical domain
+          continue;
+
+        if(i-1>=0) {//left edge is within physical domain
+          
+
+        }
+
+      }
 }
 
 //-------------------------------------------------------------------------
@@ -326,3 +392,72 @@ Intersector::FindShortestDistanceForFirstLayer //don't forget to subtract half_d
 
 void
 Intersector::FindShortestDistanceForOtherNodes //call level set reinitializer
+
+
+//-------------------------------------------------------------------------
+
+bool
+Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, double my_half_thickness)
+{
+  vector<Vec3D>&  Xs(surface.X);
+  vector<Int3>&   Es(surface.elems);
+  vector<Vec3D>&  Ns(surface.elemNorm);
+  vector<double>& As(surface.elemArea); 
+
+  for(int i=0; i<nTri; i++) {
+    int id = tri[i].trId();
+    Int3& nodes(Es[id]);
+    if(GeoTools::IsPointInThickenedTriangle(x0, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], my_half_thickness,
+                                            &As[id], &Ns[id]))
+      return true;
+  }
+
+  return false;
+}
+
+//-------------------------------------------------------------------------
+
+int
+Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir, double len, MyTriangles* tri, int nTri,
+                                                IntersectionPoint &xf, double &x0_2_xf,
+                                                IntersectionPoint &xb, double &x0_2_xb)
+{
+  vector<Vec3D>&  Xs(surface.X);
+  vector<Int3>&   Es(surface.elems);
+  vector<Vec3D>&  Ns(surface.elemNorm);
+  vector<double>& As(surface.elemArea); 
+
+  vector<pair<double, IntersectionPoint> > X; //pairs distance with intersection point info
+
+  double dist;
+  Vec3D xi; //barycentric coords of the projection point
+  for(int i=0; i<nTri; i++) {
+    int id = tri[i].trId();
+    Int3& nodes(Es[id]);
+    bool found = GeoTools::LineSegmentIntersectsTriangle(x0, dir, len, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
+                                                         &dist, NULL, &xi);
+    if(found) //store the result
+      X.push_back(std::make_pair(dist, IntersectionPoint(i,j,k,dir,id,xi)));
+  }
+
+  if(X.empty())
+    return 0;
+
+  x0_2_xf = DBL_MAX; 
+  x0_2_xb = -1.0;
+  for(auto it = X.begin(); it != X.end(); it++) {
+    if(x0_2_xf > it->first) {
+      x0_2_xf = it->first;
+      xf = it->second;
+    }
+    if(x0_2_xb < it->first) {
+      x0_2_xb = it->first;
+      xb = it->second;
+    }
+  }
+
+  return X.size();
+}
+
+//-------------------------------------------------------------------------
+
