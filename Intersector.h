@@ -29,15 +29,27 @@ class Intersector {
   struct IntersectionPoint {
     Int3 n0; //!< the first (i.e., left, bottom, or back) node
     int dir; //!< the direction of the edge (0~x, 1~y, 2~z)
+    double dist; //!< dist from n0 to the intersection point along dir
     int tid; //!< id of the triangle that it intersects
     double xi[3]; //!< barycentric coords of the intersection point within the triangle it intersects
 
-    IntersectionPoint(int i, int j, int k, int dir_, int tid_, double* xi_)
-      : n0(Int3(i,j,k)), dir(dir_), tid(tid_) {xi[0] = xi_[0]; xi[1] = xi_[1]; xi[2] = xi_[2];}
+    /** NOTE: In most cases, the point obtained using tid and xi is IDENTICAL to the point
+     *        obtained using n0, dir, and dist. 
+     *        However, the two points may not be the same when the intersection is IMPOSED to an edge because
+     *        (1) one (or two) of the vertices of the edge is occluded and 
+     *        (2) an intersection cannot be identified normally (i.e. w/o imposing thickness).
+     *        In this case, the second point (obtained using n0, dir, and dist) would be the occluded vertex,
+     *        and the first point is the closest point on the triangle to the occluded vertex.
+     *        If both vertices of the edge are occluded. The two vertices are considered as two intersection
+     *        points. */
+
+    IntersectionPoint(int i, int j, int k, int dir_, double dist_, int tid_, double* xi_)
+      : n0(Int3(i,j,k)), dir(dir_), dist(dist_), tid(tid_) {xi[0] = xi_[0]; xi[1] = xi_[1]; xi[2] = xi_[2];}
 
     IntersectionPoint &operator=(const IntersectionPoint& p2) {
-      n0 = p2.n0;  dir = p2.dir;  tid = p2.tid;  for(int i=0; i<3; i++) xi[i] = p2.xi[i]; return *this;}
+      n0 = p2.n0;  dir = p2.dir;  dist = p2.dist;  tid = p2.tid;  for(int i=0; i<3; i++) xi[i] = p2.xi[i]; return *this;}
   };
+
 
   //! Utility class to find and store bounding boxes for triangles
   class MyTriangle {
@@ -117,8 +129,10 @@ class Intersector {
                         //!< (-1 is only relevant for closed surfaces with consistent element-orientation)
 
   //! "intersections" stores edge-surface intersections where at least one vertex of the edge is inside the subdomain
-  std::vector<IntersectionPoint> intersections;
-     
+  std::vector<IntersectionPoint> intersections; /**< NOTE: Not all these intersections are registered in XForward \n
+                                                     and XBackward. When there are occluded nodes, "intersections" \n
+                                                     may contain points that are actually not used/registered! */ 
+
   //! "occluded" and "firstLayer" account for the internal ghost nodes.
   std::set<Int3> occluded;
   std::set<Int3> fisrtLayer; //!< includes occluded nodes
@@ -160,13 +174,13 @@ private:
   }
 
   //! Check if a point is occluded by a set of triangles (thickened)
-  bool IsPointOccludedByTriangles(Vec3D &coords, MyTriangle* tri, int nTri, double my_half_thickness);
+  bool IsPointOccludedByTriangles(Vec3D &coords, MyTriangle* tri, int nTri, double my_half_thickness
+                                  int& tid, double* xi = NULL);
 
   //! Find the intersections of an edge with a set of triangles. Returns the number of intersections.
   int FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir/*0~x,1~y,2~z*/, 
                                          double len, MyTriangles* tri, int nTri, 
-                                         IntersectionPoint &xf, double &x0_2_xf,
-                                         IntersectionPoint &xb, double &x0_2_xb); //!< 2 points, maybe the same
+                                         IntersectionPoint &xf, IntersectionPoint &xb); //!< 2 points, maybe the same
 
 };
 

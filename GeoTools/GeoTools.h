@@ -160,9 +160,12 @@ double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double
  *     half_thickness -- half the thickness of the (thickened & widened) triangle
  *     area (optional) -- area of the triangle
  *     dir (optional) -- unit normal direction of the triangle
+ *   Output:
+ *     xi_out[3] (optional) -- barycentric coords of the CLOSEST POINT on the triangle. It is
+ *                             guaranteed that 0<= xi[i] <= 1 for i = 1,2,3.
  */
 bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double half_thickness,
-                                double* area = NULL, Vec3D* dir = NULL);
+                                double* area = NULL, Vec3D* dir = NULL, double* xi_out = NULL);
 
 /**************************************************************************
  * Trilinear interpolation

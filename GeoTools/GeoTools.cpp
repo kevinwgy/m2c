@@ -151,7 +151,7 @@ double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double
  *     dir (optional) -- unit normal direction of the triangle
  */
 bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double half_thickness,
-                                double* area, Vec3D* dir)
+                                double* area, Vec3D* dir, double* xi_out)
 {
   assert(half_thickness>=0.0);
 
@@ -179,42 +179,65 @@ bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, doub
   xi[1] = areaPCA/areaABC;
   xi[2] = 1.0 - xi[0] - xi[1];
 
-  if(xi[0]>=0.0 && xi[1]>=0.0 && xi[2]>=0.0)
+  if(xi[0]>=0.0 && xi[1]>=0.0 && xi[2]>=0.0) {
+    if(xi_out) 
+      for(int i=0; i<3; i++) xi_out[i] = xi[i];
     return true;
+  }
 
   // copying part of the code in ProjectPointToTriangle
-  dist = DBL_MAX;
   double d2p[3] = {-1.0, -1.0, -1.0}; //dist to xA, xB, xC
   Vec3D *nodes_ptr[3] = {&xA, &xB, &xC};
   double alpha(0.0), d2l(0.0);
   int p1, p2;
   for(int i=0; i<3; i++) { //check the edges
-    if(xi[i]<0) {
+    if(xi[i]<0) {  //one or two xi's may be negative
       p1 = (i+1)%3;
       p2 = (i+2)%3;
       d2l = ProjectPointToLine(x0, *nodes_ptr[p1], *nodes_ptr[p2], alpha);
       if(d2l>half_thickness)
         return false;
       if(alpha >= 0.0 && alpha <= 1.0) { //along edge
+        if(xi_out) {
+          xi_out[i]  = 0.0;
+          xi_out[p1] = 1.0-alpha;
+          xi_out[p2] = alpha;
+        }
         return true;
       }
       else if(alpha < 0.0) {
-        if(d2p[p1]<0)
+        if(d2p[p1]<0) { //has not tested this vertex
           d2p[p1] = (x0 - *nodes_ptr[p1]).norm(); //dist to point
-        if(d2p[p1] < dist)
-          dist   = d2p[p1];
+          if(d2p[p1] <= half_thickness) {
+            if(xi_out) {
+              xi[i]  = 0.0;
+              xi[p1] = 1.0;
+              xi[p2] = 0.0;
+            }
+            return true;
+          }
+        } else //tested this vertex and the distance is longer than half_thickness
+          return false;
       }
       else { //alpha > 1.0
-        if(d2p[p2]<0)
+        if(d2p[p2]<0) { //has not tested this vertex
           d2p[p2] = (x0 - *nodes_ptr[p2]).norm(); //dist to point
-        if(d2p[p2] < dist) 
-          dist   = d2p[p2];
+          if(d2p[p2] <= half_thickness) {
+            if(xi_out) {
+              xi[i]  = 0.0;
+              xi[p1] = 0.0;
+              xi[p2] = 1.0;
+            }
+            return true;
+          }
+        } else //tested this vertex and the distance is longer than half_thickness
+          return false;
       }
     }
   }
 
-  assert(dist<=half_thickness);
-  return true;
+  // I don't think it would ever get here. But I could be wrong.
+  return false;
 }
 
 } //end of namespace

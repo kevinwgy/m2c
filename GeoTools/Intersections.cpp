@@ -84,7 +84,6 @@ AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2
                        Vec3D& V0, Vec3D& V1, Vec3D& V2,
                        double* d, Vec3D* xp, Vec3D* baryCoords)
 {
-  const double INTERSECTIONS_EPSILON = 1.0e-18;
 
   Vec3D P = V1 - V0;
   Vec3D Q = V2 - V0;
