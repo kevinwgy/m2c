@@ -25,7 +25,7 @@
 
 class Intersector {
 
-  //! A nested class that stores information about an intersection point
+  //! A nested class that stores information about an intersection point between an edge and a triangle
   struct IntersectionPoint {
     Int3 n0; //!< the first (i.e., left, bottom, or back) node
     int dir; //!< the direction of the edge (0~x, 1~y, 2~z)
@@ -105,7 +105,7 @@ class Intersector {
                                      nodes IN THE PHYSICAL DOMAIN.*/
   Vec3D subD_bbmin, subD_bbmax; //!< bounding box of the subdomain
 
-  SpaceVariable3D TMP; //!< For temporary use.
+  SpaceVariable3D TMP, TMP2; //!< For temporary use.
 
   /************************
    * Results
@@ -125,8 +125,8 @@ class Intersector {
 
   //! Phi and Sign communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
   SpaceVariable3D Phi; //!< unsigned distance from each node to the interface
-  SpaceVariable3D Sign; //!< -1 (inside), 0 (occluded), or 1 (outside)
-                        //!< (-1 is only relevant for closed surfaces with consistent element-orientation)
+  SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or 1 (outside). N = 1,2,...
+                      
 
   //! "intersections" stores edge-surface intersections where at least one vertex of the edge is inside the subdomain
   std::vector<IntersectionPoint> intersections; /**< NOTE: Not all these intersections are registered in XForward \n
@@ -135,7 +135,7 @@ class Intersector {
 
   //! "occluded" and "firstLayer" account for the internal ghost nodes.
   std::set<Int3> occluded;
-  std::set<Int3> fisrtLayer; //!< includes occluded nodes
+  std::set<Int3> fisrtLayer; //!< nodes that belong to intersecting edges (naturally, including occluded nodes)
 
 public:
 
@@ -159,6 +159,7 @@ private:
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
 
+  int FloodFill(); //!< determine the generalized sign function ("Sign"). Returns the number of "colors".
 
   //! Utility functions
   //

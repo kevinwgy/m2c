@@ -15,6 +15,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              BBmin(comm_, &(dms_.ghosted1_3dof)),
              BBmax(comm_, &(dms_.ghosted1_3dof)),
              TMP(comm_, &(dms_.ghosted1_1dof)),
+             TMP2(comm_, &(dms_.ghosted1_1dof)),
              CandidatesIndex(comm_, &(dms_.ghosted1_1dof)),
              XForward(comm_, &(dms_.ghosted1_3dof)),
              XBackward(comm_, &(dms_.ghosted1_3dof)),
@@ -73,6 +74,7 @@ Intersector::Destroy()
   BBmin.Destroy();
   BBmax.Destroy();
   TMP.Destroy();
+  TMP2.Destroy();
   CandidatesIndex.Destroy();
   XForward.Destroy();
   XBackward.Destroy();
@@ -218,11 +220,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   double*** sign   = Sign.GetDataPointer();
   
   double*** occid  = TMP.GetDataPointer(); //occluding triangle id
+  double*** layer  = TMP2.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
 
   //Clear previous values
   intersections.clear();
-  occluded.clear();
-  firstLayer.clear();
 
   //Preparation
   Vec3D tol(half_thickness*5, half_thickness*5, half_thickness*5); //a tolerance, more than enough
@@ -241,8 +242,9 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   IntersectionPoint xp0, xp1;
 
   // ----------------------------------------------------------------------------
-  // Find occluded nodes and intersections
+  // Find occluded nodes and intersections. Build occluded and firstLayer 
   // ----------------------------------------------------------------------------
+  firstLayer.clear();
   // We only deal with edges whose vertices are both in the real domain
   for(int k=k0; k<kkmax; k++)
     for(int j=j0; j<jjmax; j++)
@@ -256,6 +258,8 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
         // start with a meaningless triangle id
         occid[k][j][i] = -1;
+
+        layer[k][j][i] = -1;
 
 
         if(candid && k<kmax && j<jmax && i<imax && //candid has a valid value @ i,j,k
@@ -302,6 +306,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
             (found_back>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_back,   found_back,   half_thickness, tid))) {
           sign[k][j][i] = 0;
           occid[k][j][i] = tid;
+          layer[k][j][i] = 0;          
         }
 
         //--------------------------------------------
@@ -316,11 +321,13 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
           } else if(count==1) {
             intersections.push_back(xp0);
             xf[k][j][i][0] = xb[k][j][i][0] = intersections.size() - 1;
+            layer[k][j][i-1] = layer[k][j][i] = 1;
           } else {//more than one intersections
             intersections.push_back(xp0);
             xf[k][j][i][0] = intersections.size() - 1;
             intersections.push_back(xp1);
             xb[k][j][i][0] = intersections.size() - 1;
+            layer[k][j][i-1] = layer[k][j][i] = 1;
           }
         } else {
           xf[k][j][i][0] = xb[k][j][i][0] = -1;
@@ -335,11 +342,14 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
           } else if(count==1) {
             intersections.push_back(xp0);
             xf[k][j][i][1] = xb[k][j][i][1] = intersections.size() - 1;
+            layer[k][j-1][i] = layer[k][j][i] = 1;
           } else {//more than one intersections
             intersections.push_back(xp0);
             xf[k][j][i][1] = intersections.size() - 1;
             intersections.push_back(xp1);
             xb[k][j][i][1] = intersections.size() - 1;
+            layer[k][j-1][i] = layer[k][j][i] = 1;
+          } else {//more than one intersections
           }
         } else {
           xf[k][j][i][1] = xb[k][j][i][1] = -1;
@@ -354,11 +364,13 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
           } else if(count==1) {
             intersections.push_back(xp0);
             xf[k][j][i][2] = xb[k][j][i][2] = intersections.size() - 1;
+            layer[k-1][j][i] = layer[k][j][i] = 1;
           } else {//more than one intersections
             intersections.push_back(xp0);
             xf[k][j][i][2] = intersections.size() - 1;
             intersections.push_back(xp1);
             xb[k][j][i][2] = intersections.size() - 1;
+            layer[k-1][j][i] = layer[k][j][i] = 1;
           }
         } else {
           xf[k][j][i][2] = xb[k][j][i][2] = -1;
@@ -367,11 +379,12 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
       }
 
   // Exchange Sign and TMP so internal ghost nodes are accounted for
+  if(candid) CandidatesIndex.RestoreDataPointerToLocalVector();
   Sign.RestoreDataPointerAndInsert();
   TMP.RestoreDataPointerAndInsert();
+  TMP2.RestoreDataPointerAndInsert();
 
   occid  = TMP.GetDataPointer();
-
 
   // ----------------------------------------------------------------------------
   // Make sure all edges connected to occluded nodes have intersections
@@ -398,10 +411,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i-1];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i-1], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i-1], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
-              assert(occluded);
+              assert(is_occluded);
               intersections.push_back(IntersectionPoint(i-1,j,k, 0, 0.0, trif, xi));
             }
             if(ijk_occluded) { //(i-1,j,k) is occluded
@@ -409,10 +422,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
-              assert(occluded);
+              assert(is_occluded);
               intersections.push_back(IntersectionPoint(i-1,j,k, 0, coords[k][j][i][0] - coords[k][j][i-1][0], trif, xi));
             }
 
@@ -461,10 +474,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j-1][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j-1][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j-1][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
-              assert(occluded);
+              assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j-1,k, 1, 0.0, trif, xi));
             }
             if(ijk_occluded) { //(i-1,j,k) is occluded
@@ -472,10 +485,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
-              assert(occluded);
+              assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j-1,k, 1, coords[k][j][i][1] - coords[k][j-1][i][1], trif, xi));
             }
 
@@ -524,10 +537,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k-1][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool occluded = GeoTools::IsPointInThickenedTriangle(coords[k-1][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k-1][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
-              assert(occluded);
+              assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j,k-1, 2, 0.0, trif, xi));
             }
             if(ijk_occluded) { //(i-1,j,k) is occluded
@@ -535,10 +548,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
-              assert(occluded);
+              assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j,k-1, 2, coords[k][j][i][2] - coords[k-1][j][i][2], trif, xi));
             }
 
@@ -575,26 +588,41 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
       }
 
+  TMP.RestoreDataPointerToLocalVector();
+
+  XForward.RestoreDataPointerToLocalVector(); //Cannot exchange data, because "intersections" does not communicate
+  XBackward.RestoreDataPointerToLocalVector(); //Cannot exchange data, because "intersections" does not communicate
+
+  coordinates.RestoreDataPointerToLocalVector();
+
 
   // ----------------------------------------------------------------------------
-  // build sets of occluded and firstLayer nodes. 
+  // Build the sets of occluded and firstLayer nodes. Include internal ghost nodes
   // ----------------------------------------------------------------------------
-  I AM HERE
+  occluded.clear();
+  firstLayer.clear();
+
+  layer  = TMP2.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
+
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        if(coordinates.OutsidePhysicalDomain(i,j,k)) //this node is out of physical domain
+          continue;
+
+        if(layer[k][j][i]==0) {
+          occluded.insert(Int3(i,j,k));         
+          firstLayer.insert(Int3(i,j,k));
+        } else if(layer[k][j][i]==1) 
+          firstLayer.insert(Int3(i,j,k));
+      }
+
+  TMP2.RestoreDataPointerToLocalVector();
+
 }
 
 //-------------------------------------------------------------------------
-
-void
-Intersector::FindOcculudedNodes()
-
-void
-Intersector::FindIntersections()
-
-void
-Intersector::TagFirstLayerNodes();
-
-void
-Intersector::FloodFillStatus(); //by default, set sign = 1 (0 for occuluded) only do floodfill for sign = -1
 
 //optional
 void
@@ -626,6 +654,13 @@ Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, do
   }
 
   return false;
+}
+
+//-------------------------------------------------------------------------
+
+int FloodFill()
+{
+  return floodfiller.Fill(XForward, occluded, Sign);
 }
 
 //-------------------------------------------------------------------------
