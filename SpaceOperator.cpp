@@ -20,6 +20,8 @@ using std::chrono::duration_cast;
 using std::chrono::duration;
 using std::chrono::milliseconds;
 
+extern int NSTP_2ND_IT;
+extern int CURRENT_STEP_NUMBER;
 extern int MAX_STEP_NUMBER;
 extern double FLUX_TIME;
 extern int verbose;
@@ -2209,7 +2211,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   FLUX_TIME = FLUX_TIME + cycle_time;      
 
   MPI_Allreduce(MPI_IN_PLACE, &MAX_STEP_NUMBER, 1, MPI_INT, MPI_MAX, comm);
- 
+  MPI_Allreduce(MPI_IN_PLACE, &CURRENT_STEP_NUMBER, 1, MPI_INT, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &NSTP_2ND_IT, 1, MPI_INT, MPI_MAX, comm);
+
   MPI_Allreduce(MPI_IN_PLACE, &riemann_errors, 1, MPI_INT, MPI_SUM, comm);
   if(riemann_errors>0) 
     print("Warning: Riemann solver failed to find a bracketing interval or to converge on %d edge(s).\n", riemann_errors);
