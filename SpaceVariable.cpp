@@ -211,6 +211,18 @@ void SpaceVariable3D::Setup(MPI_Comm &comm_, DM *dm_)
   ghost_jmax = ghost_j0 + ghost_ny;
   ghost_kmax = ghost_k0 + ghost_nz;
 
+  internal_ghost_i0   = ghost_i0<0    ?   i0 : ghost_i0;
+  internal_ghost_imax = ghost_imax>NX ? imax : ghost_imax;
+  internal_ghost_j0   = ghost_j0<0    ?   j0 : ghost_j0;
+  internal_ghost_jmax = ghost_jmax>NY ? jmax : ghost_jmax;
+  internal_ghost_k0   = ghost_k0<0    ?   k0 : ghost_k0;
+  internal_ghost_kmax = ghost_kmax>NZ ? kmax : ghost_kmax;
+
+  numNodes0 = nx*ny*nz;
+  numNodes1 = (internal_ghost_imax-internal_ghost_i0)
+            * (internal_ghost_jmax-internal_ghost_j0)
+            * (internal_ghost_kmax-internal_ghost_k0);
+  numNodes2 = ghost_nx*ghost_ny*ghost_nz;
 }
 
 //---------------------------------------------------------

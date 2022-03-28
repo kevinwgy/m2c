@@ -59,7 +59,13 @@ class SpaceVariable3D {
   int        ghost_width; //!< width of the ghost layer (usually 1)
   int        ghost_i0, ghost_j0, ghost_k0; //!< lower-left corner of the ghost layer
   int        ghost_imax, ghost_jmax, ghost_kmax; //!< upper-right corner of the ghost layer
+  int        internal_ghost_i0, internal_ghost_j0, internal_ghost_k0; //!< include internal ghosts (i.e. inside physical domain)
+  int        internal_ghost_imax, internal_ghost_jmax, internal_ghost_kmax; //!< include internal ghosts
   int        ghost_nx, ghost_ny, ghost_nz; //!< width of the ghosted subdomain in x, y and z directions
+
+  int        numNodes0; //number of interior nodes
+  int        numNodes1; //number of interior nodes + internal ghost nodes
+  int        numNodes2; //number of interior nodes + internal & external ghost nodes
 
 public:
   SpaceVariable3D(MPI_Comm &comm_, DM *dm_);
@@ -100,8 +106,20 @@ public:
     if(kmax_) *kmax_ = ghost_kmax;
   }
 
+  inline void GetInternalGhostedCornerIndices(int *i0_, int *j0_, int *k0_, int *imax_=0, int *jmax_=0, int *kmax_=0) {
+    *i0_ = internLghost_i0; *j0_ = internal_ghost_j0; *k0_ = internal_ghost_k0;
+    if(imax_) *imax_ = internal_ghost_imax;
+    if(jmax_) *jmax_ = internal_ghost_jmax;
+    if(kmax_) *kmax_ = internal_ghost_kmax;
+  }
+
   inline void GetGhostedSize(int *ghost_nx_, int *ghost_ny_, int *ghost_nz_) {
     *ghost_nx_ = ghost_nx; *ghost_ny_ = ghost_ny; *ghost_nz_ = ghost_nz;}
+
+  inline void GetInternalGhostedSize(int *ghost_nx_, int *ghost_ny_, int *ghost_nz_) {
+    *ghost_nx_ = internal_ghost_imax - internal_ghost_i0; 
+    *ghost_ny_ = internal_ghost_jmax - internal_ghost_j0; 
+    *ghost_nz_ = internal_ghost_kmax - internal_ghost_k0;}
 
   inline int  NumGhostLayers() {return ghost_width;}
   inline int  NumDOF() {return dof;}
@@ -116,6 +134,10 @@ public:
   double CalculateGlobalMin(int mydof = 0, bool workOnGhost = false);
 
   double CalculateGlobalMax(int mydof = 0, bool workOnGhost = false);
+
+  inline int NumInternalNodes() {return numNodes0;}
+  inline int NumNodesIncludingInternalGhosts() {return numNodes1;}
+  inline int NumNodesIncludingGhosts() {return numNodes2;}
 
   inline bool OutsidePhysicalDomainAndUnpopulated(int i, int j, int k)
   {

@@ -31,6 +31,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+  coordinates.GetInternalGhostedCornerIndices(&ii0_in, &jj0_in, &kk0_in, &iimax_in, &jjmax_in, &kkmax_in);
   coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
   // Set the capacity of internal vectors, so we don't frequently reallocate memory
@@ -71,6 +72,8 @@ Intersector::~Intersector()
 void
 Intersector::Destroy()
 {
+  floodfiller.Destroy();
+
   BBmin.Destroy();
   BBmax.Destroy();
   TMP.Destroy();
@@ -175,12 +178,9 @@ Intersector::FindNodalCandidates()
   MyTriangle *tmp = new MyTriange[nMaxCand];
   
   // Work on all nodes inside the physical domain, including internal ghost layer
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) {
-
-        if(coordinates.OutsidePhysicalDomain(i,j,k))
-          continue;
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++) {
 
         // find candidates
         int nFound = FindCandidatesInBox(tree, bbmin[k][j][i], bbmax[k][j][i], tmp, nMaxCand);
@@ -246,13 +246,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   // ----------------------------------------------------------------------------
   firstLayer.clear();
   // We only deal with edges whose vertices are both in the real domain
-  for(int k=k0; k<kkmax; k++)
-    for(int j=j0; j<jjmax; j++)
-      for(int i=i0; i<iimax; i++) {
+  for(int k=k0; k<kkmax_in; k++)
+    for(int j=j0; j<jjmax_in; j++)
+      for(int i=i0; i<iimax_in; i++) {
   
-        if(coordinates.OutsidePhysicalDomain(i,j,k)) //this node is out of physical domain
-          continue;
-
         // start with assuming it is outside
         sign[k][j][i] = 1;
 
@@ -390,13 +387,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   // Make sure all edges connected to occluded nodes have intersections
   // ----------------------------------------------------------------------------
   bool ijk_occluded;
-  for(int k=k0; k<kkmax; k++)
-    for(int j=j0; j<jjmax; j++)
-      for(int i=i0; i<iimax; i++) {
+  for(int k=k0; k<kkmax_in; k++)
+    for(int j=j0; j<jjmax_in; j++)
+      for(int i=i0; i<iimax_in; i++) {
  
-        if(coordinates.OutsidePhysicalDomain(i,j,k)) //this node is out of physical domain
-          continue;
-
         ijk_occluded = (occid[k][j][i]>=0);
         if(i-1>=0) { //left edge within physical domain
           
@@ -604,13 +598,9 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
   layer  = TMP2.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
 
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) {
-
-        if(coordinates.OutsidePhysicalDomain(i,j,k)) //this node is out of physical domain
-          continue;
-
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++) {
         if(layer[k][j][i]==0) {
           occluded.insert(Int3(i,j,k));         
           firstLayer.insert(Int3(i,j,k));

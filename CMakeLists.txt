@@ -74,6 +74,7 @@ AerosMessenger.cpp
 TriangulatedSurface.cpp
 CrackingSurface.cpp
 Intersector.cpp
+FloodFill.cpp
 EmbeddedBoundaryOperator.cpp
 CustomCommunicator.cpp
 ExactRiemannSolverBase.cpp
