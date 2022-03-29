@@ -37,7 +37,7 @@ public:
    *  occluded internal ghost nodes. 
    *  Colors are: 0 (occluded), 1, 2, ... */
   int FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction_flag,
-                                  SpaceVariable3D& Color, std::vector<Int3>& occluded_nodes);
+                                  std::set<Int3>& occluded_nodes, SpaceVariable3D& Color);
 
 
 

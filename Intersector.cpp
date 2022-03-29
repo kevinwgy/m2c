@@ -3,6 +3,8 @@
 using std::pair;
 using std::vector;
 
+extern int verbose;
+extern double domain_diagonal;
 //-------------------------------------------------------------------------
 
 Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
@@ -20,7 +22,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              XForward(comm_, &(dms_.ghosted1_3dof)),
              XBackward(comm_, &(dms_.ghosted1_3dof)),
              Phi(comm_, &(dms_.ghosted1_1dof)),
-             Sign(comm_, &(dms_.ghosted1_1dof))
+             Sign(comm_, &(dms_.ghosted1_1dof)),
+             floodfiller(comm_, dms_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
 
   CandidatesIndex.SetConstantValue(-1, true);
@@ -648,9 +651,163 @@ Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, do
 
 //-------------------------------------------------------------------------
 
-int FloodFill()
+int
+Intersector::FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures)
 {
-  return floodfiller.Fill(XForward, occluded, Sign);
+  // ----------------------------------------------------------------
+  // Call floodfiller to do the work.
+  // ----------------------------------------------------------------
+  int nColors = floodfiller.FillBasedOnEdgeObstructions(XForward, -1/*xf==-1 means no intersection*/, Sign, occluded);
+
+  // ----------------------------------------------------------------
+  // Now we need to convert the color map to what we want: 0~occluded, 1, 2,...: regions connected to Dirichlet
+  // boundaries (inlet/outlet/farfield). 1=inlet, 2=outlet. -1,-2,...: inside enclosures
+  // ----------------------------------------------------------------
+  double*** sign   = Sign.GetDataPointer();
+
+  // First, we need to find the current colors for inlet, outlet
+  std::set<int> inlet_color; 
+  std::set<int> outlet_color;  //In most cases, both sets should only contain 0 or 1 member. Otherwise, it means 
+                               //one type of boundary (e.g., inlet) is separated by the embedded surface into multiple
+                               //disconnected regions. In this case, we have to merge the colors into one.
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+    if(it->type_projection != GhostPoint::FACE)
+      continue;
+    if(it->bcType == MeshData::INLET) {
+      Int3& ijk(it->image_ijk);
+      inlet_color.insert(sign[ijk[2]][ijk[1]][ijk[0]]);
+    } else if(it->bcType == MeshData::OUTLET) {
+      Int3& ijk(it->image_ijk);
+      outlet_color.insert(sign[ijk[2]][ijk[1]][ijk[0]]);
+    }
+  }
+
+  int max_inlet_color(-1);
+  for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
+    max_inlet_color = std::max(max_inlet_color, *it);
+  MPI_Allreduce(MPI_IN_PLACE, &max_inlet_color, 1, MPI_INT, MPI_MAX, comm)  
+
+  vector<int> in_colors(max_inlet_color+1, -1);
+  for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
+    in_colors[*it] = 1;
+  MPI_Allreduce(MPI_IN_PLACE, in_colors.data(), in_colors.size(), MPI_INT, MPI_MAX, comm)  
+
+  if(in_colors[0] == 1 && verbose>1)
+    print_warning("Warning: Found occluded node(s) near an inlet or farfield boundary.");
+
+  int max_outlet_color(-1);
+  for(auto it = outlet_color.begin(); it != outlet_color.end(); it++) 
+    max_outlet_color = std::max(max_outlet_color, *it);
+  MPI_Allreduce(MPI_IN_PLACE, &max_outlet_color, 1, MPI_INT, MPI_MAX, comm)  
+
+  vector<int> out_colors(max_outlet_color+1, -1);
+  for(auto it = outlet_color.begin(); it != outlet_color.end(); it++)
+    out_colors[*it] = 1;
+  MPI_Allreduce(MPI_IN_PLACE, out_colors.data(), out_colors.size(), MPI_INT, MPI_MAX, comm)  
+  
+  if(out_colors[0] == 1 && verbose>1)
+    print_warning("Warning: Found occluded node(s) near an outlet or farfield boundary.");
+
+  // Convert colors 
+  std::map<int,int> old2new;
+  for(int i=0; i<in_colors.size(); i++)
+    if(in_colors[i] == 1)
+     old2new[i] = 1; //inlet_color;
+  for(int i=0; i<out_colors.size(); i++)
+    if(out_colors[i] == 1) {
+     assert(old2new.find(i) == old2new.end());
+     old2new[i] = 2; //outlet_color;
+    }
+  int tmp_counter = 0;
+  for(int i=1; i<nColors+1; i++)
+    if(old2new.find(i) == old2new.end())
+      old2new[i] = --tmp_counter;
+
+  int total_occluded = 0;
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(sign[k][j][i] != 0)
+          sign[k][j][i] = old2new[sign[k][j][i]];
+        else
+          total_occluded++;
+      }
+
+  // statistics
+  MPI_Allreduce(MPI_IN_PLACE, &total_occluded, 1, MPI_INT, MPI_SUM, comm)  
+
+  if(total_occluded>0) 
+    hasOcc = true; //i.e. one zero color (for occluded)
+
+  hasInlet = hasOutlet = false;
+  nClosures = 0;
+  for(it = old2new.begin(); it != old2new.end(); it++)
+    if(it->second==1)
+      hasInlet = true;
+    else if(it->second==2)
+      hasOutlet = true;
+    else if(it->second<0)
+      nClosures++;
+
+  Sign.RestoreDataPointerAndInsert();
+
+  return int(hasInlet) + int(hasOutlet) + int(hasOcc) + nClosures;
+}
+
+//-------------------------------------------------------------------------
+
+int
+Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures)
+{
+//TODO
+
+}
+
+//-------------------------------------------------------------------------
+
+void
+Intersector::CalculateUnsignedDistanceNearSurface(int nLayers, bool nodal_cands_calculated)
+{
+
+  if(!nodal_cands_calculated)
+    FindNodalCandidates();
+
+  double*** candid = CandidatesIndex.GetDataPointer();
+  double*** phi    = CandidatesIndex.GetDataPointer();
+  
+  // set const. value to phi, by default
+  double default_distance = 0.5*domain_diagonal;
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++)
+        phi[k][j][i] = default_distance;
+
+  assert(nLayers>=1);
+
+  // if layer>1, build another scope and another tree.
+  // XXX
+
+  // loop through layers. 1st layer means nodes connected to intersecting edges (including occluded nodes).
+  for(int layer=1; layer<=nLayers; layer++) {
+    std::set<Int3> seeds_for_next;
+     
+  }
+
+
+
+
+
+
+
+
+  }
+
+
+ ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi[3],
+                              double* area = NULL, Vec3D* dir = NULL,
+                              bool return_signed_distance = false);   
+
 }
 
 //-------------------------------------------------------------------------

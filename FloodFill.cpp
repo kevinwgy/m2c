@@ -2,6 +2,7 @@
 #include<Utils.h>
 
 using std::vector;
+using std::set;
 
 //-----------------------------------------------------------------------------------
 
@@ -33,7 +34,7 @@ FloodFill::Destroy()
 
 int
 FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction_flag,
-                                       SpaceVariable3D& Color, vector<Int3>& occluded_nodes)
+                                       set<Int3>& occluded_nodes, SpaceVariable3D& Color)
 {
   const int UNDECIDED = -1, IN_QUEUE = -2;
 
@@ -115,7 +116,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
 
 
   //---------------------------------
-  // Part II. Fill the subdomain
+  // Part II. Unionize colors
   //---------------------------------
   int iter;
   int numColors(-1);
@@ -178,6 +179,8 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
         for(int j=jj0_in; j<jjmax_in; j++)
           for(int i=ii0_in; i<iimax_in; i++)
             numColors = std::max(numColors, color[k][j][i]); //find numColors
+
+      MPI_Allreduce(MPI_IN_PLACE, &numColors, 1, MPI_INT, MPI_MAX, comm);
 
       Color.RestoreDataPointerToLocalVector();
       break;

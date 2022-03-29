@@ -2,10 +2,9 @@
 #define _INTERSECTOR_H_
 
 #include<IoData.h>
-#include<SpaceVariable.h>
 #include<KDTree.h>
 #include<TriangulatedSurface.h>
-#include<GhostPoint.h>
+#include<FloodFill.h>
 
 /****************************************************************
  * Class Intersector is responsible for tracking a triangulated
@@ -79,6 +78,9 @@ class Intersector {
 
   EmbeddedSurfaceData &iod_surface;
 
+  //! A tool for flood-fill
+  FloodFill floodfiller;
+
   //! Info about the triangulated surface
   TriangulatedSurface &surface; //!< the surface tracked by the intersector
   bool closed_surface; //!< whether the surface is closed AND normals are consistent
@@ -125,8 +127,8 @@ class Intersector {
                                   XBackward stores the one that is closest to the right/top/front vertex. */
 
   //! Phi and Sign communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
-  SpaceVariable3D Phi; //!< unsigned distance from each node to the interface
-  SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or 1 (outside). N = 1,2,...
+  SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
+  SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or N (inlet, outlet). N = 1,2,...
                       
 
   //! "intersections" stores edge-surface intersections where at least one vertex of the edge is inside the subdomain
@@ -156,11 +158,21 @@ private:
 
   void BuildSubdomainScopeAndKDTree(); //!< build "scope" and "tree"
 
+  //! Many functions below assume that "BuildNodalBoundingBoxes" and "BuildSubdomainScopeAndKDTree" have been called.
+
   void FindNodalCandidates(); //!< find nearby triangles for each node based on bounding boxes and KDTree
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
 
-  int FloodFill(); //!< determine the generalized sign function ("Sign"). Returns the number of "colors".
+  int FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures); /**< determine the generalized sign function ("Sign"). 
+                                                                                     Returns the number of "colors" (sum of the four).\n*/
+
+  /** When the structure has moved (slightly), this "refill" function should be called, not the one above. This one is faster, and
+   *  also maintains the same "signs". Calling the original "FloodFill" function may lead to sign(tag) change for the same enclosure.*/
+  int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures);
+
+
+  void CalculateUnsignedDistanceNearSurface(int nLayers, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
   //! Utility functions
   //

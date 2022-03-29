@@ -78,7 +78,7 @@ double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi
  *        a sharp discontinuity when a point moves across the plane at a point outside the triange.
  *     - If you do not care about the sign of the returned value, the order of A, B, C, and
  *       the orientation of "dir" do not matter. But be careful, the returned value may
- *       be negative.
+ *       be negative, if "return_signed_distance" is (mistakenly) turned on.
  *     - If you care about the sign of the returned value, xA, xB, xC have to be ordered
  *       such that the normal of the triangle can be determined based on the right-hand rule.
  *       This is the case even if you explicitly specify "dir".
