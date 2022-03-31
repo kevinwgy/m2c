@@ -95,7 +95,7 @@ inline double GetShortestDistanceFromPointToLineSegment(Vec3D& x0, Vec3D& xA, Ve
 inline double GetNormalAndAreaOfTriangle(Vec3D& xA, Vec3D& xB, Vec3D& xC, 
                                          Vec3D& dir)
 {
-  Vec3D ABC = (xB-xA)^(xC-xA); //cross product
+  Vec3D ABC = 0.5*(xB-xA)^(xC-xA); //cross product
   double area= ABC.norm();
   assert(area != 0.0);
   dir = 1.0/area*ABC;
@@ -123,6 +123,7 @@ inline double GetNormalAndAreaOfTriangle(Vec3D& xA, Vec3D& xB, Vec3D& xC,
  */
 double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi[3],
                            double* area = NULL, Vec3D* dir = NULL);
+
 
 /**************************************************************************
  * Project a point onto a triangle, that is, find the closest point on the triangle
@@ -152,6 +153,7 @@ double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double
                               double* area = NULL, Vec3D* dir = NULL, 
                               bool return_signed_distance = false);
 
+
 /**************************************************************************
  * Find if the distance from a point to a triangle is less than "half_thickness"
  *   Inputs:
@@ -164,8 +166,53 @@ double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double
  *     xi_out[3] (optional) -- barycentric coords of the CLOSEST POINT on the triangle. It is
  *                             guaranteed that 0<= xi[i] <= 1 for i = 1,2,3.
  */
-bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double half_thickness,
-                                double* area = NULL, Vec3D* dir = NULL, double* xi_out = NULL);
+bool IsPointInsideTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double half_thickness = 1.0e-14,
+                           double* area = NULL, Vec3D* dir = NULL, double* xi_out = NULL);
+
+
+/**************************************************************************
+ * Check if a ray collides with a moving triangle (continuous collision
+ * detection (CCD)). Vertices of the triangle are assumed to move along
+ * straight lines at constant speeds.
+ *   Inputs:
+ *     x0 -- initial position of the point
+ *     x  -- current position of the point
+ *     A0,B0,C0 -- initial positions of the three vertices of the triangle
+ *     A,B,C -- current positions of the three vertices (same order!)
+ *     half_thickness (optional) -- half of the thickness of the triangle. Default: 0
+ *     area0, dir0 (optional) -- area and normal of the original triangle (A0-B0-C0)
+ *     area, dir (optional) -- area and normal of the current triangle (A-B-C)
+ *   Output:
+ *     time (optional): time of collision, [0, 1]
+ *   Ref:
+ *     See M2C notes.
+ */
+bool ContinuousRayTriangleCollision(Vec3D& x0, Vec3D &x, Vec3D& A0, Vec3D& B0, Vec3D& C0, Vec3D& A, Vec3D& B, Vec3D& C,
+                                    double* time = NULL,
+                                    double half_thickness = 1.0e-14, double* area0 = NULL, Vec3D* dir0 = NULL,
+                                    double* area = NULL, Vec3D* dir = NULL);
+
+/**************************************************************************
+ * Find if a point is swept by a moving triangle (continuous collision
+ * detection (CCD)). Vertices of the triangle are assumed to move along
+ * straight lines at constant speeds.
+ *   Inputs:
+ *     x -- position of the point
+ *     A0,B0,C0 -- initial positions of the three vertices of the triangle
+ *     A,B,C -- current positions of the three vertices (same order!)
+ *     half_thickness (optional) -- half of the thickness of the triangle. Default: 0
+ *     area0, dir0 (optional) -- area and normal of the original triangle (A0-B0-C0)
+ *     area, dir (optional) -- area and normal of the current triangle (A-B-C)
+ *   Output:
+ *     time (optional): time of collision, [0, 1]
+ */
+inline bool IsPointSweptByTriangle(Vec3D& x, Vec3D& A0, Vec3D& B0, Vec3D& C0, Vec3D& A, Vec3D& B, Vec3D& C,
+                                   double* time = NULL,
+                                   double half_thickness = 1.0e-14, double* area0 = NULL, Vec3D* dir0 = NULL,
+                                   double* area = NULL, Vec3D* dir = NULL)
+{
+  return ContinuousRayTriangleCollision(x, x, A0, B0, C0, A, B, C, time, half_thickness, area0, dir0, area, dir);
+}
 
 /**************************************************************************
  * Trilinear interpolation

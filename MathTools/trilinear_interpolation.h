@@ -6,7 +6,7 @@ namespace MathTools {
 
 template<typename T>
 T trilinear_interpolation(T c000, T c001, T c010, T c011, 
-                          T c100, T c101, T c110, T c111, double *xi)
+                          T c100, T c101, T c110, T c111, T *xi)
 {
   T c00 = (1-xi[0])*c000 + xi[0]*c001;
   T c10 = (1-xi[0])*c100 + xi[0]*c101;
@@ -23,9 +23,9 @@ T trilinear_interpolation(T c000, T c001, T c010, T c011,
 
 template<typename T>
 T trilinear_interpolation(T c000, T c001, T c010, T c011, 
-                          T c100, T c101, T c110, T c111, double *x0, double *dx, double *x)
+                          T c100, T c101, T c110, T c111, T *x0, T *dx, T *x)
 {
-  double xi[3];
+  T xi[3];
   for(int i=0; i<3; i++)
     xi[i] = (x[i]-x0[i])/dx[i]; 
 

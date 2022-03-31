@@ -53,7 +53,7 @@ double ClosestTriangle::project(Vec3D x0, int tria, double& xi1, double& xi2) co
   Vec3D xB = structX[iB];
   Vec3D xC = structX[iC];
 
-  Vec3D ABC = (xB-xA)^(xC-xA);
+  Vec3D ABC = 0.5*(xB-xA)^(xC-xA);
   double areaABC = ABC.norm();
   Vec3D dir = 1.0/areaABC*ABC;
 
@@ -62,8 +62,8 @@ double ClosestTriangle::project(Vec3D x0, int tria, double& xi1, double& xi2) co
   Vec3D xp = x0 - dist*dir;
 
   //calculate barycentric coords.
-  double areaPBC = (((xB-xp)^(xC-xp))*dir);
-  double areaPCA = (((xC-xp)^(xA-xp))*dir);
+  double areaPBC = (0.5*(xB-xp)^(xC-xp))*dir;
+  double areaPCA = (0.5*(xC-xp)^(xA-xp))*dir;
   xi1 = areaPBC/areaABC;
   xi2 = areaPCA/areaABC;
 

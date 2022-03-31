@@ -102,11 +102,14 @@ class Intersector {
   int ii0_in, jj0_in, kk0_in, iimax_in, jjmax_in, kkmax_in; //!< corners of the ghosted subdomain, excluding external ghosts
   int NX, NY, NZ; //!< global size (number of cells in the real domain)
 
+  std::vector<double> &x_glob, &y_glob, &z_glob; //!< x,y,z coords of the entire domain
+  std::vector<double> &dx_glob, &dy_glob, &dz_glob; //!< dx, dy, dz of the entire domain
+
   SpaceVariable3D BBmin, BBmax; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
                                      in the physical domain. For each node, the BB contains the \n
-                                     node itself and all the edges that connect the node with other \n
-                                     nodes IN THE PHYSICAL DOMAIN.*/
-  Vec3D subD_bbmin, subD_bbmax; //!< bounding box of the subdomain
+                                     node itself and all the edges (n layers, n TBD) that connect the node \n
+                                     with other nodes IN THE PHYSICAL DOMAIN.*/
+  Vec3D subD_bbmin, subD_bbmax; //!< bounding box of the subdomain (n layers, n TBD)
 
   SpaceVariable3D TMP, TMP2; //!< For temporary use.
 
@@ -140,12 +143,18 @@ class Intersector {
   std::set<Int3> occluded;
   std::set<Int3> fisrtLayer; //!< nodes that belong to intersecting edges (naturally, including occluded nodes)
 
+  //! tracks nodes that are swept by the surface during small motion (e.g., in one time step)
+  //! Does not include nodes that are occluded at present.
+  std::set<Int3> swept;
+
 public:
 
   Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
               TriangulatedSurface &surface_,
               SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
-              std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_);
+              std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
+              std::vector<dobule> &x_, std::vector<double> &y_, std::vector<double> &z_,
+              std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
 
   ~Intersector();
 
@@ -154,7 +163,7 @@ public:
 
 private:
 
-  void BuildNodalBoundingBoxes(); //!< build BBmin, BBmax, subD_bbmin, subD_bbmax
+  void BuildNodalAndSubdomainBoundingBoxes(int nLayer=1); //!< build BBmin, BBmax, subD_bbmin, subD_bbmax
 
   void BuildSubdomainScopeAndKDTree(); //!< build "scope" and "tree"
 
@@ -167,12 +176,14 @@ private:
   int FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures); /**< determine the generalized sign function ("Sign"). 
                                                                                      Returns the number of "colors" (sum of the four).\n*/
 
-  /** When the structure has moved (slightly), this "refill" function should be called, not the one above. This one is faster, and
+  /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This one is faster, and
    *  also maintains the same "signs". Calling the original "FloodFill" function may lead to sign(tag) change for the same enclosure.*/
   int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures);
 
+  //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
+  void FindSweptNodes(std::set<Int3> &firstLayer0, std::vector<Vec3D> &X0);
 
-  void CalculateUnsignedDistanceNearSurface(int nLayers, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
+  void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
   //! Utility functions
   //

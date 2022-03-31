@@ -1,5 +1,6 @@
 #include <GeoTools.h>
 #include <cfloat> //DBL_MAX
+#include <polynomial_equations.h>
 
 namespace GeoTools {
 
@@ -35,8 +36,8 @@ double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi
     xp = x0 - dist*(*dir);
 
     //calculate barycentric coords.
-    areaPBC = (((xB-xp)^(xC-xp))*(*dir));
-    areaPCA = (((xC-xp)^(xA-xp))*(*dir));
+    areaPBC = (0.5*(xB-xp)^(xC-xp))*(*dir);
+    areaPCA = (0.5*(xC-xp)^(xA-xp))*(*dir);
     areaABC = *area;
 
   } else {
@@ -47,8 +48,8 @@ double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi
     dist = (x0-xA)*mydir;
     xp = x0 - dist*mydir;
 
-    areaPBC = (((xB-xp)^(xC-xp))*mydir);
-    areaPCA = (((xC-xp)^(xA-xp))*mydir);
+    areaPBC = (0.5*(xB-xp)^(xC-xp))*mydir;
+    areaPCA = (0.5*(xC-xp)^(xA-xp))*mydir;
   }
 
   //calculate barycentric coords.
@@ -150,8 +151,8 @@ double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double
  *     area (optional) -- area of the triangle
  *     dir (optional) -- unit normal direction of the triangle
  */
-bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double half_thickness,
-                                double* area, Vec3D* dir, double* xi_out)
+bool IsPointInsideTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double half_thickness,
+                           double* area, Vec3D* dir, double* xi_out)
 {
   assert(half_thickness>=0.0);
 
@@ -170,8 +171,8 @@ bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, doub
   
   Vec3D xp = x0 - dist*mydir;
 
-  double areaPBC = (((xB-xp)^(xC-xp))*mydir);
-  double areaPCA = (((xC-xp)^(xA-xp))*mydir);
+  double areaPBC = (0.5*(xB-xp)^(xC-xp))*mydir;
+  double areaPCA = (0.5*(xC-xp)^(xA-xp))*mydir;
 
   //calculate barycentric coords.
   double xi[3];
@@ -239,5 +240,98 @@ bool IsPointInThickenedTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, doub
   // I don't think it would ever get here. But I could be wrong.
   return false;
 }
+
+
+/**************************************************************************
+ * Check if a ray collides with a moving triangle (continuous collision 
+ * detection (CCD)). Vertices of the triangle are assumed to move along 
+ * straight lines at constant speeds. 
+ *   Inputs:
+ *     x0 -- initial position of the point
+ *     x  -- current position of the point
+ *     A0,B0,C0 -- initial positions of the three vertices of the triangle
+ *     A,B,C -- current positions of the three vertices (same order!)
+ *     half_thickness (optional) -- half of the thickness of the triangle. Default: 0
+ *     area0, dir0 (optional) -- area and normal of the original triangle (A0-B0-C0)
+ *     area, dir (optional) -- area and normal of the current triangle (A-B-C)
+ *   Output:
+ *     time (optional): time of collision, [0, 1]
+ *   Ref:
+ *     See M2C notes.
+ */
+bool ContinuousRayTriangleCollision(Vec3D& x0, Vec3D& x, Vec3D& A0, Vec3D& B0, Vec3D& C0, Vec3D& A, Vec3D& B, Vec3D& C,
+                                    double* time, double half_thickness, double* area0, Vec3D* dir0,
+                                    double* area, Vec3D* dir)
+{
+
+  // Step 1. Check if x0 is occluded by A0-B0-C0
+  double areaABC0;
+  Vec3D mydir0;
+  if(area0 && dir0) {
+    areaABC0 = *area0;
+    mydir0 = *dir0;
+  } else
+    areaABC0 = GetNormalAndAreaOfTriangle(A0, B0, C0, mydir0);
+
+  if(IsPointInsideTriangle(x0,A0,B0,C0,half_thickness,&areaABC0,&mydir0)) {
+    if(*time) *time = 0;
+    return true;
+  }
+
+  // Step 2. Check if x is occluded by A-B-C
+  double areaABC;
+  Vec3D mydir;
+  if(area && dir) {
+    areaABC = *area;
+    mydir = *dir;
+  } else
+    areaABC = GetNormalAndAreaOfTriangle(A, B, C, mydir);
+
+  if(IsPointInsideTriangle(x,A,B,C,half_thickness,&areaABC,&mydir)) {
+    if(*time) *time = 1.0;
+    return true;
+  }
+
+  // Step 3. Check for point-plane collision at 0<t<1
+  Vec3D Dx=x-x0, DA=A-A0, DB=B-B0, DC=C-C0;
+  Vec3D B0_A0 = B0 - A0;
+  Vec3D C0_A0 = C0 - A0;
+  Vec3D DB_DA = DB - DA;
+  Vec3D DC_DA = DC - DA;
+
+  Vec3D r0 = x0 - A0;
+  Vec3D r1 = Dx - DA;
+  Vec3D v0 = B0_A0^C0_A0;
+  Vec3D v1 = DB_DA^C0_A0 + B0_A0^DC_DA;
+  Vec3D v2 = DB_DA^DC_DA;
+
+  // form cubic equation at^3 + bt^2 + ct + d = 0;
+  double a = r1*v2;
+  double b = r0*v2 + r1*v1;
+  double c = r0*v1 + r1*v0;
+  double d = r0*v0;
+
+  // solve the equation analytically.
+  double t[3] = {-1,-1,-1};
+  int nReal = MathTools::cubic_equation_solver(a,b,c,d,t[0],t[1],t[2]);
+  if(nReal==0)
+    return false;
+
+  // Step 4. Check for point-triangle collision at possible time instants
+  for(int i=0; i<nReal; i++) {
+    if(t[i]<0 || t[i]>1.0)
+      continue;
+    Vec3D xt = x0+t[i]*Dx;
+    Vec3D At = A0+t[i]*DA;
+    Vec3D Bt = B0+t[i]*DB;
+    Vec3D Ct = C0+t[i]*DC;
+    if(IsPointInsideTriangle(xt, At, Bt, Ct, half_thickness)) {
+      if(*time) *time = t[i];
+      return true;
+    }
+  }
+  return false;  
+}
+
 
 } //end of namespace

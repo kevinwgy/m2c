@@ -10,10 +10,13 @@ extern double domain_diagonal;
 Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
                          TriangulatedSurface &surface_, SpaceVariable3D &coordinates_, 
                          SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
-                         vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_)
+                         vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
+                         vector<dobule> &x_, vector<double> &y_, vector<double> &z_,
+                         vector<double> &dx_, vector<double> &dy_, vector<double> &dz_)
            : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree(NULL),
              coordinates(coordinates_), delta_xyz(delta_xyz_), volume(volume_),
              ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
+             x_glob(x_), y_glob(y_), z_glob(z_), dx_glob(dx_), dy_glob(dy_), dz_glob(dz_),
              BBmin(comm_, &(dms_.ghosted1_3dof)),
              BBmax(comm_, &(dms_.ghosted1_3dof)),
              TMP(comm_, &(dms_.ghosted1_1dof)),
@@ -91,47 +94,39 @@ Intersector::Destroy()
 //-------------------------------------------------------------------------
 
 void
-Intersector::BuildNodalBoundingBoxes()
+Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
 {
-  double tol = 0.01;  //i.e. 1% tolerance
+  double tol = 0.1;  //i.e. tolerance = 10% of element size
 
-  Vec3D*** coords = (Vec3D***) coordinates.GetDataPointer();
   Vec3D*** bbmin  = (Vec3D***) BBmin.GetDataPointer();
   Vec3D*** bbmax  = (Vec3D***) BBmax.GetDataPointer();
 
   double delta;
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax; i++) {
 
-        delta = tol*(coords[k][j][i][0] - coords[k][j][i-1][0]); 
-        bbmin[k][j][i][0] = i-1>=0 ? coords[k][j][i-1][0] - tol : coords[k][j][i][0] - tol;
-        delta = tol*(coords[k][j][i+1][0] - coords[k][j][i][0]); 
-        bbmax[k][j][i][0] = i+1<NX ? coords[k][j][i+1][0] + tol : coords[k][j][i][0] + tol;
+        delta = tol*dx_glob[i]; 
+        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nLayer)] - tol;
+        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nLayer)] + tol;
 
-        delta = tol*(coords[k][j][i][1] - coords[k][j-1][i][1]); 
-        bbmin[k][j][i][1] = j-1>=0 ? coords[k][j-1][i][1] - tol : coords[k][j][i][1] - tol;
-        delta = tol*(coords[k][j+1][i][1] - coords[k][j][i][1]); 
-        bbmax[k][j][i][1] = j+1<NY ? coords[k][j+1][i][1] + tol : coords[k][j][i][1] + tol;
+        delta = tol*dy_glob[j]; 
+        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nLayer)] - tol;
+        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nLayer)] + tol;
 
-        delta = tol*(coords[k][j][i][2] - coords[k-1][j][i][2]); 
-        bbmin[k][j][i][2] = k-1>=0 ? coords[k-1][j][i][2] - tol : coords[k][j][i][2] - tol;
-        delta = tol*(coords[k+1][j][i][2] - coords[k][j][i][2]); 
-        bbmax[k][j][i][2] = k+1<NZ ? coords[k+1][j][i][2] + tol : coords[k][j][i][2] + tol;
-
+        delta = tol*dz_glob[k]; 
+        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nLayer)] - tol;
+        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nLayer)] + tol;
       }
 
   //subD_bb includes the ghost boundary
-  subD_bbmin[0] = coords[kk0][jj0][ii0][0]             - tol*(coords[k0][j0][i0][0]           - coords[k0][j0][i0-1][0]);
-  subD_bbmax[0] = coords[kkmax-1][jjmax-1][iimax-1][0] + tol*(coords[kmax-1][jmax-1][imax][0] - coords[kmax-1][jmax-1][imax-1][0]);
-  subD_bbmin[1] = coords[kk0][jj0][ii0][1]             - tol*(coords[k0][j0][i0][1]           - coords[k0][j0-1][i0][1]);
-  subD_bbmax[1] = coords[kkmax-1][jjmax-1][iimax-1][1] + tol*(coords[kmax-1][jmax][imax-1][1] - coords[kmax-1][jmax-1][imax-1][1]);
-  subD_bbmin[2] = coords[kk0][jj0][ii0][2]             - tol*(coords[k0][j0][i0][2]           - coords[k0-1][j0][i0][2]);
-  subD_bbmax[2] = coords[kkmax-1][jjmax-1][iimax-1][2] + tol*(coords[kmax][jmax-1][imax-1][2] - coords[kmax-1][jmax-1][imax-1][2]);
+  for(int p=0; p<3; p++) {
+    subD_bbmin[p] = bbmin[kk0_in][jj0_in][ii0_in][p];
+    subD_bbmax[p] = bbmax[kkmax_in-1][jjmax_in-1][iimax_in-1][p];
+  }
 
-  coordinates.RestoreDataPointerToLocalVector();
-  BBmin.RestoreDataPointerAndInsert();
-  BBmax.RestoreDataPointerAndInsert();
+  BBmin.RestoreDataPointerToLocalVector();
+  BBmax.RestoreDataPointerToLocalVector();
 }
 
 //-------------------------------------------------------------------------
@@ -173,7 +168,6 @@ Intersector::FindNodalCandidates()
 
   int nMaxCand = 500; //will increase if necessary
 
-  Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
   Vec3D*** bbmin   = (Vec3D***) BBmin.GetDataPointer();
   Vec3D*** bbmax   = (Vec3D***) BBmax.GetDataPointer();
   double*** candid = CandidatesIndex.GetDataPointer();
@@ -202,7 +196,6 @@ Intersector::FindNodalCandidates()
 
       }
 
-  coordinates.RestoreDataPointerToLocalVector();
   BBmin.RestoreDataPointerToLocalVector();
   BBmax.RestoreDataPointerToLocalVector();
   CandidatesIndex.RestoreDataPointerToLocalVector(); //can NOT communicate, because "candidates" do not.
@@ -408,7 +401,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i-1];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i-1], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i-1], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
               assert(is_occluded);
@@ -419,7 +412,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
               assert(is_occluded);
@@ -471,7 +464,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j-1][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j-1][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j-1][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
               assert(is_occluded);
@@ -482,7 +475,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
               assert(is_occluded);
@@ -534,7 +527,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k-1][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k-1][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k-1][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
               assert(is_occluded);
@@ -545,7 +538,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               int trif = occid[k][j][i];
               Int3& nf(surface.elems[trif]);
               // re-run the checker to get xi
-              bool is_occluded = GeoTools::IsPointInThickenedTriangle(coords[k][j][i], surface.X[nf[0]],
+              bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
                                             surface.elemArea[trif], surface.elemNorm[trif], xi);
               assert(is_occluded);
@@ -639,8 +632,8 @@ Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, do
   for(int i=0; i<nTri; i++) {
     int id = tri[i].trId();
     Int3& nodes(Es[id]);
-    if(GeoTools::IsPointInThickenedTriangle(x0, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], my_half_thickness,
-                                            &As[id], &Ns[id], xi)) {
+    if(GeoTools::IsPointInsideTriangle(x0, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], my_half_thickness,
+                                       &As[id], &Ns[id], xi)) {
       tid = id;
       return true;
     }
@@ -767,46 +760,85 @@ Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &has
 //-------------------------------------------------------------------------
 
 void
-Intersector::CalculateUnsignedDistanceNearSurface(int nLayers, bool nodal_cands_calculated)
+Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated)
 {
 
-  if(!nodal_cands_calculated)
+  if(!nodal_cands_calculated) {
+    BuildNodalBoundingBoxes(nLayer);
+    BuildSubdomainScopeAndKDTree();
     FindNodalCandidates();
+  }
 
   double*** candid = CandidatesIndex.GetDataPointer();
-  double*** phi    = CandidatesIndex.GetDataPointer();
+  Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
+  double*** phi    = Phi.GetDataPointer();
   
   // set const. value to phi, by default
-  double default_distance = 0.5*domain_diagonal;
-  for(int k=kk0_in; k<kkmax_in; k++)
-    for(int j=jj0_in; j<jjmax_in; j++)
-      for(int i=ii0_in; i<iimax_in; i++)
+  double default_distance = domain_diagonal;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
         phi[k][j][i] = default_distance;
 
-  assert(nLayers>=1);
-
-  // if layer>1, build another scope and another tree.
-  // XXX
+  assert(nLayer>=1);
 
   // loop through layers. 1st layer means nodes connected to intersecting edges (including occluded nodes).
-  for(int layer=1; layer<=nLayers; layer++) {
-    std::set<Int3> seeds_for_next;
-     
+  vector<Vec3D>&  Xs(surface.X);
+  vector<Int3>&   Es(surface.elems);
+  vector<Vec3D>&  Ns(surface.elemNorm);
+  vector<double>& As(surface.elemArea); 
+  std::set<Int3> this_layer = firstLayer;
+
+  for(int layer=1; layer<=nLayer; layer++) {
+
+    std::set<Int3> next_layer;
+
+    int i,j,k;
+    double bar = 0.99*default_distance;
+    for(auto it = this_layer.begin(); it != this_layer.end(); it++) {
+
+      i = (*it)[0];
+      j = (*it)[1];
+      k = (*it)[2];
+
+      // we only need to take care of the subdomain interior, because phi will be assembled.
+      // but when layer is 1, "firstLayer" includes internal ghosts.
+      if(layer==1 && Phi.IsHere(i,j,k,false))
+        continue;
+
+      vector<MyTriangles> &cands = candidates[candid[k][j][i]].second;
+      assert(cands.size()>0);
+
+      double dist = DBL_MAX;
+      int id;
+      for(int tri=0; tri<cands.size(); tri++) {
+        id = cands[tri].trId();
+        Int3 &nodes(Es[id]);
+        dist = std::min(dist,
+                        GeoTools::ProjectPointToTriangle(coords[k][j][i], Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
+                                                         As[id], Ns[id], false));
+      }
+      phi[k][j][i] = dist;
+
+      //insert neighbors to the next layer
+      if(layer<nLayer) {
+        assert(dist < bar);
+        if(i-1>=i0  && phi[k][j][i-1] >= bar) next_layer.insert(Int3(i-1,j,k));
+        if(i+1<imax && phi[k][j][i+1] >= bar) next_layer.insert(Int3(i+1,j,k));
+        if(j-1>=j0  && phi[k][j-1][i] >= bar) next_layer.insert(Int3(i,j-1,k));
+        if(j+1<jmax && phi[k][j+1][i] >= bar) next_layer.insert(Int3(i,j+1,k));
+        if(k-1>=k0  && phi[k-1][j][i] >= bar) next_layer.insert(Int3(i,j,k-1));
+        if(k+1<kmax && phi[k+1][j][i] >= bar) next_layer.insert(Int3(i,j,k+1));
+      }
+    }
+
+    this_layer = next_layer;
   }
 
 
-
-
-
-
-
-
-  }
-
-
- ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi[3],
-                              double* area = NULL, Vec3D* dir = NULL,
-                              bool return_signed_distance = false);   
+  CandidatesIndex.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerAndInsert(); 
 
 }
 
