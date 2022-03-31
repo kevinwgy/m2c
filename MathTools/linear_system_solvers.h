@@ -2,8 +2,8 @@
 
 namespace MathTools {
 
-bool SolveLinearSystem2x2(double a11, double a12, double a21, double a22, double b1, double b2,
-                          double &x1, double &x2)
+inline bool SolveLinearSystem2x2(double a11, double a12, double a21, double a22, double b1, double b2,
+                                 double &x1, double &x2)
 {
   double det = a11*a22 - a12*a21;
 
