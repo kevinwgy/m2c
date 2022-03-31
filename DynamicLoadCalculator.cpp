@@ -1,6 +1,6 @@
 #include<DynamicLoadCalculator.h>
 #include<EmbeddedBoundaryOperator.h>
-#include<rbf_interp_2d.hpp>
+#include<rbf_interp.hpp>
 #include<cfloat> //DBL_MAX
 
 using std::string;

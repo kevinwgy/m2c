@@ -7,7 +7,7 @@
 #include <algorithm> //std::upper_bound
 #include <cfloat> //DBL_MAX
 #include <KDTree.h>
-#include <rbf_interp_2d.hpp>
+#include <rbf_interp.hpp>
 using std::cout;
 using std::endl;
 using std::max;

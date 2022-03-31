@@ -106,7 +106,8 @@ LagrangianOutput.cpp
 Utils.cpp
 ClosestTriangle.cpp
 MathTools/r8lib.cpp
-MathTools/rbf_interp_2d.cpp
+MathTools/rbf_interp.cpp
+MathTools/polynomial_equations.cpp
 GeoTools/GeoTools.cpp
 GeoTools/Intersections.cpp)
 
