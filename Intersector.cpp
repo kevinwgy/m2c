@@ -61,7 +61,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   surface.CalculateNormalsAndAreas();
 
   //build nodal bounding boxes
-  BuildNodalBoundingBoxes();
+  BuildNodalAndSubdomainBoundingBoxes(1);
 
 }
 
@@ -751,10 +751,64 @@ Intersector::FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClos
 //-------------------------------------------------------------------------
 
 int
-Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures)
+Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures, bool nodal_cands_calculated)
 {
-//TODO
+  if(!nodal_cands_calculated) {
+    BuildNodalAndSubdomainBoundingBoxes(1);
+    BuildSubdomainScopeAndKDTree();
+    FindNodalCandidates();
+  }
 
+  double*** sign   = Sign.GetDataPointer();
+  
+  XXX I AM HERE XXX
+
+
+}
+
+//-------------------------------------------------------------------------
+ 
+void
+Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
+{
+  if(!nodal_cands_calculated) {
+    BuildNodalAndSubdomainBoundingBoxes(1);
+    BuildSubdomainScopeAndKDTree();
+    FindNodalCandidates();
+  }
+  
+  swept.clear();
+
+  double*** candid = CandidatesIndex.GetDataPointer();
+  Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
+
+  vector<Vec3D>&  Xs(surface.X);
+  vector<Int3>&   Es(surface.elems);
+  vector<Vec3D>&  Ns(surface.elemNorm);
+  vector<double>& As(surface.elemArea); 
+
+  double collision_time;
+
+  for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
+    if(occluded.find(*it) != occluded.end())
+      continue; //we don't store nodes that are currently occluded
+
+    assert(candid[k][j][i]>=0);
+    vector<MyTriangles> &cands(candidates[candid[k][j][i]].second);
+    assert(cands.size()>0);
+
+    for(auto it2 = cands.begin(); it2 != cands.end(); it2++) {
+      int id = it2->trId();
+      Int3 &nodes(Es[id]);
+      if(GeoTools::IsPointSweptByTriangle(coords[(*it)[2]][(*it)[1]][(*it)[0]], X0[nodes[0]], X0[nodes[1]], X0[nodes[2]],
+                                          Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], &collision_time, half_thickness, 
+                                          NULL, NULL, &(As[id]), &(Ns[id])))
+        swept.insert(*it);
+    }
+  }
+      
+  CandidatesIndex.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
 }
 
 //-------------------------------------------------------------------------
@@ -764,7 +818,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
 {
 
   if(!nodal_cands_calculated) {
-    BuildNodalBoundingBoxes(nLayer);
+    BuildNodalAndSubdomainBoundingBoxes(nLayer);
     BuildSubdomainScopeAndKDTree();
     FindNodalCandidates();
   }
@@ -806,7 +860,8 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
       if(layer==1 && Phi.IsHere(i,j,k,false))
         continue;
 
-      vector<MyTriangles> &cands = candidates[candid[k][j][i]].second;
+      assert(candid[k][j][i]>=0);
+      vector<MyTriangles> &cands(candidates[candid[k][j][i]].second);
       assert(cands.size()>0);
 
       double dist = DBL_MAX;
@@ -816,7 +871,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
         Int3 &nodes(Es[id]);
         dist = std::min(dist,
                         GeoTools::ProjectPointToTriangle(coords[k][j][i], Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
-                                                         As[id], Ns[id], false));
+                                                         &(As[id]), &(Ns[id]), false));
       }
       phi[k][j][i] = dist;
 
@@ -850,8 +905,6 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 {
   vector<Vec3D>&  Xs(surface.X);
   vector<Int3>&   Es(surface.elems);
-  vector<Vec3D>&  Ns(surface.elemNorm);
-  vector<double>& As(surface.elemArea); 
 
   vector<pair<double, IntersectionPoint> > X; //pairs distance with intersection point info
 

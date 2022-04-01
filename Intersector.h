@@ -141,10 +141,10 @@ class Intersector {
 
   //! "occluded" and "firstLayer" account for the internal ghost nodes.
   std::set<Int3> occluded;
-  std::set<Int3> fisrtLayer; //!< nodes that belong to intersecting edges (naturally, including occluded nodes)
+  std::set<Int3> firstLayer; //!< nodes that belong to intersecting edges (naturally, including occluded nodes)
 
   //! tracks nodes that are swept by the surface during small motion (e.g., in one time step)
-  //! Does not include nodes that are occluded at present.
+  //! Does not include nodes that are occluded at present. Includes internal ghost nodes.
   std::set<Int3> swept;
 
 public:
@@ -175,13 +175,13 @@ private:
 
   int FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures); /**< determine the generalized sign function ("Sign"). 
                                                                                      Returns the number of "colors" (sum of the four).\n*/
-
-  /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This one is faster, and
-   *  also maintains the same "signs". Calling the original "FloodFill" function may lead to sign(tag) change for the same enclosure.*/
-  int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures);
+  /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This function only recomputes
+   *  the "Sign" of swept nodes. It is faster, and also maintains the same "signs". Calling the original "FloodFill" function may 
+   *  lead to sign(tag) change for the same enclosure.*/
+  int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures, bool nodal_cands_calculated = false);
 
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
-  void FindSweptNodes(std::set<Int3> &firstLayer0, std::vector<Vec3D> &X0);
+  void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
 
   void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
