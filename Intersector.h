@@ -17,7 +17,8 @@
  *     the help of level set reinitializer)
  * (4) closest point on the interface to each node (If solution is not
  *     unique, only one solution is found)
- * (5) (if the interface is a closed surface) the inside/outside
+ * (5) nodes swept by the (dynamic) surface in one time step
+ * (6) (if the interface is a closed surface) the inside/outside
  *     status of each node with respect to the surface.
  * Note: The above results are stored within this class.
  ***************************************************************/
@@ -142,6 +143,10 @@ class Intersector {
   //! "occluded" and "firstLayer" account for the internal ghost nodes.
   std::set<Int3> occluded;
   std::set<Int3> firstLayer; //!< nodes that belong to intersecting edges (naturally, including occluded nodes)
+  std::set<Int3> imposed_occluded; /**< tracks nodes whose sign cannot be resolved; these nodes are FORCED to have\n
+                                        the sign of occluded(0), but intersections from these nodes to neighbors\n
+                                        may not exist! Includes internal ghost nodes.*/
+                                        
 
   //! tracks nodes that are swept by the surface during small motion (e.g., in one time step)
   //! Does not include nodes that are occluded at present. Includes internal ghost nodes.
@@ -173,12 +178,14 @@ private:
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
 
-  int FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures); /**< determine the generalized sign function ("Sign"). 
+  int FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions); /**< determine the generalized sign function ("Sign"). 
                                                                                      Returns the number of "colors" (sum of the four).\n*/
+
   /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This function only recomputes
    *  the "Sign" of swept nodes. It is faster, and also maintains the same "signs". Calling the original "FloodFill" function may 
-   *  lead to sign(tag) change for the same enclosure.*/
-  int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nClosures, bool nodal_cands_calculated = false);
+   *  lead to sign(tag) change for the same enclosure.
+   *  Note: This function must be called AFTER calling "findSweptNodes"*/
+  int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, bool nodal_cands_calculated = false);
 
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
   void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
