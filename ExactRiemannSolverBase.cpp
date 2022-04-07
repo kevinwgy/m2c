@@ -853,25 +853,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
   if(p > ps) {//rarefaction --- numerical integration
 
-    double dp_max = 1.25*(p-ps)/numSteps_rarefaction;
-    double dp_target = dp_max/1.25;
-
-    // initialize drho based on linear approximation
-    double e = vf[id]->GetInternalEnergyPerUnitMass(rho,p);
-    double dpdrho = vf[id]->GetDpdrho(rho,e);
-    double drho_op1 = (p-ps)/dpdrho/numSteps_rarefaction; //use EOS
-    double drho_op2 = rho/(numSteps_rarefaction*2.5); //initial step size
-    double drho_target = std::min(drho_op1, drho_op2);
-    double drho_max = 1.25 * drho_target;
-
     // prepare for numerical integration
     double rhos_0 = rho, us_0 = u, ps_0 = p, xi_0; //start point of each step
     double rhos_1 = rho, us_1 = u, ps_1 = p, xi_1; //end point of each step
-    double drho = drho_target;
-    double dp = std::min(dp_target, drho_target * dpdrho);
+    double dp = (p-ps)/numSteps_rarefaction;
 
+    double e = vf[id]->GetInternalEnergyPerUnitMass(rho,p);
     double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
-
     if(rho<=0 || c<0) {
       fprintf(stderr,"Warning: Negative density or c^2 (square of sound speed) in ComputeRhoUStar." 
                      "rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
@@ -1019,22 +1007,31 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       //
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
       if (It_wave == 1) { NSTP_2ND_IT = std::max(i, NSTP_2ND_IT);}  
-      double tiny = 1.e-14;
+      //double tiny = 1.e-14;
+    
       double errBar = tol_rarefaction; 
-      double uErrScaled = uErr / (c+tiny);
-      double rhoErrScaled = rhoErr / std::min( std::min(rhos1, rhos0), 0.001*fabs(rhos1-rhos0)/errBar);
+      double uErrScaled = uErr / c;
+      double rhoErrScaled = rhoErr / rho;
      // std::cout << "uErrScaled = " << uErrScaled << "." << std::endl;
       double dpTemp = 0;
       double safety = 0.9;
-      if (uErrScaled > errBar) { 
-        dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.25 );
-        dpTemp = std::max(dpTemp, 0.2*dp);
+      if (rhoErrScaled > errBar) { 
+        dpTemp = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.25 );
+        dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
         dp = std::min(dpTemp, ps_1-ps);
         continue;
       } 
+      else if (uErrScaled > errBar) {
+        dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.25 );
+        dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
+        dp = std::min(dpTemp, ps_1-ps);
+        continue;
+      }
       else {
-        dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
-        dpTemp = std::min(dpTemp, 10*dp);
+        double dpTemp_rho = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.2 );
+        double dpTemp_u = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
+        dpTemp = std::min(dpTemp_rho, dpTemp_u);        
+        dpTemp = std::min(dpTemp, 10*dp); //don't increase dp too much
       }
 #if PRINT_RIEMANN_SOLUTION == 1
       std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErr = " << uErr << ", uErrScaled = " << uErrScaled << "." << std::endl;
