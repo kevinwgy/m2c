@@ -68,15 +68,13 @@ int main(int argc, char* argv[])
   //! Initialize Embedded Boundary Operator, if needed
   EmbeddedBoundaryOperator *embed = NULL;
   if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
-    embed = new EmbeddedBoundaryOperator(iod, true); 
+    embed = new EmbeddedBoundaryOperator(comm, iod, true); 
     concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
                                     embed->GetPointerToForcesOnSurface(0));
   } else if(iod.ebm.embed_surfaces.surfaces.dataMap.size() != 0)
-    embed = new EmbeddedBoundaryOperator(iod, false);
+    embed = new EmbeddedBoundaryOperator(comm, iod, false);
 
-  //! Track the embedded boundaries
-  if(embed)
-    embed->TrackSurfaces();
+
   //! Initialize VarFcn (EOS, etc.) 
 
   std::vector<VarFcnBase *> vf;
@@ -137,6 +135,15 @@ int main(int argc, char* argv[])
 
   //! Initialize space operator
   SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
+
+  //! Track the embedded boundaries
+  if(embed) {
+    embed->SetCommAndMeshInfo(dms, spo.GetMeshCoordinates(), 
+                              *(spo.GetPointerToInnerGhostNodes()), *(spo.GetPointerToOuterGhostNodes()),
+                              xcoords, ycoords, zcoords, dx, dy, dz);
+    embed->SetupIntersectors();
+    embed->TrackSurfaces();
+  }
 
   //! Initialize interpolator
   InterpolatorBase *interp = NULL;

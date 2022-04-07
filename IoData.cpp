@@ -2402,6 +2402,7 @@ void SurfaceTrackerData::setup(const char *name, ClassAssigner *father)
 
 EmbeddedSurfaceData::EmbeddedSurfaceData()
 {
+  surface_provided_by_other_solver = NO;
   filename = "";
   type = None;
   thermal  = Adiabatic;
@@ -2413,7 +2414,11 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
+
+  new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByOtherSolver", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
+     "No", 0, "Yes", 1);
 
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
 

@@ -1001,7 +1001,10 @@ struct SurfaceTrackerData {
 
 //------------------------------------------------------------------------------
 
+//NOTE Currently, Embedded surface must use triangle elements.
 struct EmbeddedSurfaceData {
+
+  enum YesNo {NO = 0, YES = 1} surface_provided_by_other_solver;
 
   const char *filename; //!< file for nodal coordinates and elements
   

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string>
 #include <mpi.h>
+#include <cctype>
 
 using std::string;
 
@@ -44,6 +45,14 @@ void exit_mpi();
 //! Determine if solution snapshot should be written
 bool isTimeToWrite(double time, double dt, int time_step, double frequency_dt, int frequency,
                    double last_snapshot_time, bool force_write);
+//--------------------------------------------------
+//! case-insensitive string compare (true: equal;  false: unequal)
+inline bool same_strings_insensitive(std::string &str1, std::string &str2)
+{
+  return ((str1.size() == str2.size()) && 
+           std::equal(str1.begin(), str1.end(), str2.begin(), 
+                      [](char &c1, char &c2){return (c1==c2 || std::toupper(c1)==std::toupper(c2));}));
+}
 //--------------------------------------------------
 //! Copy a double array of known dimension
 inline void copyarray(double* in, double* out, int dim)

@@ -9,12 +9,11 @@ extern double domain_diagonal;
 
 Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
                          TriangulatedSurface &surface_, SpaceVariable3D &coordinates_, 
-                         SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
                          vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
                          vector<dobule> &x_, vector<double> &y_, vector<double> &z_,
                          vector<double> &dx_, vector<double> &dy_, vector<double> &dz_)
            : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree(NULL),
-             coordinates(coordinates_), delta_xyz(delta_xyz_), volume(volume_),
+             coordinates(coordinates_), 
              ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
              x_glob(x_), y_glob(y_), z_glob(z_), dx_glob(dx_), dy_glob(dy_), dz_glob(dz_),
              BBmin(comm_, &(dms_.ghosted1_3dof)),
@@ -22,6 +21,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              TMP(comm_, &(dms_.ghosted1_1dof)),
              TMP2(comm_, &(dms_.ghosted1_1dof)),
              CandidatesIndex(comm_, &(dms_.ghosted1_1dof)),
+             ClosestPointIndex(comm_, &(dms_.ghosted1_1dof)),
              XForward(comm_, &(dms_.ghosted1_3dof)),
              XBackward(comm_, &(dms_.ghosted1_3dof)),
              Phi(comm_, &(dms_.ghosted1_1dof)),
@@ -30,6 +30,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
 {
 
   CandidatesIndex.SetConstantValue(-1, true);
+  ClosestPointIndex.SetConstantValue(-1, true);
   XForward.SetConstantValue(-1, true);
   XBackward.SetConstantValue(-1, true);
 
@@ -85,10 +86,26 @@ Intersector::Destroy()
   TMP.Destroy();
   TMP2.Destroy();
   CandidatesIndex.Destroy();
+  ClosestPointIndex.Destroy();
   XForward.Destroy();
   XBackward.Destroy();
   Phi.Destroy();
   Sign.Destroy();
+}
+
+//-------------------------------------------------------------------------
+
+void
+Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, int phi_layers)
+{
+  assert(phi_layers>=1);
+
+  BuildNodalAndSubdomainBoundingBoxes(1); //1 layer
+  BuildSubdomainScopeAndKDTree();
+  FindNodalCandidates();
+  FindIntersections(true);
+  FloodFill(hasInlet, hasOutlet, hasOcc, nRegions);
+  CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
 }
 
 //-------------------------------------------------------------------------
@@ -942,13 +959,17 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
 
   double*** candid = CandidatesIndex.GetDataPointer();
   double*** phi    = Phi.GetDataPointer();
+  double*** cpi    = ClosestPointIndex.GetDataPointer();
   
   // set const. value to phi, by default
   double default_distance = domain_diagonal;
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++)
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++) {
         phi[k][j][i] = default_distance;
+        cpi[k][j][i] = -1;
+      }
+  closest_points.clear();
 
   assert(nLayer>=1);
 
@@ -965,42 +986,49 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
 
     int i,j,k;
     double bar = 0.99*default_distance;
+    double xi[3];
     for(auto it = this_layer.begin(); it != this_layer.end(); it++) {
 
       i = (*it)[0];
       j = (*it)[1];
       k = (*it)[2];
 
-      // we only need to take care of the subdomain interior, because phi will be assembled.
-      // but when layer is 1, "firstLayer" includes internal ghosts.
-      if(layer==1 && Phi.IsHere(i,j,k,false))
-        continue;
-
       assert(candid[k][j][i]>=0);
       vector<MyTriangles> &cands(candidates[candid[k][j][i]].second);
       assert(cands.size()>0);
 
-      double dist = DBL_MAX;
+      double dist = DBL_MAX, new_dist;
+      ClosestPoint cp(-1,DBL_MAX,xi); //initialize to garbage
+
       int id;
       for(int tri=0; tri<cands.size(); tri++) {
         id = cands[tri].trId();
         Int3 &nodes(Es[id]);
         Vec3D coords(x_glob[i], y_glob[j], z_glob[k]); //inside physical domain (safe)
-        dist = std::min(dist,
-                        GeoTools::ProjectPointToTriangle(coords, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
-                                                         &(As[id]), &(Ns[id]), false));
+        
+        new_dist = GeoTools::ProjectPointToTriangle(coords, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], xi,
+                                                    &(As[id]), &(Ns[id]), false)
+        if(new_dist<dist) {
+          dist = new_dist;
+          cp.tid = id;
+          cp.dist = new_dist;
+          for(int s=0; s<3; s++)
+            cp.xi[s] = xi[s];
+        }
       }
       phi[k][j][i] = dist;
+      closest_points.push_back(std::make_pair(*it, cp));
+      cpi[k][j][i] = closest_points.size() - 1;
 
       //insert neighbors to the next layer
       if(layer<nLayer) {
         assert(dist < bar);
-        if(i-1>=i0  && phi[k][j][i-1] >= bar) next_layer.insert(Int3(i-1,j,k));
-        if(i+1<imax && phi[k][j][i+1] >= bar) next_layer.insert(Int3(i+1,j,k));
-        if(j-1>=j0  && phi[k][j-1][i] >= bar) next_layer.insert(Int3(i,j-1,k));
-        if(j+1<jmax && phi[k][j+1][i] >= bar) next_layer.insert(Int3(i,j+1,k));
-        if(k-1>=k0  && phi[k-1][j][i] >= bar) next_layer.insert(Int3(i,j,k-1));
-        if(k+1<kmax && phi[k+1][j][i] >= bar) next_layer.insert(Int3(i,j,k+1));
+        if(i-1>=ii0_in  && phi[k][j][i-1] >= bar) next_layer.insert(Int3(i-1,j,k));
+        if(i+1<iimax_in && phi[k][j][i+1] >= bar) next_layer.insert(Int3(i+1,j,k));
+        if(j-1>=jj0_in  && phi[k][j-1][i] >= bar) next_layer.insert(Int3(i,j-1,k));
+        if(j+1<jjmax_in && phi[k][j+1][i] >= bar) next_layer.insert(Int3(i,j+1,k));
+        if(k-1>=kk0_in  && phi[k-1][j][i] >= bar) next_layer.insert(Int3(i,j,k-1));
+        if(k+1<kkmax_in && phi[k+1][j][i] >= bar) next_layer.insert(Int3(i,j,k+1));
       }
     }
 
@@ -1009,6 +1037,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
 
 
   CandidatesIndex.RestoreDataPointerToLocalVector();
+  ClosestPointIndex.RestoreDataPointerToLocalVector(); //cannot communicate, because "closest_points" do not.
   Phi.RestoreDataPointerAndInsert(); 
 
 }

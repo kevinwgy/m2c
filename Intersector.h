@@ -75,6 +75,20 @@ class Intersector {
   };
 
 
+  //! Utility class to store the closest point on the surface to a node (an arbitrary point)
+  struct ClosestPoint {
+    int tid;
+    double dist; //!< dist to the node in question
+    double xi[3]; //!< closest point is at xi[0]*node[0] + xi[1]*node[1] + xi[2]*node[2]
+
+    ClosestPoint(int tid_, double dist_, double xi_[3]) : tid(tid_), dist(dist_) {
+      for(int i=0; i<3; i++) xi[i] = xi_[i];}
+
+    ClosestPoint &operator=(const ClosestPoint& p2) {
+      tid = p2.tid;  dist = p2.dist;
+      for(int i=0; i<3; i++) xi[i] = p2.xi[i]; return *this;}
+  };
+
   MPI_Comm& comm;
 
   EmbeddedSurfaceData &iod_surface;
@@ -92,8 +106,6 @@ class Intersector {
 
   //! Mesh info
   SpaceVariable3D& coordinates;
-  SpaceVariable3D& delta_xyz;
-  SpaceVariable3D& volume;
 
   std::vector<GhostPoint> &ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   std::vector<GhostPoint> &ghost_nodes_outer; //!< ghost nodes outside the physical domain
@@ -134,6 +146,9 @@ class Intersector {
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
   SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or N (inlet, outlet). N = 1,2,...
                       
+  //! Closest point on triangle (for near-field nodes inside subdomain, including internal ghosts nodes)
+  SpaceVariable3D ClosestPointIndex; //!< index in the vector closest_points. (-1 means not available)
+  std::vector<std::pair<Int3, ClosestPoint> > closest_points;
 
   //! "intersections" stores edge-surface intersections where at least one vertex of the edge is inside the subdomain
   std::vector<IntersectionPoint> intersections; /**< NOTE: Not all these intersections are registered in XForward \n
@@ -156,7 +171,7 @@ public:
 
   Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
               TriangulatedSurface &surface_,
-              SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+              SpaceVariable3D &coordinates_, 
               std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
               std::vector<dobule> &x_, std::vector<double> &y_, std::vector<double> &z_,
               std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
@@ -165,12 +180,18 @@ public:
 
   void Destroy();
 
+  //! Interface tracking functions
+  void TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions);
 
-private:
+ 
+
+/** Below is like the a la carte menu. Try to use the pre-defined "combos" above as much as you can. 
+ *  The functions below are not all independent with each other!*/
+public:
 
   void BuildNodalAndSubdomainBoundingBoxes(int nLayer=1); //!< build BBmin, BBmax, subD_bbmin, subD_bbmax
 
-  void BuildSubdomainScopeAndKDTree(); //!< build "scope" and "tree"
+  void BuildSubdomainScopeAndKDTree(); //!< build "scope" and "tree". Requires subdomain bounding box
 
   //! Many functions below assume that "BuildNodalBoundingBoxes" and "BuildSubdomainScopeAndKDTree" have been called.
 
@@ -180,6 +201,8 @@ private:
 
   int FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions); /**< determine the generalized sign function ("Sign"). 
                                                                                      Returns the number of "colors" (sum of the four).\n*/
+  //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
+  void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
 
   /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This function only recomputes
    *  the "Sign" of swept nodes. It is faster, and also maintains the same "signs". Calling the original "FloodFill" function may 
@@ -187,11 +210,9 @@ private:
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
   int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, bool nodal_cands_calculated = false);
 
-  //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
-  void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
-
   void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
+private: 
   //! Utility functions
   //
   //! Use a tree to find candidates. maxCand may change, tmp may be reallocated (if size is insufficient)

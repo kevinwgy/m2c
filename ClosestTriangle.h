@@ -8,7 +8,7 @@
 /***********************************************************
  * class ClosestTriangle is a utility class that finds the 
  * signed distance from a point to a set of triangles that
- * for a CLOSED SURFACE (e.g., an embedded structure). This class was
+ * form a CLOSED SURFACE (e.g., an embedded structure). This class was
  * originally written by KW and ML around 2009. See
  * Wang et al., IJNMF, 2012 (The projection-based method).
  * Usage: It is usually not efficient nor necessary to run
