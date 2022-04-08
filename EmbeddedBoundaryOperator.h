@@ -42,7 +42,7 @@ class EmbeddedBoundaryOperator {
 public:
    
   //! Constructor: Without intersector (pointers are set to NULL) or M2C mesh info
-  EmbeddedBoundaryOperator(IoData &iod_, bool surface_from_other_solver = false);
+  EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver = false);
   ~EmbeddedBoundaryOperator();
 
   void Destroy();

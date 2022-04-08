@@ -1,5 +1,6 @@
 #include<Intersector.h>
 #include<GeoTools.h>
+#include<Intersections.h>
 using std::pair;
 using std::vector;
 
@@ -10,7 +11,7 @@ extern double domain_diagonal;
 Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
                          TriangulatedSurface &surface_, SpaceVariable3D &coordinates_, 
                          vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
-                         vector<dobule> &x_, vector<double> &y_, vector<double> &z_,
+                         vector<double> &x_, vector<double> &y_, vector<double> &z_,
                          vector<double> &dx_, vector<double> &dy_, vector<double> &dz_)
            : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree(NULL),
              coordinates(coordinates_), 
@@ -44,7 +45,6 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   // Set the capacity of internal vectors, so we don't frequently reallocate memory
   int capacity = (imax-i0)*(jmax-j0)*(kmax-k0)/4; //should be big enough
   intersections.reserve(capacity);
-  occluded.reserve(capacity); 
   candidates.reserve(capacity*2);
   scope.reserve(surface.elems.size());
 
@@ -104,7 +104,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   BuildSubdomainScopeAndKDTree();
   FindNodalCandidates();
   FindIntersections(true);
-  FloodFill(hasInlet, hasOutlet, hasOcc, nRegions);
+  FloodFillColors(hasInlet, hasOutlet, hasOcc, nRegions);
   CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
 }
 
@@ -160,7 +160,7 @@ Intersector::BuildSubdomainScopeAndKDTree()
     MyTriangle tri(it - Es.begin(), Xs[(*it)[0]], Xs[(*it)[1]], Xs[(*it)[2]]);
     bool inside = true;
     for(int i=0; i<3; i++) {
-      if(tri.val[i] > subD_bbmax[i] || tri.val[i] + tri.width[i] < subD_bbmin[i]) {
+      if(tri.val(i) > subD_bbmax[i] || tri.val(i) + tri.width(i) < subD_bbmin[i]) {
         inside = false;
         break;
       }
@@ -190,7 +190,7 @@ Intersector::FindNodalCandidates()
   Vec3D*** bbmax   = (Vec3D***) BBmax.GetDataPointer();
   double*** candid = CandidatesIndex.GetDataPointer();
 
-  MyTriangle *tmp = new MyTriange[nMaxCand];
+  MyTriangle *tmp = new MyTriangle[nMaxCand];
   
   // Work on all nodes inside the physical domain, including internal ghost layer
   for(int k=kk0_in; k<kkmax_in; k++)
@@ -360,8 +360,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
             intersections.push_back(xp1);
             xb[k][j][i][1] = intersections.size() - 1;
             layer[k][j-1][i] = layer[k][j][i] = 1;
-          } else {//more than one intersections
-          }
+          } 
         } else {
           xf[k][j][i][1] = xb[k][j][i][1] = -1;
         }
@@ -421,7 +420,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               // re-run the checker to get xi
               bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i-1], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
-                                            surface.elemArea[trif], surface.elemNorm[trif], xi);
+                                            &surface.elemArea[trif], &surface.elemNorm[trif], xi);
               assert(is_occluded);
               intersections.push_back(IntersectionPoint(i-1,j,k, 0, 0.0, trif, xi));
             }
@@ -432,7 +431,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               // re-run the checker to get xi
               bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
-                                            surface.elemArea[trif], surface.elemNorm[trif], xi);
+                                            &surface.elemArea[trif], &surface.elemNorm[trif], xi);
               assert(is_occluded);
               intersections.push_back(IntersectionPoint(i-1,j,k, 0, coords[k][j][i][0] - coords[k][j][i-1][0], trif, xi));
             }
@@ -484,7 +483,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               // re-run the checker to get xi
               bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j-1][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
-                                            surface.elemArea[trif], surface.elemNorm[trif], xi);
+                                            &surface.elemArea[trif], &surface.elemNorm[trif], xi);
               assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j-1,k, 1, 0.0, trif, xi));
             }
@@ -495,7 +494,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               // re-run the checker to get xi
               bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
-                                            surface.elemArea[trif], surface.elemNorm[trif], xi);
+                                            &surface.elemArea[trif], &surface.elemNorm[trif], xi);
               assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j-1,k, 1, coords[k][j][i][1] - coords[k][j-1][i][1], trif, xi));
             }
@@ -547,7 +546,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               // re-run the checker to get xi
               bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k-1][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
-                                            surface.elemArea[trif], surface.elemNorm[trif], xi);
+                                            &surface.elemArea[trif], &surface.elemNorm[trif], xi);
               assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j,k-1, 2, 0.0, trif, xi));
             }
@@ -558,7 +557,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
               // re-run the checker to get xi
               bool is_occluded = GeoTools::IsPointInsideTriangle(coords[k][j][i], surface.X[nf[0]],
                                             surface.X[nf[1]], surface.X[nf[2]], half_thickness,
-                                            surface.elemArea[trif], surface.elemNorm[trif], xi);
+                                            &surface.elemArea[trif], &surface.elemNorm[trif], xi);
               assert(is_occluded);
               intersections.push_back(IntersectionPoint(i,j,k-1, 2, coords[k][j][i][2] - coords[k-1][j][i][2], trif, xi));
             }
@@ -628,13 +627,19 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
 //-------------------------------------------------------------------------
 
-//optional
-void
-Intersector::FindShortestDistanceForFirstLayer //don't forget to subtract half_distance
-
-void
-Intersector::FindShortestDistanceForOtherNodes //call level set reinitializer
-
+int
+Intersector::FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec3D bbmax, 
+                                 MyTriangle* tmp, int& maxCand)
+{
+  int found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
+  if(found>maxCand) {
+    maxCand = found; 
+    delete [] tmp;
+    tmp = new MyTriangle[maxCand];
+    found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
+  }
+  return found;
+}
 
 //-------------------------------------------------------------------------
 
@@ -663,12 +668,12 @@ Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, do
 //-------------------------------------------------------------------------
 
 int
-Intersector::FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions)
+Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions)
 {
   // ----------------------------------------------------------------
   // Call floodfiller to do the work.
   // ----------------------------------------------------------------
-  int nColors = floodfiller.FillBasedOnEdgeObstructions(XForward, -1/*xf==-1 means no intersection*/, Sign, occluded);
+  int nColors = floodfiller.FillBasedOnEdgeObstructions(XForward, -1/*xf==-1 means no intersection*/, occluded, Sign);
 
   // ----------------------------------------------------------------
   // Now we need to convert the color map to what we want: 0~occluded, 1, 2,...: regions connected to Dirichlet
@@ -696,12 +701,12 @@ Intersector::FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegi
   int max_inlet_color(-1);
   for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
     max_inlet_color = std::max(max_inlet_color, *it);
-  MPI_Allreduce(MPI_IN_PLACE, &max_inlet_color, 1, MPI_INT, MPI_MAX, comm)  
+  MPI_Allreduce(MPI_IN_PLACE, &max_inlet_color, 1, MPI_INT, MPI_MAX, comm);
 
   vector<int> in_colors(max_inlet_color+1, -1);
   for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
     in_colors[*it] = 1;
-  MPI_Allreduce(MPI_IN_PLACE, in_colors.data(), in_colors.size(), MPI_INT, MPI_MAX, comm)  
+  MPI_Allreduce(MPI_IN_PLACE, in_colors.data(), in_colors.size(), MPI_INT, MPI_MAX, comm);
 
   if(in_colors[0] == 1 && verbose>1)
     print_warning("Warning: Found occluded node(s) near an inlet or farfield boundary.");
@@ -709,12 +714,12 @@ Intersector::FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegi
   int max_outlet_color(-1);
   for(auto it = outlet_color.begin(); it != outlet_color.end(); it++) 
     max_outlet_color = std::max(max_outlet_color, *it);
-  MPI_Allreduce(MPI_IN_PLACE, &max_outlet_color, 1, MPI_INT, MPI_MAX, comm)  
+  MPI_Allreduce(MPI_IN_PLACE, &max_outlet_color, 1, MPI_INT, MPI_MAX, comm);
 
   vector<int> out_colors(max_outlet_color+1, -1);
   for(auto it = outlet_color.begin(); it != outlet_color.end(); it++)
     out_colors[*it] = 1;
-  MPI_Allreduce(MPI_IN_PLACE, out_colors.data(), out_colors.size(), MPI_INT, MPI_MAX, comm)  
+  MPI_Allreduce(MPI_IN_PLACE, out_colors.data(), out_colors.size(), MPI_INT, MPI_MAX, comm);
   
   if(out_colors[0] == 1 && verbose>1)
     print_warning("Warning: Found occluded node(s) near an outlet or farfield boundary.");
@@ -748,14 +753,14 @@ Intersector::FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegi
       }
 
   // statistics
-  MPI_Allreduce(MPI_IN_PLACE, &total_occluded, 1, MPI_INT, MPI_SUM, comm)  
+  MPI_Allreduce(MPI_IN_PLACE, &total_occluded, 1, MPI_INT, MPI_SUM, comm);
 
   if(total_occluded>0) 
     hasOcc = true; //i.e. one zero color (for occluded)
 
   hasInlet = hasOutlet = false;
   nRegions = 0;
-  for(it = old2new.begin(); it != old2new.end(); it++)
+  for(auto it = old2new.begin(); it != old2new.end(); it++)
     if(it->second==1)
       hasInlet = true;
     else if(it->second==2)
@@ -770,8 +775,8 @@ Intersector::FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegi
 
 //-------------------------------------------------------------------------
 
-int
-Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, bool nodal_cands_calculated)
+void
+Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
 {
   // "FindSweptNodes" should be called before calling this function. So, in most cases, "nodal_cands_calculated" should be true
   
@@ -786,8 +791,8 @@ Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &has
   double*** candid = CandidatesIndex.GetDataPointer();
   
   //add swepted nodes to nodes2fill (including internal ghosts)
-  set<Int3> nodes2fill = swept;
-  set<Int3> nodes2fill2;
+  std::set<Int3> nodes2fill = swept;
+  std::set<Int3> nodes2fill2;
 
   // go over swept nodes, correct their signs
   int i0,j0,k0;
@@ -802,7 +807,7 @@ Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &has
   for(int iter = 0; iter < max_it; iter++) {
 
     total_remaining_nodes = nodes2fill.size();
-    MPI_Allreduce(MPI_IN_PLACE, &total_remaining_nodes, 1, MPI_INT, MPI_SUM, comm)  
+    MPI_Allreduce(MPI_IN_PLACE, &total_remaining_nodes, 1, MPI_INT, MPI_SUM, comm);
     if(total_remaining_nodes == 0) //Yeah
       break;
   
@@ -823,7 +828,7 @@ Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &has
 
       // if this node is swept, candidates must exist. Otherwise, the surface moved too much!
       assert(candid[k0][j0][i0]>=0);
-      vector<MyTriangles> &cands(candidates[candid[k0][j0][i0]].second);
+      vector<MyTriangle> &cands(candidates[candid[k0][j0][i0]].second);
       assert(cands.size()>0);
 
       //go over first layer neighbors, find a nonblocked reliable neighbor
@@ -860,6 +865,7 @@ Intersector::RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &has
          }
 
       DONE_WITH_THIS_NODE:
+      continue; //need this to make "GOTO" work
     }
     nodes2fill = nodes2fill2;
 
@@ -923,12 +929,17 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
 
   double collision_time;
 
+  int i,j,k;
   for(auto it = firstLayer.begin(); it != firstLayer.end(); it++) {
     if(occluded.find(*it) != occluded.end())
       continue; //we don't store nodes that are currently occluded
 
+    i = (*it)[0];
+    j = (*it)[1];
+    k = (*it)[2];
+
     assert(candid[k][j][i]>=0);
-    vector<MyTriangles> &cands(candidates[candid[k][j][i]].second);
+    vector<MyTriangle> &cands(candidates[candid[k][j][i]].second);
     assert(cands.size()>0);
 
     for(auto it2 = cands.begin(); it2 != cands.end(); it2++) {
@@ -994,7 +1005,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
       k = (*it)[2];
 
       assert(candid[k][j][i]>=0);
-      vector<MyTriangles> &cands(candidates[candid[k][j][i]].second);
+      vector<MyTriangle> &cands(candidates[candid[k][j][i]].second);
       assert(cands.size()>0);
 
       double dist = DBL_MAX, new_dist;
@@ -1007,7 +1018,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
         Vec3D coords(x_glob[i], y_glob[j], z_glob[k]); //inside physical domain (safe)
         
         new_dist = GeoTools::ProjectPointToTriangle(coords, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], xi,
-                                                    &(As[id]), &(Ns[id]), false)
+                                                    &(As[id]), &(Ns[id]), false);
         if(new_dist<dist) {
           dist = new_dist;
           cp.tid = id;
@@ -1045,7 +1056,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
 //-------------------------------------------------------------------------
 
 int
-Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir, double len, MyTriangles* tri, int nTri,
+Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir, double len, MyTriangle* tri, int nTri,
                                                 IntersectionPoint &xf, IntersectionPoint &xb)
 {
   vector<Vec3D>&  Xs(surface.X);

@@ -63,7 +63,7 @@ DynamicLoadCalculator::RunForAeroS()
 
   // Initialize Embedded Boundary Operator
   EmbeddedBoundaryOperator *embed = NULL;
-  embed = new EmbeddedBoundaryOperator(iod, true);
+  embed = new EmbeddedBoundaryOperator(comm, iod, true);
   concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
                                   embed->GetPointerToForcesOnSurface(0));
   

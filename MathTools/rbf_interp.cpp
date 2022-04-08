@@ -1,4 +1,4 @@
-# include <rbf_interp_2d.hpp>
+# include <rbf_interp.hpp>
 # include <r8lib.hpp>
 # include <cstdlib>
 # include <iostream>

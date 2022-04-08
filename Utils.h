@@ -47,7 +47,7 @@ bool isTimeToWrite(double time, double dt, int time_step, double frequency_dt, i
                    double last_snapshot_time, bool force_write);
 //--------------------------------------------------
 //! case-insensitive string compare (true: equal;  false: unequal)
-inline bool same_strings_insensitive(std::string &str1, std::string &str2)
+inline bool same_strings_insensitive(std::string str1, std::string str2)
 {
   return ((str1.size() == str2.size()) && 
            std::equal(str1.begin(), str1.end(), str2.begin(), 

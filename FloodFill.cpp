@@ -136,7 +136,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
          ob[k][j][i+1][0] == non_obstruction_flag && //not obstructed
          color[k][j][i+1] > color[k][j][i]) { //colors dos not match, and mine needs to be reset
         if(old2new.find(color[k][j][i+1]) == old2new.end() || old2new[color[k][j][i+1]] > color[k][j][i])
-          old2new[color[k][j][i+1]] = color[k][j][i]
+          old2new[color[k][j][i+1]] = color[k][j][i];
       }
       if(Color.IsHere(i-1,j,k,false) && //right boundary
          ob[k][j][i][0] == non_obstruction_flag && //not obstructed
@@ -178,7 +178,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
       for(int k=kk0_in; k<kkmax_in; k++)
         for(int j=jj0_in; j<jjmax_in; j++)
           for(int i=ii0_in; i<iimax_in; i++)
-            numColors = std::max(numColors, color[k][j][i]); //find numColors
+            numColors = std::max(numColors, (int)color[k][j][i]); //find numColors
 
       MPI_Allreduce(MPI_IN_PLACE, &numColors, 1, MPI_INT, MPI_MAX, comm);
 
@@ -200,7 +200,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
 
   } 
 
-  if(iter==mpi_size()) {
+  if(iter==mpi_size) {
     print_error("*** Error: Flood-fill failed after %d iterations.\n", iter);
     exit_mpi();
   }

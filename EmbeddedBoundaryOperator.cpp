@@ -108,12 +108,12 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
   coordinates_ptr       = &coordinates_;
   ghost_nodes_inner_ptr = &ghost_nodes_inner_; 
   ghost_nodes_outer_ptr = &ghost_nodes_outer_; 
-  x_glob_ptr            = &x_
-  y_glob_ptr            = &y_
-  z_glob_ptr            = &z_
-  dx_glob_ptr           = &dx_
-  dy_glob_ptr           = &dy_
-  dz_glob_ptr           = &dz_
+  x_glob_ptr            = &x_;
+  y_glob_ptr            = &y_;
+  z_glob_ptr            = &z_;
+  dx_glob_ptr           = &dx_;
+  dy_glob_ptr           = &dy_;
+  dz_glob_ptr           = &dz_;
 }
 
 //------------------------------------------------------------------------------------------------
@@ -147,7 +147,6 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
   int MAXLINE = 500;
   char line[MAXLINE], key1[MAXLINE], key2[MAXLINE], copyForType[MAXLINE];
 
-
   int num0 = 0;
   int num1 = 0;
   double x1, x2, x3;
@@ -166,21 +165,21 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
   while(fgets(line, MAXLINE, topFile) != 0) {
 
     sscanf(line, "%s", key1);
+    string key1_string(key1);
 
-    if(strcmp(key1.substr(0,1),"#") {
+    if(key1[0] == '#') {
       //Do nothing. This is user's comment
     }
-    else if(same_strings_insensitive(key1,"Nodes")){
+    else if(same_strings_insensitive(key1_string,"Nodes")){
       if(found_nodes) {//already found nodes... This is a conflict
         print_error("*** Error: Found multiple sets of nodes (keyword 'Nodes') in %s.\n", filename);
         exit_mpi();
       }
       sscanf(line, "%*s %s", key2);
-      nodeSetName = std::string(key2);
       type_reading = 1;
       found_nodes = true;
     }
-    else if(same_strings_insensitive(key1, "Elements")) {
+    else if(same_strings_insensitive(key1_string, "Elements")) {
 
       if(found_elems) {//already found elements... This is a conflict
         print_error("*** Error: Found multiple sets of elements (keyword 'Elements') in %s.\n", filename);
@@ -265,7 +264,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
   int nNodes = nodeList.size();
   map<int,int> old2new;
   Xs.resize(nNodes);
-  int id;
+  int id(-1);
   if(nNodes != maxNode) { // need to renumber nodes, i.e. create "old2new"
     print_warning("Warning: The node indices of an embedded surface have a gap: "
                   "max index = %d, number of nodes = %d. Renumbering nodes. (%s)",
@@ -306,6 +305,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
   // ------------------------------
   for(auto it = elemList.begin(); it != elemList.end(); it++) {
 
+    id = (*it)[0];
     node1 = (*it)[1];
     node2 = (*it)[2];
     node3 = (*it)[3];
@@ -430,7 +430,7 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
   // loop through all the surfaces
   for(int i = 0; i < F.size(); i++) {
     // copy force
-    assert(F[i].size() == F_prev[i].size())
+    assert(F[i].size() == F_prev[i].size());
     for(int j=0; j<F[i].size(); j++)
       F_prev[i][j] = F[i][j];
 
@@ -454,8 +454,19 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 void
 EmbeddedBoundaryOperator::TrackSurfaces()
 {
+  vector<bool> hasInlet(intersector.size(), false);
+  vector<bool> hasOutlet(intersector.size(), false);
+  vector<bool> hasOccluded(intersector.size(), false);
+  vector<int> numRegions(intersector.size(), 0);
+  int phi_layers = 3;
   for(int i = 0; i < intersector.size(); i++) {
-    intersector[i]->TrackSurfaceFullCourse();
+    bool a, b, c;
+    int d;
+    intersector[i]->TrackSurfaceFullCourse(a, b, c, d, phi_layers);
+    hasInlet[i] = a;
+    hasOutlet[i] = b;
+    hasOccluded[i] = c;
+    numRegions[i] = d;
   }
 }
 

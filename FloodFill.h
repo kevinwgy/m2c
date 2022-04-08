@@ -21,8 +21,8 @@ class FloodFill {
   int ii0_in, jj0_in, kk0_in, iimax_in, jjmax_in, kkmax_in; //!< corners of the ghosted subdomain, excluding external ghosts
   int NX, NY, NZ; //!< global size
 
-  vector<GhostPoint> ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
-  vector<GhostPoint> ghost_nodes_outer; //!< ghost nodes outside the physical domain
+  std::vector<GhostPoint> ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  std::vector<GhostPoint> ghost_nodes_outer; //!< ghost nodes outside the physical domain
 
 public:
 

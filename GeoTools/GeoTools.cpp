@@ -302,7 +302,7 @@ bool ContinuousRayTriangleCollision(Vec3D& x0, Vec3D& x, Vec3D& A0, Vec3D& B0, V
   Vec3D r0 = x0 - A0;
   Vec3D r1 = Dx - DA;
   Vec3D v0 = B0_A0^C0_A0;
-  Vec3D v1 = DB_DA^C0_A0 + B0_A0^DC_DA;
+  Vec3D v1 = (DB_DA^C0_A0) + (B0_A0^DC_DA);
   Vec3D v2 = DB_DA^DC_DA;
 
   // form cubic equation at^3 + bt^2 + ct + d = 0;

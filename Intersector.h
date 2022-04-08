@@ -43,6 +43,8 @@ class Intersector {
      *        If both vertices of the edge are occluded. The two vertices are considered as two intersection
      *        points. */
 
+    IntersectionPoint() : n0(-1,-1,-1), dir(-1), dist(-1), tid(-1) {xi[0] = xi[1] = xi[2] = -1;}
+
     IntersectionPoint(int i, int j, int k, int dir_, double dist_, int tid_, double* xi_)
       : n0(Int3(i,j,k)), dir(dir_), dist(dist_), tid(tid_) {xi[0] = xi_[0]; xi[1] = xi_[1]; xi[2] = xi_[2];}
 
@@ -60,9 +62,7 @@ class Intersector {
     MyTriangle(int id_, double x_[3], double w_[3]) : id(id_) {
       for(int j=0; j<3; j++) {x[j] = x_[j];  w[j] = w_[j];} 
     }
-    MyTriangle(const MyTriangle& t2) : id(t2.id) {
-      for(int j=0; j<3; j++) {x[j] = t2.x[j];  w[j] = t2.w[j];}
-    }
+
     MyTriangle(int id_, Vec3D& node1, Vec3D& node2, Vec3D& node3) : id(id_) {
       for(int j=0; j<3; j++) {
         x[j] = std::min(std::min(node1[j], node2[j]), node3[j]);
@@ -86,7 +86,7 @@ class Intersector {
 
     ClosestPoint &operator=(const ClosestPoint& p2) {
       tid = p2.tid;  dist = p2.dist;
-      for(int i=0; i<3; i++) xi[i] = p2.xi[i]; return *this;}
+      for(int i=0; i<3; i++) {xi[i] = p2.xi[i];} return *this;}
   };
 
   MPI_Comm& comm;
@@ -173,7 +173,7 @@ public:
               TriangulatedSurface &surface_,
               SpaceVariable3D &coordinates_, 
               std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
-              std::vector<dobule> &x_, std::vector<double> &y_, std::vector<double> &z_,
+              std::vector<double> &x_, std::vector<double> &y_, std::vector<double> &z_,
               std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
 
   ~Intersector();
@@ -181,7 +181,7 @@ public:
   void Destroy();
 
   //! Interface tracking functions
-  void TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions);
+  void TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, int phi_layers);
 
  
 
@@ -199,8 +199,8 @@ public:
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
 
-  int FloodFill(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions); /**< determine the generalized sign function ("Sign"). 
-                                                                                     Returns the number of "colors" (sum of the four).\n*/
+  int FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions); /**< determine the generalized sign function ("Sign"). 
+                                                                                          Returns the number of "colors" (sum of the four).\n*/
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
   void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
 
@@ -208,7 +208,7 @@ public:
    *  the "Sign" of swept nodes. It is faster, and also maintains the same "signs". Calling the original "FloodFill" function may 
    *  lead to sign(tag) change for the same enclosure.
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
-  int RefillAfterSurfaceUpdate(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, bool nodal_cands_calculated = false);
+  void RefillAfterSurfaceUpdate(bool nodal_cands_calculated = false);
 
   void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
@@ -216,23 +216,15 @@ private:
   //! Utility functions
   //
   //! Use a tree to find candidates. maxCand may change, tmp may be reallocated (if size is insufficient)
-  inline int FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec3D bbmax, 
-                                 MyTriangles* tmp, int& maxCand) {
-    int found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
-    if(found>maxCand) {
-      maxCand = found; delete [] tmp;  tmp = new MyTriangle[maxCand];
-      found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
-    }
-    return found; 
-  }
+  int FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec3D bbmax, MyTriangle* tmp, int& maxCand);
 
   //! Check if a point is occluded by a set of triangles (thickened)
-  bool IsPointOccludedByTriangles(Vec3D &coords, MyTriangle* tri, int nTri, double my_half_thickness
+  bool IsPointOccludedByTriangles(Vec3D &coords, MyTriangle* tri, int nTri, double my_half_thickness,
                                   int& tid, double* xi = NULL);
 
   //! Find the intersections of an edge with a set of triangles. Returns the number of intersections.
   int FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir/*0~x,1~y,2~z*/, 
-                                         double len, MyTriangles* tri, int nTri, 
+                                         double len, MyTriangle* tri, int nTri, 
                                          IntersectionPoint &xf, IntersectionPoint &xb); //!< 2 points, maybe the same
 
 };

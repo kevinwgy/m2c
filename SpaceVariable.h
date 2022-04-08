@@ -107,7 +107,7 @@ public:
   }
 
   inline void GetInternalGhostedCornerIndices(int *i0_, int *j0_, int *k0_, int *imax_=0, int *jmax_=0, int *kmax_=0) {
-    *i0_ = internLghost_i0; *j0_ = internal_ghost_j0; *k0_ = internal_ghost_k0;
+    *i0_ = internal_ghost_i0; *j0_ = internal_ghost_j0; *k0_ = internal_ghost_k0;
     if(imax_) *imax_ = internal_ghost_imax;
     if(jmax_) *jmax_ = internal_ghost_jmax;
     if(kmax_) *kmax_ = internal_ghost_kmax;
