@@ -59,8 +59,6 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
 
   closed_surface = surface.CheckSurfaceOrientationAndClosedness();
 
-  surface.CalculateNormalsAndAreas();
-
   //build nodal bounding boxes
   BuildNodalAndSubdomainBoundingBoxes(1);
 
@@ -104,6 +102,8 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   BuildSubdomainScopeAndKDTree();
   FindNodalCandidates();
   FindIntersections(true);
+  fprintf(stderr,"Got here!\n");
+  exit_mpi();
   FloodFillColors(hasInlet, hasOutlet, hasOcc, nRegions);
   CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
 }
@@ -169,10 +169,16 @@ Intersector::BuildSubdomainScopeAndKDTree()
       scope.push_back(tri); //creating a copy of "tri" and store it in scope
   }
 
+//  fprintf(stderr,"scope size: %d.\n", (int)scope.size());
+
   // build the tree
   if(tree)
     delete tree;
-  tree = new KDTree<MyTriangle,3>(scope.size(), scope.data());
+
+  if(scope.size()!=0)
+    tree = new KDTree<MyTriangle,3>(scope.size(), scope.data());
+  else
+    tree = NULL;
 }
 
 //-------------------------------------------------------------------------
@@ -180,7 +186,6 @@ Intersector::BuildSubdomainScopeAndKDTree()
 void
 Intersector::FindNodalCandidates()
 {
-  assert(tree);
 
   candidates.clear();
 
@@ -198,7 +203,7 @@ Intersector::FindNodalCandidates()
       for(int i=ii0_in; i<iimax_in; i++) {
 
         // find candidates
-        int nFound = FindCandidatesInBox(tree, bbmin[k][j][i], bbmax[k][j][i], tmp, nMaxCand);
+        int nFound = tree ? FindCandidatesInBox(tree, bbmin[k][j][i], bbmax[k][j][i], tmp, nMaxCand) : 0;
 
         // update candidates and CandidatesIndex
         if(nFound==0) {
@@ -288,7 +293,8 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
              candid[k][j][i-1] < 0) {
             //DO NOTHING. No nodal candidates
           } else
-            found_left = FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
+            found_left = tree ? FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left)
+                              : 0;
         }
 
         if(j-1>=0) { //the edge [k][j-1][i] -> [k][j][i] is inside the physical domain
@@ -296,7 +302,8 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
              candid[k][j-1][i] < 0) {
             //DO NOTHING. No nodal candidates
           } else
-            found_bottom = FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
+            found_bottom = tree ? FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom)
+                                : 0;
         }
 
         if(k-1>=0) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
@@ -304,7 +311,8 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
              candid[k-1][j][i] < 0) {
             //DO NOTHING. No nodal candidates
           } else
-            found_back = FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
+            found_back = tree ? FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back)
+                              : 0;
         }
 
 

@@ -67,10 +67,18 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
       }
     }
 
+    surface_type[index] = it->second->type;
 
     ReadMeshFile(it->second->filename, surface_type[index], surfaces[index].X, surfaces[index].elems);
 
     surfaces[index].X0 = surfaces[index].X;
+
+    surfaces[index].BuildConnectivities();
+    surfaces[index].CalculateNormalsAndAreas();
+/*
+    bool orientation = surfaces[index].CheckSurfaceOrientation(); 
+    bool closed = surfaces[index].CheckSurfaceClosedness();
+*/
   }
 
   print("- Activated the Embedded Boundary Method. Detected %d surface(s) (%d from concurrent program(s)).\n",
@@ -188,7 +196,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
       sscanf(line, "%*s %s", key2);
       type_reading = 2;
       found_elems = true;
-
+/*
       // now we look for keywords for the type of structure
       strcpy(copyForType, key2);
       int l = 0;
@@ -209,6 +217,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
         print_error("*** Error: Detected unsupported surface type in %s (%s).\n", filename, key2);
         exit_mpi();
       } 
+*/
     }
     else if(type_reading == 1) { //reading a node (following "Nodes Blabla")
       int count = sscanf(line, "%d %lf %lf %lf", &num1, &x1, &x2, &x3);
@@ -236,7 +245,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
         exit_mpi();
       }
       if(num0 > maxElem)
-        maxElem = num1;
+        maxElem = num0;
 
       elemList.push_back({num0, node1, node2, node3});
     }
@@ -266,10 +275,10 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
   Xs.resize(nNodes);
   int id(-1);
   if(nNodes != maxNode) { // need to renumber nodes, i.e. create "old2new"
-    print_warning("Warning: The node indices of an embedded surface have a gap: "
-                  "max index = %d, number of nodes = %d. Renumbering nodes. (%s)",
+    print_warning("Warning: The node indices of an embedded surface may have a gap: "
+                  "max index = %d, number of nodes = %d. Renumbering nodes. (%s)\n",
                   maxNode, nNodes, filename);
-    assert(nNodes < maxNode);
+//    assert(nNodes < maxNode);
 
     int current_id = 0; 
     vector<bool> nodecheck(maxNode+1, false);
@@ -356,10 +365,10 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
   int nElems = elemList.size();
   Es.resize(nElems);
   if(nElems != maxElem) { // need to renumber elements.
-    print_warning("Warning: The element indices of an embedded surface have a gap: "
-                  "max index = %d, number of elements = %d. Renumbering elements. (%s)",
+    print_warning("Warning: The element indices of an embedded surface may have a gap: "
+                  "max index = %d, number of elements = %d. Renumbering elements. (%s)\n",
                   maxElem, nElems, filename);
-    assert(nElems < maxElem);
+//    assert(nElems < maxElem);
     
     int current_id = 0; 
     vector<bool> elemcheck(maxElem+1, false);
