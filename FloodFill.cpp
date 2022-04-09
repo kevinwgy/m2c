@@ -69,9 +69,9 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
     mycolor++; //color starts at 1
 
     // find an undecided node as seed
-    for(int k=seed[2]; k<kkmax_in; k++)
-      for(int j=seed[1]; j<jjmax_in; j++)
-        for(int i=seed[0]; i<iimax_in; i++) {
+    for(int k=kk0_in; k<kkmax_in; k++)
+      for(int j=jj0_in; j<jjmax_in; j++)
+        for(int i=ii0_in; i<iimax_in; i++) {
           if(color[k][j][i] != UNDECIDED)
             continue; 
           seed[0] = i;
@@ -80,7 +80,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
           goto FOUND_SEED;
         }
     FOUND_SEED:
-    assert(seed != Int3(iimax_in-1,jjmax_in-1,kkmax_in-1));
+    assert(seed != Int3(iimax_in-1,jjmax_in-1,kkmax_in-1)); //everyone else are decided. this is the last one...
     Q.push(seed);
 
     int i,j,k;

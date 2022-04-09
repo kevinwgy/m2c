@@ -313,15 +313,28 @@ void SpaceVariable3D::StoreMeshCoordinates(SpaceVariable3D &coordinates)
 
 //---------------------------------------------------------
 
-void SpaceVariable3D::WriteToVTRFile(const char *filename)
+void SpaceVariable3D::WriteToVTRFile(const char *filename, const char *varname)
 {
   if(!dm)
     return;
+
+  if(varname)
+    SetOutputVariableName(varname);
 
   PetscViewer viewer;
   PetscViewerVTKOpen(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer);
   VecView(globalVec, viewer);
   PetscViewerDestroy(&viewer);
+}
+
+//---------------------------------------------------------
+
+void SpaceVariable3D::SetOutputVariableName(const char *name)
+{
+  if(!dm)
+    return;
+
+  PetscObjectSetName((PetscObject)(globalVec), name);
 }
 
 //---------------------------------------------------------

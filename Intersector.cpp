@@ -102,10 +102,15 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   BuildSubdomainScopeAndKDTree();
   FindNodalCandidates();
   FindIntersections(true);
-  fprintf(stderr,"Got here!\n");
-  exit_mpi();
   FloodFillColors(hasInlet, hasOutlet, hasOcc, nRegions);
   CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
+
+  Sign.StoreMeshCoordinates(coordinates);
+  Sign.WriteToVTRFile("Sign_filled.vtr", "color");
+  Phi.StoreMeshCoordinates(coordinates);
+  Phi.WriteToVTRFile("Phi.vtr", "phi");
+  fprintf(stderr,"Got here!\n");
+  exit_mpi();
 }
 
 //-------------------------------------------------------------------------
@@ -245,7 +250,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   intersections.clear();
 
   //Preparation
-  Vec3D tol(half_thickness*5, half_thickness*5, half_thickness*5); //a tolerance, more than enough
+  Vec3D tol(half_thickness*1.5, half_thickness*1.5, half_thickness*1.5); //a tolerance
 
   int max_left   = 500; //will increase if necessary
   int max_bottom = 500; 
@@ -277,9 +282,11 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
         layer[k][j][i] = -1;
 
+        if(!tree) //this subdomain is entirely away from surface, just set sign, occid, and layer to default values
+          continue; 
 
         if(candid && k<kmax && j<jmax && i<imax && //candid has a valid value @ i,j,k
-           candid[k][j][i] < 0)  //no nodal candidates, intersection impossible
+           candid[k][j][i] < 0)  //no nodal candidates, intersection impossible, occlusion also impossible
           continue;
  
 
@@ -289,32 +296,21 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         found_left = found_bottom = found_back = 0;
 
         if(i-1>=0) { //the edge [k][j][i-1] -> [k][j][i] is inside the physical domain
-          if(candid && k<kmax && j<jmax && //candid has a valid value @ i-1,j,k
-             candid[k][j][i-1] < 0) {
-            //DO NOTHING. No nodal candidates
-          } else
-            found_left = tree ? FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left)
-                              : 0;
+          found_left = FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
         }
 
         if(j-1>=0) { //the edge [k][j-1][i] -> [k][j][i] is inside the physical domain
-          if(candid && k<kmax && i<imax && //candid has a valid value @ i,j-1,k
-             candid[k][j-1][i] < 0) {
-            //DO NOTHING. No nodal candidates
-          } else
-            found_bottom = tree ? FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom)
-                                : 0;
+          found_bottom = FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
         }
 
         if(k-1>=0) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
-          if(candid && j<jmax && i<imax && //candid has a valid value @ i,j,k-1
-             candid[k-1][j][i] < 0) {
-            //DO NOTHING. No nodal candidates
-          } else
-            found_back = tree ? FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back)
-                              : 0;
+          found_back = FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
         }
 
+        if(j==0 && i==6) {
+          fprintf(stderr,"found_left = %d, found_bottom = %d, found_back = %d.\n", found_left, found_bottom, found_back);
+          fprintf(stderr,"candid = %e.\n", candid[k][j][i]);
+        } 
 
         //--------------------------------------------
         // Check if (i,j,k) is occluded
@@ -340,13 +336,19 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
           } else if(count==1) {
             intersections.push_back(xp0);
             xf[k][j][i][0] = xb[k][j][i][0] = intersections.size() - 1;
-            layer[k][j][i-1] = layer[k][j][i] = 1;
+            if(layer[k][j][i-1]==-1)  //it might be 0, meaning occluded. in that case we don't override
+              layer[k][j][i-1] = 1;
+            if(layer[k][j][i]==-1)
+              layer[k][j][i] = 1;
           } else {//more than one intersections
             intersections.push_back(xp0);
             xf[k][j][i][0] = intersections.size() - 1;
             intersections.push_back(xp1);
             xb[k][j][i][0] = intersections.size() - 1;
-            layer[k][j][i-1] = layer[k][j][i] = 1;
+            if(layer[k][j][i-1]==-1)
+              layer[k][j][i-1] =1;
+            if(layer[k][j][i]==-1)
+              layer[k][j][i] = 1;
           }
         } else {
           xf[k][j][i][0] = xb[k][j][i][0] = -1;
@@ -361,13 +363,19 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
           } else if(count==1) {
             intersections.push_back(xp0);
             xf[k][j][i][1] = xb[k][j][i][1] = intersections.size() - 1;
-            layer[k][j-1][i] = layer[k][j][i] = 1;
+            if(layer[k][j-1][i]==-1)
+              layer[k][j-1][i] = 1;
+            if(layer[k][j][i]==-1)
+              layer[k][j][i] = 1;
           } else {//more than one intersections
             intersections.push_back(xp0);
             xf[k][j][i][1] = intersections.size() - 1;
             intersections.push_back(xp1);
             xb[k][j][i][1] = intersections.size() - 1;
-            layer[k][j-1][i] = layer[k][j][i] = 1;
+            if(layer[k][j-1][i]==-1)
+              layer[k][j-1][i] = 1;
+            if(layer[k][j][i]==-1)
+              layer[k][j][i] = 1;
           } 
         } else {
           xf[k][j][i][1] = xb[k][j][i][1] = -1;
@@ -382,13 +390,19 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
           } else if(count==1) {
             intersections.push_back(xp0);
             xf[k][j][i][2] = xb[k][j][i][2] = intersections.size() - 1;
-            layer[k-1][j][i] = layer[k][j][i] = 1;
+            if(layer[k-1][j][i]==-1)
+              layer[k-1][j][i] = 1;
+            if(layer[k][j][i]==-1)
+              layer[k][j][i] = 1;
           } else {//more than one intersections
             intersections.push_back(xp0);
             xf[k][j][i][2] = intersections.size() - 1;
             intersections.push_back(xp1);
             xb[k][j][i][2] = intersections.size() - 1;
-            layer[k-1][j][i] = layer[k][j][i] = 1;
+            if(layer[k-1][j][i]==-1)
+              layer[k-1][j][i] = 1;
+            if(layer[k][j][i]==-1)
+              layer[k][j][i] = 1;
           }
         } else {
           xf[k][j][i][2] = xb[k][j][i][2] = -1;
@@ -609,8 +623,14 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   XBackward.RestoreDataPointerToLocalVector(); //Cannot exchange data, because "intersections" does not communicate
 
   coordinates.RestoreDataPointerToLocalVector();
-
-
+/*
+  XForward.RestoreDataPointerAndInsert();
+  XForward.StoreMeshCoordinates(coordinates);
+  XForward.WriteToVTRFile("XForward.vtr", "xf");
+  XBackward.RestoreDataPointerAndInsert();
+  XBackward.StoreMeshCoordinates(coordinates);
+  XBackward.WriteToVTRFile("XBackward.vtr", "xb");
+*/
   // ----------------------------------------------------------------------------
   // Build the sets of occluded and firstLayer nodes. Include internal ghost nodes
   // ----------------------------------------------------------------------------
@@ -631,6 +651,14 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
   TMP2.RestoreDataPointerToLocalVector();
 
+/*
+  TMP2.StoreMeshCoordinates(coordinates);
+  TMP2.WriteToVTRFile("TMP2.vtr", "layer");
+  TMP.StoreMeshCoordinates(coordinates);
+  TMP.WriteToVTRFile("TMP.vtr", "occid");
+  Sign.StoreMeshCoordinates(coordinates);
+  Sign.WriteToVTRFile("Sign.vtr", "sign");
+*/
 }
 
 //-------------------------------------------------------------------------
@@ -711,12 +739,18 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
     max_inlet_color = std::max(max_inlet_color, *it);
   MPI_Allreduce(MPI_IN_PLACE, &max_inlet_color, 1, MPI_INT, MPI_MAX, comm);
 
-  vector<int> in_colors(max_inlet_color+1, -1);
-  for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
-    in_colors[*it] = 1;
-  MPI_Allreduce(MPI_IN_PLACE, in_colors.data(), in_colors.size(), MPI_INT, MPI_MAX, comm);
+  vector<int> in_colors;
+  if(max_inlet_color!=-1) {
+    in_colors.resize(max_inlet_color+1, -1);
+    for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
+      in_colors[*it] = 1;
+    MPI_Allreduce(MPI_IN_PLACE, in_colors.data(), in_colors.size(), MPI_INT, MPI_MAX, comm);
+  }
 
-  if(in_colors[0] == 1 && verbose>1)
+  if(in_colors.size()==0) 
+    print_warning("Warning: Intersector did not find an inlet/farfield boundary of the M2C domain.\n");
+
+  if(in_colors.size()>0 && in_colors[0] == 1 && verbose>1)
     print_warning("Warning: Found occluded node(s) near an inlet or farfield boundary.");
 
   int max_outlet_color(-1);
@@ -724,12 +758,15 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
     max_outlet_color = std::max(max_outlet_color, *it);
   MPI_Allreduce(MPI_IN_PLACE, &max_outlet_color, 1, MPI_INT, MPI_MAX, comm);
 
-  vector<int> out_colors(max_outlet_color+1, -1);
-  for(auto it = outlet_color.begin(); it != outlet_color.end(); it++)
-    out_colors[*it] = 1;
-  MPI_Allreduce(MPI_IN_PLACE, out_colors.data(), out_colors.size(), MPI_INT, MPI_MAX, comm);
-  
-  if(out_colors[0] == 1 && verbose>1)
+  vector<int> out_colors;
+  if(max_outlet_color!=-1) {
+    out_colors.resize(max_outlet_color+1, -1);
+    for(auto it = outlet_color.begin(); it != outlet_color.end(); it++)
+      out_colors[*it] = 1;
+    MPI_Allreduce(MPI_IN_PLACE, out_colors.data(), out_colors.size(), MPI_INT, MPI_MAX, comm);
+  }
+ 
+  if(out_colors.size()>0 && out_colors[0] == 1 && verbose>1)
     print_warning("Warning: Found occluded node(s) near an outlet or farfield boundary.");
 
   // Convert colors 
@@ -748,6 +785,9 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
   for(int i=1; i<nColors+1; i++)
     if(old2new.find(i) == old2new.end())
       old2new[i] = --tmp_counter;
+
+  for(auto it = old2new.begin(); it != old2new.end(); it++)
+    fprintf(stderr,"old2new: %d --> %d.\n", it->first, it->second);
 
   int total_occluded = 0;
 
@@ -775,6 +815,8 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
       hasOutlet = true;
     else if(it->second<0)
       nRegions++;
+
+  fprintf(stderr,"sign[0][0][6] = %e.\n", sign[0][0][6]);
 
   Sign.RestoreDataPointerAndInsert();
 
