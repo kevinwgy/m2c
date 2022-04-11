@@ -133,7 +133,7 @@ class Intersector {
   SpaceVariable3D CandidatesIndex; //!< index in the vector "candidates" (-1 means no candidates)
   std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates;
 
-  //! XForward/XBackward stores edge-surface intersections where at least one vertex of the edge is inside the subdomain.
+  //! XForward/XBackward stores edge-surface intersections where both vertices of the edge are inside subdomain or inn. ghost
   SpaceVariable3D XForward; /**< Edge-surface intersections. X[k][j][i][0]: left-edge, [1]: bottom-edge, [2]: back-edge \n
                                  considers all the edges for which BOTH vertices are within the physical domain \n
                                  -1: no intersection. \n

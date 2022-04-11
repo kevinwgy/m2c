@@ -83,7 +83,7 @@ ClosestTriangle::checkTriangle(int trId)
   const double eps = 0;
 
   if(xi1 >= -eps && xi2 >= -eps && xi3 >= -eps) {
-    if(isFirst || std::abs(minDist) > std::abs(dist)) {
+    if(isFirst || std::fabs(minDist) > std::fabs(dist)) {
       isFirst = false;
       minDist = dist;
       bestTrId = trId;
@@ -166,7 +166,7 @@ void ClosestTriangle::checkVertex(int ip1, int trId, double trDist) {
   // Compute the distance to the node. Determining the sign of the distance
   // is delayed until the very end
   double dist = (x-structX[ip1]).norm();
-  if(isFirst || dist < std::abs(minDist)) {
+  if(isFirst || dist < std::fabs(minDist)) {
     isFirst = false;
     n1 = ip1;
     n2 = -1;
@@ -293,7 +293,7 @@ ClosestTriangle::checkEdge(int trId, int ip1, int ip2, int p3, double trDist) {
       return true;
     }
 
-    if(isFirst || std::abs(dist) < std::abs(minDist)) {
+    if(isFirst || std::fabs(dist) < std::fabs(minDist)) {
       isFirst = false;
       bestTrId = trId;
       n = structNorm[bestTrId];
@@ -366,7 +366,7 @@ double ClosestTriangle::findSignedVertexDistance()
 
     int sign = findTesterStatus(x_trial);
     if(sign!=0) {
-      minDist = (double)sign*std::abs(minDist);
+      minDist = (double)sign*std::fabs(minDist);
 //      fprintf(stderr,"NOTE: x = (%e, %e, %e), node = %d, x_trial = (%e, %e, %e). sign = %d, minDist = %e\n", x[0], x[1], x[2], n1+1, x_trial[0], x_trial[1], x_trial[2], sign, minDist);
       return minDist;
     }// else
@@ -404,7 +404,7 @@ int ClosestTriangle::findTesterStatus(Vec3D xt) const
     if((n1==triNodes[*it][0] || xi[0] >= -eps) &&
        (n1==triNodes[*it][1] || xi[1] >= -eps) &&
        (n1==triNodes[*it][2] || xi[2] >= -eps)) {
-      if(std::abs(mindist) >= std::abs(dist)) {
+      if(std::fabs(mindist) >= std::fabs(dist)) {
         mindist = dist;
         myMode = 0;
         nn1 = nn2 = -1;
@@ -466,7 +466,7 @@ void ClosestTriangle::checkEdgeForTester(Vec3D xt, int trId, int ip1, int ip2, i
     if((alpha<-eps && p1==n1) || (alpha>1.0+eps && p2==n1))
       return;
 
-    if(std::abs(dist) < std::abs(mindist)) {
+    if(std::fabs(dist) < std::fabs(mindist)) {
       bestTriangle = trId;
       nn1 = p1;
       nn2 = p2;

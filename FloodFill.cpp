@@ -40,11 +40,28 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
 
   //Note: Only fills nodes within the physical domain.
 
-  int mpi_size(0);
+  int mpi_rank(-1), mpi_size(0);
   MPI_Comm_size(comm, &mpi_size);
+  MPI_Comm_rank(comm, &mpi_rank);
 
   Vec3D***     ob = (Vec3D***) Obs.GetDataPointer();
   double*** color = Color.GetDataPointer();
+
+/*
+  if(mpi_rank==1) {
+  fprintf(stderr,"ii0 = %d, jj0= %d, kk0 = %d, iimax_in = %d, jjmax_in = %d, kkmax_in = %d.\n", ii0, jj0, kk0, iimax_in, jjmax_in, kkmax_in);
+  for(int k=kk0; k<kkmax_in; k++)
+    for(int j=jj0; j<jjmax_in; j++)
+      for(int i=ii0; i<iimax_in; i++) {
+        if(ob[k][j][i][0] != non_obstruction_flag)
+          fprintf(stderr,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k,j,i-1, k,j,i);
+        if(ob[k][j][i][1] != non_obstruction_flag)
+          fprintf(stderr,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k,j-1,i, k,j,i);
+        if(ob[k][j][i][2] != non_obstruction_flag)
+          fprintf(stderr,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k-1,j,i, k,j,i);
+      }
+  }
+*/
 
   //---------------------------------
   // Part I. Fill the subdomain
@@ -114,7 +131,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
   }
   Color.RestoreDataPointerAndInsert();
 
-
+  Color.WriteToVTRFile("Sign0.vtr", "color0");
   //---------------------------------
   // Part II. Unionize colors
   //---------------------------------
@@ -134,7 +151,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
       k = it->ijk[2];
       if(Color.IsHere(i+1,j,k,false) && //left boundary
          ob[k][j][i+1][0] == non_obstruction_flag && //not obstructed
-         color[k][j][i+1] > color[k][j][i]) { //colors dos not match, and mine needs to be reset
+         color[k][j][i+1] > color[k][j][i]) { //colors do not match, and mine needs to be reset
         if(old2new.find(color[k][j][i+1]) == old2new.end() || old2new[color[k][j][i+1]] > color[k][j][i])
           old2new[color[k][j][i+1]] = color[k][j][i];
       }

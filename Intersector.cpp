@@ -105,11 +105,20 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   FloodFillColors(hasInlet, hasOutlet, hasOcc, nRegions);
   CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
 
+  Vec3D*** xf = (Vec3D***) XForward.GetDataPointer();
+  XForward.RestoreDataPointerAndInsert();
+  XForward.StoreMeshCoordinates(coordinates);
+  XForward.WriteToVTRFile("XForward.vtr", "xf");
+  Vec3D*** xb = (Vec3D***) XBackward.GetDataPointer();
+  XBackward.RestoreDataPointerAndInsert();
+  XBackward.StoreMeshCoordinates(coordinates);
+  XBackward.WriteToVTRFile("XBackward.vtr", "xb");
   Sign.StoreMeshCoordinates(coordinates);
-  Sign.WriteToVTRFile("Sign_filled.vtr", "color");
+  Sign.WriteToVTRFile("Sign.vtr", "color");
   Phi.StoreMeshCoordinates(coordinates);
   Phi.WriteToVTRFile("Phi.vtr", "phi");
   fprintf(stderr,"Got here!\n");
+  MPI_Barrier(comm);
   exit_mpi();
 }
 
@@ -270,9 +279,9 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   // ----------------------------------------------------------------------------
   firstLayer.clear();
   // We only deal with edges whose vertices are both in the real domain
-  for(int k=k0; k<kkmax_in; k++)
-    for(int j=j0; j<jjmax_in; j++)
-      for(int i=i0; i<iimax_in; i++) {
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++) {
   
         // start with assuming it is outside
         sign[k][j][i] = 1;
@@ -306,11 +315,6 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         if(k-1>=0) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
           found_back = FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
         }
-
-        if(j==0 && i==6) {
-          fprintf(stderr,"found_left = %d, found_bottom = %d, found_back = %d.\n", found_left, found_bottom, found_back);
-          fprintf(stderr,"candid = %e.\n", candid[k][j][i]);
-        } 
 
         //--------------------------------------------
         // Check if (i,j,k) is occluded
@@ -422,12 +426,12 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   // Make sure all edges connected to occluded nodes have intersections
   // ----------------------------------------------------------------------------
   bool ijk_occluded;
-  for(int k=k0; k<kkmax_in; k++)
-    for(int j=j0; j<jjmax_in; j++)
-      for(int i=i0; i<iimax_in; i++) {
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++) {
  
         ijk_occluded = (occid[k][j][i]>=0);
-        if(i-1>=0) { //left edge within physical domain
+        if(i-1>=ii0_in) { //left edge within physical domain
           
           if(occid[k][j][i-1]<0 && !ijk_occluded) { //neither (i-1,j,k) nor (i,j,k) occluded
             //nothing to be done   
@@ -490,7 +494,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         }
 
 
-        if(j-1>=0) { //bottom edge within physical domain
+        if(j-1>=jj0_in) { //bottom edge within physical domain
           
           if(occid[k][j-1][i]<0 && !ijk_occluded) { //neither (i,j-1,k) nor (i,j,k) occluded
             //nothing to be done   
@@ -553,7 +557,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         }
 
 
-        if(k-1>=0) { //back edge within physical domain
+        if(k-1>=kk0_in) { //back edge within physical domain
           
           if(occid[k-1][j][i]<0 && !ijk_occluded) { //neither (i,j,k-1) nor (i,j,k) occluded
             //nothing to be done   
@@ -709,6 +713,7 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
   // ----------------------------------------------------------------
   // Call floodfiller to do the work.
   // ----------------------------------------------------------------
+  Sign.StoreMeshCoordinates(coordinates);
   int nColors = floodfiller.FillBasedOnEdgeObstructions(XForward, -1/*xf==-1 means no intersection*/, occluded, Sign);
 
   // ----------------------------------------------------------------
@@ -786,8 +791,10 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
     if(old2new.find(i) == old2new.end())
       old2new[i] = --tmp_counter;
 
+/*
   for(auto it = old2new.begin(); it != old2new.end(); it++)
     fprintf(stderr,"old2new: %d --> %d.\n", it->first, it->second);
+*/
 
   int total_occluded = 0;
 
@@ -815,8 +822,6 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
       hasOutlet = true;
     else if(it->second<0)
       nRegions++;
-
-  fprintf(stderr,"sign[0][0][6] = %e.\n", sign[0][0][6]);
 
   Sign.RestoreDataPointerAndInsert();
 
@@ -1080,6 +1085,13 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
       phi[k][j][i] = dist;
       closest_points.push_back(std::make_pair(*it, cp));
       cpi[k][j][i] = closest_points.size() - 1;
+
+/*
+      //verification
+      double dist_true = fabs(19.4555 - sqrt(x_glob[i]*x_glob[i]+y_glob[j]*y_glob[j]));
+      fprintf(stderr,"[%d][%d][%d]: (%e, %e, %e) true: %e, numr: %e.\n", i,j,k, x_glob[i], y_glob[j], z_glob[k],
+                     dist_true, dist);
+*/
 
       //insert neighbors to the next layer
       if(layer<nLayer) {
