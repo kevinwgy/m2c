@@ -105,6 +105,8 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   FloodFillColors(hasInlet, hasOutlet, hasOcc, nRegions);
   CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
 
+/*
+  Debug
   Vec3D*** xf = (Vec3D***) XForward.GetDataPointer();
   XForward.RestoreDataPointerAndInsert();
   XForward.StoreMeshCoordinates(coordinates);
@@ -120,6 +122,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   fprintf(stderr,"Got here!\n");
   MPI_Barrier(comm);
   exit_mpi();
+*/
 }
 
 //-------------------------------------------------------------------------
@@ -203,13 +206,13 @@ Intersector::FindNodalCandidates()
 
   candidates.clear();
 
-  int nMaxCand = 500; //will increase if necessary
+  int nMaxCand = 1000; //will increase if necessary
 
   Vec3D*** bbmin   = (Vec3D***) BBmin.GetDataPointer();
   Vec3D*** bbmax   = (Vec3D***) BBmax.GetDataPointer();
   double*** candid = CandidatesIndex.GetDataPointer();
 
-  MyTriangle *tmp = new MyTriangle[nMaxCand];
+  vector<MyTriangle> tmp(nMaxCand);
   
   // Work on all nodes inside the physical domain, including internal ghost layer
   for(int k=kk0_in; k<kkmax_in; k++)
@@ -237,7 +240,6 @@ Intersector::FindNodalCandidates()
   BBmax.RestoreDataPointerToLocalVector();
   CandidatesIndex.RestoreDataPointerToLocalVector(); //can NOT communicate, because "candidates" do not.
 
-  delete [] tmp;
 }
 
 //-------------------------------------------------------------------------
@@ -261,15 +263,15 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   //Preparation
   Vec3D tol(half_thickness*1.5, half_thickness*1.5, half_thickness*1.5); //a tolerance
 
-  int max_left   = 500; //will increase if necessary
-  int max_bottom = 500; 
-  int max_back   = 500; 
+  int max_left   = 1000; //will increase if necessary
+  int max_bottom = 1000; 
+  int max_back   = 1000; 
 
-  MyTriangle *tmp_left = new MyTriangle[max_left];
+  vector<MyTriangle> tmp_left(max_left);
   int found_left;
-  MyTriangle *tmp_bottom = new MyTriangle[max_bottom];
+  vector<MyTriangle> tmp_bottom(max_bottom);
   int found_bottom;
-  MyTriangle *tmp_back = new MyTriangle[max_back];
+  vector<MyTriangle> tmp_back(max_back);
   int found_back;
 
   IntersectionPoint xp0, xp1;
@@ -304,15 +306,15 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         //--------------------------------------------
         found_left = found_bottom = found_back = 0;
 
-        if(i-1>=0) { //the edge [k][j][i-1] -> [k][j][i] is inside the physical domain
+        if(i-1>=ii0_in) { //the edge [k][j][i-1] -> [k][j][i] is inside the physical domain
           found_left = FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
         }
 
-        if(j-1>=0) { //the edge [k][j-1][i] -> [k][j][i] is inside the physical domain
+        if(j-1>=jj0_in) { //the edge [k][j-1][i] -> [k][j][i] is inside the physical domain
           found_bottom = FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
         }
 
-        if(k-1>=0) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
+        if(k-1>=kk0_in) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
           found_back = FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
         }
 
@@ -320,9 +322,9 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         // Check if (i,j,k) is occluded
         //--------------------------------------------
         int tid(-1);
-        if ((found_left>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_left,   found_left,   half_thickness, tid)) ||
-            (found_bottom>0 && IsPointOccludedByTriangles(coords[k][j][i], tmp_bottom, found_bottom, half_thickness, tid)) ||
-            (found_back>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_back,   found_back,   half_thickness, tid))) {
+        if ((found_left>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_left.data(),   found_left,   half_thickness, tid)) ||
+            (found_bottom>0 && IsPointOccludedByTriangles(coords[k][j][i], tmp_bottom.data(), found_bottom, half_thickness, tid)) ||
+            (found_back>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_back.data(),   found_back,   half_thickness, tid))) {
           sign[k][j][i] = 0;
           occid[k][j][i] = tid;
           layer[k][j][i] = 0;          
@@ -334,7 +336,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         // left
         if(found_left) {
           int count = FindEdgeIntersectionsWithTriangles(coords[k][j][i-1], i-1, j, k, 0, 
-                          coords[k][j][i][0] - coords[k][j][i-1][0], tmp_left, found_left, xp0, xp1);
+                          coords[k][j][i][0] - coords[k][j][i-1][0], tmp_left.data(), found_left, xp0, xp1);
           if(count==0) {
             xf[k][j][i][0] = xb[k][j][i][0] = -1;
           } else if(count==1) {
@@ -361,7 +363,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         // bottom 
         if(found_bottom) {
           int count = FindEdgeIntersectionsWithTriangles(coords[k][j-1][i], i, j-1, k, 1, 
-                          coords[k][j][i][1] - coords[k][j-1][i][1], tmp_bottom, found_bottom, xp0, xp1);
+                          coords[k][j][i][1] - coords[k][j-1][i][1], tmp_bottom.data(), found_bottom, xp0, xp1);
           if(count==0) {
             xf[k][j][i][1] = xb[k][j][i][1] = -1;
           } else if(count==1) {
@@ -388,7 +390,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         // back 
         if(found_back) {
           int count = FindEdgeIntersectionsWithTriangles(coords[k-1][j][i], i, j, k-1, 2, 
-                          coords[k][j][i][2] - coords[k-1][j][i][2], tmp_back, found_back, xp0, xp1);
+                          coords[k][j][i][2] - coords[k-1][j][i][2], tmp_back.data(), found_back, xp0, xp1);
           if(count==0) {
             xf[k][j][i][2] = xb[k][j][i][2] = -1;
           } else if(count==1) {
@@ -669,14 +671,13 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
 int
 Intersector::FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec3D bbmax, 
-                                 MyTriangle* tmp, int& maxCand)
+                                 vector<MyTriangle> &tmp, int& maxCand)
 {
-  int found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
+  int found = mytree->findCandidatesInBox(bbmin, bbmax, tmp.data(), maxCand);
   if(found>maxCand) {
     maxCand = found; 
-    delete [] tmp;
-    tmp = new MyTriangle[maxCand];
-    found = mytree->findCandidatesInBox(bbmin, bbmax, tmp, maxCand);
+    tmp.resize(maxCand);
+    found = mytree->findCandidatesInBox(bbmin, bbmax, tmp.data(), maxCand);
   }
   return found;
 }
@@ -713,7 +714,6 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
   // ----------------------------------------------------------------
   // Call floodfiller to do the work.
   // ----------------------------------------------------------------
-  Sign.StoreMeshCoordinates(coordinates);
   int nColors = floodfiller.FillBasedOnEdgeObstructions(XForward, -1/*xf==-1 means no intersection*/, occluded, Sign);
 
   // ----------------------------------------------------------------

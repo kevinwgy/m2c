@@ -143,8 +143,6 @@ int main(int argc, char* argv[])
                               xcoords, ycoords, zcoords, dx, dy, dz);
     embed->SetupIntersectors();
     embed->TrackSurfaces();
-    print("Got here!\n");
-    return 0;
   }
 
   //! Initialize interpolator

@@ -216,7 +216,7 @@ private:
   //! Utility functions
   //
   //! Use a tree to find candidates. maxCand may change, tmp may be reallocated (if size is insufficient)
-  int FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec3D bbmax, MyTriangle* tmp, int& maxCand);
+  int FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec3D bbmax, std::vector<MyTriangle> &tmp, int& maxCand);
 
   //! Check if a point is occluded by a set of triangles (thickened)
   bool IsPointOccludedByTriangles(Vec3D &coords, MyTriangle* tri, int nTri, double my_half_thickness,

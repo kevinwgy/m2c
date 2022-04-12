@@ -11,6 +11,8 @@ struct GhostPoint {
 
   bool isNode; //!< whether the ghost point is a node
 
+  int owner_proc; //!< (only used when isNode==true) ID of the processor that owns this ghost node
+
   Int3  ijk; //!< if not a node, this should be the indices of the lower-left corner of the interpolation cell
   Vec3D xi; //!< local coordinates for trilinear interpolation
 
@@ -29,42 +31,42 @@ struct GhostPoint {
   GhostPoint() : 
       isNode(false), ijk(INT_MAX), xi(0.0), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE), side(UNDEFINED) {}
+      type_projection(NONE), side(UNDEFINED), owner_proc(-1) {}
 
   GhostPoint(Int3 ijk_) : 
       isNode(true), ijk(ijk_), xi(0.0), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE), side(UNDEFINED) {}
+      type_projection(NONE), side(UNDEFINED), owner_proc(-1)  {}
 
   GhostPoint(int i, int j, int k) : 
       isNode(true), ijk(Int3(i,j,k)), xi(0.0), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE), side(UNDEFINED) {}
+      type_projection(NONE), side(UNDEFINED), owner_proc(-1)  {}
 
   GhostPoint(Int3 ijk_, Vec3D xi_) : 
       isNode(false), ijk(ijk_), xi(xi_), image_ijk(INT_MAX), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE), side(UNDEFINED) {}
+      type_projection(NONE), side(UNDEFINED), owner_proc(-1)  {}
 
   GhostPoint(Int3 ijk_, Int3 image_ijk_) : 
       isNode(true), ijk(ijk_), xi(0.0), image_ijk(image_ijk_), image_xi(0.0),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE), side(UNDEFINED) {}
+      type_projection(NONE), side(UNDEFINED), owner_proc(-1)  {}
 
   GhostPoint(Int3 ijk_, Int3 image_ijk_, ProjectionType projType_, Vec3D proj_, Vec3D normal_, int bcType_) : 
       isNode(true), ijk(ijk_), xi(0.0), image_ijk(image_ijk_), image_xi(0.0),
       boundary_projection(proj_), outward_normal(normal_), bcType(bcType_),
-      type_projection(projType_), side(UNDEFINED) {}
+      type_projection(projType_), side(UNDEFINED), owner_proc(-1)  {}
 
   GhostPoint(Int3 ijk_, Int3 image_ijk_, ProjectionType projType_, Vec3D proj_, Vec3D normal_, int bcType_, Side side_) : 
       isNode(true), ijk(ijk_), xi(0.0), image_ijk(image_ijk_), image_xi(0.0),
       boundary_projection(proj_), outward_normal(normal_), bcType(bcType_),
-      type_projection(projType_), side(side_) {}
+      type_projection(projType_), side(side_), owner_proc(-1)  {}
 
   GhostPoint(Int3 ijk_, Vec3D xi_, Int3 image_ijk_, Vec3D image_xi_) : 
       isNode(false), ijk(ijk_), xi(xi_), image_ijk(image_ijk_), image_xi(image_xi_),
       boundary_projection(DBL_MAX), outward_normal(DBL_MAX), bcType(0),
-      type_projection(NONE), side(UNDEFINED) {}
+      type_projection(NONE), side(UNDEFINED), owner_proc(-1)  {}
 
 
   ~GhostPoint() {}

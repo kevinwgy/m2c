@@ -472,6 +472,21 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
 
       }
 
+  // Find out the owner of each inner ghost
+  int mpi_rank(-1);
+  MPI_Comm_rank(comm, &mpi_rank);
+  Tag.SetConstantValue(mpi_rank, false);
+  double *** tag = Tag.GetDataPointer();
+  for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++)
+    it->owner_proc = (int)tag[it->ijk[2]][it->ijk[1]][it->ijk[0]];
+
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+        tag[k][j][i] = 0.0; //restore default value (so it can be used for other purposes w/o confusion)
+  Tag.RestoreDataPointerToLocalVector();
+
+
   int nInner = ghost_nodes_inner.size();
   int nOuter = ghost_nodes_outer.size();
   MPI_Allreduce(MPI_IN_PLACE, &nInner, 1, MPI_INT, MPI_SUM, comm);
