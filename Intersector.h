@@ -123,6 +123,7 @@ class Intersector {
                                      node itself and all the edges (n layers, n TBD) that connect the node \n
                                      with other nodes IN THE PHYSICAL DOMAIN.*/
   Vec3D subD_bbmin, subD_bbmax; //!< bounding box of the subdomain (n layers, n TBD)
+  int bblayer; //!< number of layers of neighbors included in the b.b.
 
   SpaceVariable3D TMP, TMP2; //!< For temporary use.
 

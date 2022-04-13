@@ -325,6 +325,7 @@ void SpaceVariable3D::WriteToVTRFile(const char *filename, const char *varname)
   PetscViewerVTKOpen(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer);
   VecView(globalVec, viewer);
   PetscViewerDestroy(&viewer);
+  MPI_Barrier(*comm); 
 }
 
 //---------------------------------------------------------

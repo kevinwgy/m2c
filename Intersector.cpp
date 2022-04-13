@@ -60,7 +60,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   closed_surface = surface.CheckSurfaceOrientationAndClosedness();
 
   //build nodal bounding boxes
-  BuildNodalAndSubdomainBoundingBoxes(1);
+  bblayer = 1;
+  BuildNodalAndSubdomainBoundingBoxes(bblayer);
 
 }
 
@@ -98,7 +99,9 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
 {
   assert(phi_layers>=1);
 
-  BuildNodalAndSubdomainBoundingBoxes(1); //1 layer
+  if(bblayer != 1)
+    BuildNodalAndSubdomainBoundingBoxes(1); //1 layer
+
   BuildSubdomainScopeAndKDTree();
   FindNodalCandidates();
   FindIntersections(true);
@@ -162,6 +165,8 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
 
   BBmin.RestoreDataPointerToLocalVector();
   BBmax.RestoreDataPointerToLocalVector();
+
+  bblayer = nLayer;
 }
 
 //-------------------------------------------------------------------------

@@ -327,7 +327,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     VecView(Ne.GetRefToGlobalVec(), viewer);
   }
 
-
+  MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
 
   // Add a line to the pvd file to record the new solutio snapshot
   char f1[256];
