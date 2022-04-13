@@ -40,7 +40,7 @@ int MAX_STEP_NUMBER;
 double FLUX_TIME;
 int CURRENT_STEP_NUMBER;
 int NSTP_2ND_IT;
-
+int NSTP_3RD_IT;
 /*************************************
  * Main Function
  ************************************/
@@ -327,15 +327,16 @@ int main(int argc, char* argv[])
         dts = dt;
  
       if(dts<=dt)
-        print("Step %d: t = %e, dt = %e, cfl = %.4e. Max step# = %u, Current step# = %u, 2nd It. step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, t, dt, cfl, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d: t = %e, dt = %e, cfl = %.4e. Max step# = %u, Current step# = %u, 2nd It. step# = %u, 3rd It. step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, t, dt, cfl, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, NSTP_3RD_IT, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
       else
-        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Max step# = %u, Current step# = %u, 2nd It. step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Max step# = %u, Current step# = %u, 2nd It. step# = %u, 3rd It. step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, NSTP_3RD_IT, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
       //----------------------------------------------------
       // Move forward by one time-step: Update V, Phi, and ID
       //----------------------------------------------------
       CURRENT_STEP_NUMBER = 0;
       NSTP_2ND_IT = 0;
+      NSTP_3RD_IT = 0;
       t      += dt;
       dtleft -= dt;
       integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 

@@ -23,6 +23,7 @@ using std::chrono::duration_cast;
 using std::chrono::duration;
 using std::chrono::milliseconds;
 
+extern int NSTP_3RD_IT;
 extern int NSTP_2ND_IT;
 extern int CURRENT_STEP_NUMBER;
 extern int MAX_STEP_NUMBER;
@@ -62,10 +63,6 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
                             double *Vsm /*left 'star' solution*/,
                             double *Vsp /*right 'star' solution*/)
 {
-  size_t moreSteps = 10;
-  std::vector<std::vector<double>> integrationPath1(3, vector<double> (moreSteps*numSteps_rarefaction, 0.) ); // first index: 1-pressure, 2-density, 3-velocity
-  std::vector<std::vector<double>> integrationPath3(3, vector<double> (moreSteps*numSteps_rarefaction, 0.) );
-  
   size_t It_1wave = 0;
   size_t It_3wave = 0;  
 
@@ -77,7 +74,14 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
   double pr    = Vp[4];
   //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
-  
+
+  std::vector<double> vectL{pl, rhol, ul};
+  std::vector<double> vectR{pr, rhor, ur};
+  std::vector<std::vector<double>> integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
+  std::vector<std::vector<double>> integrationPath3;
+  integrationPath1.push_back(vectL);
+  integrationPath3.push_back(vectR); 
+ 
 #if PRINT_RIEMANN_SOLUTION == 1
     std::cout << "Left State (rho, u, p): " << rhol << ", " << ul << ", " << pl << "." << std::endl;
     std::cout << "Right State (rho, u, p): " << rhor << ", " << ur << ", " << pr << "." << std::endl;
@@ -877,17 +881,17 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     }
 */
 
-    size_t index0 = 0;
+    int index0 = 0;
     if (It_wave > 0) {
-	    for (size_t j = 0; j < integrationPath[0].size(); j++) {
-		    if (integrationPath[0][j] < ps) {
-			    index0 = j-1;
+	    for (int j = integrationPath.size()-1; j >= 0; j--) {
+		    if (integrationPath[j][0] > ps) {
+			    index0 = j;
 			    break;
 		    }
 	    }
-	    ps_0 = integrationPath[0][index0];
-	    rhos_0 = integrationPath[1][index0];
-	    us_0 = integrationPath[2][index0];
+	    ps_0 = integrationPath[index0][0];
+	    rhos_0 = integrationPath[index0][1];
+	    us_0 = integrationPath[index0][2];
 	    //dp = std::min(dp, ps_0 - ps);
 	    dp = ps_0 - ps;
     }
@@ -905,12 +909,6 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     double uErr = 0.;
     double rhoErr = 0.;
     for(int i=0; i<numSteps_rarefaction*10; i++) {
-
-      if (It_wave == 0) {
-          integrationPath[0][i] = ps_0;
-          integrationPath[1][i] = rhos_0;
-          integrationPath[2][i] = us_0; 
-      }
  
 /*
       if (wavenumber == 1) {
@@ -970,16 +968,15 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
         cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
 #endif
-        if (It_wave > 0 && i > 1) {
-          std::cout << "It# " << It_wave << ": " << i << " steps." << std::endl;
-          exit(1);
-        }
+//        if (It_wave > 0 && i > 1) {
+//          std::cout << "It# " << It_wave << ": " << i << " steps." << std::endl;
+//          exit(1);
+//        }
         done = true;
 
-	if (It_wave == 0) {
-		integrationPath[0][i+1] = ps_1;
-		integrationPath[1][i+1] = rhos_1;
-		integrationPath[2][i+1] = us_1; 
+	if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
+		std::vector<double> currentVect = {ps_1, rhos_1, us_1};
+		integrationPath.push_back(currentVect);
 	}  
 	It_wave = It_wave + 1;
         
@@ -1006,7 +1003,8 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       // Adjust step size, then update state
       //
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
-      if (It_wave == 1) { NSTP_2ND_IT = std::max(i, NSTP_2ND_IT);}  
+      if (It_wave == 1) { NSTP_2ND_IT = std::max(i, NSTP_2ND_IT);} 
+      if (It_wave == 2) { NSTP_3RD_IT = std::max(i, NSTP_3RD_IT);} 
       //double tiny = 1.e-14;
     
       double errBar = tol_rarefaction; 
