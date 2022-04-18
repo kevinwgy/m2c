@@ -854,7 +854,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
   // default
   rhos = rho;
   us   = u;
-
+    
   if(p > ps) {//rarefaction --- numerical integration
 
     // prepare for numerical integration
@@ -882,7 +882,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 */
 
     int index0 = 0;
-    if (It_wave > 0) {
+    if (integrationPath.size() > 1) {
 	    for (int j = integrationPath.size()-1; j >= 0; j--) {
 		    if (integrationPath[j][0] > ps) {
 			    index0 = j;
@@ -892,9 +892,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	    ps_0 = integrationPath[index0][0];
 	    rhos_0 = integrationPath[index0][1];
 	    us_0 = integrationPath[index0][2];
-	    //dp = std::min(dp, ps_0 - ps);
+	    //dp = std::min(10*dp, ps_0 - ps);
 	    dp = ps_0 - ps;
     }
+    double pStart_new = ps_0;
+    double dpStart = dp;
  
     double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
     xi_0 = xi;
@@ -908,7 +910,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     bool done = false;
     double uErr = 0.;
     double rhoErr = 0.;
-    for(int i=0; i<numSteps_rarefaction*10; i++) {
+    int moreSteps = 10;
+    int continueTimes = 0;
+    int continueTolerance = 1000;
+ 
+    for(int i=0; i<numSteps_rarefaction*moreSteps; i++) {
  
 /*
       if (wavenumber == 1) {
@@ -918,7 +924,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         testFile3 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
       }      
 */
-      bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
+     bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
                              rhos_0, us_0, ps_0 /*start state*/, dp /*step size*/,
                              rhos_1, us_1, ps_1, xi_1 /*output: end state*/,
                              uErr, rhoErr /*output: absolute error in us*/);
@@ -926,7 +932,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 //      fprintf(stderr,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
 //              rhos_0, us_0, ps_0, drho, rhos_1, us_1, ps_1, ps, success);
       if(!success) {
-        dp = std::min(dp/2.0, ps_1-ps);
+        dp = dp/2.0;
+        continueTimes = continueTimes + 1;
+        if (continueTimes > continueTolerance) {
+//          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
+//                       continueTimes, id, p, ps, pStart_new, dpStart, dp, ps_1, c, rho, integrationPath.size());
+          break;
+        }
         continue;
       }
 
@@ -951,7 +963,9 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       }
 
       //fprintf(stderr,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
-
+      if (It_wave == 1) { NSTP_2ND_IT = std::max(i, NSTP_2ND_IT);} 
+      if (It_wave == 2) { NSTP_3RD_IT = std::max(i, NSTP_3RD_IT);} 
+ 
       // Check if we have reached the final pressure ps
       if(fabs(ps_1 - ps) <= 1.e-14) {
         rhos = rhos_1;
@@ -1003,26 +1017,29 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       // Adjust step size, then update state
       //
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
-      if (It_wave == 1) { NSTP_2ND_IT = std::max(i, NSTP_2ND_IT);} 
-      if (It_wave == 2) { NSTP_3RD_IT = std::max(i, NSTP_3RD_IT);} 
-      //double tiny = 1.e-14;
+     //double tiny = 1.e-14;
     
       double errBar = tol_rarefaction; 
       double uErrScaled = uErr / c;
       double rhoErrScaled = rhoErr / rho;
      // std::cout << "uErrScaled = " << uErrScaled << "." << std::endl;
-      double dpTemp = 0;
+      double dpTemp = dp;
       double safety = 0.9;
+      if (i == moreSteps*numSteps_rarefaction-1) {
+	      fprintf(stderr,"*** Warning: integrator used up all the steps specified. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, uErrScaled = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+                       id, p, ps, pStart_new, dpStart, dp, ps_1, uErrScaled, rhoErrScaled, c, rho, integrationPath.size());
+      }        
+          
       if (rhoErrScaled > errBar) { 
         dpTemp = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.25 );
         dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
-        dp = std::min(dpTemp, ps_1-ps);
+        dp = std::min(dpTemp, ps_0-ps);
         continue;
       } 
       else if (uErrScaled > errBar) {
         dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.25 );
         dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
-        dp = std::min(dpTemp, ps_1-ps);
+        dp = std::min(dpTemp, ps_0-ps);
         continue;
       }
       else {
@@ -1031,6 +1048,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         dpTemp = std::min(dpTemp_rho, dpTemp_u);        
         dpTemp = std::min(dpTemp, 10*dp); //don't increase dp too much
       }
+
 #if PRINT_RIEMANN_SOLUTION == 1
       std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErr = " << uErr << ", uErrScaled = " << uErrScaled << "." << std::endl;
       std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", rhoErr = " << rhoErr << ", rhoErrScaled = " << rhoErrScaled << std::endl;
@@ -1043,7 +1061,10 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       us_0   = us_1;
       ps_0   = ps_1;
       xi_0   = xi_1;
-
+      if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
+	      std::vector<double> currentVect = {ps_1, rhos_1, us_1};
+	      integrationPath.push_back(currentVect);
+      }
     }
 
     if(!done) {
