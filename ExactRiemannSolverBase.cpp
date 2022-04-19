@@ -14,6 +14,8 @@ using std::endl;
 
 extern int verbose;
 
+#define INVALID_MATERIAL_ID -1
+
 //-----------------------------------------------------
 
 ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, 
@@ -305,10 +307,8 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
                                          double *Vs, int &id, double *Vsm, double *Vsp /*outputs*/)
 {
   // find tangential velocity from input
-  double unorl    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
-  double unorr    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
-  double utanl[3] = {Vm[1]-unorl*dir[0], Vm[2]-unorl*dir[1], Vm[3]-unorl*dir[2]};
-  double utanr[3] = {Vp[1]-unorr*dir[0], Vp[2]-unorr*dir[1], Vp[3]-unorr*dir[2]};
+  double utanl[3] = {Vm[1]-ul*dir[0], Vm[2]-ul*dir[1], Vm[3]-ul*dir[2]};
+  double utanr[3] = {Vp[1]-ur*dir[0], Vp[2]-ur*dir[1], Vp[3]-ur*dir[2]};
 
   // find material id at xi = x = 0
   if(u2>=0)
@@ -416,7 +416,6 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
   }
 
   // determine the tangential components of velocity -- upwinding
-  int k;
   if(u2>0) {
     for(int i=1; i<=3; i++)
       Vs[i] += utanl[i-1];
@@ -468,6 +467,120 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 #endif
 
 }
+
+//-----------------------------------------------------
+
+void
+ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm, 
+                            double rhol, double ul, double pl, int idl, double ustar,
+                            double rhol2, double u2/*ustar*/, double p2,
+                            bool trans_rare, double Vrare_x0[3], /*inputs*/
+                            double *Vs, int &id, double *Vsm /*outputs*/)
+{
+  // find tangential velocity from input
+  double utanl[3] = {Vm[1]-ul*dir[0], Vm[2]-ul*dir[1], Vm[3]-ul*dir[2]};
+
+  // find material id at xi = x = 0
+  if(u2>=0)
+    id = idl;
+  else
+    id = INVALID_MATERIAL_ID;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+  // the 2-wave
+  sol1d.push_back(vector<double>{u2, rhol2, u2, p2, (double)idl});
+#endif
+
+  if(id != INVALID_MATERIAL_ID) {
+
+    Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
+
+    if(trans_rare) {
+      Vs[0] = Vrare_x0[0];
+      Vs[1] = Vrare_x0[1]*dir[0];
+      Vs[2] = Vrare_x0[1]*dir[1];
+      Vs[3] = Vrare_x0[1]*dir[2];
+      Vs[4] = Vrare_x0[2];
+    }
+    else { 
+      //find state variables at xi = x = 0
+
+      bool is_star_state = false;
+
+      if(pl >= p2) {//1-wave is rarefaction
+        double el2 = vf[idl]->GetInternalEnergyPerUnitMass(rhol2, p2);
+        double cl2 = vf[idl]->ComputeSoundSpeedSquare(rhol2, el2);
+
+        if(rhol2<=0 || cl2<0) {
+          fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l2)."
+                  " rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
+                  rhol2, pl, el2, cl2, idl);
+          exit(-1);
+        } else
+          cl2 = sqrt(cl2);
+
+        if(u2 - cl2 <= 0) //rarefaction tail speed
+          is_star_state = true;
+      } 
+      else {//1-wave is shock
+        double us = (rhol2*u2 - rhol*ul)/(rhol2 - rhol); //shock speed
+        if(us <= 0)      
+          is_star_state = true;
+      }
+
+      if(is_star_state) {
+        Vs[0] = rhol2;
+        Vs[1] = u2*dir[0];
+        Vs[2] = u2*dir[1];
+        Vs[3] = u2*dir[2];
+        Vs[4] = p2;
+      } else {
+        Vs[0] = rhol;
+        Vs[1] = ul*dir[0];
+        Vs[2] = ul*dir[1];
+        Vs[3] = ul*dir[2];
+        Vs[4] = pl;
+      }
+    }
+
+    // determine the tangential components of velocity -- upwinding
+    for(int i=1; i<=3; i++)
+      Vs[i] += utanl[i-1];
+  }
+
+
+  // determine Vsm, i.e. the star states on the minus side of the contact discontinuity
+  Vsm[0] = rhol2;
+  Vsm[1] = utanl[0] + u2*dir[0];
+  Vsm[2] = utanl[1] + u2*dir[1];
+  Vsm[3] = utanl[2] + u2*dir[2];
+  Vsm[4] = p2;
+
+
+#if PRINT_RIEMANN_SOLUTION == 1
+  std::sort(sol1d.begin(), sol1d.end(), 
+            [](vector<double> v1, vector<double> v2){return v1[0]<v2[0];});
+  int last = sol1d.size()-1;
+  double xi_span = sol1d[last][0] - sol1d[0][0];
+  sol1d.insert(sol1d.begin(), vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3], sol1d[0][4]});
+  last++;
+  sol1d.push_back(vector<double>{sol1d[last][0]+xi_span, sol1d[last][1], sol1d[last][2], sol1d[last][3], sol1d[last][4]});
+
+  FILE* solFile = fopen("RiemannSolution.txt", "w");
+  print(solFile, "## One-Dimensional Riemann Problem.\n");
+  print(solFile, "## Initial State: %e %e %e, id %d (left) | wall velocity: %e.\n", 
+        rhol, ul, pl, idl, ustar);
+  print(solFile, "## xi(x/t) | density | velocity | pressure | internal energy per mass | material id\n");
+
+  for(auto it = sol1d.begin(); it != sol1d.end(); it++) 
+    print(solFile,"% e    % e    % e    % e    % e    % d\n", (*it)[0], (*it)[1], (*it)[2], (*it)[3], 
+                   vf[(int)(*it)[4]]->GetInternalEnergyPerUnitMass((*it)[1], (*it)[3]), (int)(*it)[4]);
+
+  fclose(solFile);
+#endif
+
+}
+
 
 //----------------------------------------------------------------------------------
 //! find a bracketing interval [p0, p1] (f0*f1<=0)
@@ -639,6 +752,158 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
 }
 
 //----------------------------------------------------------------------------------
+//! find a bracketing interval [p0, p1] (f0*f1<=0)
+bool
+ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, double pl, double el, double cl, int idl,
+                            double ustar, double &p0, double &rhol0, double &ul0, 
+                            double &p1, double &rhol1, double &ul1)
+{
+
+  /*convention: p0 < p1*/
+
+  bool success = true;
+
+  // Step 1: Find two feasible points (This step should never fail)
+  success = FindInitialFeasiblePointsOneSided(rhol, ul, pl, el, cl, idl, ustar, /*inputs*/
+                                      p0, rhol0, ul0, p1, rhol1, ul1/*outputs*/);
+
+  if(!success) {//This should never happen (unless user's inputs have errors)!
+    p0 = p1 = pressure_at_failure;
+    return false;
+  }
+  
+#if PRINT_RIEMANN_SOLUTION == 1
+  fprintf(stderr, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ustar, p1, ul1-ustar);
+  fprintf(stderr, "Searching for a bracketing interval...\n");
+#endif
+
+  // Step 2: Starting from the two feasible points, find a bracketing interval
+  //         This step may fail, which indicates a solution may not exist for arbitrary left & right states
+  //         If this happens, return the point with smallest absolute value of "f"
+
+  double p2, rhol2, ul2;
+  double f0, f1;
+  int i;
+
+  // These are variables corresponding to the smallest magnitude of "f" --- used only if a bracketing interval
+  // cannot be found. This is to just to minimize the chance of code crashing...
+  double fmin, p_fmin, rhol_fmin, ul_fmin;
+  if(fabs(ul0-ustar) < fabs(ul1-ustar)) {
+    fmin = fabs(ul0 - ustar);
+    p_fmin = p0;  rhol_fmin = rhol0;  ul_fmin = ul0;
+  } else {
+    fmin = fabs(ul1 - ustar);
+    p_fmin = p1;  rhol_fmin = rhol1;  ul_fmin = ul1;
+  }
+
+  for(i=0; i<maxIts_bracket; i++) {
+    
+    f0 = ul0 - ustar;
+    f1 = ul1 - ustar;
+
+    if(f0*f1<=0.0)
+      return true;
+
+    // find a physical p2 that has the opposite sign
+    if(fabs(f0-f1)>1e-9) {
+      p2 = p1 - f1*(p1-p0)/(f1-f0); //the Secant method
+      if(p2<p0)
+        p2 -= 0.1*(p1-p0);
+      else //p2 cannot be between p0 and p1, so p2>p1
+        p2 += 0.1*(p1-p0);
+    } else {//f0 == f1
+      p2 = 1.1*p1; 
+      //p2 = p1 + *(p1-p0); 
+    }
+
+    if(p2<min_pressure || i==int(maxIts_bracket/2) ) {//does not look right. reset to a small non-negative pressure
+      p2 = 1.0e-8; 
+    }
+
+    success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
+
+    if(!success) {
+
+#if PRINT_RIEMANN_SOLUTION == 1
+      fprintf(stderr, "  -- p2 = %e (failed)\n", p2);
+#endif
+      //move closer to [p0, p1]
+      for(int j=0; j<maxIts_bracket/2; j++) {
+        if(p2<p0)     
+          p2 = p0 - 0.5*(p0-p2);
+        else //p2>p1
+          p2 = p1 + 0.5*(p2-p1);
+
+        success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
+
+        if(success)
+          break;
+      }
+    }
+
+    if(!success)
+      break;
+
+    // check & update fmin (only used if the Riemann solver fails -- a "failsafe" feature)
+    if(fabs(ul2-ustar)<fmin) {
+      fmin = fabs(ul2-ustar);
+      p_fmin = p2;  rhol_fmin = rhol2;  ul_fmin = ul2;
+    }
+
+    // update p0 or p1
+    if(p2<p0) {
+      p1 = p0;  rhol1 = rhol0;  ul1 = ul0;
+      p0 = p2;  rhol0 = rhol2;  ul0 = ul2;
+    } else {//p2>p1
+      p0 = p1;  rhol0 = rhol1;  ul0 = ul1;
+      p1 = p2;  rhol1 = rhol2;  ul1 = ul2;
+    }
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    fprintf(stderr, "  -- p0 = %e, f0 = %e, p1 = %e, f1 = %e (success)\n", p0, ul0-ustar, p1, ul1-ustar);
+#endif
+
+  }
+
+  if(!success || i==maxIts_bracket) {
+    if(verbose>=1) {
+      cout << "Warning: Exact half-Riemann solver failed. (Unable to find a bracketing interval) " << endl;
+      cout << "   left: " << std::setprecision(10) << rhol << ", " << std::setprecision(10) << ul << ", " 
+                             << std::setprecision(10) << pl << " (" << idl << "); ustar: "
+                             << std::setprecision(10) << ustar << "."
+                             << " Residual (|ulstar-ustar|): " << std::setprecision(10) << fmin << endl;
+    }
+    if(fmin<failure_threshold*fabs(ul-ustar)) {
+      if(verbose>=1) 
+        cout << "*** Best approximate solution: rhols = " << rhol_fmin << ", ps = " << p_fmin << "." << endl;
+      p0    = p1    = p_fmin;
+      rhol0 = rhol1 = rhol_fmin;
+      ul0   = ul1   = ul_fmin; 
+    } else { //it could be that the Riemann problem has no solution!
+      p2 = pressure_at_failure;
+      success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
+      if(success) {
+        if(verbose >= 1)
+          cout << "*** Prescribed solution: rhols = " << rhol2 << ", ps = " << p2 << "." << endl;
+        p0    = p1    = p2;
+        rhol0 = rhol1 = rhol2; 
+        ul0   = ul1   = ul2; 
+      } else {
+        if(verbose >= 1)
+          cout << "*** Best approximation: rhols = " << rhol_fmin << ", ps = " << p_fmin << "." << endl;
+        p0    = p1    = p_fmin;
+        rhol0 = rhol1 = rhol_fmin;
+        ul0   = ul1   = ul_fmin; 
+      }
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
+//----------------------------------------------------------------------------------
 
 bool
 ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double pl, double el, double cl, int idl,
@@ -745,6 +1010,99 @@ myLabel:
 
 //----------------------------------------------------------------------------------
 
+bool
+ExactRiemannSolverBase::FindInitialFeasiblePointsOneSided(double rhol, double ul, double pl, double el, 
+                            double cl, int idl, double ustar, double &p0, double &rhol0, double &ul0, 
+                            double &p1, double &rhol1, double &ul1)
+{
+  double dp;
+  int found = 0;
+  bool success = true;
+
+  // Method 1: Use the acoustic theory (Eqs. (20)-(22) of Kamm) to find p0, p1
+  found = FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli(rhol, ul, pl, el, cl, idl, ustar,
+              p0, rhol0, ul0, p1, rhol1, ul1/*outputs*/);
+
+  if(found==2)
+    return true; //yeah
+
+  if(found==1) //the first one (p0) is good --> only need to find p1
+    goto myLabel;
+
+  // Method 2: based on dp (fixed width search)
+
+  // 2.1. find the first one (p0)
+  dp = ul>ustar ? 0.5*pl : -0.5*pl;
+  for(int i=0; i<maxIts_bracket; i++) {
+    p0 = pl + 0.01*(i+1)*(i+1)*dp;
+
+    if(p0<min_pressure)
+      p0 = pressure_at_failure; 
+    success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
+                              rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
+                              rhol0, ul0);
+    if(success)
+      break;
+  }
+  if(!success) {//search in the opposite direction
+    for(int i=0; i<maxIts_bracket; i++) {
+      p0 = pl - 0.01*(i+1)*(i+1)*dp;
+      if(p0<min_pressure || i==(int)(maxIts_bracket/2)) //not right... set to a small pos. pressure
+        p0 = pressure_at_failure; 
+      success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
+                                rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
+                                rhol0, ul0);
+      if(success)
+        break;
+    } 
+  }
+
+  if(!success) {
+    if(verbose>=1)
+      fprintf(stderr,"Warning: Failed to find the first initial guess (p0) in the 1D half-Riemann solver (it = %d). "
+                     "Left: %e %e %e (%d), ustar: %e.\n",
+                      maxIts_bracket, rhol, ul, pl, idl, ustar);
+    return false;
+  }
+      
+myLabel:
+  // 2.2. find the second one (p1)
+  dp = p0-pl;
+  for(int i=0; i<maxIts_bracket; i++) {
+    p1 = p0 + 0.01*(i+1)*(i+1)*dp;
+    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
+    if(success)
+      break;
+  }
+  if(!success) //search in the opposite direction
+    for(int i=0; i<maxIts_bracket; i++) {
+      p1 = p0 - 0.01*(i+1)*(i+1)*dp;
+      if(p1<min_pressure)
+        p1 = pressure_at_failure*1000.0; //so it is not the same as p0
+      success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
+      if(success)
+        break;
+    } 
+  if(!success) {
+    if(verbose>=1)
+      fprintf(stderr,"Warning: Failed to find the second initial guess (p1) in the 1D half-Riemann solver (it = %d). "
+                     "Left: %e %e %e (%d), ustar: %e.\n",
+                      maxIts_bracket, rhol, ul, pl, idl, ustar);
+    return false;
+  }
+ 
+  // Make sure p0<p1
+  if(p0>p1) {
+    std::swap(p0,p1);
+    std::swap(rhol0, rhol1);
+    std::swap(ul0, ul1);
+  } 
+
+  return true;
+}
+
+//----------------------------------------------------------------------------------
+
 int
 ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, 
                             double pl, double el, double cl, int idl,
@@ -793,6 +1151,84 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, d
                 rhor1, ur1/*outputs*/);
   if(!success)
     return found;
+
+  found = 2; //found p0 and p1!
+  return found;
+}
+
+//----------------------------------------------------------------------------------
+
+int
+ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli(double rhol, double ul, 
+                            double pl, double el, double cl, int idl, double ustar,
+                            double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1)
+{
+  int found = 0;
+  bool success = true;
+  bool used_Bernoulli = false;
+
+  // 1.1: Initialize p0 using acoustic theory ((20) of Kamm)
+  double Cl = rhol*cl; //acoustic impedance
+  p0 = pl + Cl*(ul - ustar);
+
+  success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/,
+                rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
+                rhol0, ul0/*outputs*/);
+  if(!success) {
+
+    //1.1.1: Try bernoulli's equation
+    p0 = pl + 0.5*rhol*(ul*ul - ustar*ustar);
+    success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/,
+                  rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
+                  rhol0, ul0/*outputs*/);
+    if(!success)
+      return found;
+    used_Bernoulli = true;
+  }
+
+
+  found = 1; //found p0!
+
+  // 1.2. Initialize p1 by bernoulli's equation or acoustic relation
+  if(!used_Bernoulli) {
+    p1 = pl + 0.5*rhol*(ul*ul - ustar*ustar);
+    double tmp = std::max(fabs(p0), fabs(p1));
+    if(fabs(p1 - p0)/tmp<1.0e-8)
+      p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
+
+    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
+                  rhol, rhol0/*initial guesses for Hugo. eq.*/,
+                  rhol1, ul1/*outputs*/);
+
+    if(!success) {
+      double Clbar = (ul0 == ul) ? Cl : fabs(p0 - pl)/fabs(ul0 - ul);
+      p1 = pl + Clbar*(ul - ustar);
+      tmp = std::max(fabs(p0), fabs(p1));
+      if(fabs(p1 - p0)/tmp<1.0e-8)
+        p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
+
+      success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
+                    rhol, rhol0/*initial guesses for Hugo. eq.*/,
+                    rhol1, ul1/*outputs*/);
+      if(!success)
+        return found;
+    }
+
+    used_Bernoulli = true;
+  }
+  else {
+    double Clbar = (ul0 == ul) ? Cl : fabs(p0 - pl)/fabs(ul0 - ul);
+    p1 = pl + Clbar*(ul - ustar);
+    double tmp = std::max(fabs(p0), fabs(p1));
+    if(fabs(p1 - p0)/tmp<1.0e-8)
+      p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
+
+    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
+                  rhol, rhol0/*initial guesses for Hugo. eq.*/,
+                  rhol1, ul1/*outputs*/);
+    if(!success)
+      return found;
+  }
 
   found = 2; //found p0 and p1!
   return found;
@@ -1314,7 +1750,228 @@ ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, in
 
 }
 
-//----------------------------------------------------------------------------------
+//-----------------------------------------------------
+/** Solves the one-sided Riemann problem. The valid material
+ * is assumed to be on the "left", that is, "dir" points towards
+ * the interface or wall
+ * Return values:
+ * 0: no errors
+ * 1: riemann solver failed to find a bracketing interval
+ */
+int
+ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal towards interface/wall*/,
+                             double *Vm, int idl /*left state*/,
+                             double *Ustar, /*interface/wall velocity (3D)*/
+                             double *Vs, int &id, /*solution at xi = 0 (i.e. x=0), id = -1 if invalid*/
+                             double *Vsm /*left 'star' solution*/)
+{
+  // Convert to a 1D problem (i.e. One-Dimensional Riemann)
+  double rhol  = Vm[0];
+  double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
+  double pl    = Vm[4];
+  double ustar = Ustar[0]*dir[0] + Ustar[1]*dir[1] + Ustar[2]*dir[2];
+
+  double el = vf[idl]->GetInternalEnergyPerUnitMass(rhol, pl);
+  double cl = vf[idl]->ComputeSoundSpeedSquare(rhol, el);
+
+  if(rhol<=0 || cl<0) {
+    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeOneSidedRiemannSolution." 
+            " rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
+            rhol, ul, pl, el, cl, idl);
+    exit(-1);
+  } else
+    cl = sqrt(cl);
+
+  // Declare variables in the "star region"
+  double p0(DBL_MIN), ul0(0.0), rhol0(DBL_MIN);
+  double p1(DBL_MIN), ul1(0.0), rhol1(DBL_MIN); //Secand Method ("k-1","k" in Kamm, (19))
+  double p2(DBL_MIN), ul2(0.0), rhol2(DBL_MIN); // "k+1"
+  double f0(0.0), f1(0.0), f2(0.0); //difference between ul and ur
+
+
+  // -------------------------------
+  // Now, Solve The One-Sided Riemann Problem
+  // -------------------------------
+  bool success = true;
+
+  // monitor if the solution involves a transonic rarefaction. This is special as the solution 
+  // at xi = x = 0 is within the rarefaction fan.
+  bool trans_rare = false;
+  double Vrare_x0[3]; //rho, u, and p at x = 0, in the case of a transonic rarefaction
+
+
+  // A Trivial Case
+  if(ul == ustar) {
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol, ul, pl, trans_rare, Vrare_x0, //inputs
+                             Vs, id, Vsm/*outputs*/);
+    return 0;
+  }
+
+  // -------------------------------
+  // Step 1: Initialization
+  //         (find initial interval [p0, p1])
+  // -------------------------------
+  success = FindInitialIntervalOneSided(rhol, ul, pl, el, cl, idl, ustar, /*inputs*/
+                                        p0, rhol0, ul0, p1, rhol1, ul1/*outputs*/);
+  /* our convention is that p0 < p1 */
+
+  if(!success) { //failed to find a bracketing interval. Output the state corresponding smallest "f"
+
+    // get sol1d, trans_rare and Vrare_x0
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.clear();
+#endif
+    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol0, rhol0*1.1, rhol2, ul2,
+                  &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+
+    if(!success) {
+      cout << "Warning: One-sided Riemann solver failed to find an initial bracketing interval (Returning a modified initial state)." << endl;
+
+      double utanl[3] = {Vm[1]-ul*dir[0], Vm[2]-ul*dir[1], Vm[3]-ul*dir[2]};
+
+      Vsm[0] = Vm[0];
+      Vsm[1] = utanl[0] + ustar*dir[0];
+      Vsm[2] = utanl[1] + ustar*dir[1];
+      Vsm[3] = utanl[2] + ustar*dir[2];
+      Vsm[4] = Vm[4];
+
+      if(ustar >= 0) {
+        id = idl;
+        for(int i=0; i<5; i++)
+          Vs[i] = Vsm[i];
+      } else {
+        id = INVALID_MATERIAL_ID;
+      }
+      return 1;
+    }
+
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p1, trans_rare, Vrare_x0, /*inputs*/
+                             Vs, id, Vsm);
+    return 1;
+  }
+
+  f0 = ul0 - ustar;
+  f1 = ul1 - ustar;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    cout << "Found initial interval: p0 = " << p0 << ", f0 = " << f0 << ", p1 = " << p1 << ", f1 = " << f1 << endl;
+#endif
+                                          
+  // -------------------------------
+  // Step 2: Main Loop (Secant Method, Safeguarded) 
+  // -------------------------------
+  double denom = 0; 
+
+  int iter = 0;
+  double err_p = 1.0, err_u = 1.0;
+
+  //p2 (and f2) is always the latest one
+  p2 = p1; 
+  f2 = f1;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+  sol1d.clear();
+#endif
+
+  for(iter=0; iter<maxIts_main; iter++) {
+
+    // 2.1: Update p using the Brent method (safeguarded secant method)
+    denom = f1 - f0;
+    if(denom == 0) {
+      cout << "Warning: Division-by-zero while using the secant method to solve the one-sided Riemann problem." << endl;
+      cout << "         left state: " << rhol << ", " << ul << ", " << pl << ", " << idl << " | wall velocity (normal): " 
+           << ustar << endl;
+      cout << "         dir = " << dir[0] << "," << dir[1] << "," << dir[2]
+           << ", f0 = " << f0 << ", f1 = " << f1 << endl;
+      p2 = 0.5*(p0+p1);
+    } else {
+      p2 = p2 - f2*(p1-p0)/denom;  // update p2
+      if(p2<=p0 || p2>=p1) //discard and switch to bisection
+        p2 = 0.5*(p0+p1);
+    }
+
+    //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
+
+
+try_again:
+
+    // 2.2: Calculate ul2 
+    success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl/*inputs*/, 
+                  rhol0, rhol1/*initial guesses for Hugo. eq.*/,
+                  rhol2, ul2/*outputs*/, 
+                  &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+
+    if(!success) {
+      //fprintf(stderr,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //        rhol, ul, pl, idl, rhor, ur, pr, idr);
+      p2 = 0.5*(p2+p0); //move closer to p0
+
+      iter++;
+      if(iter<maxIts_main)
+        goto try_again;
+      else
+        break;
+    }
+
+
+    f2 = ul2 - ustar;
+    
+ 
+    // 2.3: Update for the next iteration
+    if(f0*f2<0.0) {
+      p1 = p2;
+      f1 = f2;
+      rhol1 = rhol2;
+    } else {
+      p0 = p2;
+      f0 = f2;
+      rhol0 = rhol2;
+    }
+
+
+    // 2.4: Check stopping criterion
+    err_p = fabs(p1 - p0)/fabs(pl + 0.5*rhol*ul*ul);
+    err_u = fabs(f2)/cl;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    cout << "Iter " << iter << ": p-interval = [" << p0 << ", " << p1 << "], p2 = " << p2 << ", err_p = " << err_p 
+         << ", err_u = " << err_u << "." << endl;
+#endif
+
+    if( (err_p < tol_main && err_u < tol_main) || (err_p < tol_main*1e-3) || (err_u < tol_main*1e-3) )
+      break; // converged
+
+    trans_rare = false; //reset
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.clear();
+#endif
+
+  }
+
+
+  // -------------------------------
+  // Step 3: Find state at xi = x = 0 (for output)
+  // -------------------------------
+  FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
+                           Vs, id, Vsm);
+
+  if(iter == maxIts_main) {
+    if(verbose>=1) {
+      cout << "Warning: Exact Half-Riemann solver failed to converge. err_p = " << err_p
+           << ", err_u = " << err_u << "." << endl;
+      cout << "    Vm = [" << Vm[0] << ", " << Vm[1] << ", " << Vm[2] << ", " << Vm[3] << ", " << Vm[4] << "] (" << idl
+           << "),  ustar = " << ustar << endl;
+    }
+    return 1;  //failed
+  }
+  
+
+  //success!
+  return 0;
+
+}
+
 
 
 //----------------------------------------------------------------------------------

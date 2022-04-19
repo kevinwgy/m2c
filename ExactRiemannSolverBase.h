@@ -34,6 +34,12 @@ public:
                           double rhor, double ur, double pr, int idr,
                           double pmin, double pmax, double dp);
 
+  virtual int ComputeOneSidedRiemannSolution(double *dir/*unit normal towards interface/wall*/, 
+                                             double *Vm, int idm /*left state*/,
+                                             double *Ustar, /*interface/wall velocity (3D)*/
+                                             double *Vs, int &id, /*solution at xi = 0 (i.e. x=0), id = -1 if invalid*/
+                                             double *Vsm /*left 'star' solution*/);
+
 #if PRINT_RIEMANN_SOLUTION == 1
   vector<vector<double> > sol1d;
 #endif
@@ -93,6 +99,25 @@ protected: //internal functions
            double rhol2, double rhor2, double u2, double p2,
            bool trans_rare, double Vrare_x0[3], /*inputs*/
            double *Vs, int &id, double *Vsm, double *Vsp /*outputs*/);
+
+
+  //! For one-sided Riemann problem
+  
+  bool FindInitialIntervalOneSided(double rhol, double ul, double pl, double el, double cl, int idl, double ustar,
+           double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1/*outputs*/);
+
+  bool FindInitialFeasiblePointsOneSided(double rhol, double ul, double pl, double el, double cl, int idl, double ustar,
+           double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1/*outputs*/);
+
+  int FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli(double rhol, double ul,
+           double pl, double el, double cl, int idl, double ustar,
+           double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1/*outputs*/);
+
+  void FinalizeOneSidedSolution(double *dir, double *Vm, double rhol, double ul, double pl, int idl, double ustar,
+                                double rhol2, double u2/*ustar*/, double p2,
+                                bool trans_rare, double Vrare_x0[3], /*inputs*/
+                                double *Vs, int &id, double *Vsm /*outputs*/);
+
 
 };
 
