@@ -46,6 +46,8 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   min_pressure         = iod_riemann.min_pressure;
   failure_threshold    = iod_riemann.failure_threshold;
   pressure_at_failure  = iod_riemann.pressure_at_failure;
+  integrationPath1.reserve(100);
+  integrationPath3.reserve(100);
 }
 
 //-----------------------------------------------------
@@ -74,11 +76,11 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
   double pr    = Vp[4];
   //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
-
+  
+  integrationPath1.clear();
+  integrationPath3.clear();
   std::vector<double> vectL{pl, rhol, ul};
   std::vector<double> vectR{pr, rhor, ur};
-  std::vector<std::vector<double>> integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
-  std::vector<std::vector<double>> integrationPath3;
   integrationPath1.push_back(vectL);
   integrationPath3.push_back(vectR); 
  
@@ -140,7 +142,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   // Step 1: Initialization
   //         (find initial interval [p0, p1])
   // -------------------------------
-  success = FindInitialInterval(It_1wave, It_3wave, integrationPath1, integrationPath3,
+  success = FindInitialInterval(It_1wave, It_3wave, 
                                 rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
                                 p0, rhol0, rhor0, ul0, ur0,
                                 p1, rhol1, rhor1, ul1, ur1/*outputs*/);
@@ -509,7 +511,7 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 //----------------------------------------------------------------------------------
 //! find a bracketing interval [p0, p1] (f0*f1<=0)
 bool
-ExactRiemannSolverBase::FindInitialInterval(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3,
+ExactRiemannSolverBase::FindInitialInterval(size_t& It_1wave, size_t& It_3wave, 
                             double rhol, double ul, double pl, double el, double cl, int idl,
                             double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
                             double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
@@ -520,7 +522,7 @@ ExactRiemannSolverBase::FindInitialInterval(size_t& It_1wave, size_t& It_3wave, 
   bool success = true;
 
   // Step 1: Find two feasible points (This step should never fail)
-  success = FindInitialFeasiblePoints(It_1wave, It_3wave, integrationPath1, integrationPath3, /*store data for acceleration*/
+  success = FindInitialFeasiblePoints(It_1wave, It_3wave, 
                                       rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
                                       p0, rhol0, rhor0, ul0, ur0, p1, rhol1, rhor1, ul1, ur1/*outputs*/);
 
@@ -680,7 +682,7 @@ ExactRiemannSolverBase::FindInitialInterval(size_t& It_1wave, size_t& It_3wave, 
 //----------------------------------------------------------------------------------
 
 bool
-ExactRiemannSolverBase::FindInitialFeasiblePoints(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3,
+ExactRiemannSolverBase::FindInitialFeasiblePoints(size_t& It_1wave, size_t& It_3wave, 
                             double rhol, double ul, double pl, double el, double cl, int idl,
                             double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
                             double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0, 
@@ -691,7 +693,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(size_t& It_1wave, size_t& It_3
   bool success = true;
 
   // Method 1: Use the acoustic theory (Eqs. (20)-(22) of Kamm) to find p0, p1
-  found = FindInitialFeasiblePointsByAcousticTheory(It_1wave, It_3wave, integrationPath1, integrationPath3,
+  found = FindInitialFeasiblePointsByAcousticTheory(It_1wave, It_3wave,
               rhol, ul, pl, el, cl, idl, 
               rhor, ur, pr, er, cr, idr, /*inputs*/
               p0, rhol0, rhor0, ul0, ur0, p1, rhol1, rhor1, ul1, ur1/*outputs*/);
@@ -787,7 +789,7 @@ myLabel:
 //----------------------------------------------------------------------------------
 
 int
-ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(size_t& It_1wave, size_t& It_3wave, std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3, /*for acceleration*/ 
+ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(size_t& It_1wave, size_t& It_3wave, /*for acceleration*/ 
                             double rhol, double ul, double pl, double el, double cl, int idl,
                             double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
                             double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0, 
@@ -910,7 +912,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     bool done = false;
     double uErr = 0.;
     double rhoErr = 0.;
-    int moreSteps = 10;
+    int moreSteps = 20;
     int continueTimes = 0;
     int continueTolerance = 1000;
  
@@ -1531,8 +1533,7 @@ void
 ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, int idl,
                                            double rhor, double ur, double pr, int idr,
                                            double pmin, double pmax, double dp,
-                                           size_t& It_1wave, size_t& It_3wave,
-                                           std::vector<std::vector<double>>& integrationPath1, std::vector<std::vector<double>>& integrationPath3)
+                                           size_t& It_1wave, size_t& It_3wave)
 {
 
   vector<std::array<double,3> > left; //(p*, rhol*, ul*)
