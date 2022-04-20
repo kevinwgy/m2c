@@ -103,6 +103,7 @@ protected: //internal functions
 
   //! For one-sided Riemann problem
   
+  //! In the case of a shock, need two initial guesses of pressure
   bool FindInitialIntervalOneSided(double rhol, double ul, double pl, double el, double cl, int idl, double ustar,
            double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1/*outputs*/);
 
@@ -112,6 +113,12 @@ protected: //internal functions
   int FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli(double rhol, double ul,
            double pl, double el, double cl, int idl, double ustar,
            double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1/*outputs*/);
+
+  //! Integrate the isentropic relations to the wall velocity us.
+  bool ComputeOneSidedRarefaction(double rho, double u, double p, double e,
+                                  double c, int id, double us/*inputs*/,
+                                  double &rhos, double &ps/*outputs*/,
+                                  bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/);
 
   void FinalizeOneSidedSolution(double *dir, double *Vm, double rhol, double ul, double pl, int idl, double ustar,
                                 double rhol2, double u2/*ustar*/, double p2,

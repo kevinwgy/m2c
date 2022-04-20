@@ -759,6 +759,8 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
                             double &p1, double &rhol1, double &ul1)
 {
 
+  assert(ul>ustar); //this function is only needed (and applicable) when there is a shock
+
   /*convention: p0 < p1*/
 
   bool success = true;
@@ -771,6 +773,9 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
     p0 = p1 = pressure_at_failure;
     return false;
   }
+
+  assert(p0>pl);
+  assert(p1>pl);
   
 #if PRINT_RIEMANN_SOLUTION == 1
   fprintf(stderr, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ustar, p1, ul1-ustar);
@@ -816,11 +821,12 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
       //p2 = p1 + *(p1-p0); 
     }
 
-    if(p2<min_pressure || i==int(maxIts_bracket/2) ) {//does not look right. reset to a small non-negative pressure
-      p2 = 1.0e-8; 
-    }
 
+    if(p2<pl || i==int(maxIts_bracket/2) ) {//does not look right. reset to pl
+      p2 = pl; 
+    }
     success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
+
 
     if(!success) {
 
@@ -834,6 +840,8 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
         else //p2>p1
           p2 = p1 + 0.5*(p2-p1);
 
+        if(p2<pl)
+          p2 = pl;
         success = ComputeRhoUStar(1, rhol, ul, pl, p2, idl, rhol0, rhol1, rhol2, ul2);
 
         if(success)
@@ -1044,19 +1052,6 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsOneSided(double rhol, double ul
     if(success)
       break;
   }
-  if(!success) {//search in the opposite direction
-    for(int i=0; i<maxIts_bracket; i++) {
-      p0 = pl - 0.01*(i+1)*(i+1)*dp;
-      if(p0<min_pressure || i==(int)(maxIts_bracket/2)) //not right... set to a small pos. pressure
-        p0 = pressure_at_failure; 
-      success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
-                                rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
-                                rhol0, ul0);
-      if(success)
-        break;
-    } 
-  }
-
   if(!success) {
     if(verbose>=1)
       fprintf(stderr,"Warning: Failed to find the first initial guess (p0) in the 1D half-Riemann solver (it = %d). "
@@ -1074,15 +1069,6 @@ myLabel:
     if(success)
       break;
   }
-  if(!success) //search in the opposite direction
-    for(int i=0; i<maxIts_bracket; i++) {
-      p1 = p0 - 0.01*(i+1)*(i+1)*dp;
-      if(p1<min_pressure)
-        p1 = pressure_at_failure*1000.0; //so it is not the same as p0
-      success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
-      if(success)
-        break;
-    } 
   if(!success) {
     if(verbose>=1)
       fprintf(stderr,"Warning: Failed to find the second initial guess (p1) in the 1D half-Riemann solver (it = %d). "
@@ -1285,7 +1271,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     //fprintf(stderr,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
     // integration by Runge-Kutta 4
     bool done = false;
-    double loc_tol_rarefaction = tol_rarefaction*ps_0;
+    double loc_tol_rarefaction = tol_rarefaction*fabs(ps_0);
     for(int i=0; i<numSteps_rarefaction*5; i++) {
 
       bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
@@ -1595,6 +1581,148 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
 //----------------------------------------------------------------------------------
 
+//! Connect the left initial state with the left star state (the 1-wave) --- for one-sided Riemann problem
+//! where the solution contains a rarefaction (not a shock).
+bool  //true: success  | false: failure
+ExactRiemannSolverBase::ComputeOneSidedRarefaction(double rho, double u, double p, double e,
+                                                   double c, int id, double us/*inputs*/,
+                                                   double &rhos, double &ps/*outputs*/, 
+                                                   bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
+{
+
+  assert(u<us);
+  
+  int wavenumber = 1;
+
+  // default
+  rhos = rho;
+  ps   = p;
+
+  //in this function, du, drho are all positive!
+
+  double du_target = (us-u)/numSteps_rarefaction;
+  double du_max = du_target*1.25;
+
+  // initialize drho based on linear approximation & fixing c
+  double drho_op1 = du_target*rho/c;
+  double drho_op2 = rho/(numSteps_rarefaction*2.5); //initial step size
+  double drho = std::min(drho_op1, drho_op2);
+
+  // prepare for numerical integration
+  double rhos_0 = rho, us_0 = u, ps_0 = p, xi_0; //start point of each step
+  double rhos_1 = rho, us_1 = u, ps_1 = p, xi_1; //end point of each step
+  double du;
+
+  double xi = u - c; 
+  xi_0 = xi;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+  sol1d.push_back(vector<double>{xi, rho, u, p, (double)id});
+#endif
+
+  // integration by Runge-Kutta 4
+  // as we integrate, rho and p decreases, while u increases until reaching ustar.
+  bool done = false;
+  double loc_tol_rarefaction = tol_rarefaction*std::max(us-u, std::max(fabs(us), fabs(u)));
+  for(int i=0; i<numSteps_rarefaction*5; i++) {
+
+    bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
+                       rhos_0, us_0, ps_0 /*start state*/, drho /*step size*/,
+                       rhos_1, us_1, ps_1, xi_1 /*output: end state*/); 
+
+    if(!success) {
+      drho /= 2.0;
+      continue;
+    }
+
+    du = us_1 - us_0; //du and drho are positive in this function
+
+    if(du > du_max) {
+      drho = drho/du*du_target;
+      continue;
+    }
+    if(us_1 - us > loc_tol_rarefaction) { //went over the hill...
+      if(du!=0)
+        drho = drho/du*(us - us_0);
+      else
+        drho /= 2.0;
+      continue;
+    } 
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1, (double)id});
+#endif
+
+    if(trans_rare && Vrare_x0 && xi_0*xi_1<=0) {//transonic rarefaction, crossing x = xi = 0
+      *trans_rare = true;
+      double w0 = fabs(xi_1), w1 = fabs(xi_0);
+      double ww = w0 + w1;
+      w0 /= ww;
+      w1 /= ww;
+      Vrare_x0[0] = w0*rhos_0 + w1*rhos_1;
+      Vrare_x0[1] = w0*us_0   + w1*us_1;
+      Vrare_x0[2] = w0*ps_0   + w1*ps_1;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+      sol1d.push_back(vector<double>{0.0, Vrare_x0[0], Vrare_x0[1], Vrare_x0[2], (double)id});
+#endif
+
+    }
+
+
+    // Check if we have reached the final pressure ps
+    if(fabs(us - us_1) <= loc_tol_rarefaction) {
+      rhos = rhos_1;
+      ps   = ps_1;
+      
+      if(vf[id]->CheckState(rhos,ps,true)) { //true: silence
+#if PRINT_RIEMANN_SOLUTION == 1
+        cout << "Rarefaction solver reached a nonphysical state!" << endl;         
+#endif
+        return false;
+      }
+
+#if PRINT_RIEMANN_SOLUTION == 1
+      cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
+#endif
+      done = true;
+      break; //done!
+    }
+
+    // If the solver gets here, it means it hasn't reached the final pressure ps.
+    // Adjust step size, then update state
+
+    drho = std::min( drho/du*std::min(du_target,us-us_1), //don't go beyond us
+                     drho*4.0); //don't increase too much in one step
+       
+    rhos_0 = rhos_1;
+    us_0   = us_1;
+    ps_0   = ps_1;
+    xi_0   = xi_1;
+
+  }
+
+  if(!done) {
+    if(vf[id]->CheckState(rhos_1,ps_1,true)) {
+#if PRINT_RIEMANN_SOLUTION == 1
+      cout << "  " << wavenumber << "-wave: rarefaction, solver failed (unphysical state: rhos = "
+           << rhos_1 << ", ps = " << ps_1 << "!)" << endl;
+#endif
+      return false; //failed
+    } else {
+#if PRINT_RIEMANN_SOLUTION == 1
+      cout << "  " << wavenumber << "-wave: rarefaction, solver did not converge (final sol.: rhos_1 = "
+           << rhos_1 << ", ps_1 = " << ps_1 << "; inputs: rho = " << rho << ", p = " << p << ", us = " << us << ")" << endl;
+#endif
+      return false; 
+    }
+  }
+
+  return true; //yeah!
+}
+
+//----------------------------------------------------------------------------------
+
 bool
 ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                             double rho_0, double u_0, double p_0 /*start state*/, 
@@ -1807,6 +1935,44 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
     return 0;
   }
 
+
+
+  if(ul < ustar) { //rarefaction
+
+    success = ComputeOneSidedRarefaction(rhol, ul, pl, el, cl, idl, ustar, rhol2, p2, &trans_rare, Vrare_x0); 
+
+    if(!success) {
+      cout << "Warning: One-sided Riemann solver failed to complete (Returning a modified initial state)." << endl;
+
+      double utanl[3] = {Vm[1]-ul*dir[0], Vm[2]-ul*dir[1], Vm[3]-ul*dir[2]};
+
+      Vsm[0] = Vm[0];
+      Vsm[1] = utanl[0] + ustar*dir[0];
+      Vsm[2] = utanl[1] + ustar*dir[1];
+      Vsm[3] = utanl[2] + ustar*dir[2];
+      Vsm[4] = Vm[4];
+
+      if(ustar >= 0) {
+        id = idl;
+        for(int i=0; i<5; i++)
+          Vs[i] = Vsm[i];
+      } else {
+        id = INVALID_MATERIAL_ID;
+      }
+      return 1;
+    }
+
+    // success!
+    //
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
+                             Vs, id, Vsm);
+    return 0;
+
+  }
+
+
+  // -------------------------------
+  // Now, ul > ustar --> SHOCK
   // -------------------------------
   // Step 1: Initialization
   //         (find initial interval [p0, p1])
@@ -1849,6 +2015,10 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
                              Vs, id, Vsm);
     return 1;
   }
+
+
+  assert(p0>pl);
+  assert(p1>pl);
 
   f0 = ul0 - ustar;
   f1 = ul1 - ustar;
