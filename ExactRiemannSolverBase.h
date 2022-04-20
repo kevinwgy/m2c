@@ -110,7 +110,7 @@ protected: //internal functions
   bool FindInitialFeasiblePointsOneSided(double rhol, double ul, double pl, double el, double cl, int idl, double ustar,
            double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1/*outputs*/);
 
-  int FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli(double rhol, double ul,
+  int FindInitialFeasiblePointsOneSidedByAcousticTheory(double rhol, double ul,
            double pl, double el, double cl, int idl, double ustar,
            double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1/*outputs*/);
 

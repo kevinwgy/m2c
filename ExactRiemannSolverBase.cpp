@@ -563,8 +563,6 @@ ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm,
   int last = sol1d.size()-1;
   double xi_span = sol1d[last][0] - sol1d[0][0];
   sol1d.insert(sol1d.begin(), vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3], sol1d[0][4]});
-  last++;
-  sol1d.push_back(vector<double>{sol1d[last][0]+xi_span, sol1d[last][1], sol1d[last][2], sol1d[last][3], sol1d[last][4]});
 
   FILE* solFile = fopen("RiemannSolution.txt", "w");
   print(solFile, "## One-Dimensional Riemann Problem.\n");
@@ -1028,7 +1026,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsOneSided(double rhol, double ul
   bool success = true;
 
   // Method 1: Use the acoustic theory (Eqs. (20)-(22) of Kamm) to find p0, p1
-  found = FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli(rhol, ul, pl, el, cl, idl, ustar,
+  found = FindInitialFeasiblePointsOneSidedByAcousticTheory(rhol, ul, pl, el, cl, idl, ustar,
               p0, rhol0, ul0, p1, rhol1, ul1/*outputs*/);
 
   if(found==2)
@@ -1145,13 +1143,15 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, d
 //----------------------------------------------------------------------------------
 
 int
-ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli(double rhol, double ul, 
+ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticTheory(double rhol, double ul, 
                             double pl, double el, double cl, int idl, double ustar,
                             double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1)
 {
+  
+  assert(ul>ustar); //only needed in the case of a shock
+
   int found = 0;
   bool success = true;
-  bool used_Bernoulli = false;
 
   // 1.1: Initialize p0 using acoustic theory ((20) of Kamm)
   double Cl = rhol*cl; //acoustic impedance
@@ -1161,60 +1161,29 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticsAndBernoulli
                 rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
                 rhol0, ul0/*outputs*/);
   if(!success) {
-
-    //1.1.1: Try bernoulli's equation
-    p0 = pl + 0.5*rhol*(ul*ul - ustar*ustar);
+    p0 = 1.5*pl;
     success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl/*inputs*/,
                   rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
                   rhol0, ul0/*outputs*/);
     if(!success)
       return found;
-    used_Bernoulli = true;
   }
 
 
   found = 1; //found p0!
 
-  // 1.2. Initialize p1 by bernoulli's equation or acoustic relation
-  if(!used_Bernoulli) {
-    p1 = pl + 0.5*rhol*(ul*ul - ustar*ustar);
-    double tmp = std::max(fabs(p0), fabs(p1));
-    if(fabs(p1 - p0)/tmp<1.0e-8)
-      p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
+  double Clbar = (ul0 == ul) ? Cl : fabs(p0 - pl)/fabs(ul0 - ul);
+  p1 = pl + Clbar*(ul - ustar);
+  double tmp = std::max(fabs(p0), fabs(p1));
+  if(fabs(p1 - p0)/tmp<1.0e-8)
+    p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
 
-    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
-                  rhol, rhol0/*initial guesses for Hugo. eq.*/,
-                  rhol1, ul1/*outputs*/);
-
-    if(!success) {
-      double Clbar = (ul0 == ul) ? Cl : fabs(p0 - pl)/fabs(ul0 - ul);
-      p1 = pl + Clbar*(ul - ustar);
-      tmp = std::max(fabs(p0), fabs(p1));
-      if(fabs(p1 - p0)/tmp<1.0e-8)
-        p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
-
-      success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
-                    rhol, rhol0/*initial guesses for Hugo. eq.*/,
-                    rhol1, ul1/*outputs*/);
-      if(!success)
-        return found;
-    }
-
-    used_Bernoulli = true;
-  }
-  else {
-    double Clbar = (ul0 == ul) ? Cl : fabs(p0 - pl)/fabs(ul0 - ul);
-    p1 = pl + Clbar*(ul - ustar);
-    double tmp = std::max(fabs(p0), fabs(p1));
-    if(fabs(p1 - p0)/tmp<1.0e-8)
-      p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
-
-    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
-                  rhol, rhol0/*initial guesses for Hugo. eq.*/,
-                  rhol1, ul1/*outputs*/);
-    if(!success)
-      return found;
-  }
+  success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
+                rhol, rhol0/*initial guesses for Hugo. eq.*/,
+                rhol1, ul1/*outputs*/);
+  fprintf(stderr,"p1 = %e, success = %d.\n", p1, (int)success);
+  if(!success)
+    return found;
 
   found = 2; //found p0 and p1!
   return found;
