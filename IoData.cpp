@@ -575,7 +575,7 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 10, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
@@ -594,6 +594,8 @@ Assigner *MaterialModelData::getAssigner()
   jwlModel.setup("JonesWilkinsLeeModel", ca);
 
   viscosity.setup("ViscosityModel", ca);
+  
+  heat_diffusion.setup("HeatDiffusionModel", ca);
   
   return ca;
 };
@@ -646,6 +648,28 @@ void ViscosityModelData::setup(const char *name, ClassAssigner *father) {
                                       &ViscosityModelData::Cth);
 
 }
+
+//------------------------------------------------------------------------------
+
+HeatDiffusionModelData::HeatDiffusionModelData()
+{
+  type = NONE;
+  diffusivity = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+void HeatDiffusionModelData::setup(const char *name, ClassAssigner *father) {
+
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+
+  new ClassToken<HeatDiffusionModelData>(ca, "Type", this,
+           reinterpret_cast<int HeatDiffusionModelData::*>(&HeatDiffusionModelData::type), 2,
+           "None",     HeatDiffusionModelData::NONE,
+           "Constant", HeatDiffusionModelData::CONSTANT);
+
+  new ClassDouble<HeatDiffusionModelData>(ca, "Diffusivity", this, &HeatDiffusionModelData::diffusivity);
+} 
 
 //------------------------------------------------------------------------------
 

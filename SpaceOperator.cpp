@@ -38,7 +38,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
     Tag(comm_, &(dm_all_.ghosted1_1dof)),
-    symm(NULL), visco(NULL), smooth(NULL)
+    symm(NULL), visco(NULL), heat_diffusion(NULL), smooth(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -65,6 +65,7 @@ SpaceOperator::~SpaceOperator()
 {
   if(symm) delete symm;
   if(visco) delete visco;
+  if(heat_diffusion) delete heat_diffusion;
   if(smooth) delete smooth;
 }
 
@@ -77,6 +78,8 @@ void SpaceOperator::Destroy()
   if(symm) symm->Destroy();
 
   if(visco) visco->Destroy();
+
+  if(heat_diffusion) heat_diffusion->Destroy();
 
   if(smooth) smooth->Destroy();
 
@@ -624,6 +627,26 @@ void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, Grad
     assert(grad_);
     visco = new ViscosityOperator(comm, dm_all, iod.eqs, varFcn, coordinates, delta_xyz,
                                   *interpolator_, *grad_);
+  }
+}
+
+//-----------------------------------------------------
+
+void SpaceOperator::SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_)
+{
+  bool needit = false;
+  for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
+    if(it->second->heat_diffusion.type != HeatDiffusionModelData::NONE) {
+      needit = true;
+      break; //initialize heat_diffusion if any material has heat diffusion 
+    }
+  }
+
+  if(needit) {
+    assert(interpolator_); //make sure it is not NULL
+    assert(grad_);
+    heat_diffusion = new HeatDiffusionOperator(comm, dm_all, iod.eqs, varFcn, coordinates, delta_xyz,
+                                               *interpolator_, *grad_);
   }
 }
 
@@ -2660,6 +2683,9 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, R);
+
+  if(heat_diffusion)
+    heat_diffusion->AddDiffusionFluxes(V, ID, R);
 
   if(symm) //cylindrical or spherical symmetry
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side

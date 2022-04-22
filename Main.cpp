@@ -159,6 +159,9 @@ int main(int argc, char* argv[])
   //! Setup viscosity operator in spo (if viscosity model is not NONE)
   spo.SetupViscosityOperator(interp, grad);
 
+  //! Setup heat diffusion operator in spo (if heat diffusion model is not NONE)
+  spo.SetupHeatDiffusionOperator(interp, grad);
+ 
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
   SpaceVariable3D ID(comm, &(dms.ghosted1_1dof)); //!< material id

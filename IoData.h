@@ -289,6 +289,21 @@ struct ViscosityModelData {
 
 //------------------------------------------------------------------------------
 
+struct HeatDiffusionModelData {
+
+  enum Type {NONE = 0, CONSTANT = 1} type;
+
+  // constant
+  double diffusivity;
+
+  HeatDiffusionModelData();
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct MaterialModelData {
 
   int id;
@@ -305,6 +320,8 @@ struct MaterialModelData {
   JonesWilkinsLeeModelData jwlModel;
 
   ViscosityModelData viscosity;
+
+  HeatDiffusionModelData heat_diffusion;
 
   MaterialModelData();
   ~MaterialModelData() {}

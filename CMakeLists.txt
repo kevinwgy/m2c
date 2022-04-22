@@ -85,6 +85,7 @@ Interpolator.cpp
 GradientCalculatorCentral.cpp
 GradientCalculatorFD3.cpp
 ViscosityOperator.cpp
+HeatDiffusionOperator.cpp
 ProbeOutput.cpp
 MaterialVolumeOutput.cpp
 Output.cpp

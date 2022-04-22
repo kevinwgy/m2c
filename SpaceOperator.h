@@ -3,6 +3,7 @@
 #include <ExactRiemannSolverBase.h>
 #include <SymmetryOperator.h>
 #include <ViscosityOperator.h>
+#include <HeatDiffusionOperator.h>
 #include <SmoothingOperator.h>
 #include <FluxFcnBase.h>
 #include <Reconstructor.h>
@@ -42,8 +43,11 @@ class SpaceOperator
   //! Class for imposing spherical or cylindrical symmetry (sink terms placed on the left-hand-side!)
   SymmetryOperator* symm;
 
-  //! Class for calculating spatial gradients of variables
+  //! Class for computing viscous fluxes
   ViscosityOperator* visco;
+
+  //! Class for calculating heat diffusion fluxes
+  HeatDiffusionOperator* heat_diffusion;
 
   //! Class for smoothing the solution
   SmoothingOperator* smooth;
@@ -80,6 +84,8 @@ public:
                               bool workOnGhost = false, bool checkState = true);
 
   void SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
+
+  void SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
   void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID);
     
