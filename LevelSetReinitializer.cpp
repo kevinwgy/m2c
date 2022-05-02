@@ -144,7 +144,7 @@ RETRY_FullDomain:
     if(dphi_max<0.1) //ok...
       return;
     if(cfl < 0.02) {//failed...
-      print_error("*** ERROR: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
+      print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
                   residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       exit_mpi();
     } else {
@@ -254,7 +254,7 @@ RETRY_NarrowBand:
     if(dphi_max<0.1) //ok...
       return; 
     if(cfl < 0.02) {//failed...
-      print_error("*** ERROR: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
+      print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
                   residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       exit_mpi();
     } else {

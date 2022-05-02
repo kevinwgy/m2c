@@ -5,6 +5,7 @@
 #include<KDTree.h>
 #include<TriangulatedSurface.h>
 #include<FloodFill.h>
+#include<EmbeddedBoundaryDataSet.h>
 
 /****************************************************************
  * Class Intersector is responsible for tracking a triangulated
@@ -24,33 +25,6 @@
  ***************************************************************/
 
 class Intersector {
-
-  //! A nested class that stores information about an intersection point between an edge and a triangle
-  struct IntersectionPoint {
-    Int3 n0; //!< the first (i.e., left, bottom, or back) node
-    int dir; //!< the direction of the edge (0~x, 1~y, 2~z)
-    double dist; //!< dist from n0 to the intersection point along dir
-    int tid; //!< id of the triangle that it intersects
-    double xi[3]; //!< barycentric coords of the intersection point within the triangle it intersects
-
-    /** NOTE: In most cases, the point obtained using tid and xi is IDENTICAL to the point
-     *        obtained using n0, dir, and dist. 
-     *        However, the two points may not be the same when the intersection is IMPOSED to an edge because
-     *        (1) one (or two) of the vertices of the edge is occluded and 
-     *        (2) an intersection cannot be identified normally (i.e. w/o imposing thickness).
-     *        In this case, the second point (obtained using n0, dir, and dist) would be the occluded vertex,
-     *        and the first point is the closest point on the triangle to the occluded vertex.
-     *        If both vertices of the edge are occluded. The two vertices are considered as two intersection
-     *        points. */
-
-    IntersectionPoint() : n0(-1,-1,-1), dir(-1), dist(-1), tid(-1) {xi[0] = xi[1] = xi[2] = -1;}
-
-    IntersectionPoint(int i, int j, int k, int dir_, double dist_, int tid_, double* xi_)
-      : n0(Int3(i,j,k)), dir(dir_), dist(dist_), tid(tid_) {xi[0] = xi_[0]; xi[1] = xi_[1]; xi[2] = xi_[2];}
-
-    IntersectionPoint &operator=(const IntersectionPoint& p2) {
-      n0 = p2.n0;  dir = p2.dir;  dist = p2.dist;  tid = p2.tid;  for(int i=0; i<3; i++) xi[i] = p2.xi[i]; return *this;}
-  };
 
 
   //! Utility class to find and store bounding boxes for triangles
@@ -74,20 +48,6 @@ class Intersector {
     int trId() const { return id; }
   };
 
-
-  //! Utility class to store the closest point on the surface to a node (an arbitrary point)
-  struct ClosestPoint {
-    int tid;
-    double dist; //!< dist to the node in question
-    double xi[3]; //!< closest point is at xi[0]*node[0] + xi[1]*node[1] + xi[2]*node[2]
-
-    ClosestPoint(int tid_, double dist_, double xi_[3]) : tid(tid_), dist(dist_) {
-      for(int i=0; i<3; i++) xi[i] = xi_[i];}
-
-    ClosestPoint &operator=(const ClosestPoint& p2) {
-      tid = p2.tid;  dist = p2.dist;
-      for(int i=0; i<3; i++) {xi[i] = p2.xi[i];} return *this;}
-  };
 
   MPI_Comm& comm;
 
@@ -213,7 +173,11 @@ public:
 
   void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
+  // Get pointers to all the results
+  void GetPointersToResults(EmbeddedBoundaryDataSet *ebds);
+
 private: 
+
   //! Utility functions
   //
   //! Use a tree to find candidates. maxCand may change, tmp may be reallocated (if size is insufficient)

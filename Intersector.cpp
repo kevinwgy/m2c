@@ -1,6 +1,7 @@
 #include<Intersector.h>
 #include<GeoTools.h>
 #include<Intersections.h>
+#include<EmbeddedBoundaryDataSet.h>
 using std::pair;
 using std::vector;
 
@@ -90,6 +91,29 @@ Intersector::Destroy()
   XBackward.Destroy();
   Phi.Destroy();
   Sign.Destroy();
+}
+
+//-------------------------------------------------------------------------
+
+void
+Intersector::GetPointersToResults(EmbeddedBoundaryDataSet *ebds)
+{
+  if(!ebds) {
+    print_error("*** Error: GetPointersToResults failed. Invalid input.\n");
+    exit_mpi();
+  }
+
+  ebds->XForward_ptr          = &XForward;
+  ebds->XBackward_ptr         = &XBackward;
+  ebds->Phi_ptr               = &Phi;
+  ebds->Sign_ptr              = &Sign;
+  ebds->ClosestPointIndex_ptr = &ClosestPointIndex;
+  ebds->closest_points_ptr    = &closest_points;
+  ebds->intersections_ptr     = &intersections;
+  ebds->occluded_ptr          = &occluded;
+  ebds->firstLayer_ptr        = &firstLayer;
+  ebds->imposed_occluded_ptr  = &imposed_occluded;
+  ebds->swept_ptr             = &swept;
 }
 
 //-------------------------------------------------------------------------
@@ -850,7 +874,7 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
 
   double*** candid = CandidatesIndex.GetDataPointer();
   
-  //add swepted nodes to nodes2fill (including internal ghosts)
+  //add swept nodes to nodes2fill (including internal ghosts)
   std::set<Int3> nodes2fill = swept;
   std::set<Int3> nodes2fill2;
 

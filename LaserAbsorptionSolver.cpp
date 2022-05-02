@@ -59,7 +59,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
   for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
     if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
-      fprintf(stderr,"ERROR: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
+      fprintf(stderr,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
       exit_mpi();
     }
     std::get<0>(absorption[it->first]) = it->second->slope;
@@ -128,7 +128,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
   for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
     if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
-      fprintf(stderr,"ERROR: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
+      fprintf(stderr,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
       exit(-1);
     }
     std::get<0>(absorption[it->first]) = it->second->slope;
