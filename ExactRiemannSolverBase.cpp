@@ -936,11 +936,16 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       if(!success) {
         dp = dp/2.0;
         continueTimes = continueTimes + 1;
-        if (continueTimes > continueTolerance) {
+        if (continueTimes > continueTolerance || dp == 0.0) {
 //          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
 //                       continueTimes, id, p, ps, pStart_new, dpStart, dp, ps_1, c, rho, integrationPath.size());
           break;
         }
+        continue;
+      }
+
+      if (ps_1-ps < -1.e-14) {
+        dp = ps_0 - ps;
         continue;
       }
 
@@ -1019,11 +1024,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       // Adjust step size, then update state
       //
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
-     //double tiny = 1.e-14;
-    
+     
+      double tiny = 1.e-30;
       double errBar = tol_rarefaction; 
-      double uErrScaled = uErr / c;
-      double rhoErrScaled = rhoErr / rho;
+      double uErrScaled = uErr / c + tiny;
+      double rhoErrScaled = rhoErr / rho + tiny;
      // std::cout << "uErrScaled = " << uErrScaled << "." << std::endl;
       double dpTemp = dp;
       double safety = 0.9;
