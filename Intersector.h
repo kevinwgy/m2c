@@ -6,6 +6,7 @@
 #include<TriangulatedSurface.h>
 #include<FloodFill.h>
 #include<EmbeddedBoundaryDataSet.h>
+#include<memory> //unique_ptr
 
 /****************************************************************
  * Class Intersector is responsible for tracking a triangulated
@@ -106,6 +107,7 @@ class Intersector {
   //! Phi and Sign communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
   SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or N (inlet, outlet). N = 1,2,...
+  std::vector<int> SignReachesBoundary; //!< stores whether each negative sign touches the domain boundary
                       
   //! Closest point on triangle (for near-field nodes inside subdomain, including internal ghosts nodes)
   SpaceVariable3D ClosestPointIndex; //!< index in the vector closest_points. (-1 means not available)
@@ -174,7 +176,7 @@ public:
   void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
   // Get pointers to all the results
-  void GetPointersToResults(EmbeddedBoundaryDataSet *ebds);
+  std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();
 
 private: 
 

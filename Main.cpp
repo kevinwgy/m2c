@@ -27,6 +27,8 @@ double domain_diagonal;
 clock_t start_time;
 MPI_Comm m2c_comm;
 
+int INACTIVE_MATERIAL_ID;
+
 /*************************************
  * Main Function
  ************************************/
@@ -165,9 +167,10 @@ int main(int argc, char* argv[])
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
   SpaceVariable3D ID(comm, &(dms.ghosted1_1dof)); //!< material id
+  INACTIVE_MATERIAL_ID = -1;
 
   //! Impose initial condition
-  spo.SetInitialCondition(V, ID);
+  spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToIntersectorResults() : nullptr);
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;

@@ -3,10 +3,12 @@
 #include<list>
 #include<utility>
 #include<Utils.h>
+#include<memory.h> //unique_ptr
 
 using std::string;
 using std::map;
 using std::vector;
+using std::unique_ptr;
 
 //------------------------------------------------------------------------------------------------
 
@@ -489,8 +491,28 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaceFromOtherSolver()
 
 //------------------------------------------------------------------------------------------------
 
+unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > >
+EmbeddedBoundaryOperator::GetPointerToIntersectorResults()
+{
+  unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > p(new vector<unique_ptr<EmbeddedBoundaryDataSet> >());
 
+  for(int i=0; i<intersector.size(); i++) {
+    assert(intersector[i]); //should not call this function is surfaces are not "tracked"
+    p->push_back(intersector[i]->GetPointerToResults());
+  }
 
+  return p;
+}
+
+//------------------------------------------------------------------------------------------------
+
+unique_ptr<EmbeddedBoundaryDataSet>
+EmbeddedBoundaryOperator::GetPointerToIntersectoResultsOnSurface(int i)
+{
+  assert(i>=0 && i<intersector.size());
+  assert(intersector[i]);
+  return intersector[i]->GetPointerToResults();
+}
 
 //------------------------------------------------------------------------------------------------
 

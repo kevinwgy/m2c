@@ -9,6 +9,8 @@
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
 
+class EmbeddedBoundaryDataSet;
+
 /*******************************************
  * class SpaceOperator drives computations
  * that require domain/mesh information
@@ -36,6 +38,9 @@ class SpaceOperator
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
   int NX, NY, NZ; //!< global size
+
+  std::vector<double> &x_glob, &y_glob, &z_glob;
+  std::vector<double> &dx_glob, &dy_glob, &dz_glob;
 
   //! Class for spatial reconstruction
   Reconstructor rec;
@@ -87,7 +92,8 @@ public:
 
   void SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
-  void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID);
+  void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                           std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
     
   void ApplyBoundaryConditions(SpaceVariable3D &V);
 
@@ -122,6 +128,11 @@ private:
 
   void CreateGhostNodeLists(bool screenout);
 
+  void ApplyPointBasedInitialCondition(PointData& point, 
+                                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
+                                       vector<double***> &color,
+                                       Vec5D*** v, double*** id);
+                                       
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
 
   void CheckReconstructedStates(SpaceVariable3D &V,

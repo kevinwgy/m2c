@@ -4,6 +4,7 @@
 #include<EmbeddedBoundaryDataSet.h>
 using std::pair;
 using std::vector;
+using std::unique_ptr;
 
 extern int verbose;
 extern double domain_diagonal;
@@ -95,25 +96,25 @@ Intersector::Destroy()
 
 //-------------------------------------------------------------------------
 
-void
-Intersector::GetPointersToResults(EmbeddedBoundaryDataSet *ebds)
+unique_ptr<EmbeddedBoundaryDataSet>
+Intersector::GetPointerToResults()
 {
-  if(!ebds) {
-    print_error("*** Error: GetPointersToResults failed. Invalid input.\n");
-    exit_mpi();
-  }
+  unique_ptr<EmbeddedBoundaryDataSet> ebds(new EmbeddedBoundaryDataSet());
 
-  ebds->XForward_ptr          = &XForward;
-  ebds->XBackward_ptr         = &XBackward;
-  ebds->Phi_ptr               = &Phi;
-  ebds->Sign_ptr              = &Sign;
-  ebds->ClosestPointIndex_ptr = &ClosestPointIndex;
-  ebds->closest_points_ptr    = &closest_points;
-  ebds->intersections_ptr     = &intersections;
-  ebds->occluded_ptr          = &occluded;
-  ebds->firstLayer_ptr        = &firstLayer;
-  ebds->imposed_occluded_ptr  = &imposed_occluded;
-  ebds->swept_ptr             = &swept;
+  ebds->XForward_ptr            = &XForward;
+  ebds->XBackward_ptr           = &XBackward;
+  ebds->Phi_ptr                 = &Phi;
+  ebds->Sign_ptr                = &Sign;
+  ebds->SignReachesBoundary_ptr = &SignReachesBoundary;
+  ebds->ClosestPointIndex_ptr   = &ClosestPointIndex;
+  ebds->closest_points_ptr      = &closest_points;
+  ebds->intersections_ptr       = &intersections;
+  ebds->occluded_ptr            = &occluded;
+  ebds->firstLayer_ptr          = &firstLayer;
+  ebds->imposed_occluded_ptr    = &imposed_occluded;
+  ebds->swept_ptr               = &swept;
+
+  return ebds;
 }
 
 //-------------------------------------------------------------------------
@@ -851,6 +852,23 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
       hasOutlet = true;
     else if(it->second<0)
       nRegions++;
+
+
+  // fill SignReachesBoundary
+  SignReachesBoundary.resize(nRegions, 0);
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+    if(it->type_projection != GhostPoint::FACE)
+      continue;
+    Int3& ijk(it->image_ijk);
+    int mycolor = sign[ijk[2]][ijk[1]][ijk[0]];
+    if(mycolor<0) 
+      SignReachesBoundary[-mycolor] = 1;
+  }
+  MPI_Allreduce(MPI_IN_PLACE, SignReachesBoundary.data(), SignReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
+ 
+
+
+  // Finalization
 
   Sign.RestoreDataPointerAndInsert();
 

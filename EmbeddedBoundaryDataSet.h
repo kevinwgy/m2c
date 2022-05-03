@@ -73,6 +73,7 @@ public:
   SpaceVariable3D *XBackward_ptr;
   SpaceVariable3D *Phi_ptr;
   SpaceVariable3D *Sign_ptr; 
+  std::vector<int> *SignReachesBoundary_ptr;
   SpaceVariable3D *ClosestPointIndex_ptr;
   std::vector<std::pair<Int3, ClosestPoint> > *closest_points_ptr;
   std::vector<IntersectionPoint> *intersections_ptr;
@@ -86,8 +87,9 @@ public:
 
 public:
   EmbeddedBoundaryDataSet() : XForward_ptr(nullptr), XBackward_ptr(nullptr), Phi_ptr(nullptr),
-                              Sign_ptr(nullptr), ClosestPointIndex_ptr(nullptr),
-                              closest_points_ptr(nullptr), occluded_ptr(nullptr), firstLayer_ptr(nullptr),
+                              Sign_ptr(nullptr), SignReachesBoundary_ptr(nullptr), 
+                              ClosestPointIndex_ptr(nullptr), closest_points_ptr(nullptr), 
+                              occluded_ptr(nullptr), firstLayer_ptr(nullptr),
                               imposed_occluded_ptr(nullptr), swept_ptr(nullptr)
   { }
 

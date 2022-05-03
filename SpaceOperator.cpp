@@ -4,18 +4,23 @@
 #include <Vector5D.h>
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
+#include <EmbeddedBoundaryDataSet.h>
 #include <algorithm> //std::upper_bound
 #include <cfloat> //DBL_MAX
 #include <KDTree.h>
 #include <rbf_interp.hpp>
+#include <memory> //unique_ptr
 using std::cout;
 using std::endl;
 using std::max;
 using std::min;
 using std::map;
+using std::unique_ptr;
 using namespace GeoTools;
 
 extern int verbose;
+extern int INACTIVE_MATERIAL_ID;
+
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -29,6 +34,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)),
+    x_glob(x), y_glob(y), z_glob(z), dx_glob(dx), dy_glob(dy), dz_glob(dz),
     rec(comm_, dm_all_, iod_.schemes.ns.rec, coordinates, delta_xyz, &varFcn, &fluxFcn),
     Vl(comm_, &(dm_all_.ghosted1_5dof)),
     Vr(comm_, &(dm_all_.ghosted1_5dof)),
@@ -653,7 +659,8 @@ void SpaceOperator::SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, 
 //-----------------------------------------------------
 
 //apply IC within the real domain
-void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID) 
+void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                        unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS)
 {
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
@@ -1208,7 +1215,56 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   }
 
 
+  //! specify point-based initial condition
+  if(!ic.pointMap.dataMap.empty() && EBDS == nullptr) {
+    print_error("*** Error: Unable to specify point-based initial conditions without embedded boundaries.\n"
+                "           Background state can be specified using the 'Farfield' or 'Inlet' structure, even\n"
+                "           if the domain does not contain a far-field or inlet boundary.\n");
+    exit_mpi();
+  }
 
+  if(EBDS != nullptr) {
+
+    vector<double***> color(EBDS->size(), NULL);
+    for(int i=0; i<EBDS->size(); i++) {
+      assert((*EBDS)[i]->Sign_ptr);
+      color[i] = (*EBDS)[i]->Sign_ptr->GetDataPointer();
+    }
+
+    for(auto it=ic.pointMap.dataMap.begin(); it!=ic.pointMap.dataMap.end(); it++) {
+
+      print("- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
+            it->second->x, it->second->y, it->second->z, it->second->initialConditions.materialid);
+
+      ApplyPointBasedInitialCondition(*it->second, *(EBDS.get()), color, v, id);
+    }
+
+    // set material Id for occluded nodes
+    int i,j,k;
+    for(int surf=0; surf<EBDS->size(); surf++) {
+      set<Int3> *occluded = (*EBDS)[surf]->occluded_ptr;
+      set<Int3> *imposed_occluded = (*EBDS)[surf]->imposed_occluded_ptr;
+      for(auto it = occluded->begin(); it != occluded->end(); it++) {
+        i = (*it)[0];
+        j = (*it)[1];
+        k = (*it)[2];
+        if(!coordinates.IsHere(i,j,k,false))
+          continue;
+        id[k][j][i] = INACTIVE_MATERIAL_ID;
+      }
+      for(auto it = imposed_occluded->begin(); it != imposed_occluded->end(); it++) {
+        i = (*it)[0];
+        j = (*it)[1];
+        k = (*it)[2];
+        if(!coordinates.IsHere(i,j,k,false))
+          continue;
+        id[k][j][i] = INACTIVE_MATERIAL_ID;
+      }
+    }
+
+    for(int i=0; i<EBDS->size(); i++)
+      (*EBDS)[i]->Sign_ptr->RestoreDataPointerToLocalVector();
+  }
 
 
   V.RestoreDataPointerAndInsert();
@@ -1218,6 +1274,158 @@ void SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID)
   //! Apply boundary condition to populate ghost nodes (no need to do this for ID)
   ClipDensityAndPressure(V, ID);
   ApplyBoundaryConditions(V);   
+
+}
+
+//-----------------------------------------------------
+//! Apply boundary condition based on user-specified point and "flood-fill"
+void 
+SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
+                                               vector<unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
+                                               vector<double***> &color,
+                                               Vec5D*** v, double*** id)
+{
+  assert(EBDS.size()>0);
+
+  //Step 1. Locate the point within the mesh
+  int i0,j0,k0;
+  i0 = int(std::upper_bound(x_glob.begin(), x_glob.end(), point.x) - x_glob.begin()) - 1;
+  j0 = int(std::upper_bound(y_glob.begin(), y_glob.end(), point.y) - y_glob.begin()) - 1;
+  k0 = int(std::upper_bound(z_glob.begin(), z_glob.end(), point.z) - z_glob.begin()) - 1;
+  vector<Int3> vertices; 
+  vertices.reserve(8);
+  vector<bool> owner;
+  owner.reserve(8);
+
+  int i(i0),j(j0),k(k0);
+  for(int dk=0; dk<=1; dk++) {
+    for(int dj=0; dj<=1; dj++) {
+      for(int di=0; di<=1; di++) {
+
+        vertices.push_back(Int3(i,j,k));
+        owner.push_back(coordinates.IsHere(i,j,k,false));
+
+        i++;
+      }
+      j++;
+    }
+    k++; 
+  }
+
+  //Step 2. Loop through embedded boundaries and determine the color at user-specified point from each boundary
+  vector<int> mycolor(EBDS.size(), INT_MIN);
+  for(int surf = 0; surf < EBDS.size(); surf++) {
+
+    vector<int> max_color(vertices.size(), INT_MIN);
+    vector<int> min_color(vertices.size(), INT_MAX);
+    vector<int> occluded(vertices.size(), 0);
+
+    for(int n=0; n<8; n++) {
+      if(owner[n]) {
+        i = vertices[n][0];
+        j = vertices[n][1];
+        k = vertices[n][2];
+        max_color[n] = color[surf][k][j][i];
+        min_color[n] = color[surf][k][j][i];
+        if(color[surf][k][j][i]==0)
+          occluded[n] = 1;
+      }
+    }
+
+    MPI_Allreduce(MPI_IN_PLACE, max_color.data(), 8, MPI_INT, MPI_MAX, comm);
+    MPI_Allreduce(MPI_IN_PLACE, min_color.data(), 8, MPI_INT, MPI_MIN, comm);
+    MPI_Allreduce(MPI_IN_PLACE, occluded.data(), 8, MPI_INT, MPI_MAX, comm);
+
+    // check if any node in the box is occluded. If yes, exit.
+    for(int n=0; n<8; n++) {
+      if(occluded[n]>0) {
+        print_error("*** Error: User-specified point (%e %e %e) is too close to embedded surface %d.\n",
+                    point.x, point.y, point.z, surf);
+        exit_mpi();
+      }
+    }
+
+    // determine mycolor[surf]
+    mycolor[surf] = INT_MIN;
+    for(int n=0; n<8; n++) {
+      if(max_color[n] != INT_MIN) {
+        mycolor[surf] = max_color[n];
+        break;
+      }
+    }
+    if(mycolor[surf] == INT_MIN) {
+      print_error("*** Error: Unable to determine the 'color' of point (%e %e %e) from surface %d.\n",
+                  point.x, point.y, point.z, surf);
+      exit_mpi();
+    }
+    for(int n=0; n<8; n++) {
+      if(max_color[n] != INT_MIN && max_color[n] != mycolor[surf]) {
+        print_error("*** Error: Found different colors (%d and %d) around point (%e %e %e), using surface %d.\n",
+                    mycolor[surf], max_color[n], point.x, point.y, point.z, surf);
+        print_error("           This point may be too close to the embedded surface.\n");
+        exit_mpi();
+      }
+    }
+    for(int n=0; n<8; n++) {
+      if(min_color[n] != INT_MAX && min_color[n] != mycolor[surf]) {
+        print_error("*** Error: Found different colors (%d and %d) around point (%e %e %e), using embedded surface %d.\n",
+                    mycolor[surf], min_color[n], point.x, point.y, point.z, surf);
+        print_error("           This point may be too close to the embedded surface.\n");
+        exit_mpi();
+      }
+    }
+
+  }
+
+  //Step 3: Determine the "ruling surface" and color of this point.
+  int ruling_surface = -1;
+  int mycolor_final = INT_MIN;
+  for(i=0; i<mycolor.size(); i++) {
+    assert(mycolor[i] != 0);
+    if(mycolor[i]<0) { 
+      if(ruling_surface == -1) {
+        ruling_surface = i;
+        mycolor_final = mycolor[i];
+      }
+      else { //need to resolve a "conflict"
+        if((*EBDS[i]->SignReachesBoundary_ptr)[-mycolor[i]] == 0) {
+          if((*EBDS[ruling_surface]->SignReachesBoundary_ptr)[-mycolor_final] == 0)
+            print_warning("Warning: User-specified point (%e %e %e) is inside isolated regions in "
+                          "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
+                          ruling_surface, i);
+          ruling_surface = i;
+          mycolor_final = mycolor[i];
+        }
+        else {
+          if((*EBDS[ruling_surface]->SignReachesBoundary_ptr)[-mycolor_final] == 1) {
+            ruling_surface = i;
+            mycolor_final = mycolor[i];
+          }
+        }
+      }
+    }
+  }
+  if(ruling_surface<0) {
+    print_error("*** Error: Unable to impose boundary condition based on point (%e %e %e). This point is connected"
+                " to the far-field.\n", point.x, point.y, point.z);
+    exit_mpi();
+  }
+
+
+  //Step 4: Update state variables and ID
+  double*** ruling_colors = color[ruling_surface];
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if (ruling_colors[k][j][i] == mycolor_final) { 
+            v[k][j][i][0] = point.initialConditions.density;
+            v[k][j][i][1] = point.initialConditions.velocity_x;
+            v[k][j][i][2] = point.initialConditions.velocity_y;
+            v[k][j][i][3] = point.initialConditions.velocity_z;
+            v[k][j][i][4] = point.initialConditions.pressure;
+            id[k][j][i]   = point.initialConditions.materialid;
+          }
+        }
 
 }
 

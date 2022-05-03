@@ -55,6 +55,8 @@ public:
   vector<vector<Vec3D> >      *GetPointerToForces() {return &F;}
   vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<F.size()); return &F[i];}
 
+  std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > GetPointerToIntersectorResults();
+  std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToIntersectoResultsOnSurface(int i); 
 
 
   void SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable3D &coordinates_, 
