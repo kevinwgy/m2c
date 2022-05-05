@@ -28,6 +28,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              XForward(comm_, &(dms_.ghosted1_3dof)),
              XBackward(comm_, &(dms_.ghosted1_3dof)),
              Phi(comm_, &(dms_.ghosted1_1dof)),
+             Phi_nLayer(0),
              Sign(comm_, &(dms_.ghosted1_1dof)),
              floodfiller(comm_, dms_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
@@ -104,6 +105,7 @@ Intersector::GetPointerToResults()
   ebds->XForward_ptr            = &XForward;
   ebds->XBackward_ptr           = &XBackward;
   ebds->Phi_ptr                 = &Phi;
+  ebds->Phi_nLayer              = Phi_nLayer;
   ebds->Sign_ptr                = &Sign;
   ebds->SignReachesBoundary_ptr = &SignReachesBoundary;
   ebds->ClosestPointIndex_ptr   = &ClosestPointIndex;
@@ -1069,6 +1071,8 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
     BuildSubdomainScopeAndKDTree();
     FindNodalCandidates();
   }
+
+  Phi_nLayer = nLayer;
 
   double*** candid = CandidatesIndex.GetDataPointer();
   double*** phi    = Phi.GetDataPointer();

@@ -72,6 +72,7 @@ public:
   SpaceVariable3D *XForward_ptr;
   SpaceVariable3D *XBackward_ptr;
   SpaceVariable3D *Phi_ptr;
+  int Phi_nLayer;
   SpaceVariable3D *Sign_ptr; 
   std::vector<int> *SignReachesBoundary_ptr;
   SpaceVariable3D *ClosestPointIndex_ptr;
@@ -87,7 +88,7 @@ public:
 
 public:
   EmbeddedBoundaryDataSet() : XForward_ptr(nullptr), XBackward_ptr(nullptr), Phi_ptr(nullptr),
-                              Sign_ptr(nullptr), SignReachesBoundary_ptr(nullptr), 
+                              Phi_nLayer(0), Sign_ptr(nullptr), SignReachesBoundary_ptr(nullptr), 
                               ClosestPointIndex_ptr(nullptr), closest_points_ptr(nullptr), 
                               occluded_ptr(nullptr), firstLayer_ptr(nullptr),
                               imposed_occluded_ptr(nullptr), swept_ptr(nullptr)

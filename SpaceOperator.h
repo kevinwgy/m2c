@@ -92,8 +92,8 @@ public:
 
   void SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
-  void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                           std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
+  std::map<int,std::pair<int,int> > SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                             std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
     
   void ApplyBoundaryConditions(SpaceVariable3D &V);
 
@@ -128,9 +128,10 @@ private:
 
   void CreateGhostNodeLists(bool screenout);
 
-  void ApplyPointBasedInitialCondition(PointData& point, 
-                                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
-                                       vector<double***> &color,
+  std::map<int,std::pair<int,int> > 
+  ApplyPointBasedInitialCondition(PointData& point, 
+                                  vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
+                                  vector<double***> &color,
                                        Vec5D*** v, double*** id);
                                        
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);

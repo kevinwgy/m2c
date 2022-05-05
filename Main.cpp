@@ -170,7 +170,8 @@ int main(int argc, char* argv[])
   INACTIVE_MATERIAL_ID = -1;
 
   //! Impose initial condition
-  spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToIntersectorResults() : nullptr);
+  std::map<int, std::pair<int,int> >
+  id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToIntersectorResults() : nullptr);
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -190,7 +191,12 @@ int main(int argc, char* argv[])
     lso.push_back(new LevelSetOperator(comm, dms, iod, *it->second, spo));
     Phi.push_back(new SpaceVariable3D(comm, &(dms.ghosted1_1dof)));
 
-    lso.back()->SetInitialCondition(*Phi.back());
+    if(id2closure.find(matid) != id2closure.end()) {
+      lso.back()->SetInitialCondition(*Phi.back(), 
+                                      embed->GetPointerToIntersectoResultsOnSurface(id2closure[matid].first),
+                                      id2closure[matid].second);
+    } else
+      lso.back()->SetInitialCondition(*Phi.back());
 
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           lso.size()-1, matid);

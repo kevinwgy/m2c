@@ -106,6 +106,7 @@ class Intersector {
 
   //! Phi and Sign communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
+  int Phi_nLayer; //!< number of layers of nodes where Phi is calculated.
   SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or N (inlet, outlet). N = 1,2,...
   std::vector<int> SignReachesBoundary; //!< stores whether each negative sign touches the domain boundary
                       

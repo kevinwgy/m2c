@@ -9,6 +9,7 @@
  * of the level set equation
  ******************************************/
 class SpaceOperator;
+class EmbeddedBoundaryDataSet;
 
 class LevelSetOperator
 {
@@ -64,7 +65,8 @@ public:
                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo);
   ~LevelSetOperator();
 
-  void SetInitialCondition(SpaceVariable3D &Phi);
+  void SetInitialCondition(SpaceVariable3D &Phi, std::unique_ptr<EmbeddedBoundaryDataSet> EBDS = nullptr, int mycolor = INT_MIN);
+
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
 
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);

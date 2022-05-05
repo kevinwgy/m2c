@@ -3,6 +3,7 @@
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
 #include <GradientCalculatorFD3.h>
+#include <EmbeddedBoundaryDataSet.h>
 
 #ifdef LEVELSET_TEST
   #include <Vector2D.h>
@@ -13,6 +14,7 @@ using std::max;
 using std::pair;
 
 extern double domain_diagonal;
+extern int INACTIVE_MATERIAL_ID;
 //-----------------------------------------------------
 
 LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -278,7 +280,7 @@ void LevelSetOperator::CreateGhostNodeLists()
 
 //-----------------------------------------------------
 
-void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
+void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, std::unique_ptr<EmbeddedBoundaryDataSet> EBDS, int mycolor)
 {
   //get info
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
@@ -586,6 +588,80 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 #endif
 
 
+  int ebds_counter = 0;
+  if(EBDS != nullptr) {
+    if(!reinit) {
+      print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary. In this case, \n"
+                  "           level set reinitialization must be turned on.\n", materialid);
+      exit_mpi();
+    }    
+
+    if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::FIXED)
+      print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary. In this case,\n"
+                    "         it may be better to 'fix' the first layer nodes when reinitializing the level set.\n",
+                    materialid);
+
+    int nLayer = EBDS->Phi_nLayer;
+    if(nLayer<2) 
+      print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary.\n"
+                    "         The intersector should compute unsigned distance ('phi') for at least two layers\n"
+                    "         of nodes. Currently, this value is set to %d.\n", EBDS->Phi_nLayer); 
+
+    double*** color = EBDS->Sign_ptr->GetDataPointer();
+    double*** psi   = EBDS->Phi_ptr->GetDataPointer();
+     
+    int k1,j1,i1;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+    
+          //Check if this node is within nLayer of the interface
+          bool near = false;
+          for(int dk=-nLayer; dk<=nLayer; dk++) {
+            k1 = k + dk;
+            for(int dj=-nLayer; dj<=nLayer; dj++) {
+              j1 = j + dj;
+              for(int di=-nLayer; di<=nLayer; di++) {
+                i1 = i + di; 
+                if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
+                  continue;
+                if(color[k1][j1][i1] == mycolor) {
+                  near = true;
+                  goto DONE;  
+                }
+              }
+            }
+          }
+DONE:
+
+          if(!near) 
+            continue; //nothing to do
+
+          ebds_counter++;
+
+          // determine phi at [k][j][i]
+          if(color[k][j][i] == mycolor) {//"inside"
+            if(phi[k][j][i]>=0) 
+              phi[k][j][i] = -psi[k][j][i];
+            else
+              phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+          } else if(color[k][j][i] == INACTIVE_MATERIAL_ID) {
+            phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
+          } else { //"outside"
+            if(phi[k][j][i]>=0)
+              phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
+            else //this is really bad... the user should avoid this...
+              phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+          }
+        }
+
+
+    MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
+
+    EBDS->Sign_ptr->RestoreDataPointerToLocalVector();
+    EBDS->Phi_ptr->RestoreDataPointerToLocalVector();
+  }
+
   coordinates.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerAndInsert();
 
@@ -595,6 +671,13 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     assert(reinit);
     reinit->ConstructNarrowBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
   }
+
+  if(EBDS && ebds_counter>0) {
+    print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
+          materialid, ebds_counter);
+    Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
+  }
+
 }
 
 //-----------------------------------------------------
