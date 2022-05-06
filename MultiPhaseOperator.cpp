@@ -11,6 +11,7 @@ using std::set;
 using std::tuple;
 using std::get;
 extern int verbose;
+extern int INACTIVE_MATERIAL_ID;
 //-----------------------------------------------------
 
 MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -113,7 +114,7 @@ MultiPhaseOperator::Destroy()
 //-----------------------------------------------------
 
 void 
-MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID)
+MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID)
 {
 
 #ifdef LEVELSET_TEST
@@ -141,6 +142,9 @@ MultiPhaseOperator::UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariabl
     for(int k=kk0; k<kkmax; k++)
       for(int j=jj0; j<jjmax; j++)
         for(int i=ii0; i<iimax; i++) {
+
+          if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+            continue; //if occluded, id should not be changed
 
           if(phi[ls][k][j][i]<0) {
             if(id[k][j][i] != 0) {
@@ -1175,7 +1179,7 @@ MultiPhaseOperator::UpdateLevelSetsInUnresolvedCells(vector<SpaceVariable3D*> &P
 
   //Note that "unresolved" may be non-empty only for some of the processor cores / subdomains
   //What we do here is very similar to "Part II" in function ResolveConflictsInLevelSets
-  //Currently, this only handles unresolved *background* cells (i.e. ID = 0)
+  //TODO:Currently, this only handles unresolved *background* cells (i.e. ID = 0)
 
   int ls_size = Phi.size();
 

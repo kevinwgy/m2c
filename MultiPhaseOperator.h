@@ -47,7 +47,7 @@ public:
   ~MultiPhaseOperator();
 
   //! update material id including the ghost region
-  void UpdateMaterialID(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
+  void UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
 
   int UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID,
                                                SpaceVariable3D &V, RiemannSolutions &riemann_solutions,

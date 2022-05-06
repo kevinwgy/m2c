@@ -26,12 +26,13 @@ StateVariable::StateVariable()
 {
 
   materialid  = 0;
-  density     = -1.0;
+  density     = 0.0;
   velocity_x  = 0.0;
   velocity_y  = 0.0;
   velocity_z  = 0.0;
-  pressure    = -1.0;
-  temperature = -1.0;
+  pressure    = 0.0;
+  temperature = 0.0;
+  internal_energy_per_mass = 0.0;
 
 }
 
@@ -40,7 +41,7 @@ StateVariable::StateVariable()
 void StateVariable::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 8, father);
 
   new ClassInt<StateVariable>(ca, "MaterialID", this, &StateVariable::materialid);
   new ClassDouble<StateVariable>(ca, "Density", this, &StateVariable::density);
@@ -49,6 +50,7 @@ void StateVariable::setup(const char *name, ClassAssigner *father)
   new ClassDouble<StateVariable>(ca, "VelocityZ", this, &StateVariable::velocity_z);
   new ClassDouble<StateVariable>(ca, "Pressure", this, &StateVariable::pressure);
   new ClassDouble<StateVariable>(ca, "Temperature", this, &StateVariable::temperature);
+  new ClassDouble<StateVariable>(ca, "InternalEnergyPerUnitMass", this, &StateVariable::internal_energy_per_mass);
 
 }
 
@@ -728,12 +730,13 @@ EquationsData::EquationsData()
 
 void EquationsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 3, father); 
 
   materials.setup("Material", ca);
 
   transitions.setup("MaterialTransition", ca);
 
+  dummy_state.setup("DummyState", ca);
 }
 
 //------------------------------------------------------------------------------

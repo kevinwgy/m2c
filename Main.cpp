@@ -6,6 +6,7 @@
 #include <VarFcnSG.h>
 #include <VarFcnMG.h>
 #include <VarFcnJWL.h>
+#include <VarFcnDummy.h>
 #include <FluxFcnGenRoe.h>
 #include <FluxFcnLLF.h>
 #include <FluxFcnHLLC.h>
@@ -145,7 +146,9 @@ int main(int argc, char* argv[])
                               xcoords, ycoords, zcoords, dx, dy, dz);
     embed->SetupIntersectors();
     embed->TrackSurfaces();
-    return 0;
+
+    vf.push_back(new VarFcnDummy(iod.eqs.dummy_state)); //for "inactive" nodes, occluded or inside a solid body
+    INACTIVE_MATERIAL_ID = vf.size() - 1;
   }
 
   //! Initialize interpolator
@@ -167,7 +170,6 @@ int main(int argc, char* argv[])
   //! Initialize State Variables
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
   SpaceVariable3D ID(comm, &(dms.ghosted1_1dof)); //!< material id
-  INACTIVE_MATERIAL_ID = -1;
 
   //! Impose initial condition
   std::map<int, std::pair<int,int> >
@@ -212,7 +214,7 @@ int main(int argc, char* argv[])
   
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, spo, lso);
-  mpo.UpdateMaterialID(Phi,ID); //populate the ghost layer of ID (outside domain boundary)
+  mpo.UpdateMaterialIDByLevelSet(Phi,ID); //populate the ghost layer of ID (outside domain boundary)
 
 
   //! Initialize laser radiation solver (if needed)

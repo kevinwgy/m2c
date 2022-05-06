@@ -1216,6 +1216,37 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
 
+  //Now, deal with embedded boundaries
+  vector<double***> color;
+
+  //! assign dummy state and "INACTIVE_MATERIAL_ID" to regions enclosed by any embedded surface
+  if(EBDS != nullptr) {
+
+    color.resize(EBDS->size(), NULL);
+    for(int i=0; i<EBDS->size(); i++) {
+      assert((*EBDS)[i]->Sign_ptr);
+      color[i] = (*EBDS)[i]->Sign_ptr->GetDataPointer();
+    }
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+
+          for(int surf=0; surf<color.size(); surf++) {
+            if(color[surf][k][j][i] <= 0) {//occluded or enclosed
+              v[k][j][i][0] = iod.eqs.dummy_state.density;
+              v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
+              v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
+              v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
+              v[k][j][i][4] = iod.eqs.dummy_state.pressure;
+              id[k][j][i] = INACTIVE_MATERIAL_ID;
+              break;
+            }
+          }
+        }
+  }
+
+
   //! specify point-based initial condition
   if(!ic.pointMap.dataMap.empty() && EBDS == nullptr) {
     print_error("*** Error: Unable to specify point-based initial conditions without embedded boundaries.\n"
@@ -1227,12 +1258,6 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   map<int, pair<int,int> > id2closure;
   if(EBDS != nullptr) {
 
-    vector<double***> color(EBDS->size(), NULL);
-    for(int i=0; i<EBDS->size(); i++) {
-      assert((*EBDS)[i]->Sign_ptr);
-      color[i] = (*EBDS)[i]->Sign_ptr->GetDataPointer();
-    }
-
     for(auto it=ic.pointMap.dataMap.begin(); it!=ic.pointMap.dataMap.end(); it++) {
 
       print("- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
@@ -1241,7 +1266,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       id2closure = ApplyPointBasedInitialCondition(*it->second, *(EBDS.get()), color, v, id);
     }
 
-    // set material Id for occluded nodes
+    // Verification (can be deleted): occluded nodes should have inactive_material_id
     int i,j,k;
     for(int surf=0; surf<EBDS->size(); surf++) {
       set<Int3> *occluded = (*EBDS)[surf]->occluded_ptr;
@@ -1252,7 +1277,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
         k = (*it)[2];
         if(!coordinates.IsHere(i,j,k,false))
           continue;
-        id[k][j][i] = INACTIVE_MATERIAL_ID;
+        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
       }
       for(auto it = imposed_occluded->begin(); it != imposed_occluded->end(); it++) {
         i = (*it)[0];
@@ -1260,13 +1285,17 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
         k = (*it)[2];
         if(!coordinates.IsHere(i,j,k,false))
           continue;
-        id[k][j][i] = INACTIVE_MATERIAL_ID;
+        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
       }
     }
 
+  }
+
+  if(EBDS != nullptr) {
     for(int i=0; i<EBDS->size(); i++)
       (*EBDS)[i]->Sign_ptr->RestoreDataPointerToLocalVector();
   }
+
 
 
   V.RestoreDataPointerAndInsert();

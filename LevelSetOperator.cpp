@@ -14,7 +14,6 @@ using std::max;
 using std::pair;
 
 extern double domain_diagonal;
-extern int INACTIVE_MATERIAL_ID;
 //-----------------------------------------------------
 
 LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -645,7 +644,7 @@ DONE:
               phi[k][j][i] = -psi[k][j][i];
             else
               phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
-          } else if(color[k][j][i] == INACTIVE_MATERIAL_ID) {
+          } else if(color[k][j][i] == 0) {//occluded
             phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
           } else { //"outside"
             if(phi[k][j][i]>=0)

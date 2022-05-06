@@ -403,7 +403,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
 
-    mpo.UpdateMaterialID(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
+    mpo.UpdateMaterialIDByLevelSet(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
 
     vector<Int3> unresolved;
     int nUnresolved = mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions,
@@ -413,7 +413,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
       mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
       for(int i=0; i<Phi.size(); i++)
         lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true); //will NOT change sign of phi
-      mpo.UpdateMaterialID(Phi, ID); //should only update ID of unresolved cells      
+      mpo.UpdateMaterialIDByLevelSet(Phi, ID); //should only update ID of unresolved cells      
       mpo.FixUnresolvedNodes(unresolved, IDn, ID, V, unresolved/*not used*/, true); 
     }
 

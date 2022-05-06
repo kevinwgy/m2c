@@ -46,6 +46,9 @@ public:
     pmax = data.pmax;
     failsafe_density = data.failsafe_density;
   }
+
+  VarFcnBase(StateVariable &sv) {} //only used to construct VarFcnDummy
+
   virtual ~VarFcnBase() {}
  
   //----- EOS-Specific Functions -----//

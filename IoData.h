@@ -46,6 +46,7 @@ struct StateVariable {
   double velocity_z;
   double pressure;
   double temperature;
+  double internal_energy_per_mass;
 
   StateVariable();
   ~StateVariable() {}
@@ -357,6 +358,8 @@ struct EquationsData {
   ObjectMap<MaterialModelData> materials;
 
   ObjectMap<MaterialTransitionData> transitions;
+
+  StateVariable dummy_state; //!< for "inactive" nodes
 
   EquationsData();
   ~EquationsData() {}
