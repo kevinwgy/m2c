@@ -4,6 +4,7 @@
 #include <GradientCalculatorBase.h>
 #include <VarFcnBase.h>
 #include <Interpolator.h>
+#include <HeatDiffuFcn.h>
 
 /***************************************************
  * class HeatDiffusionOperator calculates the diffusive 
@@ -18,6 +19,9 @@ class HeatDiffusionOperator
   
   //! Variable function
   vector<VarFcnBase*>& varFcn; //!< each material has a varFcn
+   
+  //! Heat diffusion function (one for each material)
+  vector<HeatDiffuFcnBase*> heatdiffFcn;
 
   //! Mesh info
   SpaceVariable3D &coordinates;

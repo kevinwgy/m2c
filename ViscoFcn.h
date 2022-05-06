@@ -62,7 +62,7 @@ public:
     flux[1] = tauxx;
     flux[2] = tauxy;
     flux[3] = tauxz;
-    flux[4] = V[1]*tauxx + V[2]*tauxy + V[3]*tauxz;
+    flux[4] = V[0]*tauxx + V[1]*tauxy + V[2]*tauxz;
   }
 
   //! Compute the viscous flux function
@@ -80,7 +80,7 @@ public:
     flux[1] = tauxy;
     flux[2] = tauyy;
     flux[3] = tauyz;
-    flux[4] = V[1]*tauxy + V[2]*tauyy + V[3]*tauyz;
+    flux[4] = V[0]*tauxy + V[1]*tauyy + V[2]*tauyz;
   }
 
   //! Compute the viscous flux function
@@ -98,7 +98,7 @@ public:
     flux[1] = tauxz;
     flux[2] = tauyz;
     flux[3] = tauzz;
-    flux[4] = V[1]*tauxz + V[2]*tauyz + V[3]*tauzz;
+    flux[4] = V[0]*tauxz + V[1]*tauyz + V[2]*tauzz;
   }
 
 };
