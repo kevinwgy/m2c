@@ -2,6 +2,7 @@
 #define _MULTIPHASE_OPERATOR_H_
 #include<SpaceVariable.h>
 #include<PhaseTransition.h>
+#include<GhostPoint.h>
 #include<tuple>
 
 class Vec5D;
@@ -29,6 +30,9 @@ class MultiPhaseOperator
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
+  vector<GhostPoint> *ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  vector<GhostPoint> *ghost_nodes_outer; //!< ghost nodes outside the physical domain
+
   //! internal variable for tracking or tagging things.
   SpaceVariable3D Tag;
 
@@ -45,6 +49,9 @@ public:
   MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                      vector<VarFcnBase*> &varFcn_, SpaceOperator &spo, vector<LevelSetOperator*> &lso);
   ~MultiPhaseOperator();
+
+  //! update material id at (external) ghost nodes (they get the IDs of their images)
+  void UpdateMaterialIDAtGhostNodes(SpaceVariable3D &ID);
 
   //! update material id including the ghost region
   void UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
@@ -67,6 +74,9 @@ public:
   //! update phi values in cells that are failed in "UpdateStateVariablesAfterInterfaceMotion". This often
   //  means the appearance of a narrow gap between subdomain boundaries.
   void UpdateLevelSetsInUnresolvedCells(vector<SpaceVariable3D*> &Phi, vector<Int3> &unresolved);
+
+  //! at each node (including external ghosts), at most one "phi" can be negative.
+  int CheckLevelSetOverlapping(vector<SpaceVariable3D*> &Phi);
 
   void Destroy();
 

@@ -19,6 +19,8 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                   : comm(comm_), iod(iod_), varFcn(varFcn_),
                     coordinates(spo.GetMeshCoordinates()),
                     delta_xyz(spo.GetMeshDeltaXYZ()),
+                    ghost_nodes_inner(spo.GetPointerToInnerGhostNodes()), 
+                    ghost_nodes_outer(spo.GetPointerToOuterGhostNodes()),
                     Tag(comm_, &(dm_all_.ghosted1_1dof)),
                     Lambda(comm_, &(dm_all_.ghosted1_1dof))
 {
@@ -184,6 +186,78 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, Sp
     Tag.RestoreDataPointerAndInsert();
   else
     Tag.RestoreDataPointerToLocalVector();
+
+  ID.RestoreDataPointerAndInsert();
+
+}
+
+//-----------------------------------------------------
+
+int 
+MultiPhaseOperator::CheckLevelSetOverlapping(vector<SpaceVariable3D*> &Phi)
+{
+
+  int ls_size = Phi.size();
+
+  if(ls_size<=1)
+    return 0; //cannot have overlapping...
+
+  vector<double***> phi(ls_size, NULL);
+  for(int ls=0; ls<ls_size; ls++) 
+    phi[ls] = Phi[ls]->GetDataPointer();
+  
+  int overlap = 0;
+  bool inside = false;
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+
+        inside = false;
+        for(int ls = 0; ls<ls_size; ls++) {//loop through all the level set functions
+          if(phi[ls][k][j][i]<0) {
+            if(!inside) {
+              inside = true;
+            } else {
+              overlap++;
+              break;
+            }
+          }
+        }
+
+      }
+
+
+  for(int ls=0; ls<ls_size; ls++) 
+    Phi[ls]->RestoreDataPointerToLocalVector(); //no changes made
+
+  MPI_Allreduce(MPI_IN_PLACE, &overlap, 1, MPI_INT, MPI_SUM, comm);
+
+  return overlap;
+}
+
+//-----------------------------------------------------
+
+void 
+MultiPhaseOperator::UpdateMaterialIDAtGhostNodes(SpaceVariable3D &ID)
+{
+
+#ifdef LEVELSET_TEST
+  return; //testing the level set solver w/o solving the N-S / Euler equations
+#endif
+
+  double*** id  = (double***)ID.GetDataPointer();
+
+  for(auto it = ghost_nodes_outer->begin(); it != ghost_nodes_outer->end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    id[k][j][i] = id[im_k][im_j][im_i];
+
+  }
 
   ID.RestoreDataPointerAndInsert();
 

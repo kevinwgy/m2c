@@ -241,7 +241,9 @@ private:
                                                SpaceVariable3D *V = NULL); //if NULL, use stored temperature
   
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin
-    return std::get<0>(absorption[id])*(T - std::get<1>(absorption[id])) + std::get<2>(absorption[id]);}
+    return id<absorption.size() ? 
+             std::get<0>(absorption[id])*(T - std::get<1>(absorption[id])) + std::get<2>(absorption[id])
+           : 0.0; //could get here if there are "inactive" nodes
 };
 
 #endif

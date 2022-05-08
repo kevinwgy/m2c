@@ -214,7 +214,15 @@ int main(int argc, char* argv[])
   
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, spo, lso);
-  mpo.UpdateMaterialIDByLevelSet(Phi,ID); //populate the ghost layer of ID (outside domain boundary)
+  if(lso.size()>1) { //at each node, at most one "phi" can be negative
+    int overlap = mpo.CheckLevelSetOverlapping(Phi);
+    if(overlap>0) {
+      print_error("*** Error: Found overlapping material subdomains. Number of overlapped cells "
+                  "(including duplications): %d.\n", overlap);
+      exit_mpi();
+    }
+  }
+  mpo.UpdateMaterialIDAtGhostNodes(ID); //ghost nodes (outside domain) get the ID of their image nodes
 
 
   //! Initialize laser radiation solver (if needed)
