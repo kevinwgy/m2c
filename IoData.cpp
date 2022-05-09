@@ -2434,6 +2434,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   type = None;
   thermal  = Adiabatic;
   heat_source = 0.0;
+  dynamics_calculator = "";
 }
 
 //------------------------------------------------------------------------------
@@ -2441,7 +2442,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByOtherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
@@ -2461,6 +2462,9 @@ Assigner *EmbeddedSurfaceData::getAssigner()
 
   tracker.setup("SurfaceTracker", ca);
   
+  new ClassStr<EmbeddedSurfaceData>(ca, "UserDefinedDynamicsCalculator", this, 
+                                    &EmbeddedSurfaceData::dynamics_calculator);
+
   return ca;
 }
 

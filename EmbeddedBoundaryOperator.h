@@ -2,8 +2,10 @@
 #define _EMBEDDED_BOUNDARY_OPERATOR_H_
 
 #include<Intersector.h>
+#include<UserDefinedDynamics.h>
 #include<cassert>
 #include<map>
+#include<tuple>
 
 /******************************************************************
  * Class EmbeddedBoundaryOperator stores data related to one or
@@ -28,8 +30,10 @@ class EmbeddedBoundaryOperator {
   vector<vector<Vec3D> > F_prev; //!< forces at the previous time step
   vector<EmbeddedSurfaceData::Type> surface_type;
 
-  vector<Intersector*> intersector; //one intersector for each embedded surface (initialized to NULL)
+  vector<Intersector*> intersector; //!< one intersector for each embedded surface (initialized to NULL)
  
+  vector<std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> > dynamics_calculator; //!< the 1st one is the calculator
+
   //! Mesh info (Not used when the class is used for special purposes, e.g., DynamicLoadCalculator)
   //! These information are generally needed when the surface needs to be "tracked" within the M2C mesh
   DataManagers3D* dms_ptr;
@@ -68,14 +72,19 @@ public:
   void ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID);
 
   void TrackSurfaces();
-  void TrackUpdatedSurfaceFromOtherSolver();
+  void TrackUpdatedSurfaces();
+
+  void ApplyUserDefinedSurfaceDynamics(double t, double dt);
+
+  void UpdateSurfacesPrevAndFPrev(bool partial_copy=true); //!< copy surfaces.nodes/elements to surfaces_prev; also copy F to F_prev
 
 private:
 
   void ReadMeshFile(const char *filename, EmbeddedSurfaceData::Type& surface_type,
                     vector<Vec3D> &Xs, vector<Int3> &Es);
 
-  void UpdateSurfacesPrevAndFPrev(bool partial_copy=true); //!< copy surfaces.nodes/elements to surfaces_prev; also copy F to F_prev
+  void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
+
 };
 
 

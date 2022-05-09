@@ -115,5 +115,6 @@ GeoTools/Intersections.cpp)
 
 # link to libraries
 target_link_libraries(m2c petsc mpi parser)
+target_link_libraries(m2c ${CMAKE_DL_LIBS}) #linking to the dl library (-ldl)
 add_dependencies(m2c extern_lib)
 add_dependencies(m2c VersionHeader)

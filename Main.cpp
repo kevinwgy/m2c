@@ -299,9 +299,15 @@ int main(int argc, char* argv[])
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 
   if(concurrent.Coupled()) {
+    if(embed) 
+      embed->UpdateSurfacesPrevAndFPrev();
+
     concurrent.CommunicateBeforeTimeStepping(); 
-    if(embed)
-      embed->TrackUpdatedSurfaceFromOtherSolver();
+
+    if(embed) {
+      embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not conccurent solver)
+      embed->TrackUpdatedSurfaces();
+    }
   }
 
   // find maxTime, and dts (meaningful only with concurrent programs)
@@ -360,6 +366,10 @@ int main(int argc, char* argv[])
 
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
     if(concurrent.Coupled()) {
+
+      if(embed) 
+        embed->UpdateSurfacesPrevAndFPrev();
+
       if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
         if(time_step==1)
           concurrent.FirstExchange();
@@ -370,8 +380,10 @@ int main(int argc, char* argv[])
       dts =  concurrent.GetTimeStepSize();
       tmax = concurrent.GetMaxTime(); //at final time-step, tmax is set to a very small number
 
-      if(embed)
-        embed->TrackUpdatedSurfaceFromOtherSolver();
+      if(embed) {
+        embed->ApplyUserDefinedSurfaceDynamics(t, dts); //update surfaces provided through input (not conccurent solver)
+        embed->TrackUpdatedSurfaces();
+      }
     }
 
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);

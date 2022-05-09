@@ -1035,6 +1035,8 @@ struct EmbeddedSurfaceData {
 
   double heat_source;
 
+  const char *dynamics_calculator;
+
   SurfaceTrackerData tracker;
 
   EmbeddedSurfaceData();

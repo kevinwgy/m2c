@@ -158,6 +158,25 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
 //-------------------------------------------------------------------------
 
 void
+Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
+{
+  assert(phi_layers>=1);
+
+  if(bblayer != 1)
+    BuildNodalAndSubdomainBoundingBoxes(1); //1 layer
+
+  BuildSubdomainScopeAndKDTree();
+  FindNodalCandidates();
+  FindIntersections(true);
+  FindSweptNodes(Xprev, true);
+  RefillAfterSurfaceUpdate(true);
+  CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
+
+}
+
+//-------------------------------------------------------------------------
+
+void
 Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
 {
   double tol = 0.1;  //i.e. tolerance = 10% of element size (plus 50% of surface thickness)
@@ -1003,6 +1022,21 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
       sign[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
       //sign must be valid (i.e. not NULL) if total_remaining_nodes>0
   }
+
+
+  // Update "SignReachesBoundary"
+  if(sign) {
+    for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+      if(it->type_projection != GhostPoint::FACE)
+        continue;
+      Int3& ijk(it->image_ijk);
+      int mycolor = sign[ijk[2]][ijk[1]][ijk[0]];
+      if(mycolor<0) 
+        SignReachesBoundary[-mycolor] = 1;
+    }
+    MPI_Allreduce(MPI_IN_PLACE, SignReachesBoundary.data(), SignReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
+  }
+
 
   if(sign)
     Sign.RestoreDataPointerToLocalVector();

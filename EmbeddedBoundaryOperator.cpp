@@ -4,6 +4,7 @@
 #include<utility>
 #include<Utils.h>
 #include<memory.h> //unique_ptr
+#include<dlfcn.h> //dlopen, dlclose
 
 using std::string;
 using std::map;
@@ -52,7 +53,8 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
     if(index==0) {
       if(surface_from_other_solver) {
         if(it->second->surface_provided_by_other_solver != EmbeddedSurfaceData::YES) {
-          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", index); 
+          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", 
+                      index); 
           exit_mpi();
         } 
         continue; //no file to read
@@ -89,12 +91,23 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // set NULL to intersector pointers
   intersector.resize(surfaces.size(), NULL);
 
+  // setup dynamics_calculator
+  SetupUserDefinedDynamicsCalculator();
 }
 
 //------------------------------------------------------------------------------------------------
 
 EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
-{ }
+{
+  for(auto it = dynamics_calculator.begin(); it != dynamics_calculator.end(); it++) {
+    if(std::get<0>(*it)) {
+      assert(std::get<2>(*it)); //this is the destruction function
+      (std::get<2>(*it))(std::get<0>(*it)); //use the destruction function to destroy the calculator
+      assert(std::get<1>(*it));
+      dlclose(std::get<1>(*it));
+    }
+  }
+}
 
 //------------------------------------------------------------------------------------------------
 
@@ -484,9 +497,38 @@ EmbeddedBoundaryOperator::TrackSurfaces()
 //------------------------------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryOperator::TrackUpdatedSurfaceFromOtherSolver()
+EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 {
-  print_warning("Warning: EmbeddedBoundaryOperator::TrackUpdatedSurfaceFromOtherSolver has not been implemented.\n");
+  int phi_layers = 3;
+  for(int i=0; i<intersector.size(); i++) {
+    if(iod_embedded_surfaces[i]->surface_provided_by_other_solver == EmbeddedSurfaceData::NO &&
+       strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+      continue; //this surface is fixed...
+    intersector[i]->RecomputeFullCourse(surfaces_prev[i].X, phi_layers);
+  }
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
+{
+  for(int i=0; i<surfaces.size(); i++) {
+    if(strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+      continue; //not specified for this surface
+    UserDefinedDynamics *calculator(std::get<0>(dynamics_calculator[i]));
+    assert(calculator);
+
+    vector<Vec3D> &Xs(surfaces[i].X);
+    vector<Vec3D> &X0(surfaces[i].X0);
+    vector<Vec3D> disp(Xs.size(), 0.0);
+    calculator->GetUserDefinedDynamics(t, Xs.size(), (double*)Xs.data(), 
+                                       (double*)disp.data(), (double*)surfaces[i].Udot.data());
+    for(int i=0; i<Xs.size(); i++) {
+      for(int j=0; j<3; j++)
+        Xs[i][j] = X0[i][j] + disp[i][j];
+    }
+  }
 }
 
 //------------------------------------------------------------------------------------------------
@@ -497,7 +539,7 @@ EmbeddedBoundaryOperator::GetPointerToIntersectorResults()
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > p(new vector<unique_ptr<EmbeddedBoundaryDataSet> >());
 
   for(int i=0; i<intersector.size(); i++) {
-    assert(intersector[i]); //should not call this function is surfaces are not "tracked"
+    assert(intersector[i]); //should not call this function if surfaces are not "tracked"
     p->push_back(intersector[i]->GetPointerToResults());
   }
 
@@ -513,6 +555,56 @@ EmbeddedBoundaryOperator::GetPointerToIntersectoResultsOnSurface(int i)
   assert(intersector[i]);
   return intersector[i]->GetPointerToResults();
 }
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
+{
+  dynamics_calculator.resize(surfaces.size(), std::make_tuple(nullptr,nullptr,nullptr));
+  for(int i=0; i<surfaces.size(); i++) {
+    if(strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+      continue; //not specified for this surface
+    if(iod_embedded_surfaces[i]->surface_provided_by_other_solver == EmbeddedSurfaceData::YES) {
+      print_error("*** Error: Unable to apply user-defined dynamics for Surface %d, which is owned by "
+                  "another solver.\n", i);
+      exit_mpi();
+    }
+
+    // setup the calculator: dynamically load the object
+    std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> &me(dynamics_calculator[i]);
+    std::get<1>(me) = dlopen(iod_embedded_surfaces[i]->dynamics_calculator, RTLD_NOW);
+    if(!std::get<1>(me)) {
+      print_error("*** Error: Unable to load object %s.\n", iod_embedded_surfaces[i]->dynamics_calculator);
+      exit_mpi();
+    }
+    dlerror();
+    CreateUDD* create = (CreateUDD*) dlsym(std::get<1>(me), "Create");
+    const char* dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Create in %s.\n",
+                  iod_embedded_surfaces[i]->dynamics_calculator);
+      exit_mpi();
+    }
+    std::get<2>(me) = (DestroyUDD*) dlsym(std::get<1>(me), "Destroy");
+    dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Destroy in %s.\n",
+                  iod_embedded_surfaces[i]->dynamics_calculator);
+      exit_mpi();
+    }
+     
+    //This is the actual calculator
+    std::get<0>(me) = create();
+
+    print("- Loaded user-defined dynamics calculator for surface %d from %s.\n",
+          i, iod_embedded_surfaces[i]->dynamics_calculator);
+  }
+
+}
+
+//------------------------------------------------------------------------------------------------
+
 
 //------------------------------------------------------------------------------------------------
 

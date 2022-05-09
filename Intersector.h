@@ -108,7 +108,10 @@ class Intersector {
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
   int Phi_nLayer; //!< number of layers of nodes where Phi is calculated.
   SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or N (inlet, outlet). N = 1,2,...
-  std::vector<int> SignReachesBoundary; //!< stores whether each negative sign touches the domain boundary
+  std::vector<int> SignReachesBoundary; /**< stores whether each negative signed regions (i.e. enclosrures)  touches \n
+                                             the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
+                                             the size of this vector is "nRegions" calculated in FloodFillColors.*/
+                                           
                       
   //! Closest point on triangle (for near-field nodes inside subdomain, including internal ghosts nodes)
   SpaceVariable3D ClosestPointIndex; //!< index in the vector closest_points. (-1 means not available)
@@ -147,7 +150,8 @@ public:
   //! Interface tracking functions
   void TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, int phi_layers);
 
- 
+  void RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
+
 
 /** Below is like the a la carte menu. Try to use the pre-defined "combos" above as much as you can. 
  *  The functions below are not all independent with each other!*/
