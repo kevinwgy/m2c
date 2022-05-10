@@ -23,10 +23,12 @@ using std::chrono::duration_cast;
 using std::chrono::duration;
 using std::chrono::milliseconds;
 
+extern double DP_MIN_GLOBAL;
+extern double DP_MIN_CURRENT;
 extern int NSTP_3RD_IT;
 extern int NSTP_2ND_IT;
 extern int CURRENT_STEP_NUMBER;
-extern int MAX_STEP_NUMBER;
+extern int MAX_STEP_NUMBER; 
 extern int verbose;
 //extern std::ofstream testFile1;
 //extern std::ofstream testFile3;
@@ -48,6 +50,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   pressure_at_failure  = iod_riemann.pressure_at_failure;
   integrationPath1.reserve(100);
   integrationPath3.reserve(100);
+  dp_avg = std::numeric_limits<double>::max();
 }
 
 //-----------------------------------------------------
@@ -895,7 +898,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	    rhos_0 = integrationPath[index0][1];
 	    us_0 = integrationPath[index0][2];
 	    //dp = std::min(10*dp, ps_0 - ps);
-	    dp = ps_0 - ps;
+	    if (index0 != integrationPath.size()-1) {
+              dp = ps_0-ps; 
+            } else { 
+              dp = std::min( integrationPath[index0-1][0]-integrationPath[index0][0], ps_0-ps );
+            }
     }
     double pStart_new = ps_0;
     double dpStart = dp;
@@ -914,8 +921,8 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     double rhoErr = 0.;
     int moreSteps = 20;
     int continueTimes = 0;
-    int continueTolerance = 1000;
- 
+    int continueTolerance = std::max(1000, numSteps_rarefaction);
+     
     for(int i=0; i<numSteps_rarefaction*moreSteps; i++) {
  
 /*
@@ -939,7 +946,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         if (continueTimes > continueTolerance || dp == 0.0) {
 //          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
 //                       continueTimes, id, p, ps, pStart_new, dpStart, dp, ps_1, c, rho, integrationPath.size());
-          break;
+           break;
         }
         continue;
       }
@@ -994,7 +1001,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 //          exit(1);
 //        }
         done = true;
-
+        
 	if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
 		std::vector<double> currentVect = {ps_1, rhos_1, us_1};
 		integrationPath.push_back(currentVect);
@@ -1016,7 +1023,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 #endif
         CURRENT_STEP_NUMBER = std::max(i, CURRENT_STEP_NUMBER);
         MAX_STEP_NUMBER = std::max(i, MAX_STEP_NUMBER);
-        //std::cout << "MAX_STEP_NUMBER = " << MAX_STEP_NUMBER << std::endl;
+        double i_double = (double) i;
+        dp_avg = (p - ps) / (i_double+1.0);
+        if ( DP_MIN_GLOBAL == std::numeric_limits<double>::max() ) {
+          DP_MIN_CURRENT = std::min(dp_avg, DP_MIN_CURRENT);
+        } else if ( p-ps > DP_MIN_GLOBAL) {
+          DP_MIN_CURRENT = std::min(dp_avg, DP_MIN_CURRENT);
+        }
         break; //done!
       }
 
@@ -1029,6 +1042,18 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       double errBar = tol_rarefaction; 
       double uErrScaled = uErr / c + tiny;
       double rhoErrScaled = rhoErr / rho + tiny;
+      if (isnan(rhoErrScaled)==1) {
+        fprintf(stderr,"*** Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+                       id, p, ps, pStart_new, dpStart, dp, ps_0, ps_1, uErr, uErrScaled, rhos_0, rhos_1, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
+        exit (EXIT_FAILURE);
+      }  
+ 
+      if (isnan(uErrScaled)==1) {
+        fprintf(stderr,"*** Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+                       id, p, ps, pStart_new, dpStart, dp, ps_0, ps_1, uErr, uErrScaled, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
+        exit (EXIT_FAILURE);
+      }  
+
      // std::cout << "uErrScaled = " << uErrScaled << "." << std::endl;
       double dpTemp = dp;
       double safety = 0.9;
@@ -1060,6 +1085,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErr = " << uErr << ", uErrScaled = " << uErrScaled << "." << std::endl;
       std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", rhoErr = " << rhoErr << ", rhoErrScaled = " << rhoErrScaled << std::endl;
 #endif
+
       dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
 
 //      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps
@@ -1391,6 +1417,11 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double drho_err = (2825./27648./c_0_square + 18575./48384./c_2_square + 13525./55296./c_3_square + 277./14336./c_4_square + 0.25/c_5_square) * dp;
   double du = (37./378./c_0/rho_0 + 250./621./c_2/rho_2 + 125./594./c_3/rho_3 + 512./1771./c_5/rho_5) * dp;
   double du_err = (2825./27648./c_0/rho_0 + 18575./48384./c_2/rho_2 + 13525./55296./c_3/rho_3 + 277./14336./c_4/rho_4 + 0.25/c_5/rho_5) * dp;
+
+  if (isnan(du) == 1 || isnan(du_err) ==1) {
+   // fprintf(stderr, "*** Error: du or du_err is nan: du = %e, du_err = %e.\n", du, du_err);
+    return false;
+  }
 
   rhoErr = fabs(drho_err - drho);
   uErr = fabs(du_err - du);

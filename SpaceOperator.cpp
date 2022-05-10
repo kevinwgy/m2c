@@ -20,6 +20,8 @@ using std::chrono::duration_cast;
 using std::chrono::duration;
 using std::chrono::milliseconds;
 
+extern double DP_MIN_CURRENT;
+extern double DP_MIN_GLOBAL;
 extern int NSTP_3RD_IT;
 extern int NSTP_2ND_IT;
 extern int CURRENT_STEP_NUMBER;
@@ -2211,6 +2213,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //fprintf(stdout, "After: cycle_time = %e.\n", cycle_time);
   FLUX_TIME = FLUX_TIME + cycle_time;      
 
+  MPI_Allreduce(MPI_IN_PLACE, &DP_MIN_CURRENT, 1, MPI_DOUBLE, MPI_MIN, comm);
+  DP_MIN_GLOBAL = std::min(DP_MIN_GLOBAL, DP_MIN_CURRENT);
+ 
   MPI_Allreduce(MPI_IN_PLACE, &MAX_STEP_NUMBER, 1, MPI_INT, MPI_MAX, comm);
   MPI_Allreduce(MPI_IN_PLACE, &CURRENT_STEP_NUMBER, 1, MPI_INT, MPI_MAX, comm);
   MPI_Allreduce(MPI_IN_PLACE, &NSTP_2ND_IT, 1, MPI_INT, MPI_MAX, comm);

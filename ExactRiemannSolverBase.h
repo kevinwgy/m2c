@@ -21,6 +21,7 @@ protected:
   double min_pressure, failure_threshold, pressure_at_failure;
   std::vector<std::vector<double>> integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
   std::vector<std::vector<double>> integrationPath3;
+  double dp_avg;
 
 public:
   ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann);
