@@ -174,6 +174,8 @@ int main(int argc, char* argv[])
   //! Impose initial condition
   std::map<int, std::pair<int,int> >
   id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToIntersectorResults() : nullptr);
+  if(embed)
+    embed->StoreID2Closure(id2closure);
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -292,22 +294,21 @@ int main(int argc, char* argv[])
     laser->ComputeLaserRadiance(V, ID, *L, t);
 
   //! Compute force on embedded surfaces (if any) using initial state
-  if(embed) 
+  if(embed) {
     embed->ComputeForces(V, ID);
+    embed->UpdateSurfacesPrevAndFPrev();
+  }
 
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 
   if(concurrent.Coupled()) {
-    if(embed) 
-      embed->UpdateSurfacesPrevAndFPrev();
-
     concurrent.CommunicateBeforeTimeStepping(); 
+  }
 
-    if(embed) {
-      embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not conccurent solver)
-      embed->TrackUpdatedSurfaces();
-    }
+  if(embed) {
+    embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not conccurent solver)
+    embed->TrackUpdatedSurfaces();
   }
 
   // find maxTime, and dts (meaningful only with concurrent programs)
@@ -361,14 +362,14 @@ int main(int argc, char* argv[])
 
     } while (concurrent.Coupled() && dtleft != 0.0);
 
-    if(embed) 
+
+    if(embed) {
       embed->ComputeForces(V, ID);
+      embed->UpdateSurfacesPrevAndFPrev();
+    }
 
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
     if(concurrent.Coupled()) {
-
-      if(embed) 
-        embed->UpdateSurfacesPrevAndFPrev();
 
       if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
         if(time_step==1)
@@ -379,11 +380,11 @@ int main(int argc, char* argv[])
 
       dts =  concurrent.GetTimeStepSize();
       tmax = concurrent.GetMaxTime(); //at final time-step, tmax is set to a very small number
+    }
 
-      if(embed) {
-        embed->ApplyUserDefinedSurfaceDynamics(t, dts); //update surfaces provided through input (not conccurent solver)
-        embed->TrackUpdatedSurfaces();
-      }
+    if(embed) {
+      embed->ApplyUserDefinedSurfaceDynamics(t, dts); //update surfaces provided through input (not conccurent solver)
+      embed->TrackUpdatedSurfaces();
     }
 
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);

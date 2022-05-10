@@ -155,6 +155,31 @@ EmbeddedBoundaryOperator::SetupIntersectors()
 //------------------------------------------------------------------------------------------------
 
 void
+EmbeddedBoundaryOperator::StoreID2Closure(std::map<int, std::pair<int,int> > &id2closure_)
+{
+  id2color = id2closure_;
+
+  inactive_colors.clear();
+  for(int i=0; i<surfaces.size(); i++) {
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectoResultsOnSurface(surf);
+    int nRegions = EBDS->nRegions; //this is the number of *closures*. Colors -1, -2, ...
+    for(int color = -1; color>=-nRegions; color--) {
+      bool found = false;
+      for(auto it = id2color.begin(); it != id2color.end(); it++) {
+        if(it->second->first == i && it->second->second == color) {
+          found = true;
+          break;
+        }
+      }
+      if(!found)
+        inactive_colors.push_back(std::make_pair(i, color));
+    } 
+  }
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
 EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData::Type& surface_type, 
                                        vector<Vec3D> &Xs, vector<Int3> &Es)
 {
@@ -470,7 +495,25 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
 void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
-  print_warning("Warning: EmbeddedBoundaryOperator::ComputeForces has not been implemented.\n");
+
+  Vec5D***  v  = (Vec5D***) V.GetDataPointer();
+  double*** id = ID.GetDataPointer();
+  
+  // loop through all the embedded surfaces
+  for(int surf=0; surf<surfaces.size(); surf++) {
+
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectoResultsOnSurface(surf);
+
+    I AM HERE
+
+
+
+  }
+
+  //TODO: Must assemble force
+
+  V.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
 }
 
 //------------------------------------------------------------------------------------------------

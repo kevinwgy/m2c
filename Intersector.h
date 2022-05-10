@@ -15,8 +15,8 @@
  * Wang et al., IJNMF, 2012. The intersector is able to find
  * (1) nodes covered by the interface (occluded nodes),
  * (2) all the edge-interface intersections,
- * (3) shortest distance from each node to the intersector (w/
- *     the help of level set reinitializer)
+ * (3) shortest distance from each node to the interface (usually
+ *     only a few layers of nodes near the surface)
  * (4) closest point on the interface to each node (If solution is not
  *     unique, only one solution is found)
  * (5) nodes swept by the (dynamic) surface in one time step
@@ -111,7 +111,8 @@ class Intersector {
   std::vector<int> SignReachesBoundary; /**< stores whether each negative signed regions (i.e. enclosrures)  touches \n
                                              the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
                                              the size of this vector is "nRegions" calculated in FloodFillColors.*/
-                                           
+  bool hasInlet, hasOutlet, hasOcc;
+  int nRegions;
                       
   //! Closest point on triangle (for near-field nodes inside subdomain, including internal ghosts nodes)
   SpaceVariable3D ClosestPointIndex; //!< index in the vector closest_points. (-1 means not available)
@@ -148,7 +149,7 @@ public:
   void Destroy();
 
   //! Interface tracking functions
-  void TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, int phi_layers);
+  void TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers);
 
   void RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
 
@@ -167,7 +168,7 @@ public:
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
 
-  int FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions); /**< determine the generalized sign function ("Sign"). 
+  int FloodFillColors(); /**< determine the generalized sign function ("Sign"). 
                                                                                           Returns the number of "colors" (sum of the four).\n*/
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
   void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer

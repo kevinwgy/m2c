@@ -1024,7 +1024,13 @@ struct SurfaceTrackerData {
 //NOTE Currently, Embedded surface must use triangle elements.
 struct EmbeddedSurfaceData {
 
-  enum YesNo {NO = 0, YES = 1} surface_provided_by_other_solver;
+  enum YesNo {NO = 0, YES = 1};
+  YesNo surface_provided_by_other_solver;
+
+  //! force calculation
+  YesNo compute_force;
+  double gauss_points_lofting; //!< non-dimensional, relative to local element size
+  double internal_pressure; //!< pressure applied on the inactive side (i.e. inside solid body)
 
   const char *filename; //!< file for nodal coordinates and elements
   

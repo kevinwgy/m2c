@@ -32,6 +32,12 @@ class EmbeddedBoundaryOperator {
 
   vector<Intersector*> intersector; //!< one intersector for each embedded surface (initialized to NULL)
  
+  //! mapping from material ID (specified using "points") to <surface number, color>
+  std::map<int, std::pair<int,int> > id2color;
+
+  //! inactive closures: pair of <surface number, color>
+  std::vector<std::pair<int,int> > inactive_colors;
+
   vector<std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> > dynamics_calculator; //!< the 1st one is the calculator
 
   //! Mesh info (Not used when the class is used for special purposes, e.g., DynamicLoadCalculator)
@@ -68,6 +74,8 @@ public:
                           std::vector<double> &x_, std::vector<double> &y_, std::vector<double> &z_,
                           std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
   void SetupIntersectors();
+
+  void StoreID2Closure(std::map<int, std::pair<int,int> > &id2closure_); //build id2color and inactive_colors
 
   void ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID);
 

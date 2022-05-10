@@ -1433,6 +1433,9 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
         }
         else {
           if((*EBDS[ruling_surface]->SignReachesBoundary_ptr)[-mycolor_final] == 1) {
+            print_warning("Warning: User-specified point (%e %e %e) is inside isolated(*) regions in "
+                          "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
+                          ruling_surface, i);
             ruling_surface = i;
             mycolor_final = mycolor[i];
           }

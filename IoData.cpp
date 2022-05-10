@@ -2430,6 +2430,12 @@ void SurfaceTrackerData::setup(const char *name, ClassAssigner *father)
 EmbeddedSurfaceData::EmbeddedSurfaceData()
 {
   surface_provided_by_other_solver = NO;
+
+  // force calculation
+  compute_force = YES;
+  gauss_points_lofting = 0.0;
+  internal_pressure = 0.0;
+
   filename = "";
   type = None;
   thermal  = Adiabatic;
@@ -2442,10 +2448,18 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 10, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByOtherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
+     "No", 0, "Yes", 1);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "GaussPointsLofting", this, &EmbeddedSurfaceData::gauss_points_lofting);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "InternalPressure", this, &EmbeddedSurfaceData::internal_pressure);
+
+  new ClassToken<EmbeddedSurfaceData> (ca, "ComputeForce", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::compute_force), 2,
      "No", 0, "Yes", 1);
 
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);

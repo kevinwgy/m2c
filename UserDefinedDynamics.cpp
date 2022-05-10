@@ -3,9 +3,9 @@
 //------------------------------------------------------------
 // This is a template for users to fill. Not compiled w/ M2C.
 // If multiple UserDefinedDynamics need to be defined, they should
-// have different names (e.g., MyDynamicsCalculator1, 
+// have different names (e.g., MyDynamicsCalculator1, MyDynamicsCalculator2, etc.)
 // Compilation script (an example):
-// g++ -O3 -fPIC -I/path/to/UserDefinedDynamics.h -c UserDefinedDynamics.cpp; g++ -shared UserDefinedDynamics.o -o UserDefinedDynamics.so; rm UserDefinedDynamics.o
+// g++ -O3 -fPIC -I/path/to/folder/that/contains/UserDefinedDynamics.h -c UserDefinedDynamics.cpp; g++ -shared UserDefinedDynamics.o -o UserDefinedDynamics.so; rm UserDefinedDynamics.o
 //------------------------------------------------------------
 
 class MyDynamicsCalculator : public UserDefinedDynamics{
@@ -33,7 +33,7 @@ MyDynamicsCalculator::GetUserDefinedDynamics(double time, int nNodes, double *X0
 }
 
 //------------------------------------------------------------
-// The class factory (Note: Do NOT change function names.)
+// The class factory (Note: Do NOT change these functions except the word "MyDynamicsCalculator".)
 extern "C" UserDefinedDynamics* Create() {
   return new MyDynamicsCalculator; //TODO: If you've changed the name of the derived class, this needs to be updated.
 }

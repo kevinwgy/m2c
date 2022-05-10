@@ -29,7 +29,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              XBackward(comm_, &(dms_.ghosted1_3dof)),
              Phi(comm_, &(dms_.ghosted1_1dof)),
              Phi_nLayer(0),
-             Sign(comm_, &(dms_.ghosted1_1dof)),
+             Sign(comm_, &(dms_.ghosted1_1dof)), hasInlet(false), hasOutlet(false),
+             hasOcc(false), nRegions(0),
              floodfiller(comm_, dms_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
 
@@ -108,6 +109,10 @@ Intersector::GetPointerToResults()
   ebds->Phi_nLayer              = Phi_nLayer;
   ebds->Sign_ptr                = &Sign;
   ebds->SignReachesBoundary_ptr = &SignReachesBoundary;
+  ebds->hasInlet                = hasInlet;
+  ebds->hasOutlet               = hasOutlet;
+  ebds->hasOcc                  = hasOcc;
+  ebds->nRegions                = nRegions;
   ebds->ClosestPointIndex_ptr   = &ClosestPointIndex;
   ebds->closest_points_ptr      = &closest_points;
   ebds->intersections_ptr       = &intersections;
@@ -122,7 +127,7 @@ Intersector::GetPointerToResults()
 //-------------------------------------------------------------------------
 
 void
-Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, int phi_layers)
+Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers)
 {
   assert(phi_layers>=1);
 
@@ -132,8 +137,13 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   BuildSubdomainScopeAndKDTree();
   FindNodalCandidates();
   FindIntersections(true);
-  FloodFillColors(hasInlet, hasOutlet, hasOcc, nRegions);
+  FloodFillColors();
   CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
+
+  hasInlet_  = hasInlet;
+  hasOutlet_ = hasOutlet;
+  hasOcc_    = hasOcc;
+  nRegions_  = nRegions;
 
 /*
   Debug
@@ -760,7 +770,7 @@ Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, do
 //-------------------------------------------------------------------------
 
 int
-Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions)
+Intersector::FloodFillColors()
 {
   // ----------------------------------------------------------------
   // Call floodfiller to do the work.
