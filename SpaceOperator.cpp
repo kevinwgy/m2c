@@ -27,6 +27,7 @@ extern int NSTP_2ND_IT;
 extern int CURRENT_STEP_NUMBER;
 extern int MAX_STEP_NUMBER;
 extern double FLUX_TIME;
+extern double EXACT_RIEMANN_TIME;
 extern int verbose;
 //-----------------------------------------------------
 
@@ -1884,6 +1885,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                            vector<SpaceVariable3D*> *Phi)
 {
+  double delta_exactRiemannTime = 0.; // for recording the computation time of Exact Riemann solver
+
   //------------------------------------
   // Preparation: Delete previous riemann_solutions
   //------------------------------------
@@ -1997,10 +2000,17 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             }
 
             //Solve 1D Riemann problem
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+            auto time_r1_start = high_resolution_clock::now();
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
               err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-            else//linear reconstruction w/ limitor
+            }
+            else {//linear reconstruction w/ limitor
               err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            }
+            auto time_r1_end = high_resolution_clock::now();
+            duration<double, std::milli> time_r1 = time_r1_end - time_r1_start;
+	    double delta_exactRiemannTime1 = time_r1.count();
+            delta_exactRiemannTime = delta_exactRiemannTime + delta_exactRiemannTime1;
 
             if(err)  {
               riemann_errors++;
@@ -2076,10 +2086,17 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             }
 
             //Solve 1D Riemann problem
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+            auto time_r2_start = high_resolution_clock::now();
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
               err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-            else
+            }
+            else {
               err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            }
+            auto time_r2_end = high_resolution_clock::now();
+            duration<double, std::milli> time_r2 = time_r2_end - time_r2_start;
+            double delta_exactRiemannTime2 = time_r2.count();
+            delta_exactRiemannTime = delta_exactRiemannTime + delta_exactRiemannTime2;
 
             if(err) {
               riemann_errors++;
@@ -2154,10 +2171,17 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             }
 
             //Solve 1D Riemann problem
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
+            auto time_r3_start = high_resolution_clock::now();
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
               err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-            else
+            }
+            else {
               err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+            }
+	    auto time_r3_end = high_resolution_clock::now();
+            duration<double, std::milli> time_r3 = time_r3_end - time_r3_start;
+            double delta_exactRiemannTime3 = time_r3.count();
+            delta_exactRiemannTime = delta_exactRiemannTime + delta_exactRiemannTime3;             
 
             if(err) {
               riemann_errors++;
@@ -2207,6 +2231,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   auto time_2 = high_resolution_clock::now();
   duration<double, std::milli> thisCycle = time_2 - time_1;
   double cycle_time = thisCycle.count();
+
+  MPI_Allreduce(MPI_IN_PLACE, &delta_exactRiemannTime, 1, MPI_DOUBLE, MPI_MAX, comm);
+  EXACT_RIEMANN_TIME = EXACT_RIEMANN_TIME + delta_exactRiemannTime;
 
   //fprintf(stdout, "Before: cycle_time = %e.\n", cycle_time);
   MPI_Allreduce(MPI_IN_PLACE, &cycle_time, 1, MPI_DOUBLE, MPI_MAX, comm);

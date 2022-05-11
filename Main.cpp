@@ -40,6 +40,7 @@ MPI_Comm m2c_comm;
 
 int MAX_STEP_NUMBER;
 double FLUX_TIME;
+double EXACT_RIEMANN_TIME;
 int CURRENT_STEP_NUMBER;
 int NSTP_2ND_IT;
 int NSTP_3RD_IT;
@@ -53,6 +54,7 @@ int main(int argc, char* argv[])
 {
   MAX_STEP_NUMBER = 0;
   FLUX_TIME = 0.;
+  EXACT_RIEMANN_TIME = 0.;
   CURRENT_STEP_NUMBER = 0;
   DP_MIN_GLOBAL = std::numeric_limits<double>::max();
 
@@ -332,9 +334,9 @@ int main(int argc, char* argv[])
         dts = dt;
  
       if(dts<=dt)
-        print("Step %d: t = %e, dt = %e, cfl = %.4e. dp_min so far: %e, current dp_min: %e. Max step# = %u, Current step# = %u, 2nd It. step# = %u, 3rd It. step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, t, dt, cfl, DP_MIN_GLOBAL, DP_MIN_CURRENT, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, NSTP_3RD_IT, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d: t = %e, dt = %e, cfl = %.4e. dp_min so far: %e, current dp_min: %e. Max step# = %u, Current step# = %u, 2nd It. step# = %u, 3rd It. step# = %u. Exact Riemann time: %.4e ms, Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, t, dt, cfl, DP_MIN_GLOBAL, DP_MIN_CURRENT, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, NSTP_3RD_IT, EXACT_RIEMANN_TIME, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
       else
-        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. dp_min so far: %e, current dp_min: %e. Max step# = %u, Current step# = %u, 2nd It. step# = %u, 3rd It. step# = %u. Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, DP_MIN_GLOBAL, DP_MIN_CURRENT, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, NSTP_3RD_IT, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. dp_min so far: %e, current dp_min: %e. Max step# = %u, Current step# = %u, 2nd It. step# = %u, 3rd It. step# = %u. Exact Riemann time: %.4e ms, Flux time: %.4e ms, Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, DP_MIN_GLOBAL, DP_MIN_CURRENT, MAX_STEP_NUMBER, CURRENT_STEP_NUMBER, NSTP_2ND_IT, NSTP_3RD_IT, EXACT_RIEMANN_TIME, FLUX_TIME, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
       //----------------------------------------------------
       // Move forward by one time-step: Update V, Phi, and ID
