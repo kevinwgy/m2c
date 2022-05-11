@@ -5,6 +5,7 @@
 #include<Utils.h>
 #include<memory.h> //unique_ptr
 #include<dlfcn.h> //dlopen, dlclose
+#include<Vector5D.h>
 
 using std::string;
 using std::map;
@@ -161,12 +162,12 @@ EmbeddedBoundaryOperator::StoreID2Closure(std::map<int, std::pair<int,int> > &id
 
   inactive_colors.clear();
   for(int i=0; i<surfaces.size(); i++) {
-    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectoResultsOnSurface(surf);
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectoResultsOnSurface(i);
     int nRegions = EBDS->nRegions; //this is the number of *closures*. Colors -1, -2, ...
     for(int color = -1; color>=-nRegions; color--) {
       bool found = false;
       for(auto it = id2color.begin(); it != id2color.end(); it++) {
-        if(it->second->first == i && it->second->second == color) {
+        if(it->second.first == i && it->second.second == color) {
           found = true;
           break;
         }
@@ -504,8 +505,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
     unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectoResultsOnSurface(surf);
 
+/*
     I AM HERE
-
+*/
 
 
   }

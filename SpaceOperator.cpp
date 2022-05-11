@@ -1224,8 +1224,8 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     color.resize(EBDS->size(), NULL);
     for(int i=0; i<EBDS->size(); i++) {
-      assert((*EBDS)[i]->Sign_ptr);
-      color[i] = (*EBDS)[i]->Sign_ptr->GetDataPointer();
+      assert((*EBDS)[i]->Color_ptr);
+      color[i] = (*EBDS)[i]->Color_ptr->GetDataPointer();
     }
 
     for(int k=k0; k<kmax; k++)
@@ -1293,7 +1293,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   if(EBDS != nullptr) {
     for(int i=0; i<EBDS->size(); i++)
-      (*EBDS)[i]->Sign_ptr->RestoreDataPointerToLocalVector();
+      (*EBDS)[i]->Color_ptr->RestoreDataPointerToLocalVector();
   }
 
 
@@ -1423,8 +1423,8 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
         mycolor_final = mycolor[i];
       }
       else { //need to resolve a "conflict"
-        if((*EBDS[i]->SignReachesBoundary_ptr)[-mycolor[i]] == 0) {
-          if((*EBDS[ruling_surface]->SignReachesBoundary_ptr)[-mycolor_final] == 0)
+        if((*EBDS[i]->ColorReachesBoundary_ptr)[-mycolor[i]] == 0) {
+          if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 0)
             print_warning("Warning: User-specified point (%e %e %e) is inside isolated regions in "
                           "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
                           ruling_surface, i);
@@ -1432,7 +1432,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
           mycolor_final = mycolor[i];
         }
         else {
-          if((*EBDS[ruling_surface]->SignReachesBoundary_ptr)[-mycolor_final] == 1) {
+          if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 1) {
             print_warning("Warning: User-specified point (%e %e %e) is inside isolated(*) regions in "
                           "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
                           ruling_surface, i);
@@ -1451,7 +1451,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
 
 
   //Store the mapping from point-based materialid to the ruling surface and "color"
-  if((*EBDS[ruling_surface]->SignReachesBoundary_ptr)[-mycolor_final] == 0)
+  if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 0)
     id2closure[point.initialConditions.materialid] = make_pair(ruling_surface, mycolor_final);
 
   //Step 4: Update state variables and ID

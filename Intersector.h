@@ -20,8 +20,9 @@
  * (4) closest point on the interface to each node (If solution is not
  *     unique, only one solution is found)
  * (5) nodes swept by the (dynamic) surface in one time step
- * (6) (if the interface is a closed surface) the inside/outside
- *     status of each node with respect to the surface.
+ * (6) the "color" of each node (i.e. connectivity info)
+ * (7) the elements in the embedded surface that form the boundary
+ *     of a "color", and their inward-facing side.
  * Note: The above results are stored within this class.
  ***************************************************************/
 
@@ -104,11 +105,11 @@ class Intersector {
                                   two vertices. XForward stores the one that is closest to the left/bottom/back vertex. \n
                                   XBackward stores the one that is closest to the right/top/front vertex. */
 
-  //! Phi and Sign communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
+  //! Phi and Color communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
   int Phi_nLayer; //!< number of layers of nodes where Phi is calculated.
-  SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or N (inlet, outlet). N = 1,2,...
-  std::vector<int> SignReachesBoundary; /**< stores whether each negative signed regions (i.e. enclosrures)  touches \n
+  SpaceVariable3D Color; //!< GENERALIZED color: -N (inside enclosure #N), 0 (occluded), or N (inlet=1, outlet=2).
+  std::vector<int> ColorReachesBoundary; /**< stores whether each negative colored regions (i.e. enclosrures)  touches \n
                                              the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
                                              the size of this vector is "nRegions" calculated in FloodFillColors.*/
   bool hasInlet, hasOutlet, hasOcc;
@@ -126,8 +127,8 @@ class Intersector {
   //! "occluded" and "firstLayer" account for the internal ghost nodes.
   std::set<Int3> occluded;
   std::set<Int3> firstLayer; //!< nodes that belong to intersecting edges (naturally, including occluded nodes)
-  std::set<Int3> imposed_occluded; /**< tracks nodes whose sign cannot be resolved; these nodes are FORCED to have\n
-                                        the sign of occluded(0), but intersections from these nodes to neighbors\n
+  std::set<Int3> imposed_occluded; /**< tracks nodes whose color cannot be resolved; these nodes are FORCED to have\n
+                                        the color of occluded(0), but intersections from these nodes to neighbors\n
                                         may not exist! Includes internal ghost nodes.*/
                                         
 
@@ -168,20 +169,28 @@ public:
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
 
-  int FloodFillColors(); /**< determine the generalized sign function ("Sign"). 
+  int FloodFillColors(); /**< determine the generalized color function ("Color"). 
                                                                                           Returns the number of "colors" (sum of the four).\n*/
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
   void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
 
   /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This function only recomputes
-   *  the "Sign" of swept nodes. It is faster, and also maintains the same "signs". Calling the original "FloodFill" function may 
-   *  lead to sign(tag) change for the same enclosure.
+   *  the "Color" of swept nodes. It is faster, and also maintains the same "colors". Calling the original "FloodFill" function may 
+   *  lead to color(tag) change for the same enclosure.
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
   void RefillAfterSurfaceUpdate(bool nodal_cands_calculated = false);
 
   void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
 
-  // Get pointers to all the results
+  //! Find the elements of the embedded surface that constitute the boundary of a "color". For each element in\n
+  //! in this set, determine which side(s) of it faces the interior of this color. "status" has the size of\n
+  //! surface.elems. For each element, status = 0 means this element does not belong to the boundary of "color",\n
+  //! 1 means the positive side (i.e. along "elemNorm") faces the interior, 2 means the negative side faces the\n
+  //! interior; 3 means both sides face the interior.
+  //! Note: This function assumes intersections and colors "i.e. Color" have been calculated
+  void FindColorBoundary(int color, std::vector<int> &status);
+
+  //! Get pointers to all the results
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();
 
 private: 
@@ -199,6 +208,9 @@ private:
   int FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir/*0~x,1~y,2~z*/, 
                                          double len, MyTriangle* tri, int nTri, 
                                          IntersectionPoint &xf, IntersectionPoint &xb); //!< 2 points, maybe the same
+
+  //! Find the node in the (global) M2C mesh that is approximately closest to a point p in R3
+  Int3 FindClosestNodeToPointApprox(Vec3D &p);
 
 };
 

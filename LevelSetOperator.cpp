@@ -606,7 +606,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, std::unique_ptr
                     "         The intersector should compute unsigned distance ('phi') for at least two layers\n"
                     "         of nodes. Currently, this value is set to %d.\n", EBDS->Phi_nLayer); 
 
-    double*** color = EBDS->Sign_ptr->GetDataPointer();
+    double*** color = EBDS->Color_ptr->GetDataPointer();
     double*** psi   = EBDS->Phi_ptr->GetDataPointer();
      
     int k1,j1,i1;
@@ -657,7 +657,7 @@ DONE:
 
     MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
 
-    EBDS->Sign_ptr->RestoreDataPointerToLocalVector();
+    EBDS->Color_ptr->RestoreDataPointerToLocalVector();
     EBDS->Phi_ptr->RestoreDataPointerToLocalVector();
   }
 

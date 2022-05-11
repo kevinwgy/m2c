@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
   std::map<int, std::pair<int,int> >
   id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToIntersectorResults() : nullptr);
   if(embed)
-    embed->StoreID2Closure(id2closure);
+    embed->StoreID2Closure(id2closure);  //also tracks the colors of solid bodies
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
