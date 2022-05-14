@@ -6,6 +6,7 @@
 #include<TriangulatedSurface.h>
 #include<FloodFill.h>
 #include<EmbeddedBoundaryDataSet.h>
+#include<GlobalMeshInfo.h>
 #include<memory> //unique_ptr
 
 /****************************************************************
@@ -77,8 +78,7 @@ class Intersector {
   int ii0_in, jj0_in, kk0_in, iimax_in, jjmax_in, kkmax_in; //!< corners of the ghosted subdomain, excluding external ghosts
   int NX, NY, NZ; //!< global size (number of cells in the real domain)
 
-  std::vector<double> &x_glob, &y_glob, &z_glob; //!< x,y,z coords of the entire domain
-  std::vector<double> &dx_glob, &dy_glob, &dz_glob; //!< dx, dy, dz of the entire domain
+  GlobalMeshInfo &global_mesh;
 
   SpaceVariable3D BBmin, BBmax; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
                                      in the physical domain. For each node, the BB contains the \n
@@ -142,8 +142,7 @@ public:
               TriangulatedSurface &surface_,
               SpaceVariable3D &coordinates_, 
               std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
-              std::vector<double> &x_, std::vector<double> &y_, std::vector<double> &z_,
-              std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
+              GlobalMeshInfo &global_mesh_);
 
   ~Intersector();
 
@@ -193,6 +192,9 @@ public:
   //! Get pointers to all the results
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();
 
+  //! Get pointer to "scope"
+  void GetElementsInScope(std::vector<int> elems_in_scope);
+
 private: 
 
   //! Utility functions
@@ -209,8 +211,6 @@ private:
                                          double len, MyTriangle* tri, int nTri, 
                                          IntersectionPoint &xf, IntersectionPoint &xb); //!< 2 points, maybe the same
 
-  //! Find the node in the (global) M2C mesh that is approximately closest to a point p in R3
-  Int3 FindClosestNodeToPointApprox(Vec3D &p);
 
 };
 

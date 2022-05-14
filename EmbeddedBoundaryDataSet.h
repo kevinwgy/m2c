@@ -69,6 +69,7 @@ struct ClosestPoint {
 class EmbeddedBoundaryDataSet {
 
 public:
+
   SpaceVariable3D *XForward_ptr;
   SpaceVariable3D *XBackward_ptr;
   SpaceVariable3D *Phi_ptr;

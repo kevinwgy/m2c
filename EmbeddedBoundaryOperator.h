@@ -36,7 +36,12 @@ class EmbeddedBoundaryOperator {
   std::map<int, std::pair<int,int> > id2color;
 
   //! inactive closures: pair of <surface number, color>
-  std::vector<std::pair<int,int> > inactive_colors;
+  std::set<std::pair<int,int> > inactive_colors;
+
+  //! for each surface (i), inactive_elem_status[i][j] (j: 0 -- surfaces[i].elems.size()) shows weather one or both
+  //! sides of triangle element j is part of the inward-facing side of any inactive region. 
+  //! Needed for force computation
+  std::vector<std::vector<int> > inactive_elem_status;
 
   vector<std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> > dynamics_calculator; //!< the 1st one is the calculator
 
@@ -46,8 +51,7 @@ class EmbeddedBoundaryOperator {
   SpaceVariable3D* coordinates_ptr;
   std::vector<GhostPoint>* ghost_nodes_inner_ptr;
   std::vector<GhostPoint>* ghost_nodes_outer_ptr;
-  std::vector<double> *x_glob_ptr, *y_glob_ptr, *z_glob_ptr;
-  std::vector<double> *dx_glob_ptr, *dy_glob_ptr, *dz_glob_ptr;
+  GlobalMeshInfo *global_mesh_ptr;
 
 public:
    
@@ -66,16 +70,16 @@ public:
   vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<F.size()); return &F[i];}
 
   std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > GetPointerToIntersectorResults();
-  std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToIntersectoResultsOnSurface(int i); 
+  std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToIntersectorResultsOnSurface(int i); 
 
 
   void SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable3D &coordinates_, 
                           std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
-                          std::vector<double> &x_, std::vector<double> &y_, std::vector<double> &z_,
-                          std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
+                          GlobalMeshInfo &global_mesh_);
   void SetupIntersectors();
 
-  void StoreID2Closure(std::map<int, std::pair<int,int> > &id2closure_); //build id2color and inactive_colors
+  //build id2color, inactive_colors, and inactive_elem_status
+  void GatherColorInfo(std::map<int, std::pair<int,int> > &id2closure_); 
 
   void ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID);
 
@@ -92,6 +96,8 @@ private:
                     vector<Vec3D> &Xs, vector<Int3> &Es);
 
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
+
+  double CalculateLoftingHeight(Vec3D &p, double factor);
 
 };
 

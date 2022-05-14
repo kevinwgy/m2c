@@ -2432,9 +2432,9 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   surface_provided_by_other_solver = NO;
 
   // force calculation
-  compute_force = YES;
   gauss_points_lofting = 0.0;
   internal_pressure = 0.0;
+  quadrature = ONE_POINT;
 
   filename = "";
   type = None;
@@ -2454,13 +2454,14 @@ Assigner *EmbeddedSurfaceData::getAssigner()
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
      "No", 0, "Yes", 1);
 
+  new ClassToken<EmbeddedSurfaceData> (ca, "GaussQuadrature", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::quadrature), 8,
+     "None", 0, "OnePoint", 1, "ThreePoint", 2, "ThreePoints", 2,
+     "FourPoint", 3, "FourPoints", 3, "SixPoint", 4, "SixPoints", 4);
+
   new ClassDouble<EmbeddedSurfaceData>(ca, "GaussPointsLofting", this, &EmbeddedSurfaceData::gauss_points_lofting);
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "InternalPressure", this, &EmbeddedSurfaceData::internal_pressure);
-
-  new ClassToken<EmbeddedSurfaceData> (ca, "ComputeForce", this,
-     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::compute_force), 2,
-     "No", 0, "Yes", 1);
 
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
 

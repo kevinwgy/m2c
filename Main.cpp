@@ -11,6 +11,7 @@
 #include <FluxFcnLLF.h>
 #include <FluxFcnHLLC.h>
 #include <FluxFcnGodunov.h>
+#include <GlobalMeshInfo.h>
 #include <SpaceOperator.h>
 #include <TimeIntegrator.h>
 #include <MultiPhaseOperator.h>
@@ -129,6 +130,9 @@ int main(int argc, char* argv[])
                          pow(iod.mesh.ymax - iod.mesh.y0, 2) +
                          pow(iod.mesh.zmax - iod.mesh.z0, 2));
   
+  //! Setup global mesh info
+  GlobalMeshInfo global_mesh(xcoords, ycoords, zcoords, dx, dy, dz);
+
   //! Initialize PETSc
   PETSC_COMM_WORLD = comm;
   PetscInitialize(&argc, &argv, argc>=3 ? argv[2] : (char*)0, (char*)0);
@@ -137,13 +141,13 @@ int main(int argc, char* argv[])
   DataManagers3D dms(comm, xcoords.size(), ycoords.size(), zcoords.size());
 
   //! Initialize space operator
-  SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
+  SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, global_mesh);
 
   //! Track the embedded boundaries
   if(embed) {
     embed->SetCommAndMeshInfo(dms, spo.GetMeshCoordinates(), 
                               *(spo.GetPointerToInnerGhostNodes()), *(spo.GetPointerToOuterGhostNodes()),
-                              xcoords, ycoords, zcoords, dx, dy, dz);
+                              global_mesh);
     embed->SetupIntersectors();
     embed->TrackSurfaces();
 
@@ -175,7 +179,7 @@ int main(int argc, char* argv[])
   std::map<int, std::pair<int,int> >
   id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToIntersectorResults() : nullptr);
   if(embed)
-    embed->StoreID2Closure(id2closure);  //also tracks the colors of solid bodies
+    embed->GatherColorInfo(id2closure);  //also tracks the colors of solid bodies
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -197,7 +201,7 @@ int main(int argc, char* argv[])
 
     if(id2closure.find(matid) != id2closure.end()) {
       lso.back()->SetInitialCondition(*Phi.back(), 
-                                      embed->GetPointerToIntersectoResultsOnSurface(id2closure[matid].first),
+                                      embed->GetPointerToIntersectorResultsOnSurface(id2closure[matid].first),
                                       id2closure[matid].second);
     } else
       lso.back()->SetInitialCondition(*Phi.back());

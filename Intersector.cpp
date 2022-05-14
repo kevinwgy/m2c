@@ -13,12 +13,11 @@ extern double domain_diagonal;
 Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
                          TriangulatedSurface &surface_, SpaceVariable3D &coordinates_, 
                          vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
-                         vector<double> &x_, vector<double> &y_, vector<double> &z_,
-                         vector<double> &dx_, vector<double> &dy_, vector<double> &dz_)
+                         GlobalMeshInfo &global_mesh_)
            : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree(NULL),
              coordinates(coordinates_), 
              ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
-             x_glob(x_), y_glob(y_), z_glob(z_), dx_glob(dx_), dy_glob(dy_), dz_glob(dz_),
+             global_mesh(global_mesh_),
              BBmin(comm_, &(dms_.ghosted1_3dof)),
              BBmax(comm_, &(dms_.ghosted1_3dof)),
              TMP(comm_, &(dms_.ghosted1_1dof)),
@@ -127,6 +126,16 @@ Intersector::GetPointerToResults()
 //-------------------------------------------------------------------------
 
 void
+Intersector::GetElementsInScope(std::vector<int> elems_in_scope)
+{
+  elems_in_scope.resize(scope.size());
+  for(int i=0; i<scope.size(); i++)
+    elems_in_scope[i] = scope[i].trId();
+}
+
+//-------------------------------------------------------------------------
+
+void
 Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers)
 {
   assert(phi_layers>=1);
@@ -194,6 +203,13 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
 
   Vec3D*** bbmin  = (Vec3D***) BBmin.GetDataPointer();
   Vec3D*** bbmax  = (Vec3D***) BBmax.GetDataPointer();
+
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+  vector<double> &dx_glob(global_mesh.dx_glob);
+  vector<double> &dy_glob(global_mesh.dy_glob);
+  vector<double> &dz_glob(global_mesh.dz_glob);
 
   double delta;
   for(int k=kk0_in; k<kkmax_in; k++)
@@ -921,6 +937,10 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
     FindNodalCandidates();
   }
 
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+
   double*** candid = CandidatesIndex.GetDataPointer();
   
   //add swept nodes to nodes2fill (including internal ghosts)
@@ -1066,6 +1086,10 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
     FindNodalCandidates();
   }
   
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+
   swept.clear();
 
   double*** candid = CandidatesIndex.GetDataPointer();
@@ -1115,6 +1139,10 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
     BuildSubdomainScopeAndKDTree();
     FindNodalCandidates();
   }
+
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
 
   Phi_nLayer = nLayer;
 
@@ -1224,6 +1252,13 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
     exit_mpi();
   }
 
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+  vector<double> &dx_glob(global_mesh.dx_glob);
+  vector<double> &dy_glob(global_mesh.dy_glob);
+  vector<double> &dz_glob(global_mesh.dz_glob);
+
 
   // Step 1. Preparation
   vector<Vec3D>&  Xs(surface.X);
@@ -1287,8 +1322,8 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
       Int3 &nod(Es[triangle_id]);
       Vec3D p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0 + disp*Ns[triangle_id];
 
-      // locate the node that is closest (approximately) to p
-      Int3 ijk = FindClosestNodeToPointApprox(p);
+      // locate the node that is closest to p
+      Int3 ijk = global_mesh.FindClosestNodeToPoint(p, false);
 
       // find candidates (nodes with "this_color" for this point)
       vector<Int3> mycands;
@@ -1412,30 +1447,6 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 }
 
 //-------------------------------------------------------------------------
-
-Int3
-Intersector::FindClosestNodeToPointApprox(Vec3D &p)
-{
-  Int3 ijk;
-  double d1, d2;
-
-  int i = std::upper_bound(x_glob.begin(), x_glob.end(), p[0]) - x_glob.begin();
-  d1 = fabs(x_glob[i] - p[0]);
-  d2 = i==0 ? fabs(x_glob[i] - dx_glob[i] - p[0]) : fabs(x_glob[i-1] - p[0]);
-  ijk[0] = d1<d2 ? i : i-1; 
-
-  int j = std::upper_bound(y_glob.begin(), y_glob.end(), p[1]) - y_glob.begin();
-  d1 = fabs(y_glob[j] - p[1]);
-  d2 = j==0 ? fabs(y_glob[j] - dy_glob[j] - p[1]) : fabs(y_glob[j-1] - p[1]);
-  ijk[1] = d1<d2 ? j : j-1; 
-
-  int k = std::upper_bound(z_glob.begin(), z_glob.end(), p[2]) - z_glob.begin();
-  d1 = fabs(z_glob[k] - p[2]);
-  d2 = k==0 ? fabs(z_glob[k] - dz_glob[k] - p[2]) : fabs(z_glob[k-1] - p[2]);
-  ijk[2] = d1<d2 ? k : k-1; 
-
-  return ijk;
-}
 
 //-------------------------------------------------------------------------
 

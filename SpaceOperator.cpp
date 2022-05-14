@@ -26,15 +26,13 @@ extern int INACTIVE_MATERIAL_ID;
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                              vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
                              ExactRiemannSolverBase &riemann_,
-                             vector<double> &x, vector<double> &y, vector<double> &z,
-                             vector<double> &dx, vector<double> &dy, vector<double> &dz,
+                             GlobalMeshInfo &global_mesh_,
                              bool screenout) 
   : comm(comm_), dm_all(dm_all_),
     iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
-    volume(comm_, &(dm_all_.ghosted1_1dof)),
-    x_glob(x), y_glob(y), z_glob(z), dx_glob(dx), dy_glob(dy), dz_glob(dz),
+    volume(comm_, &(dm_all_.ghosted1_1dof)), global_mesh(global_mesh_),
     rec(comm_, dm_all_, iod_.schemes.ns.rec, coordinates, delta_xyz, &varFcn, &fluxFcn),
     Vl(comm_, &(dm_all_.ghosted1_5dof)),
     Vr(comm_, &(dm_all_.ghosted1_5dof)),
@@ -51,7 +49,8 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
   coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
-  SetupMesh(x,y,z,dx,dy,dz);
+  SetupMesh(global_mesh.x_glob, global_mesh.y_glob, global_mesh.z_glob,
+            global_mesh.dx_glob, global_mesh.dy_glob, global_mesh.dz_glob);
 
   CreateGhostNodeLists(screenout); //create ghost_nodes_inner and ghost_nodes_outer
 
@@ -1323,16 +1322,20 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
   map<int, pair<int,int> > id2closure;
 
   //Step 1. Locate the point within the mesh
-  int i0,j0,k0;
-  i0 = int(std::upper_bound(x_glob.begin(), x_glob.end(), point.x) - x_glob.begin()) - 1;
-  j0 = int(std::upper_bound(y_glob.begin(), y_glob.end(), point.y) - y_glob.begin()) - 1;
-  k0 = int(std::upper_bound(z_glob.begin(), z_glob.end(), point.z) - z_glob.begin()) - 1;
+  Vec3D this_point(point.x, point.y, point.z);
+  Int3 ijk0;
+  bool validpoint = global_mesh.FindElementCoveringPoint(this_point, ijk0, true);
+  if(!validpoint) {
+    print_error("*** Error: User-specified point (%e %e %e) is outside the computational domain.\n",
+                point.x, point.y, point.z);
+    exit_mpi();
+  }
   vector<Int3> vertices; 
   vertices.reserve(8);
   vector<bool> owner;
   owner.reserve(8);
 
-  int i(i0),j(j0),k(k0);
+  int i(ijk0[0]),j(ijk0[1]),k(ijk0[2]);
   for(int dk=0; dk<=1; dk++) {
     for(int dj=0; dj<=1; dj++) {
       for(int di=0; di<=1; di++) {

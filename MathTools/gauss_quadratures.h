@@ -10,17 +10,17 @@ namespace MathTools {
  *********************************************/
 class GaussQuadraturesTriangle {
 
-  static const double one_third  = 1.0/3.0;
-  static const double two_thirds = 2.0/3.0;
-  static const double one_sixth  = 1.0/6.0;
-  static const double w41        = -0.5625;
-  static const double w42        = 1.5625/3.0; 
-  static const double w61        = 0.223381589678011;
-  static const double p611       = 0.108103018168070;
-  static const double p612       = (1.0 - p611)/2.0; //0.445948490915965;
-  static const double w62        = (1.0 - 3.0*w61)/3.0; //0.109951743655322;
-  static const double p621       = 0.816847572980459;
-  static const double p622       = (1.0 - p621)/2.0; //0.091576213509771;
+  static constexpr double one_third  = 1.0/3.0;
+  static constexpr double two_thirds = 2.0/3.0;
+  static constexpr double one_sixth  = 1.0/6.0;
+  static constexpr double w41        = -0.5625;
+  static constexpr double w42        = 1.5625/3.0; 
+  static constexpr double w61        = 0.223381589678011;
+  static constexpr double p611       = 0.108103018168070;
+  static constexpr double p612       = (1.0 - p611)/2.0; //0.445948490915965;
+  static constexpr double w62        = (1.0 - 3.0*w61)/3.0; //0.109951743655322;
+  static constexpr double p621       = 0.816847572980459;
+  static constexpr double p622       = (1.0 - p621)/2.0; //0.091576213509771;
 
 public:
   static void GetParameters(int nPoint, double* w, Vec3D* p) {

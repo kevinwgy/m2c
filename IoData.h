@@ -1027,8 +1027,9 @@ struct EmbeddedSurfaceData {
   enum YesNo {NO = 0, YES = 1};
   YesNo surface_provided_by_other_solver;
 
-  //! force calculation
-  YesNo compute_force;
+  //! force calculation (NONE: force is 0, i.e. one-way coupling)
+  enum GaussQuadratureRule {NONE = 0, ONE_POINT = 1, THREE_POINT = 2, FOUR_POINT = 3,
+                            SIX_POINT = 4} quadrature;
   double gauss_points_lofting; //!< non-dimensional, relative to local element size
   double internal_pressure; //!< pressure applied on the inactive side (i.e. inside solid body)
 

@@ -3,9 +3,10 @@
 #include<list>
 #include<utility>
 #include<Utils.h>
+#include<Vector5D.h>
+#include<gauss_quadratures.h>
 #include<memory.h> //unique_ptr
 #include<dlfcn.h> //dlopen, dlclose
-#include<Vector5D.h>
 
 using std::string;
 using std::map;
@@ -17,8 +18,7 @@ using std::unique_ptr;
 EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver) 
                         : comm(comm_), iod(iod_), hasSurfFromOtherSolver(surface_from_other_solver),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
-                          ghost_nodes_outer_ptr(NULL), x_glob_ptr(NULL), y_glob_ptr(NULL), z_glob_ptr(NULL),
-                          dx_glob_ptr(NULL), dy_glob_ptr(NULL), dz_glob_ptr(NULL)
+                          ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL)
 {
   // count surfaces from files
   int counter = iod.ebm.embed_surfaces.surfaces.dataMap.size();
@@ -125,19 +125,13 @@ EmbeddedBoundaryOperator::Destroy()
 void
 EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable3D &coordinates_,
                               vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
-                              vector<double> &x_, vector<double> &y_, vector<double> &z_,
-                              vector<double> &dx_, vector<double> &dy_, vector<double> &dz_)
+                              GlobalMeshInfo &global_mesh_)
 {
   dms_ptr               = &dms_;
   coordinates_ptr       = &coordinates_;
   ghost_nodes_inner_ptr = &ghost_nodes_inner_; 
   ghost_nodes_outer_ptr = &ghost_nodes_outer_; 
-  x_glob_ptr            = &x_;
-  y_glob_ptr            = &y_;
-  z_glob_ptr            = &z_;
-  dx_glob_ptr           = &dx_;
-  dy_glob_ptr           = &dy_;
-  dz_glob_ptr           = &dz_;
+  global_mesh_ptr       = &global_mesh_;
 }
 
 //------------------------------------------------------------------------------------------------
@@ -148,21 +142,25 @@ EmbeddedBoundaryOperator::SetupIntersectors()
   for(int i=0; i<intersector.size(); i++) {
     intersector[i] = new Intersector(comm, *dms_ptr, *iod_embedded_surfaces[i], surfaces[i],
                                      *coordinates_ptr, *ghost_nodes_inner_ptr, *ghost_nodes_outer_ptr,
-                                     *x_glob_ptr, *y_glob_ptr, *z_glob_ptr,
-                                     *dx_glob_ptr, *dy_glob_ptr, *dz_glob_ptr);
+                                     *global_mesh_ptr);
   }
 }
 
 //------------------------------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryOperator::StoreID2Closure(std::map<int, std::pair<int,int> > &id2closure_)
+EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id2closure_)
 {
+
+  // Part 1: Store id2color
   id2color = id2closure_;
 
+
+  // Part 2: Find inactive colors. Warning: When multiple surfaces have inactive regions that are close
+  //         to each other or overlapping, the information collected here is invalid.
   inactive_colors.clear();
   for(int i=0; i<surfaces.size(); i++) {
-    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectoResultsOnSurface(i);
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectorResultsOnSurface(i);
     int nRegions = EBDS->nRegions; //this is the number of *closures*. Colors -1, -2, ...
     for(int color = -1; color>=-nRegions; color--) {
       bool found = false;
@@ -173,9 +171,46 @@ EmbeddedBoundaryOperator::StoreID2Closure(std::map<int, std::pair<int,int> > &id
         }
       }
       if(!found)
-        inactive_colors.push_back(std::make_pair(i, color));
+        inactive_colors.insert(std::make_pair(i, color));
     } 
   }
+
+
+  // Part 3: Find inactive_elem_status. Needed for force computation
+  inactive_elem_status.resize(surfaces.size());
+  vector<bool> touched(surfaces.size(), false);
+  for(auto it = inactive_colors.begin(); it != inactive_colors.end(); it++) {
+    int surf = it->first;
+    int this_color = it->second;
+    assert(intersector[surf]);
+    vector<int> &status(inactive_elem_status[surf]);
+    if(touched[surf]) { //be careful! Create a new vector for FindColorBoundary, then merge w/ existing one
+      vector<int> tmp;
+      intersector[surf]->FindColorBoundary(this_color, tmp);
+      assert(tmp.size() == status.size());
+      for(int i=0; i<tmp.size(); i++) {
+        if(tmp[i]==1) {
+          if(status[i]==0)
+            status[i] = 1;
+          else if(status[i]==2)
+            status[i] = 3;
+        }
+        else if(tmp[i]==2) {
+          if(status[i]==0)
+            status[i] = 2;
+          else if(status[i]==1)
+            status[i] = 3;
+        }
+        else if(tmp[i]==3)
+          status[i] = 3;
+      }
+    }
+    else {
+      intersector[surf]->FindColorBoundary(this_color, status);
+      touched[surf] = true;
+    }
+  }
+
 }
 
 //------------------------------------------------------------------------------------------------
@@ -503,8 +538,95 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
   // loop through all the embedded surfaces
   for(int surf=0; surf<surfaces.size(); surf++) {
 
-    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectoResultsOnSurface(surf);
+    // Clear force vector
+    vector<Vec3D>&  Fs(F[surf]); //Nodal loads (TO BE COMPUTED)
+    Fs.resize(surfaces[surf].X.size(), 0.0);
 
+    // Get quadrature info
+    int np = 0; //number of Gauss points
+    switch (iod_embedded_surfaces[surf]->quadrature) {
+      case EmbeddedSurfaceData::NONE :
+        np = 0; //force is always 0 --> one-way coupling
+        break;
+      case EmbeddedSurfaceData::ONE_POINT :
+        np = 1;
+        break;
+      case EmbeddedSurfaceData::THREE_POINT :
+        np = 3;
+        break;
+      case EmbeddedSurfaceData::FOUR_POINT :
+        np = 4;
+        break;
+      case EmbeddedSurfaceData::SIX_POINT :
+        np = 6;
+        break;
+      default :
+        print_error("*** Error: Detected unknown Gauss quadrature rule (%d).\n", 
+                    (int)iod_embedded_surfaces[surf]->quadrature);
+        exit_mpi();
+    }
+
+    // ------------------------------------
+    if(np==0) //one-way coupling
+      continue;
+    // ------------------------------------
+
+    // Collect info about the surface and intersection results
+    vector<Vec3D>&  Xs(surfaces[surf].X);
+    vector<Int3>&   Es(surfaces[surf].elems);
+    vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
+    vector<double>& As(surfaces[surf].elemArea);
+    vector<int>&    status(inactive_elem_status[surf]);
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectorResultsOnSurface(surf);
+
+    vector<double> weight(np, 0.0);
+    vector<Vec3D>  gbary(np, 0.0); //barycentric coords of Gauss points (symmetric) 
+    MathTools::GaussQuadraturesTriangle::GetParameters(np, weight.data(), gbary.data());
+ 
+    
+    vector<int> scope;
+    intersector[surf]->GetElementsInScope(scope);
+
+    //TODO: I AM HERE
+    //Note that different subdomain scopes overlap. We need to avoid repetition!
+    for(auto it = scope.begin(); it != scope.end(); it++) {
+
+      int id = *it; //triangle id
+      int n[3] = {Es[id][0], Es[id][1], Es[id][2]};
+
+      vector<Vec3D> tg(np, 0.0); //at each Gauss point, calculate (-pI + tau)n --> a Vec3D
+
+      for(int side=0; side<2; side++) { //loop through the two sides
+
+        Vec3D normal = Ns[id];
+        if(side==1)
+          normal *= -1.0;
+
+        if(status[id]==3 || status[id]==side+1) {//this side faces the interior of a solid body 
+//          for(int i=0; i<np; i++)
+//            tg[i] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
+          continue;
+        }
+
+
+        for(int p=0; p<np; p++) { //loop through Gauss points
+
+          Vec3D xg = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
+
+          // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
+          double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
+          xg += loft*normal;
+          
+          // Find element in the primal mesh that contains xg ---> be careful about subdomain boundaries.
+          Int3 ijk0;
+          bool foundit = global_mesh_ptr->FindElementCoveringPoint(xg, ijk0, true);
+
+
+
+        }
+
+      }
+    }
 /*
     I AM HERE
 */
@@ -512,7 +634,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
   }
 
-  //TODO: Must assemble force
+  //TODO: Must assemble force on proc 0
 
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
@@ -594,7 +716,7 @@ EmbeddedBoundaryOperator::GetPointerToIntersectorResults()
 //------------------------------------------------------------------------------------------------
 
 unique_ptr<EmbeddedBoundaryDataSet>
-EmbeddedBoundaryOperator::GetPointerToIntersectoResultsOnSurface(int i)
+EmbeddedBoundaryOperator::GetPointerToIntersectorResultsOnSurface(int i)
 {
   assert(i>=0 && i<intersector.size());
   assert(intersector[i]);
@@ -650,6 +772,24 @@ EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
 
 //------------------------------------------------------------------------------------------------
 
+double
+EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
+{
+  if(factor==0)
+    return 0.0;
+
+  assert(factor>0);
+
+  Int3 ijk;
+  bool foundit = global_mesh_ptr->FindCellCoveringPoint(p, ijk, true);
+  if(!foundit)
+    return 0.0; //no lofting applied to triangles outside. They will not (and should not) get a force.
+
+  double size = std::min(global_mesh_ptr->dx_glob[ijk[0]],
+                         std::min(global_mesh_ptr->dy_glob[ijk[1]], global_mesh_ptr->dz_glob[ijk[2]]));
+
+  return factor*size;
+}
 
 //------------------------------------------------------------------------------------------------
 

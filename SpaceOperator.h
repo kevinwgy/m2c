@@ -1,6 +1,7 @@
 #ifndef _SPACEOPERATOR_H_
 #define _SPACEOPERATOR_H_
 #include <ExactRiemannSolverBase.h>
+#include <GlobalMeshInfo.h>
 #include <SymmetryOperator.h>
 #include <ViscosityOperator.h>
 #include <HeatDiffusionOperator.h>
@@ -39,8 +40,7 @@ class SpaceOperator
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
   int NX, NY, NZ; //!< global size
 
-  std::vector<double> &x_glob, &y_glob, &z_glob;
-  std::vector<double> &dx_glob, &dy_glob, &dz_glob;
+  GlobalMeshInfo &global_mesh;
 
   //! Class for spatial reconstruction
   Reconstructor rec;
@@ -71,8 +71,7 @@ public:
   SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                 vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
                 ExactRiemannSolverBase &riemann_,
-                vector<double> &x, vector<double> &y, vector<double> &z,
-                vector<double> &dx, vector<double> &dy, vector<double> &dz,
+                GlobalMeshInfo &global_mesh_,
                 bool screenout = true); 
   ~SpaceOperator();
 

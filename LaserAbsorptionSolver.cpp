@@ -1,5 +1,6 @@
 #include<LaserAbsorptionSolver.h>
 #include<GeoTools.h>
+#include<GlobalMeshInfo.h>
 #include<algorithm> //std::sort
 #include<numeric> //std::iota
 #include<map>
@@ -280,7 +281,8 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   // -------------------------------------------------------------
   if(active_core) {
     dms = new DataManagers3D(comm, xsub.size(), ysub.size(), zsub.size());
-    spo = new SpaceOperator(comm, *dms, iod, varFcn, fluxFcn_, riemann_, xsub, ysub, zsub, dxsub, dysub, dzsub);
+    GlobalMeshInfo global_mesh(xsub,ysub,zsub,dxsub,dysub,dzsub);
+    spo = new SpaceOperator(comm, *dms, iod, varFcn, fluxFcn_, riemann_, global_mesh);
     spo->ResetGhostLayer(xminus, xplus, yminus, yplus, zminus, zplus, dxminus, dxplus, dyminus, dyplus, dzminus, dzplus);
     coordinates       = &(spo->GetMeshCoordinates());
     delta_xyz         = &(spo->GetMeshDeltaXYZ());

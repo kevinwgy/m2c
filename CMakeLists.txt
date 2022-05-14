@@ -82,6 +82,7 @@ MultiPhaseOperator.cpp
 SymmetryOperator.cpp
 SmoothingOperator.cpp
 Interpolator.cpp
+GlobalMeshInfo.cpp
 GradientCalculatorCentral.cpp
 GradientCalculatorFD3.cpp
 ViscosityOperator.cpp
