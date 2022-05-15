@@ -13,6 +13,12 @@ struct Vec3D;
  * using the global mesh info. This is supposed
  * to be a lightweight, generic class. Special
  * calculations should not be done here.
+ *
+ * Note: This class assumes the ghost nodes are
+ * located with symmetry to the first layer of
+ * nodes within the domain interior. This is
+ * usually true, but not always. See "ResetGhostLayer"
+ * in SpaceOperator for a counterexample.
  ***********************************************/
 
 class GlobalMeshInfo {
@@ -32,6 +38,14 @@ public:
 
   ~GlobalMeshInfo() {}
 
+  //! Get specific info 
+  double GetX(int i);
+  double GetY(int j);
+  double GetZ(int k);
+  double GetDx(int i);
+  double GetDy(int j);
+  double GetDz(int k);
+
   //! Determine is a point is inside the domain (formed by control volumes / cells)
   bool IsPointInDomain(Vec3D &p, bool include_ghost_layer = false);
 
@@ -44,8 +58,10 @@ public:
   //! Find the control volume / cell that covers a point in 3D (Not the same as the previous function!) 
   bool FindCellCoveringPoint(Vec3D &p, Int3 &ijk, bool include_ghost_layer = false);
 
-  //! Find the "element" (in the primal mesh) that covers a point in 3D
-  bool FindElementCoveringPoint(Vec3D &p, Int3 &ijk0, bool include_ghost_layer = false);
+  //! Find the "element" (in the primal mesh) that covers a point in 3D.
+  bool FindElementCoveringPoint(Vec3D &p, Int3 &ijk0,
+                                Vec3D *xi = NULL, //optional output: local coords of "point" within element
+                                bool include_ghost_layer = false);
 
 
 };

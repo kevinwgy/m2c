@@ -1324,7 +1324,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
   //Step 1. Locate the point within the mesh
   Vec3D this_point(point.x, point.y, point.z);
   Int3 ijk0;
-  bool validpoint = global_mesh.FindElementCoveringPoint(this_point, ijk0, true);
+  bool validpoint = global_mesh.FindElementCoveringPoint(this_point, ijk0, NULL, true);
   if(!validpoint) {
     print_error("*** Error: User-specified point (%e %e %e) is outside the computational domain.\n",
                 point.x, point.y, point.z);
@@ -1335,20 +1335,17 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
   vector<bool> owner;
   owner.reserve(8);
 
-  int i(ijk0[0]),j(ijk0[1]),k(ijk0[2]);
-  for(int dk=0; dk<=1; dk++) {
-    for(int dj=0; dj<=1; dj++) {
+  int i,j,k;
+  for(int dk=0; dk<=1; dk++)
+    for(int dj=0; dj<=1; dj++)
       for(int di=0; di<=1; di++) {
-
+        i = ijk0[0] + di;
+        j = ijk0[1] + dj;
+        k = ijk0[2] + dk;
         vertices.push_back(Int3(i,j,k));
         owner.push_back(coordinates.IsHere(i,j,k,false));
-
-        i++;
       }
-      j++;
-    }
-    k++; 
-  }
+
 
   //Step 2. Loop through embedded boundaries and determine the color at user-specified point from each boundary
   vector<int> mycolor(EBDS.size(), INT_MIN);

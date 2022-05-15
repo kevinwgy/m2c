@@ -4,6 +4,8 @@
 #include<utility>
 #include<Utils.h>
 #include<Vector5D.h>
+#include<GeoTools.h>
+#include<trilinear_interpolation.h>
 #include<gauss_quadratures.h>
 #include<memory.h> //unique_ptr
 #include<dlfcn.h> //dlopen, dlclose
@@ -12,6 +14,8 @@ using std::string;
 using std::map;
 using std::vector;
 using std::unique_ptr;
+
+extern int INACTIVE_MATERIAL_ID;
 
 //------------------------------------------------------------------------------------------------
 
@@ -532,6 +536,9 @@ void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
 
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id = ID.GetDataPointer();
   
@@ -579,35 +586,29 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
     vector<int>&    status(inactive_elem_status[surf]);
     unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectorResultsOnSurface(surf);
 
-    vector<double> weight(np, 0.0);
+    vector<double> gweight(np, 0.0);
     vector<Vec3D>  gbary(np, 0.0); //barycentric coords of Gauss points (symmetric) 
-    MathTools::GaussQuadraturesTriangle::GetParameters(np, weight.data(), gbary.data());
+    MathTools::GaussQuadraturesTriangle::GetParameters(np, gweight.data(), gbary.data());
  
     
     vector<int> scope;
     intersector[surf]->GetElementsInScope(scope);
 
-    //TODO: I AM HERE
     //Note that different subdomain scopes overlap. We need to avoid repetition!
     for(auto it = scope.begin(); it != scope.end(); it++) {
 
-      int id = *it; //triangle id
-      int n[3] = {Es[id][0], Es[id][1], Es[id][2]};
+      int tid = *it; //triangle id
+      Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
 
-      vector<Vec3D> tg(np, 0.0); //at each Gauss point, calculate (-pI + tau)n --> a Vec3D
+      vector<Vec3D> tg(np, 0.0); //traction at each Gauss point, (-pI + tau)n --> a Vec3D
+
+      assert(fabs(Ns[tid].norm()-1.0)<1.0-12); //normal must be valid!
 
       for(int side=0; side<2; side++) { //loop through the two sides
 
-        Vec3D normal = Ns[id];
+        Vec3D normal = Ns[tid];
         if(side==1)
           normal *= -1.0;
-
-        if(status[id]==3 || status[id]==side+1) {//this side faces the interior of a solid body 
-//          for(int i=0; i<np; i++)
-//            tg[i] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
-          continue;
-        }
-
 
         for(int p=0; p<np; p++) { //loop through Gauss points
 
@@ -617,25 +618,37 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
           double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
           xg += loft*normal;
           
-          // Find element in the primal mesh that contains xg ---> be careful about subdomain boundaries.
-          Int3 ijk0;
-          bool foundit = global_mesh_ptr->FindElementCoveringPoint(xg, ijk0, true);
+          // Check if this Gauss point is in this subdomain.
+          Int3 ijk;
+          bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
+          if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
+            continue;
 
-
+          // Calculate traction at Gauss point on this "side"
+          if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
+            tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
+          else
+            tg[p] += CalculateTractionAtPoint(xg, side, As[tid], normal, n, Xs, v, id); 
 
         }
 
       }
-    }
-/*
-    I AM HERE
-*/
 
+      // Integrate (See KW's notes for the formula)
+      for(int p=0; p<np; p++) {
+        tg[p] *= As[tid];
+        // each node of the triangle gets some load from this Gauss point
+        for(int node=0; node<3; node++)
+          Fs[n[node]] += gweight[p]*gbary[p][node]*tg[p];
+      }
+    }
+
+    // Processor 0 assembles the loads on the entire surface
+    MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
 
   }
 
-  //TODO: Must assemble force on proc 0
-
+  
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
 }
@@ -789,6 +802,104 @@ EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
                          std::min(global_mesh_ptr->dy_glob[ijk[1]], global_mesh_ptr->dz_glob[ijk[2]]));
 
   return factor*size;
+}
+
+//------------------------------------------------------------------------------------------------
+
+Vec3D
+EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double area,
+                                                   Vec3D &normal, Int3 &tnodes, vector<Vec3D> &Xs, 
+                                                   Vec5D*** v, double*** id)
+{
+
+  Vec3D traction(0.0);
+  Int3 ijk0(INT_MAX);
+  Vec3D xi;
+  global_mesh_ptr->FindElementCoveringPoint(p, ijk0, &xi, true);
+
+  int i,j,k;
+
+  // find which nodes in the element are on the correct side given by "normal"
+  bool sameside[2][2][2];
+  for(int dk=0; dk<=1; dk++)
+    for(int dj=0; dj<=1; dj++)
+      for(int di=0; di<=1; di++) {
+        i = ijk0[0] + di;
+        j = ijk0[1] + dj;
+        k = ijk0[2] + dk;
+
+        assert(coordinates_ptr->IsHere(i,j,k,true)); //Not in the ghosted subdomain? Something is wrong
+
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID) {
+          sameside[dk][dj][di] = false;
+          continue;
+        }
+
+
+        Vec3D x(global_mesh_ptr->GetX(i), global_mesh_ptr->GetY(j), global_mesh_ptr->GetZ(k));
+        
+        double tmp[3]; //not used.
+        double signed_distance = (side==0) ? GeoTools::ProjectPointToPlane(x, Xs[tnodes[0]], Xs[tnodes[1]],
+                                                           Xs[tnodes[2]], tmp, &area, &normal)
+                                           : GeoTools::ProjectPointToPlane(x, Xs[tnodes[1]], Xs[tnodes[0]],
+                                                           Xs[tnodes[2]], tmp, &area, &normal);
+
+        sameside[dk][dj][di] = (signed_distance>0);
+      }
+
+
+  // interpolate pressure at the point
+  // We populate opposite side and inactive nodes by average of same side / active nodes.
+  // TODO: This can be done more carefully.
+  double pressure[2][2][2];
+  double total_pressure = 0.0;
+  int n_pressure = 0;
+  for(int dk=0; dk<=1; dk++)
+    for(int dj=0; dj<=1; dj++)
+      for(int di=0; di<=1; di++) {
+
+        if(!sameside[dk][dj][di])
+          continue;
+
+        i = ijk0[0] + di;
+        j = ijk0[1] + dj;
+        k = ijk0[2] + dk;
+
+        pressure[dk][dj][di] = v[k][j][i][4]; //get pressure
+        total_pressure += pressure[dk][dj][di];
+        n_pressure++;
+      }
+
+  if(n_pressure==0) {
+    fprintf(stderr,"\033[0;31m*** Error: No valid active nodes for interpolating pressure at "
+                   "Gauss point (%e, %e, %e). Try reducing surface thickness.\n\033[0m", p[0], p[1], p[2]);
+    exit(-1);
+  }
+
+  double avg_pressure = total_pressure/n_pressure;
+  for(int dk=0; dk<=1; dk++)
+    for(int dj=0; dj<=1; dj++)
+      for(int di=0; di<=1; di++) {
+
+        if(sameside[dk][dj][di])
+          continue;
+
+        i = ijk0[0] + di;
+        j = ijk0[1] + dj;
+        k = ijk0[2] + dk;
+
+        pressure[dk][dj][di] = avg_pressure;
+      }
+  
+  //Now, perform trilinear interpolation to get p at the point
+  double my_pressure = MathTools::trilinear_interpolation(pressure[0][0][0], pressure[0][0][1],
+                                      pressure[0][1][0], pressure[0][1][1], pressure[1][0][0], 
+                                      pressure[1][0][1], pressure[1][1][0], pressure[1][1][1], (double*)xi);
+
+  //TODO: Add viscous force later!
+
+  return -1.0*my_pressure*normal;  
+
 }
 
 //------------------------------------------------------------------------------------------------

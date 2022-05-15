@@ -4,6 +4,78 @@
 
 //------------------------------------------------------------------
 
+double
+GlobalMeshInfo::GetX(int i) {
+  if(i<0)
+    return x_glob[0] + i*dx_glob[0];
+  else if(i>=x_glob.size())
+    return x_glob.back() + (i-x_glob.size()+1)*dx_glob.back();
+  else
+    return x_glob[i];
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetY(int j) {
+  if(j<0)
+    return y_glob[0] + j*dy_glob[0];
+  else if(j>=y_glob.size())
+    return y_glob.back() + (j-y_glob.size()+1)*dy_glob.back();
+  else
+    return y_glob[j];
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetZ(int k) {
+  if(k<0)
+    return z_glob[0] + k*dz_glob[0];
+  else if(k>=z_glob.size())
+    return z_glob.back() + (k-z_glob.size()+1)*dz_glob.back();
+  else
+    return z_glob[k];
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetDx(int i) {
+  if(i<0)
+    return dx_glob[0];
+  else if(i>=dx_glob.size())
+    return dx_glob.back();
+  else
+    return dx_glob[i];
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetDy(int j) {
+  if(j<0)
+    return dy_glob[0];
+  else if(j>=dy_glob.size())
+    return dy_glob.back();
+  else
+    return dy_glob[j];
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetDz(int k) {
+  if(k<0)
+    return dz_glob[0];
+  else if(k>=dz_glob.size())
+    return dz_glob.back();
+  else
+    return dz_glob[k];
+}
+
+//------------------------------------------------------------------
+
 bool
 GlobalMeshInfo::IsPointInDomain(Vec3D &p, bool include_ghost_layer)
 {
@@ -152,7 +224,7 @@ GlobalMeshInfo::FindCellCoveringPoint(Vec3D &p, Int3 &ijk, bool include_ghost_la
 //------------------------------------------------------------------
 
 bool
-GlobalMeshInfo::FindElementCoveringPoint(Vec3D &p, Int3 &ijk0, bool include_ghost_layer)
+GlobalMeshInfo::FindElementCoveringPoint(Vec3D &p, Int3 &ijk0, Vec3D *xi, bool include_ghost_layer)
 {
   if(!IsPointInNodalMesh(p, include_ghost_layer))
     return false;
@@ -160,6 +232,15 @@ GlobalMeshInfo::FindElementCoveringPoint(Vec3D &p, Int3 &ijk0, bool include_ghos
   ijk0[0] = int(std::upper_bound(x_glob.begin(), x_glob.end(), p[0]) - x_glob.begin()) - 1;
   ijk0[1] = int(std::upper_bound(y_glob.begin(), y_glob.end(), p[1]) - y_glob.begin()) - 1;
   ijk0[2] = int(std::upper_bound(z_glob.begin(), z_glob.end(), p[2]) - z_glob.begin()) - 1;
+
+  if(xi) {
+    double s0 = GetX(ijk0[0]);
+    (*xi)[0] = (p[0] - s0)/(GetX(ijk0[0]+1) - s0);
+    s0 = GetY(ijk0[1]);
+    (*xi)[1] = (p[1] - s0)/(GetY(ijk0[1]+1) - s0);
+    s0 = GetZ(ijk0[2]);
+    (*xi)[2] = (p[2] - s0)/(GetZ(ijk0[2]+1) - s0);
+  }
 
   return true;
 }
