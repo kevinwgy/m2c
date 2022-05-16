@@ -1021,6 +1021,29 @@ struct SurfaceTrackerData {
 
 //------------------------------------------------------------------------------
 
+struct LagrangianMeshOutputData {
+
+  int frequency;
+  double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
+
+  const char* prefix; //!< path
+
+  const char* orig_config; //!< original mesh
+  const char* disp; //!< displacement
+  const char* sol; //!< solution
+
+  LagrangianMeshOutputData();
+  ~LagrangianMeshOutputData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------
+
 //NOTE Currently, Embedded surface must use triangle elements.
 struct EmbeddedSurfaceData {
 
@@ -1045,6 +1068,10 @@ struct EmbeddedSurfaceData {
   const char *dynamics_calculator;
 
   SurfaceTrackerData tracker;
+
+  //output displacement and nodal load
+  LagrangianMeshOutputData output;
+
 
   EmbeddedSurfaceData();
   ~EmbeddedSurfaceData() {}
@@ -1100,26 +1127,6 @@ struct ConcurrentProgramsData {
 
   ConcurrentProgramsData();
   ~ConcurrentProgramsData() {} 
-
-  void setup(const char *, ClassAssigner * = 0);
-
-};
-
-//------------------------------------------------------------------------------
-
-struct LagrangianMeshOutputData {
-
-  int frequency;
-  double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
-
-  const char* prefix; //!< path
-
-  const char* orig_config; //!< original mesh
-  const char* disp; //!< displacement
-  const char* sol; //!< solution
-
-  LagrangianMeshOutputData();
-  ~LagrangianMeshOutputData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 

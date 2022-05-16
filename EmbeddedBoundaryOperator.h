@@ -3,6 +3,7 @@
 
 #include<Intersector.h>
 #include<UserDefinedDynamics.h>
+#include<LagrangianOutput.h>
 #include<cassert>
 #include<map>
 #include<tuple>
@@ -34,6 +35,8 @@ class EmbeddedBoundaryOperator {
 
   vector<Intersector*> intersector; //!< one intersector for each embedded surface (initialized to NULL)
  
+  vector<LagrangianOutput> lagout; //!< output displacement and *nodal load* on embedded surfaces
+
   //! mapping from material ID (specified using "points") to <surface number, color>
   std::map<int, std::pair<int,int> > id2color;
 
@@ -91,6 +94,12 @@ public:
   void ApplyUserDefinedSurfaceDynamics(double t, double dt);
 
   void UpdateSurfacesPrevAndFPrev(bool partial_copy=true); //!< copy surfaces.nodes/elements to surfaces_prev; also copy F to F_prev
+
+  //! Output embedded surfaces to files (meshes)
+  void OutputSurfaces();
+
+  //! Output displacements and nodal forces on embedded surfaces
+  void OutputResults(double time, double dt, int time_step, bool force_write=false);
 
 private:
 

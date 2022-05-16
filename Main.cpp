@@ -301,6 +301,9 @@ int main(int argc, char* argv[])
   if(embed) {
     embed->ComputeForces(V, ID);
     embed->UpdateSurfacesPrevAndFPrev();
+
+    embed->OutputSurfaces(); //!< write the mesh(es) to file
+    embed->OutputResults(t, dt, time_step, true/*force_write*/); //!< write displacement and nodal loads to file
   }
 
   //! write initial condition to file
@@ -370,6 +373,8 @@ int main(int argc, char* argv[])
     if(embed) {
       embed->ComputeForces(V, ID);
       embed->UpdateSurfacesPrevAndFPrev();
+
+      embed->OutputResults(t, dts, time_step, false/*force_write*/); //!< write displacement and nodal loads to file
     }
 
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
@@ -397,6 +402,12 @@ int main(int argc, char* argv[])
 
   if(concurrent.Coupled())
     concurrent.FinalExchange();
+
+
+  // Final outputs
+
+  if(embed)
+    embed->OutputResults(t, dt, time_step, true/*force_write*/);
 
   out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, true/*force_write*/);
 

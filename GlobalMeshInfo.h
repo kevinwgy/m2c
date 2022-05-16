@@ -2,6 +2,7 @@
 #define _GLOBAL_MESH_INFO_H_
 
 #include<vector>
+#include<cassert>
 
 struct Int3;
 struct Vec3D;
@@ -34,7 +35,10 @@ public:
   GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_, std::vector<double> &z_glob_,
                  std::vector<double> &dx_glob_, std::vector<double> &dy_glob_, std::vector<double> &dz_glob_) {
     x_glob = x_glob_;   y_glob = y_glob_;   z_glob = z_glob_;
-    dx_glob = dx_glob_; dy_glob = dy_glob_; dz_glob = dz_glob_;}
+    dx_glob = dx_glob_; dy_glob = dy_glob_; dz_glob = dz_glob_;
+    assert(x_glob.size() == dx_glob.size());
+    assert(y_glob.size() == dy_glob.size());
+    assert(z_glob.size() == dz_glob.size());}
 
   ~GlobalMeshInfo() {}
 

@@ -96,6 +96,10 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // set NULL to intersector pointers
   intersector.resize(surfaces.size(), NULL);
 
+  // setup output
+  for(int i=0; i<surfaces.size(); i++)
+    lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
+
   // setup dynamics_calculator
   SetupUserDefinedDynamicsCalculator();
 }
@@ -104,6 +108,11 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 
 EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
 {
+
+  for(int i=0; i<intersector.size(); i++)
+    if(intersector[i])
+      delete intersector[i];
+
   for(auto it = dynamics_calculator.begin(); it != dynamics_calculator.end(); it++) {
     if(std::get<0>(*it)) {
       assert(std::get<2>(*it)); //this is the destruction function
@@ -584,7 +593,6 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
     vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
     vector<double>& As(surfaces[surf].elemArea);
     vector<int>&    status(inactive_elem_status[surf]);
-    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectorResultsOnSurface(surf);
 
     vector<double> gweight(np, 0.0);
     vector<Vec3D>  gbary(np, 0.0); //barycentric coords of Gauss points (symmetric) 
@@ -634,6 +642,8 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
       }
 
+      // Now, tg carries traction from both sides of the triangle
+
       // Integrate (See KW's notes for the formula)
       for(int p=0; p<np; p++) {
         tg[p] *= As[tid];
@@ -647,10 +657,10 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
     MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
 
   }
-
   
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
+
 }
 
 //------------------------------------------------------------------------------------------------
@@ -785,6 +795,24 @@ EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
 
 //------------------------------------------------------------------------------------------------
 
+void
+EmbeddedBoundaryOperator::OutputSurfaces()
+{
+  for(int i=0; i<lagout.size(); i++)
+    lagout[i].OutputTriangulatedMesh(surfaces[i].X0, surfaces[i].elems);
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::OutputResults(double time, double dt, int time_step, bool force_write)
+{
+  for(int i=0; i<lagout.size(); i++)
+    lagout[i].OutputResults(time, dt, time_step, surfaces[i].X0, surfaces[i].X, F[i], force_write);
+}
+
+//------------------------------------------------------------------------------------------------
+
 double
 EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
 {
@@ -812,7 +840,6 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
                                                    Vec5D*** v, double*** id)
 {
 
-  Vec3D traction(0.0);
   Int3 ijk0(INT_MAX);
   Vec3D xi;
   global_mesh_ptr->FindElementCoveringPoint(p, ijk0, &xi, true);
@@ -838,7 +865,7 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
 
         Vec3D x(global_mesh_ptr->GetX(i), global_mesh_ptr->GetY(j), global_mesh_ptr->GetZ(k));
         
-        double tmp[3]; //not used.
+        double tmp[3]; 
         double signed_distance = (side==0) ? GeoTools::ProjectPointToPlane(x, Xs[tnodes[0]], Xs[tnodes[1]],
                                                            Xs[tnodes[2]], tmp, &area, &normal)
                                            : GeoTools::ProjectPointToPlane(x, Xs[tnodes[1]], Xs[tnodes[0]],

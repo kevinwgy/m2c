@@ -2448,7 +2448,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 10, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByOtherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
@@ -2479,6 +2479,8 @@ Assigner *EmbeddedSurfaceData::getAssigner()
   
   new ClassStr<EmbeddedSurfaceData>(ca, "UserDefinedDynamicsCalculator", this, 
                                     &EmbeddedSurfaceData::dynamics_calculator);
+
+  output.setup("Output", ca); //there is another "Output", must provide "ca" to distinguish
 
   return ca;
 }
