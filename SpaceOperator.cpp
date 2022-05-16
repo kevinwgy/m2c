@@ -2098,12 +2098,15 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
     for(int j=j0; j<jmax; j++) {
       for(int i=i0; i<imax; i++) {
 
+        myid = id[k][j][i];
+
+        if(myid == INACTIVE_MATERIAL_ID)
+          continue;
+
         for(int p=0; p<5; p++) {
           Vmin[p] = min(Vmin[p], v[k][j][i][p]);
           Vmax[p] = max(Vmax[p], v[k][j][i][p]);
         } 
-
-        myid = id[k][j][i];
 
         c = varFcn[myid]->ComputeSoundSpeedSquare(v[k][j][i][0]/*rho*/, 
                             varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);

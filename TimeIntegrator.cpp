@@ -70,6 +70,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
                                           vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L,
                                           double time, double dt, int time_step, int subcycle, double dts)
 {
+  //I AM HERE!!!
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);

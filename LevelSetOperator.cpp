@@ -1286,7 +1286,7 @@ double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, dou
       break;
 
     case LevelSetSchemeData::ROE :
-      lam = abs(0.5*(um+up));
+      lam = fabs(0.5*(um+up));
       tol   = max(fabs(um), fabs(up))*iod_ls.delta;
       if(lam<tol) lam = (lam*lam + tol*tol)/(2*tol);
       flux = 0.5*(phim*um + phip*up) - 0.5*lam*(phip-phim);
