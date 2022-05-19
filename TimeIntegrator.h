@@ -42,7 +42,9 @@ public:
 
   // Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                  vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, double time,
+                                  vector<SpaceVariable3D*> &Phi,
+                                  std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                  SpaceVariable3D *L, double time,
                                   double dt, int time_step, int subcycle, double dts) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
@@ -52,7 +54,9 @@ public:
   // all the tasks that are done at the end of a time-step, independent of 
   // time integrator
   void UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                       vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
+                                       vector<SpaceVariable3D*> &Phi,
+                                       std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                       SpaceVariable3D *L,
                                        double time, int time_step, int subcycle, double dts);
                                         
 };
@@ -76,7 +80,9 @@ public:
   ~TimeIntegratorFE() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
+                          vector<SpaceVariable3D*>& Phi,
+                          std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                          SpaceVariable3D *L, double time,
                           double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
@@ -107,7 +113,9 @@ public:
   ~TimeIntegratorRK2() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
+                          vector<SpaceVariable3D*>& Phi,
+                          std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                          SpaceVariable3D *L, double time,
                           double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 
@@ -138,10 +146,12 @@ public:
   ~TimeIntegratorRK3() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L, double time,
+                          vector<SpaceVariable3D*>& Phi,
+                          std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                          SpaceVariable3D *L, double time,
                           double dt, int time_step, int subcycle, double dts);
 
-  void Destroy();
+  void Destroy(); 
 
 };
 

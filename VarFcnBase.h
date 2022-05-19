@@ -32,7 +32,7 @@ class VarFcnBase {
 
 public:
   
-  enum Type{ STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2} type;
+  enum Type{STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2, DUMMY = 3} type;
 
   double rhomin,pmin;
   double rhomax,pmax;
@@ -136,20 +136,20 @@ public:
   }
 
   //----- Transformation Operators -----//
-  inline void ConservativeToPrimitive(double *U, double *V); 
-  inline void PrimitiveToConservative(double *V, double *U);
+  virtual void ConservativeToPrimitive(double *U, double *V); 
+  virtual void PrimitiveToConservative(double *V, double *U);
 
   //----- General Functions -----//
   inline int GetType() const{ return type; }
 
-  inline double ComputeSoundSpeed(double rho, double e);
-  inline double ComputeSoundSpeedSquare(double rho, double e); //!< this one does not crash on negative c^2
-  inline double ComputeMachNumber(double *V);
-  inline double ComputeEnthalpyPerUnitMass(double rho, double p); //!< h = e + p/rho
-  inline double ComputeTotalEnthalpyPerUnitMass(double *V); //!< H = 1/rho*(E + p)
+  virtual double ComputeSoundSpeed(double rho, double e);
+  virtual double ComputeSoundSpeedSquare(double rho, double e); //!< this one does not crash on negative c^2
+  virtual double ComputeMachNumber(double *V);
+  virtual double ComputeEnthalpyPerUnitMass(double rho, double p); //!< h = e + p/rho
+  virtual double ComputeTotalEnthalpyPerUnitMass(double *V); //!< H = 1/rho*(E + p)
 
   // Clipping
-  inline bool ClipDensityAndPressure(double *V, double *U = 0);
+  virtual bool ClipDensityAndPressure(double *V, double *U = 0);
 };
 
 //------------------------------------------------------------------------------
@@ -187,7 +187,7 @@ void VarFcnBase::PrimitiveToConservative(double *V, double *U)
 
 //------------------------------------------------------------------------------
 
-inline 
+inline
 double VarFcnBase::ComputeSoundSpeed(double rho, double e)
 {
   double c2 = GetDpdrho(rho, e) + GetPressure(rho,e)/rho*GetBigGamma(rho, e);
@@ -201,7 +201,7 @@ double VarFcnBase::ComputeSoundSpeed(double rho, double e)
 
 //------------------------------------------------------------------------------
 
-inline 
+inline
 double VarFcnBase::ComputeSoundSpeedSquare(double rho, double e)
 {
   return GetDpdrho(rho, e) + GetPressure(rho,e)/rho*GetBigGamma(rho, e);
@@ -209,7 +209,7 @@ double VarFcnBase::ComputeSoundSpeedSquare(double rho, double e)
 
 //------------------------------------------------------------------------------
 
-inline 
+inline
 double VarFcnBase::ComputeMachNumber(double *V)
 {
   double e = GetInternalEnergyPerUnitMass(V[0],V[4]); 
@@ -235,7 +235,7 @@ double VarFcnBase::ComputeEnthalpyPerUnitMass(double rho, double p)
 
 //------------------------------------------------------------------------------
 
-inline 
+inline
 double VarFcnBase::ComputeTotalEnthalpyPerUnitMass(double *V) //!< H = 1/rho*(E + p)
 {
   double e = GetInternalEnergyPerUnitMass(V[0],V[4]); 

@@ -17,7 +17,7 @@ private:
 public:
   VarFcnDummy(StateVariable& sv) : VarFcnBase(sv), 
                                    p0(sv.pressure), rho0(sv.density), T0(sv.temperature),
-                                   e0(sv.internal_energy_per_mass) {}
+                                   e0(sv.internal_energy_per_mass) {type = DUMMY;}
   ~VarFcnDummy() {}
 
   //! ----- EOS-Specific Functions -----
@@ -31,6 +31,24 @@ public:
   inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {return e0;}
   inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return e0;}
   inline bool   CheckState(double rho, double p, bool silence = false) const {return false;}
+  inline bool   CheckState(double *V, bool silence = false) const {return false;}
+  inline bool   CheckPhaseTransition(int id/*id of the other phase*/) const {return false;}
+
+  //! Overwrite the calculations done in the base class
+  inline void   ConservativeToPrimitive(double *U, double *V) {
+    V[0] = rho0; V[1] = V[2] = V[3] = 0.0; V[4] = p0;}
+  inline void   PrimitiveToConservative(double *V, double *U) {
+    U[0] = rho0; U[1] = U[2] = U[3] = 0.0; U[4] = rho0*e0;}
+  inline double ComputeSoundSpeed(double rho, double e) {return DBL_MIN;}
+  inline double ComputeSoundSpeedSquare(double rho, double e) {return DBL_MIN;}
+  inline double ComputeMachNumber(double *V) {return 0.0;}
+  inline double ComputeEnthalpyPerUnitMass(double rho, double p) {return e0;}
+  inline double ComputeTotalEnthalpyPerUnitMass(double *V) {return e0;}
+  inline bool   ClipDensityAndPressure(double *V, double *U) {
+    V[0] = rho0; V[1] = V[2] = V[3] = 0.0; V[4] = p0;
+    U[0] = rho0; U[1] = U[2] = U[3] = 0.0; U[4] = rho0*e0;
+    return false;
+  }
 
 };
 

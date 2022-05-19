@@ -1083,7 +1083,7 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
   rec->ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz, &Active);
 
   // Reconstruction: Phi
-  rec->Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, &Active);
+  rec->Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, nullptr/*EBDS*/, &Active);
 
   V.RestoreDataPointerToLocalVector(); //no changes made
 }

@@ -26,7 +26,7 @@ StateVariable::StateVariable()
 {
 
   materialid  = 0;
-  density     = 0.0;
+  density     = 1.0e-6;
   velocity_x  = 0.0;
   velocity_y  = 0.0;
   velocity_z  = 0.0;
@@ -2441,6 +2441,8 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   thermal  = Adiabatic;
   heat_source = 0.0;
   dynamics_calculator = "";
+
+  conRec_depth = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -2448,7 +2450,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByOtherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
@@ -2479,6 +2481,9 @@ Assigner *EmbeddedSurfaceData::getAssigner()
   
   new ClassStr<EmbeddedSurfaceData>(ca, "UserDefinedDynamicsCalculator", this, 
                                     &EmbeddedSurfaceData::dynamics_calculator);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "ConstantReconstructionDepth", 
+                                       this, &EmbeddedSurfaceData::conRec_depth);
 
   output.setup("Output", ca); //there is another "Output", must provide "ca" to distinguish
 

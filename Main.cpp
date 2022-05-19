@@ -363,7 +363,9 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 
+      integrator->AdvanceOneTimeStep(V, ID, Phi,
+                                     embed ? embed->GetPointerToIntersectorResults() : nullptr,
+                                     L, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 

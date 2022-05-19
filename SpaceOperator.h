@@ -108,7 +108,8 @@ public:
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,
-                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL);
+                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}
@@ -142,7 +143,8 @@ private:
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL,
-                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL);
+                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                              vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
 
   Vec3D CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
                                         int myid, int neighborid, vector<int> *ls_mat_id,
@@ -153,7 +155,9 @@ private:
                                          Vec3D*** dxyz, double*** phi);
 
 
-  void TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &Tag0, double depth);
+  bool TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi, 
+                                  vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                  SpaceVariable3D &Tag0);
 
   // Utility
   inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {

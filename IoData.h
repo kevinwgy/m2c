@@ -1047,8 +1047,17 @@ struct LagrangianMeshOutputData {
 //NOTE Currently, Embedded surface must use triangle elements.
 struct EmbeddedSurfaceData {
 
-  enum YesNo {NO = 0, YES = 1};
-  YesNo surface_provided_by_other_solver;
+  //! general information
+  enum Type {None = 0, Wall = 1, Symmetry = 2, DirectState = 3, MassFlow = 4, PorousWall = 5,
+             Size = 6} type;
+  enum YesNo {NO = 0, YES = 1} surface_provided_by_other_solver;
+  const char *filename; //!< file for nodal coordinates and elements
+  enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
+  double heat_source;
+
+  //! tools
+  const char *dynamics_calculator;
+  SurfaceTrackerData tracker;
 
   //! force calculation (NONE: force is 0, i.e. one-way coupling)
   enum GaussQuadratureRule {NONE = 0, ONE_POINT = 1, THREE_POINT = 2, FOUR_POINT = 3,
@@ -1056,20 +1065,10 @@ struct EmbeddedSurfaceData {
   double gauss_points_lofting; //!< non-dimensional, relative to local element size
   double internal_pressure; //!< pressure applied on the inactive side (i.e. inside solid body)
 
-  const char *filename; //!< file for nodal coordinates and elements
-  
-  enum Type {None = 0, Wall = 1, Symmetry = 2, DirectState = 3, MassFlow = 4, PorousWall = 5,
-             Size = 6} type;
-             
-  enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
+  //! flux calculation
+  double conRec_depth; //!< depth (dimensional) where constant reconstruction is applied (default: 0)
 
-  double heat_source;
-
-  const char *dynamics_calculator;
-
-  SurfaceTrackerData tracker;
-
-  //output displacement and nodal load
+  //! output displacement and nodal load
   LagrangianMeshOutputData output;
 
 

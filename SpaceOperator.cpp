@@ -1262,7 +1262,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       print("- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
             it->second->x, it->second->y, it->second->z, it->second->initialConditions.materialid);
 
-      id2closure = ApplyPointBasedInitialCondition(*it->second, *(EBDS.get()), color, v, id);
+      id2closure = ApplyPointBasedInitialCondition(*it->second, *EBDS, color, v, id);
     }
 
     // Verification (can be deleted): occluded nodes should have inactive_material_id
@@ -2171,7 +2171,8 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                           vector<SpaceVariable3D*> *Phi)
+                                           vector<SpaceVariable3D*> *Phi,
+                                           vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
   //------------------------------------
   // Preparation: Delete previous riemann_solutions
@@ -2182,11 +2183,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Reconstruction w/ slope limiters.
   //------------------------------------
-  if(Phi && Phi->size()>0 && iod.multiphase.conRec_depth>0) {
-    TagNodesOutsideConRecDepth(*Phi, Tag, iod.multiphase.conRec_depth);
-    rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID, &Tag, false); //false: apply const rec within depth
-  } else
-    rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID); 
+  if(TagNodesOutsideConRecDepth(Phi, EBDS, Tag))
+    rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID, EBDS, &Tag, false); //false: apply const rec within depth
+  else
+    rec.Reconstruct(V, Vl, Vr, Vb, Vt, Vk, Vf, &ID, EBDS, NULL); 
 
   //------------------------------------
   // Check reconstructed states (clip & check)
@@ -2526,41 +2526,107 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
 //-----------------------------------------------------
 
-void
-SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &Tag0, double depth)
+bool
+SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
+                                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                          SpaceVariable3D &Tag0)
 {
 
-  assert(depth>0);
+  // Check whether the user has specified "conRec" depth(s)
+  bool phi_tag   = (Phi && Phi->size()>0 && iod.multiphase.conRec_depth>0);
+  bool embed_tag = false;
+  for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
+           it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+    if(it->second->conRec_depth>0) {
+      if(!EBDS || EBDS->size()<=it->first || (*EBDS)[it->first]->Phi_nLayer<1) {
+        print_error("*** Error: Cannot impose constant reconstruction for cells near Embedded Surface %d.\n",
+                    it->first);
+        exit_mpi();
+      }
+      embed_tag = true;
+      break;
+    }
+  }
 
-  int ls_size = Phi.size();
-  assert(ls_size>0);
-
-  vector<double***> phi(ls_size, NULL);
-  for(int ls=0; ls<ls_size; ls++)
-    phi[ls] = Phi[ls]->GetDataPointer(); 
+  if(!(phi_tag || embed_tag))
+    return false;
 
   double*** tag = Tag0.GetDataPointer();
 
-  // loop through subdomain interior
+
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-
+      for(int i=i0; i<imax; i++)
         tag[k][j][i] = 1;
 
-        for(int ls=0; ls<ls_size; ls++) {
-          if(fabs(phi[ls][k][j][i])<depth) {
-            tag[k][j][i] = 0;
-            break;
+
+  // Tag cells specified based on level set(s) 
+  if(phi_tag) {
+
+    double depth = iod.multiphase.conRec_depth;  
+
+    int ls_size = Phi->size();
+
+    vector<double***> phi(ls_size, NULL);
+    for(int ls=0; ls<ls_size; ls++)
+      phi[ls] = (*Phi)[ls]->GetDataPointer(); 
+
+    // loop through subdomain interior
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          for(int ls=0; ls<ls_size; ls++) {
+            if(fabs(phi[ls][k][j][i])<depth) {
+              tag[k][j][i] = 0;
+              break;
+            }
           }
         }
-      }
 
-  for(int ls=0; ls<ls_size; ls++)
-    Phi[ls]->RestoreDataPointerToLocalVector();
+    for(int ls=0; ls<ls_size; ls++)
+      (*Phi)[ls]->RestoreDataPointerToLocalVector();
+  }
+
+
+  // Tag cells specified based on embedded surface(s)
+  if(embed_tag) {
+
+    vector<double***> phi;
+    vector<double> depth;
+    for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
+             it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+      if(it->second->conRec_depth<=0)
+        continue;
+      phi.push_back((*EBDS)[it->first]->Phi_ptr->GetDataPointer());
+      depth.push_back(it->second->conRec_depth);
+    }
+
+    // loop through subdomain interior
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          if(tag[k][j][i] == 0)
+            continue;
+          for(int ls=0; ls<phi.size(); ls++) {
+            if(fabs(phi[ls][k][j][i])<depth[ls]) {
+              tag[k][j][i] = 0;
+              break;
+            }
+          }
+        }
+
+    for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
+             it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+      if(it->second->conRec_depth<=0)
+        continue;
+      (*EBDS)[it->first]->Phi_ptr->RestoreDataPointerToLocalVector();
+    }
+  } 
+
 
   Tag0.RestoreDataPointerToLocalVector(); //modified, but no need to communicate (Reconstructor only checks
                                           //this tag within subdomain interior.)
+  return true;
 }
 
 //-----------------------------------------------------
@@ -2923,7 +2989,9 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
-                                    RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *Phi)
+                                    RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
+                                    vector<SpaceVariable3D*> *Phi,
+                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
 
 #ifdef LEVELSET_TEST
@@ -2933,7 +3001,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
-  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi);
+  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, EBDS);
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, R);

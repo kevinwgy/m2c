@@ -1,6 +1,9 @@
 #include<TimeIntegrator.h>
+#include<EmbeddedBoundaryDataSet.h>
+#include<memory> //unique_ptr
 using std::cout;
 using std::endl;
+using std::unique_ptr;
 
 //----------------------------------------------------------------------------
 // BASE
@@ -66,11 +69,13 @@ void TimeIntegratorFE::Destroy()
 
 //----------------------------------------------------------------------------
 
-void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                          vector<SpaceVariable3D*>& Phi, SpaceVariable3D *L,
-                                          double time, double dt, int time_step, int subcycle, double dts)
+void
+TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                                     vector<SpaceVariable3D*>& Phi,
+                                     unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                     SpaceVariable3D *L,
+                                     double time, double dt, int time_step, int subcycle, double dts)
 {
-  //I AM HERE!!!
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
@@ -79,9 +84,9 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi); // compute Rn
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get()); // compute Rn
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL); // compute Rn
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL, EBDS.get()); // compute Rn
 
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
@@ -103,7 +108,7 @@ void TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   // -------------------------------------------------------------------------------
   // End-of-step tasks
   // -------------------------------------------------------------------------------
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, time_step, subcycle, dts);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -144,9 +149,12 @@ void TimeIntegratorRK2::Destroy()
 
 //----------------------------------------------------------------------------
 
-void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                            vector<SpaceVariable3D*>& Phi, SpaceVariable3D* L, double time, double dt, 
-                            int time_step, int subcycle, double dts)
+void
+TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                                      vector<SpaceVariable3D*>& Phi,
+                                      unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                      SpaceVariable3D* L, double time, double dt, 
+                                      int time_step, int subcycle, double dts)
 {
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
@@ -156,9 +164,9 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get()); // compute R(V(n))
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get()); // compute R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -191,9 +199,9 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi); // compute R(V1) using prev. Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get());//compute R(V1) using prev.Phi, "loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL); // compute R(V1)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V1)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -219,7 +227,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //***************************************************
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, time_step, subcycle, dts);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -260,10 +268,12 @@ void TimeIntegratorRK3::Destroy()
 
 //----------------------------------------------------------------------------
 
-void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                           vector<SpaceVariable3D*>& Phi, 
-                                           SpaceVariable3D* L, double time, 
-                                           double dt, int time_step, int subcycle, double dts)
+void
+TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                                      vector<SpaceVariable3D*>& Phi, 
+                                      unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                      SpaceVariable3D* L, double time, double dt,
+                                      int time_step, int subcycle, double dts)
 { 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
@@ -272,9 +282,9 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get()); // compute R(V(n))
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get()); // compute R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -307,9 +317,9 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi); // compute R(V1) using prev. Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get()); //compute R(V1) using prev.Phi, "loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL); // compute R(V1)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V1)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -344,9 +354,9 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi); // compute R(V1) using prev. Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get()); //compute R(V1) using prev.Phi,"loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL); // compute R(V2)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V2)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -373,14 +383,16 @@ void TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
 
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, L, time, time_step, subcycle, dts);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
 
 void
 TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                                    vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
+                                                    vector<SpaceVariable3D*> &Phi,
+                                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                                    SpaceVariable3D *L,
                                                     double time, int time_step, int subcycle, double dts)
 {
 
