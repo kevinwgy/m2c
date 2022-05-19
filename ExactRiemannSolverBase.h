@@ -12,6 +12,7 @@ class ExactRiemannSolverBase {
 
 protected:
   vector<VarFcnBase*>& vf; 
+  ExactRiemannSolverData& iod_riemann;  
 
   int maxIts_main, maxIts_bracket, maxIts_shock;
   int numSteps_rarefaction;
@@ -24,7 +25,7 @@ protected:
   double dp_avg;
 
 public:
-  ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann);
+  ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_);
   virtual ~ExactRiemannSolverBase() {}
 
   virtual int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
@@ -108,6 +109,34 @@ protected: //internal functions
            bool trans_rare, double Vrare_x0[3], /*inputs*/
            double *Vs, int &id, double *Vsm, double *Vsp /*outputs*/);
 
+};
+
+class ExactRiemannSolverNonAdaptive: public ExactRiemannSolverBase {
+
+public:
+  ExactRiemannSolverNonAdaptive(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_) : ExactRiemannSolverBase(vf_, iod_riemann_) {};
+
+  int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
+                                     double *Vp, int idp /*"right" state*/, 
+                                     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
+                                     double *Vsm /*left 'star' solution*/,
+                                     double *Vsp /*right 'star' solution*/);
+
+protected:
+  bool ComputeRhoUStar(int wavenumber /*1 or 3*/,
+                   size_t& It_wave /* for acceleration, count how many times this function has been invoked for either 1-wave or 3-wave */,
+		   std::vector<std::vector<double>>& integrationPath /*3 by n, first index: 1-pressure, 2-density, 3-velocity*/,
+                   double rho, double u, double p, double ps, int id/*inputs*/,
+                   double rhos0, double rhos1/*initial guesses for Hugo. eq.*/,
+                   double &rhos, double &us/*outputs*/,
+                   bool *trans_rare = NULL, double *Vrare_x0 = NULL/*filled only if found tran rf*/);
+
+  bool Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
+                            double rho_0, double u_0, double p_0 /*start state*/, 
+                            double dp /*step size*/,
+                            double &rho, double &u, double &p, double &xi /*output*/);
+
+ 
 };
 
 #endif

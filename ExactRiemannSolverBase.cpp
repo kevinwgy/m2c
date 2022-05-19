@@ -36,7 +36,7 @@ extern int verbose;
 //-----------------------------------------------------
 
 ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, 
-                            ExactRiemannSolverData &iod_riemann) : vf(vf_)
+                            ExactRiemannSolverData &iod_riemann_) : vf(vf_), iod_riemann(iod_riemann_)
 {
   maxIts_main          = iod_riemann.maxIts_main;
   maxIts_bracket       = iod_riemann.maxIts_bracket;
@@ -178,14 +178,21 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
         for(int i=0; i<5; i++)
           Vs[i] = Vp[i];
       }
-      return 1;
+
+      ExactRiemannSolverNonAdaptive riemannNonAdaptive(vf, iod_riemann); 
+      int retryRiemann = riemannNonAdaptive.ComputeRiemannSolution(dir, Vm, idl, Vp, idr, Vs, id, Vsm, Vsp);
+      cout << "*Warning: Riemann solver failed to find an initial bracketing interval. Retried with non-adaptive version!" << endl; 
+      return retryRiemann;
     }
 
     FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol2, rhor2, 0.5*(ul2+ur2), p1,
                      trans_rare, Vrare_x0, /*inputs*/
                      Vs, id, Vsm, Vsp /*outputs*/);
 
-    return 1;
+    ExactRiemannSolverNonAdaptive riemannNonAdaptive(vf, iod_riemann); 
+    int retryRiemann = riemannNonAdaptive.ComputeRiemannSolution(dir, Vm, idl, Vp, idr, Vs, id, Vsm, Vsp);
+    cout << "*Warning: Riemann solver failed to find an initial bracketing interval. Retried with non-adaptive version!" << endl;
+    return retryRiemann;
   }
 
   f0 = ul0 - ur0;
@@ -323,7 +330,11 @@ try_again:
            << "),  Vp = [" << Vp[0] << ", " << Vp[1] << ", " << Vp[2] << ", " << Vp[3] << ", " << Vp[4] << "] (" << idr
            << ")" << endl;
     }
-    return 1;  //failed
+   
+    ExactRiemannSolverNonAdaptive riemannNonAdaptive(vf, iod_riemann);
+    int retryRiemann = riemannNonAdaptive.ComputeRiemannSolution(dir, Vm, idl, Vp, idr, Vs, id, Vsm, Vsp);
+    cout << "*Warning: Exact Riemann solver failed to converge. retried with non-adaptive version!" << endl;
+    return retryRiemann;
   }
 
 #if PRINT_RIEMANN_SOLUTION == 1
@@ -1629,6 +1640,843 @@ ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, in
   fclose(file);
 
 
+}
+
+/** Solves the one-dimensional Riemann problem. Extension of Kamm 2015 
+ * to Two Materials. See KW's notes for details
+ * Returns an integer error code
+ * 0: no errors
+ * 1: riemann solver failed to find a bracketing interval
+ */
+int
+ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir, 
+                            double *Vm, int idl /*"left" state*/, 
+                            double *Vp, int idr /*"right" state*/, 
+                            double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
+                            double *Vsm /*left 'star' solution*/,
+                            double *Vsp /*right 'star' solution*/)
+{
+  size_t It_1wave = 0;
+  size_t It_3wave = 0;  
+
+  // Convert to a 1D problem (i.e. One-Dimensional Riemann)
+  double rhol  = Vm[0];
+  double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
+  double pl    = Vm[4];
+  double rhor  = Vp[0];
+  double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
+  double pr    = Vp[4];
+  //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
+  
+  integrationPath1.clear();
+  integrationPath3.clear();
+  std::vector<double> vectL{pl, rhol, ul};
+  std::vector<double> vectR{pr, rhor, ur};
+  integrationPath1.push_back(vectL);
+  integrationPath3.push_back(vectR); 
+ 
+#if PRINT_RIEMANN_SOLUTION == 1
+    std::cout << "Left State (rho, u, p): " << rhol << ", " << ul << ", " << pl << "." << std::endl;
+    std::cout << "Right State (rho, u, p): " << rhor << ", " << ur << ", " << pr << "." << std::endl;
+#endif
+  
+  double el = vf[idl]->GetInternalEnergyPerUnitMass(rhol, pl);
+  double cl = vf[idl]->ComputeSoundSpeedSquare(rhol, el);
+
+  if(rhol<=0 || cl<0) {
+    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l)." 
+            " rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
+            rhol, ul, pl, el, cl, idl);
+    exit(-1);
+  } else
+    cl = sqrt(cl);
+
+  double er = vf[idr]->GetInternalEnergyPerUnitMass(rhor, pr);
+  double cr = vf[idr]->ComputeSoundSpeedSquare(rhor, er);
+
+  if(rhor<=0 || cr<0) {
+    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(r)."
+            " rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
+            rhor, ur, pr, er, cr, idr);
+    exit(-1);
+  } else
+    cr = sqrt(cr);
+
+
+  // Declare variables in the "star region"
+  double p0(DBL_MIN), ul0(0.0), ur0(0.0), rhol0(DBL_MIN), rhor0(DBL_MIN);
+  double p1(DBL_MIN), ul1(0.0), ur1(0.0), rhol1(DBL_MIN), rhor1(DBL_MIN); //Secand Method ("k-1","k" in Kamm, (19))
+  double p2(DBL_MIN), ul2(0.0), ur2(0.0), rhol2(DBL_MIN), rhor2(DBL_MIN); // "k+1"
+  double f0(0.0), f1(0.0), f2(0.0); //difference between ul and ur
+
+
+  // -------------------------------
+  // Now, Solve The Riemann Problem
+  // -------------------------------
+  bool success = true;
+
+  // monitor if the solution involves a transonic rarefaction. This is special as the solution 
+  // at xi = x = 0 is within the rarefaction fan.
+  bool trans_rare = false;
+  double Vrare_x0[3]; //rho, u, and p at x = 0, in the case of a transonic rarefaction
+
+
+  // A Trivial Case
+  if(ul == ur && pl == pr) {
+    FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol, rhor, ul, pl, 
+                   trans_rare, Vrare_x0, //inputs
+                   Vs, id, Vsm, Vsp/*outputs*/);
+    return 0;
+  }
+
+  // -------------------------------
+  // Step 1: Initialization
+  //         (find initial interval [p0, p1])
+  // -------------------------------
+  success = FindInitialInterval(It_1wave, It_3wave, 
+                                rhol, ul, pl, el, cl, idl, rhor, ur, pr, er, cr, idr, /*inputs*/
+                                p0, rhol0, rhor0, ul0, ur0,
+                                p1, rhol1, rhor1, ul1, ur1/*outputs*/);
+  /* our convention is that p0 < p1 */
+
+  if(!success) { //failed to find a bracketing interval. Output the state corresponding smallest "f"
+
+    // get sol1d, trans_rare and Vrare_x0
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.clear();
+#endif
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p1, idl, rhol0, rhol0*1.1, rhol2, ul2,
+                  &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+    success = success && ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr, p1, idr, rhor0, rhol0*1.1, rhor2, ur2,
+                    &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+
+    if(!success) {
+      cout << "Warning: Riemann solver failed to find an initial bracketing interval (Returning initial states as solution)." << endl;
+      for(int i=0; i<5; i++) {
+        Vsm[i] = Vm[i];
+        Vsp[i] = Vp[i];
+      }
+      double u_avg = 0.5*(ul+ur);
+      if(u_avg >= 0) {
+        id = idl;
+        for(int i=0; i<5; i++)
+          Vs[i] = Vm[i];
+      } else {
+        id = idr;
+        for(int i=0; i<5; i++)
+          Vs[i] = Vp[i];
+      }
+
+      return 1;
+    }
+
+    FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol2, rhor2, 0.5*(ul2+ur2), p1,
+                     trans_rare, Vrare_x0, /*inputs*/
+                     Vs, id, Vsm, Vsp /*outputs*/);
+
+    return 1;
+  }
+
+  f0 = ul0 - ur0;
+  f1 = ul1 - ur1;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    cout << "Found initial interval: p0 = " << p0 << ", f0 = " << f0 << ", p1 = " << p1 << ", f1 = " << f1 << endl;
+#endif
+                                          
+  // -------------------------------
+  // Step 2: Main Loop (Secant Method, Safeguarded) 
+  // -------------------------------
+  double denom = 0; 
+
+  int iter = 0;
+  double err_p = 1.0, err_u = 1.0;
+
+  //p2 (and f2) is always the latest one
+  p2 = p1; 
+  f2 = f1;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+  sol1d.clear();
+#endif
+
+  for(iter=0; iter<maxIts_main; iter++) {
+
+    // 2.1: Update p using the Brent method (safeguarded secant method)
+    denom = f1 - f0;
+    if(denom == 0) {
+      cout << "Warning: Division-by-zero while using the secant method to solve the Riemann problem." << endl;
+      cout << "         left state: " << rhol << ", " << ul << ", " << pl << ", " << idl << " | right: " 
+           << rhor << ", " << ur << ", " << pr << ", " << idr << endl;
+      cout << "         dir = " << dir[0] << "," << dir[1] << "," << dir[2]
+           << ", f0 = " << f0 << ", f1 = " << f1 << endl;
+      p2 = 0.5*(p0+p1);
+    } else {
+      p2 = p2 - f2*(p1-p0)/denom;  // update p2
+      if(p2<=p0 || p2>=p1) //discard and switch to bisection
+        p2 = 0.5*(p0+p1);
+    }
+
+    //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
+
+
+try_again:
+
+    // 2.2: Calculate ul2, ur2 
+    success = ComputeRhoUStar(1, It_1wave, integrationPath1, rhol, ul, pl, p2, idl/*inputs*/, 
+                  rhol0, rhol1/*initial guesses for Hugo. eq.*/,
+                  rhol2, ul2/*outputs*/, 
+                  &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+
+    if(!success) {
+      //fprintf(stderr,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //        rhol, ul, pl, idl, rhor, ur, pr, idr);
+      p2 = 0.5*(p2+p0); //move closer to p0
+
+      iter++;
+      if(iter<maxIts_main)
+        goto try_again;
+      else
+        break;
+    }
+
+    success = ComputeRhoUStar(3, It_3wave, integrationPath3, rhor, ur, pr,  p2, idr/*inputs*/, 
+                    rhor0, rhor1/*initial guesses for Hugo. erq.*/,
+                    rhor2, ur2/*outputs*/,
+                    &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+
+    if(!success) {
+      //fprintf(stderr,"*** Error: Exact Riemann solver failed (2). left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //        rhol, ul, pl, idl, rhor, ur, pr, idr);
+      p2 = 0.5*(p2+p1); //move closer to p1
+
+      iter++;
+      if(iter<maxIts_main)
+        goto try_again;
+      else
+        break;
+    }
+
+    f2 = ul2 - ur2;
+    
+ 
+    // 2.3: Update for the next iteration
+    if(f0*f2<0.0) {
+      p1 = p2;
+      f1 = f2;
+      rhol1 = rhol2;
+      rhor1 = rhor2;
+    } else {
+      p0 = p2;
+      f0 = f2;
+      rhol0 = rhol2;
+      rhor0 = rhor2;
+    }
+
+
+    // 2.4: Check stopping criterion
+    err_p = fabs(p1 - p0)/std::max(fabs(pl + 0.5*rhol*ul*ul), fabs(pr + 0.5*rhor*ur*ur));
+    err_u = fabs(f2)/std::max(cl, cr);
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    cout << "Iter " << iter << ": p-interval = [" << p0 << ", " << p1 << "], p2 = " << p2 << ", err_p = " << err_p 
+         << ", err_u = " << err_u << "." << endl;
+#endif
+
+    if( (err_p < tol_main && err_u < tol_main) || (err_p < tol_main*1e-3) || (err_u < tol_main*1e-3) )
+      break; // converged
+
+    trans_rare = false; //reset
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.clear();
+#endif
+
+  }
+
+
+  // -------------------------------
+  // Step 3: Find state at xi = x = 0 (for output)
+  // -------------------------------
+  double u2 = 0.5*(ul2 + ur2);
+  FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol2, rhor2, u2, p2, 
+                   trans_rare, Vrare_x0, //inputs
+                   Vs, id, Vsm, Vsp/*outputs*/);
+
+
+  if(iter == maxIts_main) {
+    if(verbose>=1) {
+      cout << "Warning: Exact Riemann solver failed to converge. err_p = " << err_p
+           << ", err_u = " << err_u << "." << endl;
+      cout << "    Vm = [" << Vm[0] << ", " << Vm[1] << ", " << Vm[2] << ", " << Vm[3] << ", " << Vm[4] << "] (" << idl
+           << "),  Vp = [" << Vp[0] << ", " << Vp[1] << ", " << Vp[2] << ", " << Vp[3] << ", " << Vp[4] << "] (" << idr
+           << ")" << endl;
+    }
+   
+    return 1;
+  }
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    std::cout << "Star State: (rhols, rhors, us, ps): " << rhol2 << ", " << rhor2 << ", " << u2 << ", " << p2 << "." << std::endl;
+#endif
+  
+
+  //success!
+  return 0;
+
+}
+
+
+
+
+//! non-adptive version, Connect the left/right initial state with the left/right star state (the 1-wave or 3-wave)
+bool  //true: success  | false: failure
+ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
+                                        size_t& It_wave, /* for acceleration, count how many times this function has been invoked for either 1-wave or 3-wave */
+                                        std::vector<std::vector<double>>& integrationPath /*3 by n, first index: 1-pressure, 2-density, 3-velocity*/,
+                                        double rho, double u, double p, double ps, int id/*inputs*/,
+                                        double rhos0, double rhos1/*initial guesses for Hugo. eq.*/,
+                                        double &rhos, double &us/*outputs*/, 
+                                        bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
+{
+  // default
+  rhos = rho;
+  us   = u;
+    
+  if(p > ps) {//rarefaction --- numerical integration
+
+    // prepare for numerical integration
+    double rhos_0 = rho, us_0 = u, ps_0 = p, xi_0; //start point of each step
+    double rhos_1 = rho, us_1 = u, ps_1 = p, xi_1; //end point of each step
+    double dp_target = (p-ps)/numSteps_rarefaction;
+
+    double e = vf[id]->GetInternalEnergyPerUnitMass(rho,p);
+    double dpdrho = vf[id]->GetDpdrho(rho,e);
+    double drho_op1 = (p-ps)/dpdrho/numSteps_rarefaction; //use EOS
+    double drho_op2 = rho/(2.5*numSteps_rarefaction); //initial step size
+    
+    double drho_target = std::min(drho_op1, drho_op2);
+    double dp = std::min(dp_target, drho_target*dpdrho);
+
+    double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
+    if(rho<=0 || c<0) {
+      fprintf(stderr,"Warning: Negative density or c^2 (square of sound speed) in ComputeRhoUStar." 
+                     "rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
+                     rho, p, e, c, id);
+      return false; //failure
+    } else
+      c = sqrt(c);
+
+#if PRINT_RIEMANN_SOLUTION == 1    
+      std::cout << wavenumber << "-wave: It# " << It_wave << std::endl;
+#endif
+
+/*    for (size_t j = 0; j < integrationPath1[0].size(); j++) {
+      std::cout << integrationPath1[0][j] << ", " << integrationPath1[1][j] << ", " << integrationPath1[2][j] << std::endl;
+    }
+*/
+
+    int index0 = 0;
+    if (integrationPath.size() > 1) {
+	    for (int j = integrationPath.size()-1; j >= 0; j--) {
+		    if (integrationPath[j][0] > ps) {
+			    index0 = j;
+			    break;
+		    }
+	    }
+	    ps_0 = integrationPath[index0][0];
+	    rhos_0 = integrationPath[index0][1];
+	    us_0 = integrationPath[index0][2];
+	    //dp = std::min(10*dp, ps_0 - ps);
+	    dp = std::min( (p-ps)/numSteps_rarefaction, ps_0 - ps );
+    }
+    double pStart_new = ps_0;
+    double dpStart = dp;
+ 
+    double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
+    xi_0 = xi;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    sol1d.push_back(vector<double>{xi, rho, u, p, (double)id});
+#endif
+
+    //fprintf(stderr,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
+    // integration by Runge-Kutta 4
+    bool done = false;
+    int moreSteps = 5;
+   // int continueTimes = 0;
+   // int continueTolerance = moreSteps*numSteps_rarefaction;
+ 
+    for(int i=0; i<numSteps_rarefaction*moreSteps; i++) {
+ 
+/*
+      if (wavenumber == 1) {
+        testFile1 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
+      } 
+      else {
+        testFile3 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
+      }      
+*/
+     bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
+                             rhos_0, us_0, ps_0 /*start state*/, dp /*step size*/,
+                             rhos_1, us_1, ps_1, xi_1 /*output: end state*/);
+                             
+//      fprintf(stderr,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
+//              rhos_0, us_0, ps_0, drho, rhos_1, us_1, ps_1, ps, success);
+      if(!success) {
+        dp = dp/2.0;
+      // continueTimes = continueTimes + 1;
+        if (dp == 0.0) {
+//          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
+//                       continueTimes, id, p, ps, pStart_new, dpStart, dp, ps_1, c, rho, integrationPath.size());
+          break;
+        }
+        continue;
+      }
+
+      if (ps_1-ps < -1.e-14) {
+        dp = ps_0 - ps;
+        continue;
+      }
+
+#if PRINT_RIEMANN_SOLUTION == 1
+      sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1, (double)id});
+#endif
+
+      if(trans_rare && Vrare_x0 && xi_0*xi_1<=0) {//transonic rarefaction, crossing x = xi = 0
+        *trans_rare = true;
+        double w0 = fabs(xi_1), w1 = fabs(xi_0);
+        double ww = w0 + w1;
+        w0 /= ww;
+        w1 /= ww;
+        Vrare_x0[0] = w0*rhos_0 + w1*rhos_1;
+        Vrare_x0[1] = w0*us_0   + w1*us_1;
+        Vrare_x0[2] = w0*ps_0   + w1*ps_1;
+
+#if PRINT_RIEMANN_SOLUTION == 1
+        sol1d.push_back(vector<double>{0.0, Vrare_x0[0], Vrare_x0[1], Vrare_x0[2], (double)id});
+#endif
+
+      }
+
+      //fprintf(stderr,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
+      if (It_wave == 1) { NSTP_2ND_IT = std::max(i, NSTP_2ND_IT);} 
+      if (It_wave == 2) { NSTP_3RD_IT = std::max(i, NSTP_3RD_IT);} 
+ 
+      // Check if we have reached the final pressure ps
+      if(fabs(ps_1 - ps) <= 1.e-14) {
+        rhos = rhos_1;
+        us   = us_1;
+      
+        if(vf[id]->CheckState(rhos,ps,true)) { //true: silence
+#if PRINT_RIEMANN_SOLUTION == 1
+          cout << "Rarefaction solver reached a nonphysical state!" << endl;         
+#endif
+          return false;
+        }
+
+#if PRINT_RIEMANN_SOLUTION == 1
+        cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
+        cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
+#endif
+//        if (It_wave > 0 && i > 1) {
+//          std::cout << "It# " << It_wave << ": " << i << " steps." << std::endl;
+//          exit(1);
+//        }
+        done = true;
+
+	if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
+		std::vector<double> currentVect = {ps_1, rhos_1, us_1};
+		integrationPath.push_back(currentVect);
+	}  
+	It_wave = It_wave + 1;
+        
+/*         
+        if (wavenumber == 1) {
+	  testFile1 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
+          testFile1.close();
+        }
+        else {
+          testFile3 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
+          testFile3.close();
+        }
+*/
+#if PRINT_RIEMANN_SOLUTION == 1
+        std::cout << "RKstep " << i << ": dp = " << dp << ", ps_0 - ps = " << ps_0 - ps << ", uErr = " << uErr << "." << std::endl;
+#endif
+        CURRENT_STEP_NUMBER = std::max(i, CURRENT_STEP_NUMBER);
+        MAX_STEP_NUMBER = std::max(i, MAX_STEP_NUMBER);
+        //std::cout << "MAX_STEP_NUMBER = " << MAX_STEP_NUMBER << std::endl;
+        break; //done!
+      }
+
+      // If the solver gets here, it means it hasn't reached the final pressure ps.
+      // Adjust step size, then update state
+      //
+//      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
+     //double tiny = 1.e-14;
+    
+#if PRINT_RIEMANN_SOLUTION == 1
+      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErr = " << uErr << ", uErrScaled = " << uErrScaled << "." << std::endl;
+      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", rhoErr = " << rhoErr << ", rhoErrScaled = " << rhoErrScaled << std::endl;
+#endif
+      dp = std::min( std::min(dp_target, ps_1-ps), //don't go beyond ps
+                     4.0*dp ); //don't increase too much in one step
+
+//      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps
+//                       dp*4.0 ); //don't increase too much in one step
+      rhos_0 = rhos_1;
+      us_0   = us_1;
+      ps_0   = ps_1;
+      xi_0   = xi_1;
+      if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
+	      std::vector<double> currentVect = {ps_1, rhos_1, us_1};
+	      integrationPath.push_back(currentVect);
+      }
+    }
+
+    if(!done) {
+      if(vf[id]->CheckState(rhos_1,ps_1,true)) {
+#if PRINT_RIEMANN_SOLUTION == 1
+        cout << "  " << wavenumber << "-wave: rarefaction, solver failed (unphysical state: rhos = "
+             << rhos_1 << ", ps = " << ps_1 << "!)" << endl;
+#endif
+        return false; //failed
+      } else {
+#if PRINT_RIEMANN_SOLUTION == 1
+        cout << "  " << wavenumber << "-wave: rarefaction, solver did not converge (final sol.: rhos_1 = "
+             << rhos_1 << ", ps_1 = " << ps_1 << "; inputs: rho = " << rho << ", p = " << p << ", ps = " << ps << ")" << endl;
+#endif
+        return false; 
+      }
+    }
+  }
+
+  else {// shock (p<=ps, rho<=rhos)
+
+    HugoniotEquation hugo(vf[id],rho,p,ps);
+
+    //find a bracketing interval
+    double f0, f1;
+    double drho = std::max(fabs(rhos0 - rhos1), 0.001*rhos0); 
+    bool found_rhos0 = false, found_rhos1 = false;
+    if(std::min(rhos0,rhos1)>=rho) {//both rhos0 and rhos1 are physically admissible
+      f0 = hugo(rhos0);
+      f1 = hugo(rhos1);
+      if(f0*f1<=0) {
+        /*found bracketing interval [rhos0, rhos1]*/
+        if(rhos0>rhos1) {
+          std::swap(rhos0,rhos1);
+          std::swap(f0,f1);
+        }
+        found_rhos0 = found_rhos1 = true;
+      } else {
+        rhos0 = rhos1; //this is our starting point (presumably rhos1 is closer to sol'n)
+        f0    = f1; 
+      }
+    } else { //at least, the smaller one among rhos0, rhos1 is non-physical
+      if(rhos1>rhos0) {
+        rhos0 = rhos1; 
+        f0    = hugo(rhos0);
+      }
+      if(rhos0<rho) {//this one is also non-physical
+        rhos0 = rho;
+        f0    = hugo(rhos0);
+        found_rhos0 = true;
+      } else {
+        /*rhos0 = rhos0;*/
+        f0 = hugo(rhos0);
+      }
+    } 
+
+    if(!found_rhos0 || !found_rhos1) {
+      int i = 0;
+      double factor = 1.5; 
+      double tmp, ftmp;
+      // before the search, rhos0 = rhos1 = an adimissible point > rho
+      rhos1 = rhos0;
+      f1    = f0;
+      while(!found_rhos0) {
+        if(++i>=maxIts_shock) {
+//          cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
+//               << " iterations (in the solution of the Hugoniot equation)." << endl;
+          return false;
+        }
+        tmp = rhos1;
+        ftmp = f1;
+        //move to the left (towards rho)
+        rhos1 = rhos0;
+        f1    = f0;
+        rhos0 = rhos1 - factor*drho;
+        if(rhos0<=rho) {
+          rhos0 = rho;
+          found_rhos0 = true;
+        }
+        f0 = hugo(rhos0);
+
+        if(f0*f1<=0) {
+          found_rhos0 = found_rhos1 = true;
+        } else {
+          //move to the right
+          rhos1 = tmp;
+          f1    = ftmp;
+          tmp   = rhos0; //don't forget the smallest point
+          ftmp  = f0;
+          rhos0 = rhos1;
+          f0    = f1;
+          rhos1 = rhos0 + factor*drho;
+          f1 = hugo(rhos1);
+          if(f0*f1<=0) {
+            found_rhos0 = found_rhos1 = true;
+          } else {
+            rhos0 = tmp;
+            f0    = ftmp;
+            drho  = rhos1 - rhos0; //update drho
+          }
+        }
+      }
+
+      if(!found_rhos1) {//keep moving to the right
+        i = 0;
+        double factor = 2.5;
+        while(!found_rhos1) {
+          if(++i>=maxIts_shock) {
+//            cout << "*** Error: Unable to find a bracketing interval after " << maxIts_shock 
+//                 << " iterations (in the solution of the Hugoniot equation (2))." << endl;
+            return false; //failure
+          }
+          rhos0 = rhos1;
+          f0    = f1;
+          rhos1 = rhos0 + factor*drho;
+          f1    = hugo(rhos1);
+          if(f0*f1<=0) {
+            found_rhos1 = true;
+          } else
+            drho = rhos1 - rhos0;
+        }
+      }
+
+    }
+
+    pair<double,double> sol;
+    double loc_tol_shock = tol_shock*std::min(rhos0,rhos1);
+#ifndef WITHOUT_BOOST
+    //*******************************************************************
+    // Calling boost function for root-finding
+    // Warning: "maxit" is BOTH AN INPUT AND AN OUTPUT
+    boost::uintmax_t maxit = maxIts_shock;
+    if(f0==0.0)
+      sol.first = sol.second = rhos0;
+    else if(f1==0.0)
+      sol.first = sol.second = rhos1;
+    else {
+      sol = toms748_solve(hugo, rhos0, rhos1, f0, f1,
+                          [=](double r0, double r1){return r1-r0<std::min(loc_tol_shock,0.001*(rhos1-rhos0));}, 
+                          maxit);
+    }
+    //*******************************************************************
+#else
+    //*******************************************************************
+    // Using a hybrid (Brent) method for root-finding
+    int maxit = 0;
+    if(f0==0.0)
+      sol.first = sol.second = rhos0;
+    else if(f1==0.0)
+      sol.first = sol.second = rhos1;
+    else {
+      double rhos2 = rhos1; //rhos2 is always the latest one
+      double f2    = f1;
+      int it;
+      for(it = 0; it<maxIts_shock; it++) {
+        drho = rhos1 - rhos0;
+        rhos2 = rhos2 - f2*(rhos1 - rhos0)/(f1 - f0); //secant method
+        if(rhos2 >= rhos1 || rhos2 <= rhos0) //discard and switch to bisection
+          rhos2 = 0.5*(rhos0+rhos1);
+        f2 = hugo(rhos2);
+        if(f2==0.0) {
+          sol.first = sol.second = rhos2;
+          break;
+        }
+        if(f2*f0<0) {
+          rhos1 = rhos2;
+          f1    = f2;
+        } else {
+          rhos0 = rhos2;
+          f0    = f2;
+        }
+        if(rhos1-rhos0<loc_tol_shock) {
+          sol.first  = rhos0;
+          sol.second = rhos1;
+          break;
+        }
+      }
+      if(it==maxIts_shock) {
+        fprintf(stderr,"*** Error: Root-finding method failed to converge after %d iterations.\n", it);
+        return false;
+      }
+      maxit = it;
+    }
+    //*******************************************************************
+#endif
+    
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    cout << "  " << wavenumber << "-wave: shock, converged in " << maxit << " iterations. fun = " 
+         << hugo(0.5*(sol.first+sol.second)) << "." << endl;
+#endif
+
+    rhos = 0.5*(sol.first+sol.second);
+
+    double du = -(ps-p)*(1.0/rhos-1.0/rho);
+    if(du<0) {
+      //cout << "Warning: Violation of hyperbolicitiy when enforcing the Rankine-Hugoniot jump conditions (du = "
+      //     << du << ")." << endl;
+      return false;
+    }
+
+    if(vf[id]->CheckState(rhos,ps,true)) //true: silence
+      return false; //nonphysical...
+
+    us = (wavenumber==1) ? u - sqrt(du) : u + sqrt(du);
+    
+
+#if PRINT_RIEMANN_SOLUTION == 1
+    double xi = (rhos*us - rho*u)/(rhos-rho);
+    if(wavenumber==1) {
+      sol1d.push_back(vector<double>{xi-0.0001*fabs(xi), rho, u, p, (double)id});
+      sol1d.push_back(vector<double>{xi, rhos, us, ps, (double)id});
+    } else {
+      sol1d.push_back(vector<double>{xi, rhos, us, ps, (double)id});
+      sol1d.push_back(vector<double>{xi+0.0001*fabs(xi), rho, u, p, (double)id});
+    }
+#endif
+
+  }
+
+  return true; //yeah!
+}
+
+
+//----------------------------------------------------------------------------------
+bool
+ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
+                            double rho_0, double u_0, double p_0 /*start state*/, 
+                            double dp /*step*/,
+                            double &rho, double &u, double &p, double &xi /*output*/)
+{
+  bool test = false;
+  double testErr = 1.e-6;
+
+  dp = -dp; // dp is positive when passed in. It is actually negative if we follow Kamm's paper 
+            // Equations (36 - 42)
+  
+  double e_0 = vf[id]->GetInternalEnergyPerUnitMass(rho_0, p_0);
+  double c_0_square = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
+
+  if(rho_0<=0 || c_0_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(0)." 
+//            " rho = %e, p = %e, e = %e, id = %d.\n",
+//            c_0_square, rho_0, p_0, e_0, id);
+    return false;
+  } 
+
+  double c_0 = sqrt(c_0_square);
+
+  double rho_1 = rho_0 + 0.5*dp/c_0_square;
+  double p_1 = p_0 + 0.5*dp;
+  double e_1 = vf[id]->GetInternalEnergyPerUnitMass(rho_1, p_1);
+  double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
+
+  if(rho_1<=0 || c_1_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
+//                   " rho = %e, p = %e, e = %e, id = %d.\n",
+//                   c_1_square, rho_1, p_1, e_1, id);
+	  return false;
+  } 
+
+  double c_1 = sqrt(c_1_square);
+                             
+  double rho_2 = rho_0 + 0.5*dp/c_1_square;
+  double p_2 = p_1;
+  double e_2 = vf[id]->GetInternalEnergyPerUnitMass(rho_2, p_2);
+  double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
+
+  if(rho_2<=0 || c_2_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(2)." 
+//               " rho = %e, p = %e, e = %e, id = %d.\n",
+//                c_2_square, rho_2, p_2, e_2, id);
+    return false;
+  }
+
+  double c_2 = sqrt(c_2_square); 
+  
+  double rho_3 = rho_0 + dp/c_2_square;
+  double p_3 = p_0 + dp;
+  double e_3 = vf[id]->GetInternalEnergyPerUnitMass(rho_3, p_3);
+  double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
+
+  if(rho_3<=0 || c_3_square<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(3)." 
+//                " rho = %e, p = %e, e = %e, id = %d.\n",
+//                c_3_square, rho_3, p_3, e_3, id);
+    return false;
+  }  
+ 
+  double c_3 = sqrt(c_3_square);
+
+  // calculate the outputs
+  //
+  double drho = 1.0/6.0*dp*(1./c_0_square + 2.0*(1./c_1_square+1./c_2_square) + 1./c_3_square);
+  double du = 1.0/6.0*dp*( 1./c_0/rho_0 + 2.0*(1./c_1/rho_1 + 1./c_2/rho_2) + 1./c_3/rho_3);
+  
+  if (isnan(du) == 1) {
+    return false;
+  }
+  
+  rho = rho_0 + drho;
+  p = p_0 + dp;
+  u = (wavenumber == 1) ? u_0 - du : u_0 + du; 
+ 
+  double e = vf[id]->GetInternalEnergyPerUnitMass(rho, p);
+  double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
+
+  //std::cout << std::setw(16) << p << std::setw(16) << rho << std::endl;
+
+  if(rho<=0 || c<0) {
+//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(final)." 
+//               " rho = %e, p = %e, e = %e, id = %d.\n",
+//               c, rho, p, e, id);
+    return false;
+  } else
+ 
+  c = sqrt(c);
+  
+  xi = (wavenumber == 1) ? u - c : u + c;
+ 
+
+//------------------------------------------------------------
+//                Test integration in rho
+//------------------------------------------------------------
+  if (test) {
+    double rhoNew, uNew, pNew, xiNew;
+	    bool successTest = Rarefaction_OneStepRK4_ODEtest(wavenumber/*1 or 3*/, id, 
+                     	    rho_0, u_0, p_0 /*start state*/, -drho /*step size*/,
+                            rhoNew, uNew, pNew, xiNew /*output:end state*/);
+	    if (!successTest) {
+		    //std::cout << "Test for integration rho failed" << std::endl;
+                    return false;
+	    } else if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
+                    return false;
+		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
+		    std::cout << "rho = " << rho << ", u = " << u << ", p = " << p << std::endl;
+		    std::cout << "rhoNew = " << rhoNew << ", uNew = " << uNew << ", pNew = " << pNew << std::endl;   
+	    }
+            if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
+		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
+	    }	
+  }
+ 
+  return true;
 }
 
 //----------------------------------------------------------------------------------
