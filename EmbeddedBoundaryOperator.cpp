@@ -724,7 +724,7 @@ EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
 //------------------------------------------------------------------------------------------------
 
 unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > >
-EmbeddedBoundaryOperator::GetPointerToIntersectorResults()
+EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData()
 {
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > p(new vector<unique_ptr<EmbeddedBoundaryDataSet> >());
 
@@ -739,7 +739,7 @@ EmbeddedBoundaryOperator::GetPointerToIntersectorResults()
 //------------------------------------------------------------------------------------------------
 
 unique_ptr<EmbeddedBoundaryDataSet>
-EmbeddedBoundaryOperator::GetPointerToIntersectorResultsOnSurface(int i)
+EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData(int i)
 {
   assert(i>=0 && i<intersector.size());
   assert(intersector[i]);

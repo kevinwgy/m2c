@@ -177,7 +177,7 @@ int main(int argc, char* argv[])
 
   //! Impose initial condition
   std::map<int, std::pair<int,int> >
-  id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToIntersectorResults() : nullptr);
+  id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
   if(embed)
     embed->GatherColorInfo(id2closure);  //also tracks the colors of solid bodies
 
@@ -201,7 +201,7 @@ int main(int argc, char* argv[])
 
     if(id2closure.find(matid) != id2closure.end()) {
       lso.back()->SetInitialCondition(*Phi.back(), 
-                                      embed->GetPointerToIntersectorResultsOnSurface(id2closure[matid].first),
+                                      embed->GetPointerToEmbeddedBoundaryData(id2closure[matid].first),
                                       id2closure[matid].second);
     } else
       lso.back()->SetInitialCondition(*Phi.back());
@@ -364,7 +364,7 @@ int main(int argc, char* argv[])
       t      += dt;
       dtleft -= dt;
       integrator->AdvanceOneTimeStep(V, ID, Phi,
-                                     embed ? embed->GetPointerToIntersectorResults() : nullptr,
+                                     embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr,
                                      L, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------

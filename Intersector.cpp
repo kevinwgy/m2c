@@ -102,12 +102,14 @@ Intersector::GetPointerToResults()
 {
   unique_ptr<EmbeddedBoundaryDataSet> ebds(new EmbeddedBoundaryDataSet());
 
+  ebds->surface_ptr             = &surface;
+  ebds->half_thickness          = half_thickness;
   ebds->XForward_ptr            = &XForward;
   ebds->XBackward_ptr           = &XBackward;
   ebds->Phi_ptr                 = &Phi;
   ebds->Phi_nLayer              = Phi_nLayer;
-  ebds->Color_ptr                = &Color;
-  ebds->ColorReachesBoundary_ptr = &ColorReachesBoundary;
+  ebds->Color_ptr               = &Color;
+  ebds->ColorReachesBoundary_ptr= &ColorReachesBoundary;
   ebds->hasInlet                = hasInlet;
   ebds->hasOutlet               = hasOutlet;
   ebds->hasOcc                  = hasOcc;
@@ -352,6 +354,14 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   int found_back;
 
   IntersectionPoint xp0, xp1;
+
+  // For completeness (to avoid confusion), we set external ghost cells to -1
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+      Int3& ijk(it->ijk);
+      xf[ijk[2]][ijk[1]][ijk[0]] = -1; //setting all three components to -1
+      xb[ijk[2]][ijk[1]][ijk[0]] = -1;
+  }
+ 
 
   // ----------------------------------------------------------------------------
   // Find occluded nodes and intersections. Build occluded and firstLayer 
@@ -699,6 +709,8 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         }
 
       }
+
+
 
   TMP.RestoreDataPointerToLocalVector();
 

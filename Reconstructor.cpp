@@ -597,7 +597,7 @@ RETRY:
               if(xf[s][k][j][i][1]>=0 || (j+1<NY && xf[s][k][j+1][i][1]>=0))
                 setValue(sigmay, 0.0, nDOF);
               if(xf[s][k][j][i][2]>=0 || (k+1<NZ && xf[s][k+1][j][i][2]>=0))
-              setValue(sigmaz, 0.0, nDOF);
+                setValue(sigmaz, 0.0, nDOF);
             }
           }
         }

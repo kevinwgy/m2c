@@ -10,12 +10,15 @@
 #include <KDTree.h>
 #include <rbf_interp.hpp>
 #include <memory> //unique_ptr
+#include <tuple>
 using std::cout;
 using std::endl;
 using std::max;
 using std::min;
 using std::map;
 using std::unique_ptr;
+using std::tuple;
+using std::get;
 using namespace GeoTools;
 
 extern int verbose;
@@ -2222,6 +2225,23 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   }
  
   //------------------------------------
+  // Extract intersection data
+  //------------------------------------
+  vector<Vec3D***> xf;  
+  vector<Vec3D***> xb;  
+  vector<TriangulatedSurface*> surfaces;
+  vector<vector<IntersectionPoint>*> intersections;
+  if(EBDS) {
+    for(auto&& ebds : *EBDS) {
+      surfaces.push_back(ebds->surface_ptr);
+      intersections.push_back(ebds->intersections_ptr);
+      xf.push_back((Vec3D***)ebds->XForward_ptr->GetDataPointer());
+      xb.push_back((Vec3D***)ebds->XBackward_ptr->GetDataPointer());
+    }
+  } 
+
+
+  //------------------------------------
   // Compute fluxes
   //------------------------------------
   Vec5D localflux1, localflux2;
@@ -2249,6 +2269,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
+  Vec3D vwallf(0.0), vwallb(0.0), nwallf(0.0), nwallb(0.0);
   for(int k=k0; k<kkmax; k++) {
     for(int j=j0; j<jjmax; j++) {
       for(int i=i0; i<iimax; i++) {
@@ -2261,6 +2282,15 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
         if(k!=kkmax-1 && j!=jjmax-1) {
  
           neighborid = id[k][j][i-1];
+
+          // See KW's notes for the decision algorithm
+          //
+          if(EBDS &&
+             FindEdgeSurfaceIntersections(i,j,k,0,surfaces,intersections,xf,xb,vwallf,vwallb,nwallf,nwallb)) {
+
+             Vec3D dir;
+             I AM HERE
+          }
 
           if(neighborid==myid) {
 
@@ -2292,8 +2322,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             if(err)  {
               riemann_errors++;
-              //fprintf(stderr,"Riemann failed (%d->%d,%d,%d). left: %e %e %e %e %e (%d), right: %e %e %e %e %e (%d), Vsm = %e %e %e %e %e, Vsp = %e %e %e %e %e\n", i-1,i,j,k, v[k][j][i-1][0], v[k][j][i-1][1], v[k][j][i-1][2], v[k][j][i-1][3], v[k][j][i-1][4], (int)id[k][j][i-1],
-              //v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], (int)id[k][j][i], Vsm[0], Vsm[1], Vsm[2], Vsm[3], Vsm[4], Vsp[0], Vsp[1], Vsp[2], Vsp[3], Vsp[4]);
             }
 
             //Clip Riemann solution and check it
@@ -2506,6 +2534,15 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     for(int i=0; i<Phi->size(); i++)
       (*Phi)[i]->RestoreDataPointerToLocalVector();
   }
+
+
+  if(xf.size()>0) {
+    for(auto&& ebds : *EBDS) {
+      ebds->XForward_ptr->RestoreDataPointerToLocalVector();
+      ebds->XBackward_ptr->RestoreDataPointerToLocalVector();
+    }
+  } 
+
 
   delta_xyz.RestoreDataPointerToLocalVector(); //no changes
   ID.RestoreDataPointerToLocalVector(); //no changes
@@ -2876,6 +2913,9 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 
         myid = id[k][j][i];
 
+        if(myid == INACTIVE_MATERIAL_ID)
+          continue;
+
         if(boundary==0) {//interior
           clipped = varFcn[myid]->ClipDensityAndPressure(vl[k][j][i]);
           if(clipped) { //go back to constant reconstruction
@@ -3038,4 +3078,76 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
 
 //-----------------------------------------------------
 
+bool
+SpaceOperator::FindEdgeSurfaceIntersections(int i, int j, int k, int dir/*0~x,1~y,2~z*/,
+                                            vector<TriangulatedSurface*>& surfaces,
+                                            vector<vector<IntersectionPoint>*>& intersections,
+                                            vector<Vec3D***>& xf, vector<Vec3D***>& xb, 
+                                            Vec3D& vwallf, Vec3D& vwallb, Vec3D& nwallf, Vec3D& nwallb)
+{
+  if(EBDS.size()==0)
+    return false; 
+
+  // Find the correct intersection: <surf. id,  intersection id,  dist-to-intersection>
+  tuple<int, int, double> fwd_intersection(std::make_tuple(-1,-1,DBL_MAX));
+  tuple<int, int, double> bwd_intersection(std::make_tuple(-1,-1,-DBL_MAX));
+  int xid;
+  for(int s=0; s<EBDS.size(); s++) {
+    xid = xf[s][k][j][i][dir];
+    if(xid>=0) {
+      double dist = (*intersections[s])[xid];
+      if(dist < get<2>(fwd_intersection)) {
+        get<0>(fwd_intersection) = s;
+        get<1>(fwd_intersection) = xid;
+        get<2>(fwd_intersection) = dist;
+      }
+    }
+    xid = xb[s][k][j][i][dir];
+    if(xid>=0) {
+      double dist = (*intersections[s])[xid];
+      if(dist > get<2>(bwd_intersection)) {
+        get<0>(bwd_intersection) = s;
+        get<1>(bwd_intersection) = xid;
+        get<2>(bwd_intersection) = dist;
+      }
+    }
+  }
+
+
+  // If intersection does not exist, return false.
+  if(get<0>(fwd_intersection)<0) {
+    assert(get<0>(bwd_intersection)<0);
+    return false;
+  } else
+    assert(get<0>(bwd_intersection)>=0);
+
+
+  // Intersection exists. 
+  int surf;
+
+  // Find normal direction and normal velocity for "forward intersection"
+  surf = get<0>(fwd_intersection);
+  xid  = get<1>(fwd_intersection);
+  IntersectionPoint& xfp((*intersections[surf])[xid]);
+  Int3 nf(surfaces[surf]->elems[xfp.tid]);
+  nwallf = surfaces[surf]->elemNorm[xfp.tid];
+  vwallf = (xfp.xi[0])*surfaces[surf]->Udot[nf[0]]
+         + (xfp.xi[1])*surfaces[surf]->Udot[nf[1]]
+         + (xfp.xi[2])*surfaces[surf]->Udot[nf[2]];
+
+  // Find normal direction and normal velocity for "backward intersection"
+  surf = get<0>(bwd_intersection);
+  xid  = get<1>(bwd_intersection);
+  IntersectionPoint& xbp((*intersections[surf])[xid]);
+  Int3 nb(surfaces[surf]->elems[xbp.tid]);
+  nwallb = surfaces[surf]->elemNorm[xbp.tid];
+  vwallb = (xbp.xi[0])*surfaces[surf]->Udot[nb[0]]
+         + (xbp.xi[1])*surfaces[surf]->Udot[nb[1]]
+         + (xbp.xi[2])*surfaces[surf]->Udot[nb[2]];
+
+  return true;
+
+}
+
+//-----------------------------------------------------
 

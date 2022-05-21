@@ -1068,6 +1068,7 @@ struct EmbeddedSurfaceData {
   //! flux calculation
   double conRec_depth; //!< depth (dimensional) where constant reconstruction is applied (default: 0)
 
+
   //! output displacement and nodal load
   LagrangianMeshOutputData output;
 
@@ -1084,6 +1085,10 @@ struct EmbeddedSurfaceData {
 struct EmbeddedSurfacesData {
 
   ObjectMap<EmbeddedSurfaceData> surfaces;
+
+  //! normal direction used to construct the 1D Riemann solver 
+  enum RiemannNormal {LEVEL_SET = 0, MESH = 1, AVERAGE = 2} riemann_normal;
+
 
   EmbeddedSurfacesData();
   ~EmbeddedSurfacesData() {}

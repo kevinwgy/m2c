@@ -11,6 +11,8 @@
 #include <RiemannSolutions.h>
 
 class EmbeddedBoundaryDataSet;
+class TriangulatedSurface;
+class IntersectionPoint;
 
 /*******************************************
  * class SpaceOperator drives computations
@@ -154,10 +156,16 @@ private:
   Vec3D CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
                                          Vec3D*** dxyz, double*** phi);
 
-
   bool TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi, 
                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                   SpaceVariable3D &Tag0);
+
+  // Find intersections (forward and backward) between an edge and embedded surface(s)
+  bool FindEdgeSurfaceIntersections(int i, int j, int k, int dir/*0~x,1~y,2~z*/,
+                                    vector<TriangulatedSurface*>& surfaces,
+                                    vector<vector<IntersectionPoint>*>& intersections,
+                                    vector<Vec3D***>& xf, vector<Vec3D***>& xb,
+                                    Vec3D& vwallf, Vec3D& vwallb, Vec3D& nwallf, Vec3D& nwallb);
 
   // Utility
   inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {
