@@ -1133,7 +1133,7 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
   new ClassToken<MultiPhaseData>
     (ca, "RiemannNormal", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::riemann_normal), 3,
-     "LevelSet", 0, "Mesh", 1, "Average", 2);
+     "EmbeddedSurface", 0, "Mesh", 1, "Average", 2);
 
   new ClassToken<MultiPhaseData>
     (ca, "LatentHeatTransfer", this,
@@ -2510,16 +2510,27 @@ void EmbeddedSurfacesData::setup(const char *name, ClassAssigner *father)
 
 EmbeddedBoundaryMethodData::EmbeddedBoundaryMethodData()
 {
-
+  riemann_normal = MESH;
+  recon = CONSTANT;
 }
 
 //------------------------------------------------------------------------------
 
 void EmbeddedBoundaryMethodData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
   embed_surfaces.setup("EmbeddedSurfaces");
+
+  new ClassToken<EmbeddedBoundaryMethodData>
+    (ca, "RiemannNormal", this,
+     reinterpret_cast<int EmbeddedBoundaryMethodData::*>(&EmbeddedBoundaryMethodData::riemann_normal), 
+     3, "LevelSet", 0, "Mesh", 1, "Average", 2);
+
+  new ClassToken<EmbeddedBoundaryMethodData>
+    (ca, "ReconstructionAtInterface", this,
+     reinterpret_cast<int EmbeddedBoundaryMethodData::*>(&EmbeddedBoundaryMethodData::recon),
+     2, "Constant", 0, "Linear", 1);
 }
 
 //------------------------------------------------------------------------------

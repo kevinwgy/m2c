@@ -173,7 +173,7 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
   //         to each other or overlapping, the information collected here is invalid.
   inactive_colors.clear();
   for(int i=0; i<surfaces.size(); i++) {
-    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToIntersectorResultsOnSurface(i);
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
     int nRegions = EBDS->nRegions; //this is the number of *closures*. Colors -1, -2, ...
     for(int color = -1; color>=-nRegions; color--) {
       bool found = false;

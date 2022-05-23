@@ -2,7 +2,7 @@
 #define _EMBEDDED_BOUNDARY_DATA_SET_H_
 
 #include <TriangulatedSurface.h>
-#include <SpaceVariable3D.h>
+#include <SpaceVariable.h>
 
 /*****************************************************************************
  * class IntersectionPoint is a utility class that stores information about an
@@ -73,7 +73,7 @@ class EmbeddedBoundaryDataSet {
 
 public:
 
-  TriangulatedSurface *surface;
+  TriangulatedSurface *surface_ptr;
   double half_thickness;
 
   SpaceVariable3D *XForward_ptr;
@@ -96,7 +96,7 @@ public:
 
 
 public:
-  EmbeddedBoundaryDataSet() : surface(nullptr), half_thickness(0.0),
+  EmbeddedBoundaryDataSet() : surface_ptr(nullptr), half_thickness(0.0),
                               XForward_ptr(nullptr), XBackward_ptr(nullptr), Phi_ptr(nullptr),
                               Phi_nLayer(0), Color_ptr(nullptr), ColorReachesBoundary_ptr(nullptr), 
                               hasInlet(false), hasOutlet(false), hasOcc(false), nRegions(0),

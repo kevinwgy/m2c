@@ -148,6 +148,14 @@ private:
                               vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
                               vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
 
+  Vec3D GetNormalForOneSidedRiemann(int d,/*0,1,2*/
+                                    int forward_or_backward,/*1~wall is in the +x/y/z dir of material, -1~-x/y/z*/
+                                    Vec3D& nwall);
+
+  Vec3D GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
+                                      int myid, int neighborid, vector<int> *ls_mat_id,
+                                      vector<double***> *phi);
+
   Vec3D CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
                                         int myid, int neighborid, vector<int> *ls_mat_id,
                                         vector<double***> *phi);
@@ -161,7 +169,7 @@ private:
                                   SpaceVariable3D &Tag0);
 
   // Find intersections (forward and backward) between an edge and embedded surface(s)
-  bool FindEdgeSurfaceIntersections(int i, int j, int k, int dir/*0~x,1~y,2~z*/,
+  bool FindEdgeSurfaceIntersections(int dir/*0~x,1~y,2~z*/, int i, int j, int k,
                                     vector<TriangulatedSurface*>& surfaces,
                                     vector<vector<IntersectionPoint>*>& intersections,
                                     vector<Vec3D***>& xf, vector<Vec3D***>& xb,

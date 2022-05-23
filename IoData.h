@@ -1086,9 +1086,6 @@ struct EmbeddedSurfacesData {
 
   ObjectMap<EmbeddedSurfaceData> surfaces;
 
-  //! normal direction used to construct the 1D Riemann solver 
-  enum RiemannNormal {LEVEL_SET = 0, MESH = 1, AVERAGE = 2} riemann_normal;
-
 
   EmbeddedSurfacesData();
   ~EmbeddedSurfacesData() {}
@@ -1102,6 +1099,11 @@ struct EmbeddedSurfacesData {
 struct EmbeddedBoundaryMethodData {
 
   EmbeddedSurfacesData embed_surfaces;
+
+  //! normal direction used to construct the 1D Riemann solver 
+  enum RiemannNormal {EMBEDDED_SURFACE = 0, MESH = 1, AVERAGE = 2} riemann_normal;
+
+  enum ReconstructionAtInterface {CONSTANT = 0, LINEAR = 1} recon;
 
   EmbeddedBoundaryMethodData();
   ~EmbeddedBoundaryMethodData() {}

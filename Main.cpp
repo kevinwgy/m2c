@@ -153,7 +153,9 @@ int main(int argc, char* argv[])
 
     vf.push_back(new VarFcnDummy(iod.eqs.dummy_state)); //for "inactive" nodes, occluded or inside a solid body
     INACTIVE_MATERIAL_ID = vf.size() - 1;
-  }
+  } else
+    INACTIVE_MATERIAL_ID = INT_MAX; //not used!
+  
 
   //! Initialize interpolator
   InterpolatorBase *interp = NULL;
