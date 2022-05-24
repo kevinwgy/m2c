@@ -28,8 +28,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              XBackward(comm_, &(dms_.ghosted1_3dof)),
              Phi(comm_, &(dms_.ghosted1_1dof)),
              Phi_nLayer(0),
-             Color(comm_, &(dms_.ghosted1_1dof)), hasInlet(false), hasOutlet(false),
-             hasOcc(false), nRegions(0),
+             Color(comm_, &(dms_.ghosted1_1dof)), hasInlet(false), hasOutlet(false), nRegions(0),
              floodfiller(comm_, dms_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
 
@@ -110,9 +109,9 @@ Intersector::GetPointerToResults()
   ebds->Phi_nLayer              = Phi_nLayer;
   ebds->Color_ptr               = &Color;
   ebds->ColorReachesBoundary_ptr= &ColorReachesBoundary;
+  ebds->color2id_ptr            = &color2id;
   ebds->hasInlet                = hasInlet;
   ebds->hasOutlet               = hasOutlet;
-  ebds->hasOcc                  = hasOcc;
   ebds->nRegions                = nRegions;
   ebds->ClosestPointIndex_ptr   = &ClosestPointIndex;
   ebds->closest_points_ptr      = &closest_points;
@@ -148,7 +147,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
   BuildSubdomainScopeAndKDTree();
   FindNodalCandidates();
   FindIntersections(true);
-  FloodFillColors();
+  bool hasOcc = FloodFillColors();
   CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
 
   hasInlet_  = hasInlet;
@@ -797,7 +796,7 @@ Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, do
 
 //-------------------------------------------------------------------------
 
-int
+bool
 Intersector::FloodFillColors()
 {
   // ----------------------------------------------------------------
@@ -899,8 +898,7 @@ Intersector::FloodFillColors()
   // statistics
   MPI_Allreduce(MPI_IN_PLACE, &total_occluded, 1, MPI_INT, MPI_SUM, comm);
 
-  if(total_occluded>0) 
-    hasOcc = true; //i.e. one zero color (for occluded)
+  bool hasOcc = total_occluded>0; //i.e. one zero color (for occluded)
 
   hasInlet = hasOutlet = false;
   nRegions = 0;
@@ -931,7 +929,7 @@ Intersector::FloodFillColors()
 
   Color.RestoreDataPointerAndInsert();
 
-  return int(hasInlet) + int(hasOutlet) + int(hasOcc) + nRegions;
+  return hasOcc;
 }
 
 //-------------------------------------------------------------------------

@@ -2805,6 +2805,10 @@ SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int
                                                vector<double***> *phi)
 {
 
+  //If any of them is NULL, something is wrong...
+  assert(ls_mat_id);
+  assert(phi);
+
   int my_ls    = (myid==0) ?       neighborid : myid;
   int neigh_ls = (neighborid==0) ? myid       : neighborid;
   bool found1(false), found2(false);
@@ -3175,13 +3179,18 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, EBDS);
 
   if(visco)
-    visco->AddDiffusionFluxes(V, ID, R);
+    visco->AddDiffusionFluxes(V, ID, EBDS, R);
 
   if(heat_diffusion)
-    heat_diffusion->AddDiffusionFluxes(V, ID, R);
+    heat_diffusion->AddDiffusionFluxes(V, ID, EBDS, R);
 
-  if(symm) //cylindrical or spherical symmetry
+  if(symm) {//cylindrical or spherical symmetry
+    if(visco || heat_diffusion) {
+      print_error("*** Error: SymmetryOperator must be extended to account for diffusion fluxes.\n");
+      exit_mpi();
+    }
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
+  }
 
   // -------------------------------------------------
   // multiply flux by -1, and divide by cell volume (for cells within the actual domain)

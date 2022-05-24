@@ -4,11 +4,13 @@
 #include<PhaseTransition.h>
 #include<GhostPoint.h>
 #include<tuple>
+#include<memory>
 
 class Vec5D;
 class SpaceOperator;
 class LevelSetOperator;
 class RiemannSolutions;
+class EmbeddedBoundaryDataSet;
 
 /*******************************************
  * class MultiPhaseOperator contains functions
@@ -56,6 +58,7 @@ public:
   //! update material id including the ghost region
   void UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
 
+  //! update V due to interface motion
   int UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID,
                                                SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
                                                std::vector<Int3> &unresolved);
@@ -77,6 +80,14 @@ public:
 
   //! at each node (including external ghosts), at most one "phi" can be negative.
   int CheckLevelSetOverlapping(vector<SpaceVariable3D*> &Phi);
+
+
+
+  //! update ID, V, and Phi due to embedded surface motion
+  void UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &ID, SpaceVariable3D &V, 
+                                          vector<SpaceVariable3D*> &Phi,
+                                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
+
 
   void Destroy();
 

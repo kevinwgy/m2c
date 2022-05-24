@@ -1,6 +1,8 @@
 #include <HeatDiffusionOperator.h>
+#include <EmbeddedBoundaryDataSet.h>
 #include <Vector5D.h>
 #include <Utils.h>
+using std::unique_ptr;
 
 //--------------------------------------------------------------------------
 
@@ -50,7 +52,9 @@ HeatDiffusionOperator::Destroy()
 //--------------------------------------------------------------------------
 // Add diffusion fluxes on the left hand side of the N-S equations
 void
-HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
+HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                          SpaceVariable3D &R)
 {
 
   //TODO

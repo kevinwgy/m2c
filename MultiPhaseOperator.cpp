@@ -3,6 +3,7 @@
 #include<LevelSetOperator.h>
 #include<Vector5D.h>
 #include<RiemannSolutions.h>
+#include<EmbeddedBoundaryDataSet.h>
 #include<algorithm>//find
 #include<set>
 using std::cout;
@@ -10,6 +11,7 @@ using std::endl;
 using std::set;
 using std::tuple;
 using std::get;
+using std::unique_ptr;
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
 //-----------------------------------------------------
@@ -233,6 +235,168 @@ MultiPhaseOperator::CheckLevelSetOverlapping(vector<SpaceVariable3D*> &Phi)
   MPI_Allreduce(MPI_IN_PLACE, &overlap, 1, MPI_INT, MPI_SUM, comm);
 
   return overlap;
+}
+
+//----------------------------------------------------- 
+void
+MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &ID, SpaceVariable3D &V,
+                                                       vector<SpaceVariable3D*> &Phi,
+                                                       vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
+{
+
+  // Step 1: Extract useful information from EBDS
+  assert(EBDS);
+  vector<std::map<int,int>*> color2id;
+  vector<std::set<Int3> > swept; //NOT a pointer. Instead, it stores the cells that need to be updated
+  vector<double***> color;
+  for(auto&& ebds : *EBDS) {
+    color2id.push_back(ebds->color2id_ptr);
+    color.push_back(ebds->Color_ptr->GetDataPointer());
+
+    swept.push_back(*ebds->swept_ptr);
+    // remove cells that are internal ghosts
+    for(auto it = swept.back().begin(); it != swept.back().end();) {
+      if(!ID.IsHere((*it)[0],(*it)[1],(*it)[2],false))
+        it = sub.erase(it); //returns the iterator to the next element 
+      else
+        it++;
+    }
+  }
+
+
+  // Step 2: Make sure occluded cells have INACTIVE id
+  int has_occ(0);
+  for(auto&& ebds : *EBDS) {
+    if(ebds->occluded_ptr->size()>0) {
+      has_occ = 1;
+      break;
+    }
+    if(ebds->imposed_occluded_ptr->size()>0) {
+      has_occ = 1;
+      break;
+    }
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &has_occ, 1, MPI_INT, MPI_MAX, comm);
+
+  double*** id  = has_occ ? ID.GetDataPointer() : NULL;
+  for(auto&& ebds : *EBDS) {
+    for(auto&& ijk : *ebds->occluded_ptr)
+      id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
+    for(auto&& ijk : *ebds->imposed_occluded_ptr)
+      id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
+  }  
+  if(id)
+    ID.RestoreDataPointerAndInsert();
+
+
+  // Step 3: Tag swept nodes (not including occluded nodes)
+  double*** tag = Tag.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) 
+        tag[k][j][i] = 0;
+  for(auto&& sub : swept)
+    for(auto&& ijk : sub)
+      tag[ijk[2]][ijk[1]][ijk[0]] = 1; 
+  Tag.RestoreDataPointerAndInsert();
+
+
+  // Step 4: Updating swept nodes, iteratively. (Usually one iteration should be enough.)
+  while(true) {
+
+    // 3.1: Count number of cells within domain interior that need correction
+    int total_count = 0;
+    for(auto&& sub : swept)
+      total_count += sub.size();
+    MPI_Allreduce(MPI_IN_PLACE, &total_count, 1, MPI_INT, MPI_SUM, comm);
+
+    if(total_count==0)
+      break;
+
+
+    // 3.2: Get data
+    tag           = Tag.GetDataPointer();
+    double*** id  = ID.GetDataPointer();
+    Vec5D***  v   = (Vec5D***) V.GetDataPointer();
+    int ls_size = Phi.size();
+    vector<double***> phi(ls_size, NULL);
+    for(int ls=0; ls<ls_size; ls++) 
+      phi[ls] = Phi[ls]->GetDataPointer();
+ 
+
+    // 2.3: Loop through unresolved swept nodes
+    int i,j,k;
+    for(int surf=0; surf<swept.size(); surf++) {
+      for(auto it = swept[surf].begin(); it != swept[surf].end(); it++) {
+        i = (*it)[0];
+        j = (*it)[1];
+        k = (*it)[2];
+
+        // determine its id
+        id[k][j][i] = (*color2id[surf])[color[surf][k][j][i]];
+        for(int k2=k-1; k2<=k+1; k2++)
+          for(int j2=j-1; j2<=j+1; j2++)
+            for(int i2=i-1; i2<=i+1; i2++) {
+
+              if(k2==k && j2==j && i2==i) //itself
+                continue; 
+
+              if(!ID.IsHereOrInternalGhost(i2,j2,k2)) //outside physical domain
+                continue;
+
+              if(tag[k2][j2][i2] != 0) //swept, and unresolved yet
+                continue;
+             DETERMINE phi and ID at the same time
+
+        // update state variables
+        double weight = 0.0;
+        Vec5D  vsum(0.0); 
+        for(int k2=k-1; k2<=k+1; k2++)
+          for(int j2=j-1; j2<=j+1; j2++)
+            for(int i2=i-1; i2<=i+1; i2++) {
+
+              if(k2==k && j2==j && i2==i) //itself
+                continue; 
+
+              if(!ID.IsHereOrInternalGhost(i2,j2,k2)) //outside physical domain
+                continue;
+
+              if(tag[k2][j2][i2] != 0) //swept, and unresolved yet
+                continue;
+
+              if(id[k2][j2][i2] == INACTIVE_MATERIAL_ID || 
+            }
+      }
+    }
+
+
+
+    MPI_Allreduce(MPI_IN_PLACE, &total_count, 1, MPI_INT, MPI_SUM, comm);
+
+ 
+
+
+
+
+
+
+
+
+  }
+
+  loop through swept
+
+  use id2color in embedded boundayr operator to update id.
+
+  to get V, loop through non-blocking neighbors that have the same id.
+
+  !!! also need to update phi, if any level set coincides with embedded boundary !!!
+     check the value of phi at swept nodes!
+  
+
+
+
+
 }
 
 //-----------------------------------------------------

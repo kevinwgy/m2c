@@ -96,6 +96,9 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // set NULL to intersector pointers
   intersector.resize(surfaces.size(), NULL);
 
+  // create color2id with empty maps (but the right size).
+  color2id.resize(surfaces.size());
+
   // setup output
   for(int i=0; i<surfaces.size(); i++)
     lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
@@ -222,6 +225,44 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
       intersector[surf]->FindColorBoundary(this_color, status);
       touched[surf] = true;
     }
+  }
+
+
+  // Part 4: Build color2id (and give it to the intersectors)
+  for(int surf=0; surf<intersector.size(); surf++) {
+    color2id[surf].clear();
+    bool hasInlet(false), hasOutlet(false), nRegions(0);
+    intersection[surf]->GetColors(hasInlet,hasOutlet,nRegions);
+    color2id[surf][0] = INACTIVE_MATERIAL_ID; //occ color is always 0
+    if(hasInlet) //inlet color is always 1
+      color2id[surf][1] = iod.bc.inlet.materialid;
+    if(hasOutlet) //outlet color is always 2
+      color2id[surf][2] = iod.bc.outlet.materialid;
+    for(int i=1; i<=nRegions; i++) {
+      //determine color2id[surf][-i]
+      bool found = false;
+      for(auto&& it : inactive_color) {
+        if(it.first == surf && it.second == -i) {
+          color2id[surf][-i] = INACTIVE_MATERIAL_ID;
+          found = true;
+          break;
+        }
+      }
+      if(found) continue;
+      for(auto&& it : id2color) {
+        if(it.second.first == surf && it.second.second == -i) {
+          color2id[surf][-i] = it.first;
+          found = true;
+          breka;
+        }
+      }
+      if(!found) {
+        print_error("*** Error: Unable to determine the material ID for color %d from surface %d.\n",
+                    -i, surf);
+        exit_mpi();
+      }
+    }
+    intersector[surf]->SetColor2ID(color2id[surf]);
   }
 
 }

@@ -82,7 +82,8 @@ public:
   int Phi_nLayer;
   SpaceVariable3D *Color_ptr; 
   std::vector<int> *ColorReachesBoundary_ptr;
-  bool hasInlet, hasOutlet, hasOcc;
+  std::map<int,int> *color2id_ptr;
+  bool hasInlet, hasOutlet;
   int nRegions;
   SpaceVariable3D *ClosestPointIndex_ptr;
   std::vector<std::pair<Int3, ClosestPoint> > *closest_points_ptr;
@@ -99,7 +100,8 @@ public:
   EmbeddedBoundaryDataSet() : surface_ptr(nullptr), half_thickness(0.0),
                               XForward_ptr(nullptr), XBackward_ptr(nullptr), Phi_ptr(nullptr),
                               Phi_nLayer(0), Color_ptr(nullptr), ColorReachesBoundary_ptr(nullptr), 
-                              hasInlet(false), hasOutlet(false), hasOcc(false), nRegions(0),
+                              color2id_ptr(nullptr),
+                              hasInlet(false), hasOutlet(false), nRegions(0),
                               ClosestPointIndex_ptr(nullptr), closest_points_ptr(nullptr), 
                               occluded_ptr(nullptr), firstLayer_ptr(nullptr),
                               imposed_occluded_ptr(nullptr), swept_ptr(nullptr)

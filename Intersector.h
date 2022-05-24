@@ -63,6 +63,7 @@ class Intersector {
   TriangulatedSurface &surface; //!< the surface tracked by the intersector
   bool closed_surface; //!< whether the surface is closed AND normals are consistent
   double half_thickness; //!< half thickness of the surface
+  std::map<int,int> color2id; //!< mapping from color to material id
 
   std::vector<MyTriangle> scope; //!< triangles relevant to the current subdomain (no tol for the BB of triangles)
   KDTree<MyTriangle, 3> *tree; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
@@ -112,7 +113,7 @@ class Intersector {
   std::vector<int> ColorReachesBoundary; /**< stores whether each negative colored regions (i.e. enclosrures)  touches \n
                                              the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
                                              the size of this vector is "nRegions" calculated in FloodFillColors.*/
-  bool hasInlet, hasOutlet, hasOcc;
+  bool hasInlet, hasOutlet;
   int nRegions;
                       
   //! Closest point on triangle (for near-field nodes inside subdomain, including internal ghosts nodes)
@@ -147,6 +148,8 @@ public:
   ~Intersector();
 
   void Destroy();
+
+  void SetColor2ID(std::map<int,int>& c2id) {color2id = c2id;}
 
   //! Interface tracking functions
   void TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers);
@@ -194,6 +197,13 @@ public:
 
   //! Get pointer to "scope"
   void GetElementsInScope(std::vector<int> elems_in_scope);
+
+  //! Get colors
+  void GetColors(bool *hasInlet_ = NULL, bool *hasOutlet_ = NULL, int *nRegions_ = NULL) {
+    if(hasInlet_)   *hasInlet_ = hasInlet;
+    if(hasOutlet_) *hasOutlet_ = hasOutlet; 
+    if(nRegions_)   *nRegions_ = nRegions;
+  }
 
 private: 
 

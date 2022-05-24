@@ -318,6 +318,8 @@ int main(int argc, char* argv[])
   if(embed) {
     embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not conccurent solver)
     embed->TrackUpdatedSurfaces();
+    mpo->UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
+                                            embed->GetPointerToEmbeddedBoundaryData()); //update V, ID, Phi
   }
 
   // find maxTime, and dts (meaningful only with concurrent programs)
@@ -398,6 +400,8 @@ int main(int argc, char* argv[])
     if(embed) {
       embed->ApplyUserDefinedSurfaceDynamics(t, dts); //update surfaces provided through input (not conccurent solver)
       embed->TrackUpdatedSurfaces();
+      mpo->UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
+                                              embed->GetPointerToEmbeddedBoundaryData()); //update V, ID, Phi
     }
 
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);
