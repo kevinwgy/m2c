@@ -73,6 +73,8 @@ public:
   TriangulatedSurface         *GetPointerToSurface(int i) {assert(i>=0 && i<surfaces.size()); return &surfaces[i];}
   vector<vector<Vec3D> >      *GetPointerToForces() {return &F;}
   vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<F.size()); return &F[i];}
+  vector<Intersector*>        *GetPointerToIntersectors() {return &intersector;}
+  Intersector                 *GetPointerToIntersector(int i) {assert(i>=0 && i<intersector.size()); return intersector[i];}
 
   std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > GetPointerToEmbeddedBoundaryData();
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToEmbeddedBoundaryData(int i); 

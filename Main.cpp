@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
 #endif
   
   //! Initialize multiphase operator (for updating "phase change")
-  MultiPhaseOperator mpo(comm, dms, iod, vf, spo, lso);
+  MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
   if(lso.size()>1) { //at each node, at most one "phi" can be negative
     int overlap = mpo.CheckLevelSetOverlapping(Phi);
     if(overlap>0) {
@@ -318,8 +318,15 @@ int main(int argc, char* argv[])
   if(embed) {
     embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not conccurent solver)
     embed->TrackUpdatedSurfaces();
-    mpo->UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
-                                            embed->GetPointerToEmbeddedBoundaryData()); //update V, ID, Phi
+    int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
+                                 embed->GetPointerToEmbeddedBoundaryData(),
+                                 embed->GetPointerToIntersectors()); //update V, ID, Phi
+    spo.ClipDensityAndPressure(V,ID);
+    if(boundary_swept) {
+      spo.ApplyBoundaryConditions(V);
+      for(int i=0; i<Phi.size(); i++) 
+        lso[i]->ApplyBoundaryConditions(*Phi[i]);
+    }
   }
 
   // find maxTime, and dts (meaningful only with concurrent programs)
@@ -400,8 +407,15 @@ int main(int argc, char* argv[])
     if(embed) {
       embed->ApplyUserDefinedSurfaceDynamics(t, dts); //update surfaces provided through input (not conccurent solver)
       embed->TrackUpdatedSurfaces();
-      mpo->UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
-                                              embed->GetPointerToEmbeddedBoundaryData()); //update V, ID, Phi
+      int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
+                                   embed->GetPointerToEmbeddedBoundaryData(),
+                                   embed->GetPointerToIntersectors()); //update V, ID, Phi
+      spo.ClipDensityAndPressure(V,ID);
+      if(boundary_swept) {
+        spo.ApplyBoundaryConditions(V);
+        for(int i=0; i<Phi.size(); i++) 
+          lso[i]->ApplyBoundaryConditions(*Phi[i]);
+      }
     }
 
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);

@@ -3,6 +3,7 @@
 #include<SpaceVariable.h>
 #include<PhaseTransition.h>
 #include<GhostPoint.h>
+#include<GlobalMeshInfo.h>
 #include<tuple>
 #include<memory>
 
@@ -11,6 +12,7 @@ class SpaceOperator;
 class LevelSetOperator;
 class RiemannSolutions;
 class EmbeddedBoundaryDataSet;
+class Intersector;
 
 /*******************************************
  * class MultiPhaseOperator contains functions
@@ -35,6 +37,8 @@ class MultiPhaseOperator
   vector<GhostPoint> *ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   vector<GhostPoint> *ghost_nodes_outer; //!< ghost nodes outside the physical domain
 
+  GlobalMeshInfo &global_mesh;
+
   //! internal variable for tracking or tagging things.
   SpaceVariable3D Tag;
 
@@ -49,7 +53,8 @@ class MultiPhaseOperator
 
 public:
   MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                     vector<VarFcnBase*> &varFcn_, SpaceOperator &spo, vector<LevelSetOperator*> &lso);
+                     vector<VarFcnBase*> &varFcn_, GlobalMeshInfo &global_mesh_,
+                     SpaceOperator &spo, vector<LevelSetOperator*> &lso);
   ~MultiPhaseOperator();
 
   //! update material id at (external) ghost nodes (they get the IDs of their images)
@@ -83,10 +88,11 @@ public:
 
 
 
-  //! update ID, V, and Phi due to embedded surface motion
-  void UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &ID, SpaceVariable3D &V, 
-                                          vector<SpaceVariable3D*> &Phi,
-                                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
+  //! update ID, V, and Phi due to embedded surface motion. Impose boundary conditions for ID, but not V and Phi
+  int UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                         vector<SpaceVariable3D*> &Phi,
+                                         std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                         vector<Intersector*> *intersector);
 
 
   void Destroy();
@@ -94,10 +100,10 @@ public:
 protected:
   int UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
                                              SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
-                                             std::vector<Int3> &unresolved);
+                                             vector<Int3> &unresolved);
 
   int UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V,
-                                          std::vector<Int3> &unresolved);
+                                          vector<Int3> &unresolved);
 
   void AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
 
@@ -110,6 +116,10 @@ protected:
                                       vector<std::tuple<Int3,int,int> > &changed, vector<int> &phi_updated,
                                       vector<Int3> *new_useful_nodes);
 
+  //! internal function called by UpdateCellsSweptByEmbeddedSurfaces
+  void FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
+                                         vector<Intersector*> *intersector,
+                                         vector<std::pair<Int3,bool> > &neighbors);
 };
 
 #endif

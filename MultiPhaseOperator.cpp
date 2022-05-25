@@ -3,7 +3,7 @@
 #include<LevelSetOperator.h>
 #include<Vector5D.h>
 #include<RiemannSolutions.h>
-#include<EmbeddedBoundaryDataSet.h>
+#include<Intersector.h>
 #include<algorithm>//find
 #include<set>
 using std::cout;
@@ -17,8 +17,9 @@ extern int INACTIVE_MATERIAL_ID;
 //-----------------------------------------------------
 
 MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                                       vector<VarFcnBase*> &varFcn_, SpaceOperator &spo, vector<LevelSetOperator*> &lso)
-                  : comm(comm_), iod(iod_), varFcn(varFcn_),
+                                       vector<VarFcnBase*> &varFcn_, GlobalMeshInfo &global_mesh_,
+                                       SpaceOperator &spo, vector<LevelSetOperator*> &lso)
+                  : comm(comm_), iod(iod_), varFcn(varFcn_), global_mesh(global_mesh_),
                     coordinates(spo.GetMeshCoordinates()),
                     delta_xyz(spo.GetMeshDeltaXYZ()),
                     ghost_nodes_inner(spo.GetPointerToInnerGhostNodes()), 
@@ -238,33 +239,43 @@ MultiPhaseOperator::CheckLevelSetOverlapping(vector<SpaceVariable3D*> &Phi)
 }
 
 //----------------------------------------------------- 
-void
-MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &ID, SpaceVariable3D &V,
+int
+MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, SpaceVariable3D &ID,
                                                        vector<SpaceVariable3D*> &Phi,
-                                                       vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
+                                                       unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                                       vector<Intersector*> *intersector)
 {
 
+  // --------------------------------------------------------
   // Step 1: Extract useful information from EBDS
+  // --------------------------------------------------------
   assert(EBDS);
-  vector<std::map<int,int>*> color2id;
-  vector<std::set<Int3> > swept; //NOT a pointer. Instead, it stores the cells that need to be updated
-  vector<double***> color;
+  vector<std::set<Int3> > swept; //NOT pointers. Instead, it actually stores the "sets"
+  vector<double***> phi_ebm;
   for(auto&& ebds : *EBDS) {
-    color2id.push_back(ebds->color2id_ptr);
-    color.push_back(ebds->Color_ptr->GetDataPointer());
+    phi_ebm.push_back(ebds->Phi_ptr->GetDataPointer());
 
     swept.push_back(*ebds->swept_ptr);
     // remove cells that are internal ghosts
     for(auto it = swept.back().begin(); it != swept.back().end();) {
       if(!ID.IsHere((*it)[0],(*it)[1],(*it)[2],false))
-        it = sub.erase(it); //returns the iterator to the next element 
+        it = swept.back().erase(it); //returns the iterator to the next element 
       else
         it++;
     }
   }
 
+  // Clean up tag
+  double*** tag = Tag.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) 
+        tag[k][j][i] = 0;
 
+
+  // --------------------------------------------------------
   // Step 2: Make sure occluded cells have INACTIVE id
+  // --------------------------------------------------------
   int has_occ(0);
   for(auto&& ebds : *EBDS) {
     if(ebds->occluded_ptr->size()>0) {
@@ -278,34 +289,77 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &ID, Spac
   }
   MPI_Allreduce(MPI_IN_PLACE, &has_occ, 1, MPI_INT, MPI_MAX, comm);
 
-  double*** id  = has_occ ? ID.GetDataPointer() : NULL;
-  for(auto&& ebds : *EBDS) {
-    for(auto&& ijk : *ebds->occluded_ptr)
-      id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
-    for(auto&& ijk : *ebds->imposed_occluded_ptr)
-      id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
-  }  
-  if(id)
+  if(has_occ) {
+    double*** id  = ID.GetDataPointer();
+    for(auto&& ebds : *EBDS) {
+      for(auto&& ijk : *ebds->occluded_ptr) {
+        id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
+        tag[ijk[2]][ijk[1]][ijk[0]] = 1;
+      }
+      for(auto&& ijk : *ebds->imposed_occluded_ptr) {
+        id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
+        tag[ijk[2]][ijk[1]][ijk[0]] = 1;
+      }
+    }  
     ID.RestoreDataPointerAndInsert();
+  }
 
 
-  // Step 3: Tag swept nodes (not including occluded nodes)
-  double*** tag = Tag.GetDataPointer();
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) 
-        tag[k][j][i] = 0;
+  // --------------------------------------------------------
+  // Step 3: Tag swept nodes (including occluded nodes, tagged above)
+  // --------------------------------------------------------
   for(auto&& sub : swept)
-    for(auto&& ijk : sub)
+    for(auto&& ijk : sub) {
+      if(tag[ijk[2]][ijk[1]][ijk[0]] != 0)
+        fprintf(stderr,"\033[0;35mWarning: Node (%d %d %d) is swept by multiple (>1) embedded surfaces.\n\033[0m",
+                ijk[0], ijk[1], ijk[2]);
+
       tag[ijk[2]][ijk[1]][ijk[0]] = 1; 
+    }
+
+
+  // --------------------------------------------------------
+  // Step 4: Find out external ghosts that need to be updated at the end.
+  // --------------------------------------------------------
+  std::list<int> ghosts;
+  for(int i=0; i<ghost_nodes_outer->size(); i++) {
+    GhostPoint& g((*ghost_nodes_outer)[i]);
+    if(g.type_projection != GhostPoint::FACE)
+      continue;
+    int im_i(g.image_ijk[0]), im_j(g.image_ijk[1]), im_k(g.image_ijk[2]);
+    if(tag[im_k][im_j][im_i] != 0)
+      ghosts.push_back(i);
+  }
+
+
+  // --------------------------------------------------------
+  // Step 5: Untag occluded nodes --- they have been resolved in Step 2.
+  // --------------------------------------------------------
+  if(has_occ) {
+    for(auto&& ebds : *EBDS) {
+      for(auto&& ijk : *ebds->occluded_ptr)
+        tag[ijk[2]][ijk[1]][ijk[0]] = 0;
+      for(auto&& ijk : *ebds->imposed_occluded_ptr)
+        tag[ijk[2]][ijk[1]][ijk[0]] = 0;
+    }  
+  }
   Tag.RestoreDataPointerAndInsert();
+  
 
+  // --------------------------------------------------------
+  // Step 6: Updating swept nodes, iteratively. (Usually one iteration should be enough.)
+  // --------------------------------------------------------
+  int total_count;
+  int iter, max_iteration = 30;
+  bool last_resort = false; //will be true if (1) progress = 0 or (2) max_iteration is reached
 
-  // Step 4: Updating swept nodes, iteratively. (Usually one iteration should be enough.)
-  while(true) {
+  for(iter=0; iter<max_iteration+2; iter++) {
 
-    // 3.1: Count number of cells within domain interior that need correction
-    int total_count = 0;
+    if(iter>=max_iteration)
+      last_resort = true;
+
+    // 6.1: Count number of cells within domain interior that need to be updated
+    total_count = 0;
     for(auto&& sub : swept)
       total_count += sub.size();
     MPI_Allreduce(MPI_IN_PLACE, &total_count, 1, MPI_INT, MPI_SUM, comm);
@@ -313,8 +367,9 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &ID, Spac
     if(total_count==0)
       break;
 
+    int progress = 0;
 
-    // 3.2: Get data
+    // 6.2: Get data
     tag           = Tag.GetDataPointer();
     double*** id  = ID.GetDataPointer();
     Vec5D***  v   = (Vec5D***) V.GetDataPointer();
@@ -324,79 +379,162 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &ID, Spac
       phi[ls] = Phi[ls]->GetDataPointer();
  
 
-    // 2.3: Loop through unresolved swept nodes
-    int i,j,k;
+    // 6.3: Loop through unresolved swept nodes. 
+    //      Note: One node should not be swept by multiple surfaces!
+    int i,j,k,i2,j2,k2;
+    vector<std::pair<Int3,bool> > neighbors; //useful neighbors, paired w/ connected or not
     for(int surf=0; surf<swept.size(); surf++) {
-      for(auto it = swept[surf].begin(); it != swept[surf].end(); it++) {
+      for(auto it = swept[surf].begin(); it != swept[surf].end();) {
         i = (*it)[0];
         j = (*it)[1];
         k = (*it)[2];
 
-        // determine its id
-        id[k][j][i] = (*color2id[surf])[color[surf][k][j][i]];
-        for(int k2=k-1; k2<=k+1; k2++)
-          for(int j2=j-1; j2<=j+1; j2++)
-            for(int i2=i-1; i2<=i+1; i2++) {
+        // Preparation: Collect useful neighbors and intersection info
+        FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,neighbors);
+ 
+        // Determine its id: Check the ID of "valid" neighbors
+        set<int> tmp_id_s;
+        for(auto&& nei : neighbors)
+          if(nei.second) //connected
+            tmp_id_s.insert(id[nei.first[2]][nei.first[1]][nei.first[0]]);
 
-              if(k2==k && j2==j && i2==i) //itself
-                continue; 
-
-              if(!ID.IsHereOrInternalGhost(i2,j2,k2)) //outside physical domain
-                continue;
-
-              if(tag[k2][j2][i2] != 0) //swept, and unresolved yet
-                continue;
-             DETERMINE phi and ID at the same time
-
-        // update state variables
-        double weight = 0.0;
-        Vec5D  vsum(0.0); 
-        for(int k2=k-1; k2<=k+1; k2++)
-          for(int j2=j-1; j2<=j+1; j2++)
-            for(int i2=i-1; i2<=i+1; i2++) {
-
-              if(k2==k && j2==j && i2==i) //itself
-                continue; 
-
-              if(!ID.IsHereOrInternalGhost(i2,j2,k2)) //outside physical domain
-                continue;
-
-              if(tag[k2][j2][i2] != 0) //swept, and unresolved yet
-                continue;
-
-              if(id[k2][j2][i2] == INACTIVE_MATERIAL_ID || 
+        int myid(-1);
+        if(tmp_id_s.size()==1)
+          myid = *tmp_id_s.begin(); //update id[k][j][i] = myid later
+        else {
+          if(!last_resort) {
+            it++;
+            continue; //not ready to update this node.
+          }
+          else { //last resort / fail-safe
+            vector<int> id_votes(varFcn.size(),0);
+            for(auto&& nei : neighbors)
+              if(nei.second) //connected
+                id_votes[id[nei.first[2]][nei.first[1]][nei.first[0]]]++;
+            int myvote = 0;
+            for(int s=0; s<id_votes.size(); s++)
+              if(id_votes[s]>myvote) {
+                myid = s;
+                myvote = id_votes[s];
+              }
+            if(myid==-1) {
+              fprintf(stderr,"\033[0;31m*** Error: Unable to determine the material ID at (%d,%d,%d).\n\033[0m",
+                      i,j,k);
+              exit(-1);
             }
+          }
+        }
+
+        // Update state variables
+        double sum_weight(0.0);
+        double weight(0.0);
+        Vec5D  vsum(0.0); 
+        for(auto&& nei : neighbors) {
+          if(nei.second) {//connected
+            i2 = nei.first[0];
+            j2 = nei.first[1];
+            k2 = nei.first[2];
+            if(myid == id[k2][j2][i2]) {
+              double dist = (Vec3D(global_mesh.GetX(i) ,global_mesh.GetY(j) ,global_mesh.GetZ(k)) -
+                             Vec3D(global_mesh.GetX(i2),global_mesh.GetY(j2),global_mesh.GetZ(k2))).norm();
+              weight        = 1.0/dist; //weighted by 1/dist
+              vsum         += weight*v[k2][j2][i2]; 
+              sum_weight += weight;
+            }
+          }
+        }
+        if(sum_weight==0) {
+          if(!last_resort) {
+            it++;
+            continue;  //not ready to update this node
+          }
+          else {
+            fprintf(stderr,"\033[0;31m*** Error: Unable to determine the state at (%d,%d,%d), id:%d.\n\033[0m",
+                    i,j,k, myid);
+            exit(-1);
+          }
+        }
+
+        v[k][j][i]  = vsum/sum_weight;
+        id[k][j][i] = myid;
+
+
+        // Fix any issues in phi: If the material subdomain corresponding to this ID is tracked by a phi, make sure the phi
+        // value is negative; if it is not tracked by phi, the phi value should be non-negative.
+        for(int ls=0; ls<ls_size; ls++) {
+          if(id[k][j][i] == ls2matid[ls]) {          
+            if(phi[ls][k][j][i]>=0) 
+              phi[ls][k][j][i] = phi_ebm[surf][k][j][i]==0 ? -1.0e-20 : -phi_ebm[surf][k][j][i];
+          }
+          else {
+            if(phi[ls][k][j][i]<0)
+              phi[ls][k][j][i] = phi_ebm[surf][k][j][i];
+          }
+        }
+
+        // Remove this swept node from workload
+        it = swept[surf].erase(it);
+        tag[k][j][i] = 0;
+        progress++;
       }
     }
 
 
+    MPI_Allreduce(MPI_IN_PLACE, &progress, 1, MPI_INT, MPI_SUM, comm);
 
-    MPI_Allreduce(MPI_IN_PLACE, &total_count, 1, MPI_INT, MPI_SUM, comm);
-
- 
-
-
-
-
-
-
-
-
+    if(progress>0) {
+      Tag.RestoreDataPointerAndInsert();
+      ID.RestoreDataPointerAndInsert();
+      V.RestoreDataPointerAndInsert();
+      for(int ls=0; ls<ls_size; ls++) 
+        Phi[ls]->RestoreDataPointerAndInsert();
+    } 
+    else {
+      Tag.RestoreDataPointerToLocalVector();
+      ID.RestoreDataPointerToLocalVector();
+      V.RestoreDataPointerToLocalVector();
+      for(int ls=0; ls<ls_size; ls++) 
+        Phi[ls]->RestoreDataPointerToLocalVector();
+      last_resort = true;
+    }
   }
 
-  loop through swept
+  // print warning and error messages
+  if(iter>10) {
+    if(!last_resort && verbose>=1) 
+      print("- Performed a large number (%d) of iterations to update nodes/cells swept by embedded surfaces.\n",
+            iter);
+  }
+  if(last_resort && total_count==0)
+    print_warning("Warning: Activated the fail-safe procedure to update nodes swept by embedded surfaces.\n");
+  if(total_count>0) {
+    print_error("*** Error: Unable to update %d cells/nodes swept by embedded surfaces.\n", total_count);
+    exit_mpi();
+  }
 
-  use id2color in embedded boundayr operator to update id.
 
-  to get V, loop through non-blocking neighbors that have the same id.
+  // Step 7: Apply boundary conditions to ID
+  int total_ghosts = ghosts.size();
+  MPI_Allreduce(MPI_IN_PLACE, &total_ghosts, 1, MPI_INT, MPI_SUM, comm);
+  if(total_ghosts>0) {
+    double*** id  = ID.GetDataPointer();
+    for(auto&& gid : ghosts) {
+      GhostPoint &g((*ghost_nodes_outer)[gid]);
+      int i(g.ijk[0]), j(g.ijk[1]), k(g.ijk[2]);
+      int im_i(g.image_ijk[0]), im_j(g.image_ijk[1]), im_k(g.image_ijk[2]);
 
-  !!! also need to update phi, if any level set coincides with embedded boundary !!!
-     check the value of phi at swept nodes!
-  
+      id[k][j][i] = id[im_k][im_j][im_i];
+    }
+    ID.RestoreDataPointerAndInsert();
+  }
 
 
+  // Step 8: Clean up
+  for(auto&& ebds : *EBDS)
+    ebds->Phi_ptr->RestoreDataPointerToLocalVector();
 
 
+  return total_ghosts;
 }
 
 //-----------------------------------------------------
@@ -626,10 +764,12 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
     v /= sum_weight;
   else if(upwind) {
     if(verbose>1) 
-      fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions w/ upwinding. Retrying.\n", i,j,k);
+      fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions"
+              " w/ upwinding. Retrying.\n\033[0m", i,j,k);
   } else {
     if(verbose>1) 
-      fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d) by Riemann solutions. Retrying.\n", i,j,k);
+      fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions."
+              " Retrying.\n\033[0m", i,j,k);
   }
 
   return counter;
@@ -713,8 +853,8 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
 
         if(sum_weight==0) {
           if(verbose>1) 
-            fprintf(stderr,"Warning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
-                    "by extrapolation w/ upwinding.\n", i,j,k, x0[0],x0[1],x0[2]);
+            fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+                    "by extrapolation w/ upwinding.\n\033[0m", i,j,k, x0[0],x0[1],x0[2]);
           unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
         } else
           v[k][j][i] /= sum_weight; 
@@ -1703,6 +1843,44 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
   delta_xyz.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
 
+}
+
+//-----------------------------------------------------
+
+void
+MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
+                                                      vector<Intersector*> *intersector,
+                                                      vector<std::pair<Int3,bool> > &neighbors)
+{
+  neighbors.clear();
+
+  Vec3D X0(global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k)), X1;
+
+  // Loop through neighbors
+  for(int k2=k-1; k2<=k+1; k2++)
+    for(int j2=j-1; j2<=j+1; j2++)
+      for(int i2=i-1; i2<=i+1; i2++) {
+
+        if(k2==k && j2==j && i2==i) //itself
+          continue; 
+
+        if(!coordinates.IsHereOrInternalGhost(i2,j2,k2)) //outside physical domain
+          continue;
+
+        if(tag[k2][j2][i2] != 0) //swept, and unresolved yet
+          continue;
+
+        bool connected = true;
+        X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
+        for(auto&& xter : *intersector) {
+          if(xter->Intersects(X0, X1)) {
+            connected = false;
+            break;
+          }
+        }
+
+        neighbors.push_back(std::make_pair(Int3(i2,j2,k2), connected));
+      }
 }
 
 //-----------------------------------------------------

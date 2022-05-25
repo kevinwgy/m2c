@@ -231,8 +231,9 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
   // Part 4: Build color2id (and give it to the intersectors)
   for(int surf=0; surf<intersector.size(); surf++) {
     color2id[surf].clear();
-    bool hasInlet(false), hasOutlet(false), nRegions(0);
-    intersection[surf]->GetColors(hasInlet,hasOutlet,nRegions);
+    bool hasInlet(false), hasOutlet(false);
+    int nRegions(0);
+    intersector[surf]->GetColors(&hasInlet,&hasOutlet,&nRegions);
     color2id[surf][0] = INACTIVE_MATERIAL_ID; //occ color is always 0
     if(hasInlet) //inlet color is always 1
       color2id[surf][1] = iod.bc.inlet.materialid;
@@ -241,7 +242,7 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
     for(int i=1; i<=nRegions; i++) {
       //determine color2id[surf][-i]
       bool found = false;
-      for(auto&& it : inactive_color) {
+      for(auto&& it : inactive_colors) {
         if(it.first == surf && it.second == -i) {
           color2id[surf][-i] = INACTIVE_MATERIAL_ID;
           found = true;
@@ -253,7 +254,7 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
         if(it.second.first == surf && it.second.second == -i) {
           color2id[surf][-i] = it.first;
           found = true;
-          breka;
+          break;
         }
       }
       if(!found) {

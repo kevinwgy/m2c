@@ -151,6 +151,9 @@ public:
 
   void SetColor2ID(std::map<int,int>& c2id) {color2id = c2id;}
 
+  //! Check if a line segment intersects with any triangles inside scope
+  bool Intersects(Vec3D &X0, Vec3D &X1);
+
   //! Interface tracking functions
   void TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers);
 
@@ -171,8 +174,8 @@ public:
 
   void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
 
-  int FloodFillColors(); /**< determine the generalized color function ("Color"). 
-                                                                                          Returns the number of "colors" (sum of the four).\n*/
+  bool FloodFillColors(); /**< determine the generalized color function ("Color").\n 
+                               Returns whether some nodes are occluded.\n"*/
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
   void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
 

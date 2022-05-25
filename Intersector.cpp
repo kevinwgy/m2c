@@ -1458,5 +1458,50 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 
 //-------------------------------------------------------------------------
 
+bool
+Intersector::Intersects(Vec3D &X0, Vec3D &X1)
+{
+  assert(tree);
+
+  // Step 1: Find candidates using the KDTree
+  Vec3D bmin(std::min(X0[0],X1[0]), std::min(X0[1],X1[1]), std::min(X0[2],X1[2]));
+  Vec3D bmax(std::max(X0[0],X1[0]), std::max(X0[1],X1[1]), std::max(X0[2],X1[2]));
+  bmin -= half_thickness;
+  bmax += half_thickness;
+
+  int maxCand = 500;
+  vector<MyTriangle> cands(maxCand);
+  int found = tree->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+  if(found>maxCand) {
+    maxCand = found;
+    cands.resize(maxCand);
+    found = tree->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+  }
+
+  if(!found)
+    return false;
+
+  // Step 2: Check if X0 or X1 is occluded (-->intersection)
+  int tid; //not used
+  if(IsPointOccludedByTriangles(X0, cands.data(), found, half_thickness, tid))
+    return true;
+  if(IsPointOccludedByTriangles(X1, cands.data(), found, half_thickness, tid))
+    return true;
+
+  // Step 3: Check for intersection
+  vector<Vec3D>& Xs(surface.X);
+  vector<Int3>&  Es(surface.elems);
+  for(int i=0; i<found; i++) {
+    Int3 &nodes(Es[cands[i].trId()]);
+    if(GeoTools::LineSegmentIntersectsTriangle(X0, X1, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]]))
+      return true;
+  }
+
+  return false;
+}
+
+//-------------------------------------------------------------------------
+
+
 //-------------------------------------------------------------------------
 
