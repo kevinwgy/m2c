@@ -11,8 +11,8 @@ using std::unique_ptr;
 
 TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                         SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
-                        LaserAbsorptionSolver* laser_)
-                  : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_),
+                        LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_)
+                  : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_), embed(embed_),
                     IDn(comm_, &(dms_.ghosted1_1dof)) 
 {
   for(int i=0; i<lso.size(); i++) {
@@ -43,8 +43,8 @@ TimeIntegratorBase::Destroy()
 
 TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                       SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
-                      LaserAbsorptionSolver* laser_)
-                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_),
+                      LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_)
+                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_),
                   Un(comm_, &(dms_.ghosted1_5dof)),
                   Rn(comm_, &(dms_.ghosted1_5dof))
 {
@@ -72,13 +72,16 @@ void TimeIntegratorFE::Destroy()
 void
 TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                      vector<SpaceVariable3D*>& Phi,
-                                     unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                                      SpaceVariable3D *L,
                                      double time, double dt, int time_step, int subcycle, double dts)
 {
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
+  // Get embedded boundary data
+  unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
+    = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
@@ -117,8 +120,9 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                                      SpaceOperator& spo_ ,vector<LevelSetOperator*>& lso_,
-                                     MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_),
+                                     MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_,
+                                     EmbeddedBoundaryOperator* embed_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
@@ -152,7 +156,6 @@ void TimeIntegratorRK2::Destroy()
 void
 TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                       vector<SpaceVariable3D*>& Phi,
-                                      unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                                       SpaceVariable3D* L, double time, double dt, 
                                       int time_step, int subcycle, double dts)
 {
@@ -160,6 +163,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
 
+  // Get embedded boundary data
+  unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
+    = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
@@ -235,8 +241,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 //----------------------------------------------------------------------------
 TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_,
-                                     MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_),
+                                     MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_,
+                                     EmbeddedBoundaryOperator* embed_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
@@ -271,13 +278,17 @@ void TimeIntegratorRK3::Destroy()
 void
 TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                       vector<SpaceVariable3D*>& Phi, 
-                                      unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+//                                      unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                                       SpaceVariable3D* L, double time, double dt,
                                       int time_step, int subcycle, double dts)
 { 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
+  // Get embedded boundary data
+  unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
+    = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))

@@ -6,6 +6,7 @@
 #include <MultiPhaseOperator.h>
 #include <LaserAbsorptionSolver.h>
 #include <RiemannSolutions.h>
+#include <EmbeddedBoundaryOperator.h>
 using std::vector;
 
 /********************************************************************
@@ -24,6 +25,9 @@ protected:
   //! Laser absorption solver (NULL if laser is not activated)
   LaserAbsorptionSolver* laser;
 
+  //! Embedded boundary method (NULL if not activated)
+  EmbeddedBoundaryOperator* embed;
+
   //!< Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
@@ -36,14 +40,13 @@ protected:
 public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
                      vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
-                     LaserAbsorptionSolver* laser_);
+                     LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_);
 
   virtual ~TimeIntegratorBase();
 
   // Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                   vector<SpaceVariable3D*> &Phi,
-                                  std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                                   SpaceVariable3D *L, double time,
                                   double dt, int time_step, int subcycle, double dts) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
@@ -55,7 +58,7 @@ public:
   // time integrator
   void UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
                                        vector<SpaceVariable3D*> &Phi,
-                                       std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                        SpaceVariable3D *L,
                                        double time, int time_step, int subcycle, double dts);
                                         
@@ -76,12 +79,11 @@ class TimeIntegratorFE : public TimeIntegratorBase
 public:
   TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                    vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
-                   LaserAbsorptionSolver* laser_);
+                   LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_);
   ~TimeIntegratorFE() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                           vector<SpaceVariable3D*>& Phi,
-                          std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                           SpaceVariable3D *L, double time,
                           double dt, int time_step, int subcycle, double dts);
 
@@ -109,12 +111,11 @@ class TimeIntegratorRK2 : public TimeIntegratorBase
 public:
   TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
-                    LaserAbsorptionSolver* laser_);
+                    LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_);
   ~TimeIntegratorRK2() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi,
-                          std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                           SpaceVariable3D *L, double time,
                           double dt, int time_step, int subcycle, double dts);
 
@@ -142,12 +143,11 @@ class TimeIntegratorRK3 : public TimeIntegratorBase
 public:
   TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
-                    LaserAbsorptionSolver* laser_);
+                    LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_);
   ~TimeIntegratorRK3() {}
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi,
-                          std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                           SpaceVariable3D *L, double time,
                           double dt, int time_step, int subcycle, double dts);
 

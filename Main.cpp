@@ -268,11 +268,11 @@ int main(int argc, char* argv[])
   TimeIntegratorBase *integrator = NULL;
   if(iod.ts.type == TsData::EXPLICIT) {
     if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
-      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser);
+      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
-      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser);
+      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
-      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser);
+      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed);
     else {
       print_error("*** Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();
@@ -374,9 +374,7 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      integrator->AdvanceOneTimeStep(V, ID, Phi,
-                                     embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr,
-                                     L, t, dt, time_step, subcycle, dts); 
+      integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 
