@@ -1095,7 +1095,9 @@ MultiPhaseData::MultiPhaseData()
 {
   flux = NUMERICAL;
   recon = CONSTANT;
+
   phasechange_type = RIEMANN_SOLUTION;
+  phasechange_dir  = UPWIND;
 
   riemann_normal = MESH;
 
@@ -1113,7 +1115,7 @@ MultiPhaseData::MultiPhaseData()
 void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 8, father);
+  ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
@@ -1129,6 +1131,11 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
     (ca, "PhaseChange", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_type), 2,
      "RiemannSolution", 0, "Extrapolation", 1);
+
+  new ClassToken<MultiPhaseData>
+    (ca, "PhaseChangeDirection", this,
+     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_dir), 2,
+     "All", 0, "Upwind", 1);
 
   new ClassToken<MultiPhaseData>
     (ca, "RiemannNormal", this,

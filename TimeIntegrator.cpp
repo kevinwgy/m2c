@@ -407,43 +407,61 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
                                                     double time, int time_step, int subcycle, double dts)
 {
 
-  // Check & fix two things: (1) cells belonging to more than 1 subdomain; (2) cells isolated between
-  // material boundaries. (2) is optional, and not done by default (frequency controlled by user).
-  int resolved_conflicts = 0; //if non-zero, force reinitialization of (all) the level sets
-  if(lso.size() && subcycle==0)  //only consider doing this in the first subcycle (if subcycling)
+   
+  if(lso.size()) {
+
+    int resolved_conflicts = 0; //if non-zero, force reinitialization of (all) the level sets
+
+    // Check & fix two things: (1) cells belonging to more than 1 subdomain; (2) cells isolated between
+    // material boundaries. (2) is optional, and not done by default (frequency controlled by user).
     resolved_conflicts = mpo.ResolveConflictsInLevelSets(time_step, Phi);
 
 
-  // Reinitialize level set (frequency specified by user)
-  if(subcycle==0) {
-    for(int i=0; i<Phi.size(); i++) {
-      lso[i]->Reinitialize(time, dts, time_step, *Phi[i], resolved_conflicts>0/*"must_do"*/);
-    }
-  }
-
-
-  // Update ID and V (skipped for single-material simulations)
-  if(lso.size()) {
-
+    // Update ID, V, and possibly also Phi (skipped for single-material simulations)
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
 
     mpo.UpdateMaterialIDByLevelSet(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
 
+    // Correct ID and Phi to be consistent with embedded surfaces (to avoid "leaking")
+    if(EBDS) {
+      assert(embed);
+      resolved_conflicts += mpo.ResolveConflictsWithEmbeddedSurfaces(Phi, IDn, ID, EBDS, embed->GetPointerToIntersectors());
+    }
+
+    // Reinitialize level set (also apply boundary conditions)
+    if(resolved_conflicts>0) { //must reinitialize
+      for(int i=0; i<Phi.size(); i++) 
+        lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true/*"must_do"*/);
+    } else {
+      if(subcycle==0) { //frequency specified by user
+        for(int i=0; i<Phi.size(); i++) 
+          lso[i]->Reinitialize(time, dts, time_step, *Phi[i], false/*"must_do"*/);
+      }
+    }
+
+
     vector<Int3> unresolved;
     int nUnresolved = mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions,
-                                                                   unresolved); //update V
+                              embed ? embed->GetPointerToIntersectors() : nullptr, unresolved); //update V
     if(nUnresolved) {//note that "unresolved" is not combined over all the subdomains, could be empty for some
       //update phi(s) at the unresolved cells
-      mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
-      for(int i=0; i<Phi.size(); i++)
-        lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true); //will NOT change sign of phi
-      mpo.UpdateMaterialIDByLevelSet(Phi, ID); //should only update ID of unresolved cells      
-      mpo.FixUnresolvedNodes(unresolved, IDn, ID, V, unresolved/*not used*/, true); 
+      if(!embed) {//if embed, directly jump to fixing resolved nodes with "apply_failsafe_density = true"!
+        mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
+        for(int i=0; i<Phi.size(); i++)
+          lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true); //will NOT change sign of phi
+        mpo.UpdateMaterialIDByLevelSet(Phi, ID); //should only update ID of unresolved cells      
+      }
+      mpo.FixUnresolvedNodes(unresolved, IDn, ID, V, embed ? embed->GetPointerToIntersectors() : nullptr,
+                             unresolved/*not used*/, true); 
     }
+
+    // add stored latent heat (Lambda) to cells that changed phase due to interface motion
+    mpo.AddLambdaToEnthalpyAfterInterfaceMotion(IDn, ID, V);
 
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
   }
+
 
   // Check for phase transitions
   if(lso.size()) {

@@ -66,15 +66,18 @@ public:
   //! update V due to interface motion
   int UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID,
                                                SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
-                                               std::vector<Int3> &unresolved);
+                                               vector<Intersector*> *intersector, vector<Int3> &unresolved);
 
   int FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
-                         SpaceVariable3D &V, vector<Int3> &still_unresolved,
+                         SpaceVariable3D &V, vector<Intersector*> *intersector, vector<Int3> &still_unresolved,
                          bool apply_failsafe_density); 
 
   //! detect phase transitions and update Phi, ID, and V
   int UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,
                              SpaceVariable3D &V, vector<int> &phi_updated, vector<Int3> *new_useful_nodes);
+
+  //! add stored latent heat (Lambda) to cells that changed phase due to interface motion
+  void AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
 
   //! if the boundaries of multiple material subdomains meet, ensure that the phi's are consistent
   int ResolveConflictsInLevelSets(int time_step, vector<SpaceVariable3D*> &Phi);
@@ -94,18 +97,20 @@ public:
                                          std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                                          vector<Intersector*> *intersector);
 
+  //! update Phi and ID to resolve any conflicts with embedded boundaries
+  int ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*> &Phi,
+          SpaceVariable3D &IDn, SpaceVariable3D &ID,
+          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS, vector<Intersector*> *intersector);
 
   void Destroy();
 
 protected:
   int UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
                                              SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
-                                             vector<Int3> &unresolved);
+                                             vector<Intersector*> *intersector, vector<Int3> &unresolved);
 
   int UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V,
-                                          vector<Int3> &unresolved);
-
-  void AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
+                                          vector<Intersector*> *intersector, vector<Int3> &unresolved);
 
   int LocalUpdateByRiemannSolutions(int i, int j, int k, int id, Vec5D &vl, Vec5D &vr, Vec5D &vb, Vec5D &vt,
                                     Vec5D &vk, Vec5D &vf, RiemannSolutions &riemann_solutions, Vec5D &v,
@@ -120,6 +125,10 @@ protected:
   void FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
                                          vector<Intersector*> *intersector,
                                          vector<std::pair<Int3,bool> > &neighbors);
+
+  //! internal function called by ResolveConflictsWithEmbeddedSurfaces
+  bool IsOrphanAcrossEmbeddedSurfaces(int i, int j, int k, double*** idn, double*** id,
+                                      vector<Intersector*> *intersector);
 };
 
 #endif

@@ -577,6 +577,8 @@ struct MultiPhaseData {
 
   enum PhaseChangeType {RIEMANN_SOLUTION = 0, EXTRAPOLATION = 1} phasechange_type;
 
+  enum PhaseChangeDirection {ALL = 0, UPWIND = 1} phasechange_dir;
+
   enum RiemannNormal {LEVEL_SET = 0, MESH = 1, AVERAGE = 2} riemann_normal;
 
   enum OnOff {Off = 0, On = 1};
