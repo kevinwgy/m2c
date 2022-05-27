@@ -57,20 +57,20 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 
     if(index==0) {
       if(surface_from_other_solver) {
-        if(it->second->surface_provided_by_other_solver != EmbeddedSurfaceData::YES) {
+        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::YES) {
           print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", 
                       index); 
           exit_mpi();
         } 
         continue; //no file to read
       } else {
-        if(it->second->surface_provided_by_other_solver != EmbeddedSurfaceData::NO) {
+        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
           print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by user?", index); 
           exit_mpi();
         }
       }
     } else {
-      if(it->second->surface_provided_by_other_solver != EmbeddedSurfaceData::NO) {
+      if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
         print_error("*** Error: Currently, only one embedded surface (with id 0) can be provided by another solver.");
         exit_mpi();
       }
@@ -733,7 +733,7 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 {
   int phi_layers = 3;
   for(int i=0; i<intersector.size(); i++) {
-    if(iod_embedded_surfaces[i]->surface_provided_by_other_solver == EmbeddedSurfaceData::NO &&
+    if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
        strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
       continue; //this surface is fixed...
     intersector[i]->RecomputeFullCourse(surfaces_prev[i].X, phi_layers);
@@ -797,7 +797,7 @@ EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
   for(int i=0; i<surfaces.size(); i++) {
     if(strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
       continue; //not specified for this surface
-    if(iod_embedded_surfaces[i]->surface_provided_by_other_solver == EmbeddedSurfaceData::YES) {
+    if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::YES) {
       print_error("*** Error: Unable to apply user-defined dynamics for Surface %d, which is owned by "
                   "another solver.\n", i);
       exit_mpi();

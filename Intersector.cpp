@@ -37,7 +37,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   XForward.SetConstantValue(-1, true);
   XBackward.SetConstantValue(-1, true);
 
-  half_thickness = 0.5*iod_surface.tracker.surface_thickness;
+  half_thickness = 0.5*iod_surface.surface_thickness;
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);

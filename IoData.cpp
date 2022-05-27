@@ -2417,26 +2417,11 @@ Assigner* LinePlot::getAssigner()
 
 //------------------------------------------------------------------------------
 
-SurfaceTrackerData::SurfaceTrackerData()
-{
-  surface_thickness = 1.0e-8;
-}
-
-//------------------------------------------------------------------------------
-
-void SurfaceTrackerData::setup(const char *name, ClassAssigner *father)
-{
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
-
-  new ClassDouble<SurfaceTrackerData>(ca, "SurfaceThickness", this, 
-                                      &SurfaceTrackerData::surface_thickness);
-}
-
-//------------------------------------------------------------------------------
-
 EmbeddedSurfaceData::EmbeddedSurfaceData()
 {
-  surface_provided_by_other_solver = NO;
+  provided_by_another_solver = NO;
+
+  surface_thickness = 1.0e-8;
 
   // force calculation
   gauss_points_lofting = 0.0;
@@ -2459,9 +2444,15 @@ Assigner *EmbeddedSurfaceData::getAssigner()
 
   ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
 
-  new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByOtherSolver", this,
-     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
+  new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
      "No", 0, "Yes", 1);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "SurfaceThickness", this, 
+                                      &EmbeddedSurfaceData::surface_thickness);
+
+  new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
+
 
   new ClassToken<EmbeddedSurfaceData> (ca, "GaussQuadrature", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::quadrature), 8,
@@ -2471,8 +2462,6 @@ Assigner *EmbeddedSurfaceData::getAssigner()
   new ClassDouble<EmbeddedSurfaceData>(ca, "GaussPointsLofting", this, &EmbeddedSurfaceData::gauss_points_lofting);
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "InternalPressure", this, &EmbeddedSurfaceData::internal_pressure);
-
-  new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "BoundaryCondition", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::type), 6,
@@ -2484,8 +2473,6 @@ Assigner *EmbeddedSurfaceData::getAssigner()
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "HeatSource", this, &EmbeddedSurfaceData::heat_source);
 
-  tracker.setup("SurfaceTracker", ca);
-  
   new ClassStr<EmbeddedSurfaceData>(ca, "UserDefinedDynamicsCalculator", this, 
                                     &EmbeddedSurfaceData::dynamics_calculator);
 
@@ -2532,7 +2519,7 @@ void EmbeddedBoundaryMethodData::setup(const char *name, ClassAssigner *father)
   new ClassToken<EmbeddedBoundaryMethodData>
     (ca, "RiemannNormal", this,
      reinterpret_cast<int EmbeddedBoundaryMethodData::*>(&EmbeddedBoundaryMethodData::riemann_normal), 
-     3, "LevelSet", 0, "Mesh", 1, "Average", 2);
+     3, "EmbeddedSurface", 0, "Mesh", 1, "Average", 2);
 
   new ClassToken<EmbeddedBoundaryMethodData>
     (ca, "ReconstructionAtInterface", this,

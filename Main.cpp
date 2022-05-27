@@ -233,6 +233,9 @@ int main(int argc, char* argv[])
   mpo.UpdateMaterialIDAtGhostNodes(ID); //ghost nodes (outside domain) get the ID of their image nodes
 
 
+  print("I am here!\n");
+  exit_mpi();
+
   //! Initialize laser radiation solver (if needed)
   LaserAbsorptionSolver* laser = NULL;
   SpaceVariable3D* L = NULL;  //laser radiance

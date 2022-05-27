@@ -1011,18 +1011,6 @@ struct OutputData {
 
 //------------------------------------------------------------------------------
 
-struct SurfaceTrackerData {
-
-  double surface_thickness;
-
-  SurfaceTrackerData();
-  ~SurfaceTrackerData() {}
-
-  void setup(const char *, ClassAssigner * = 0);
-};
-
-//------------------------------------------------------------------------------
-
 struct LagrangianMeshOutputData {
 
   int frequency;
@@ -1052,14 +1040,15 @@ struct EmbeddedSurfaceData {
   //! general information
   enum Type {None = 0, Wall = 1, Symmetry = 2, DirectState = 3, MassFlow = 4, PorousWall = 5,
              Size = 6} type;
-  enum YesNo {NO = 0, YES = 1} surface_provided_by_other_solver;
+  enum YesNo {NO = 0, YES = 1} provided_by_another_solver;
   const char *filename; //!< file for nodal coordinates and elements
   enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
   double heat_source;
 
+  double surface_thickness;
+
   //! tools
   const char *dynamics_calculator;
-  SurfaceTrackerData tracker;
 
   //! force calculation (NONE: force is 0, i.e. one-way coupling)
   enum GaussQuadratureRule {NONE = 0, ONE_POINT = 1, THREE_POINT = 2, FOUR_POINT = 3,
