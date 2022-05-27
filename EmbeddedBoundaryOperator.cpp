@@ -96,9 +96,6 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // set NULL to intersector pointers
   intersector.resize(surfaces.size(), NULL);
 
-  // create color2id with empty maps (but the right size).
-  color2id.resize(surfaces.size());
-
   // setup output
   for(int i=0; i<surfaces.size(); i++)
     lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
@@ -165,14 +162,10 @@ EmbeddedBoundaryOperator::SetupIntersectors()
 //------------------------------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id2closure_)
+EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> > &id2closure)
 {
 
-  // Part 1: Store id2color
-  id2color = id2closure_;
-
-
-  // Part 2: Find inactive colors. Warning: When multiple surfaces have inactive regions that are close
+  // Part 1: Find inactive colors. Warning: When multiple surfaces have inactive regions that are close
   //         to each other or overlapping, the information collected here is invalid.
   inactive_colors.clear();
   for(int i=0; i<surfaces.size(); i++) {
@@ -180,7 +173,7 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
     int nRegions = EBDS->nRegions; //this is the number of *closures*. Colors -1, -2, ...
     for(int color = -1; color>=-nRegions; color--) {
       bool found = false;
-      for(auto it = id2color.begin(); it != id2color.end(); it++) {
+      for(auto it = id2closure.begin(); it != id2closure.end(); it++) {
         if(it->second.first == i && it->second.second == color) {
           found = true;
           break;
@@ -192,7 +185,7 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
   }
 
 
-  // Part 3: Find inactive_elem_status. Needed for force computation
+  // Part 2: Find inactive_elem_status. Needed for force computation
   inactive_elem_status.resize(surfaces.size());
   vector<bool> touched(surfaces.size(), false);
   for(auto it = inactive_colors.begin(); it != inactive_colors.end(); it++) {
@@ -227,44 +220,6 @@ EmbeddedBoundaryOperator::GatherColorInfo(std::map<int, std::pair<int,int> > &id
     }
   }
 
-
-  // Part 4: Build color2id (and give it to the intersectors)
-  for(int surf=0; surf<intersector.size(); surf++) {
-    color2id[surf].clear();
-    bool hasInlet(false), hasOutlet(false);
-    int nRegions(0);
-    intersector[surf]->GetColors(&hasInlet,&hasOutlet,&nRegions);
-    color2id[surf][0] = INACTIVE_MATERIAL_ID; //occ color is always 0
-    if(hasInlet) //inlet color is always 1
-      color2id[surf][1] = iod.bc.inlet.materialid;
-    if(hasOutlet) //outlet color is always 2
-      color2id[surf][2] = iod.bc.outlet.materialid;
-    for(int i=1; i<=nRegions; i++) {
-      //determine color2id[surf][-i]
-      bool found = false;
-      for(auto&& it : inactive_colors) {
-        if(it.first == surf && it.second == -i) {
-          color2id[surf][-i] = INACTIVE_MATERIAL_ID;
-          found = true;
-          break;
-        }
-      }
-      if(found) continue;
-      for(auto&& it : id2color) {
-        if(it.second.first == surf && it.second.second == -i) {
-          color2id[surf][-i] = it.first;
-          found = true;
-          break;
-        }
-      }
-      if(!found) {
-        print_error("*** Error: Unable to determine the material ID for color %d from surface %d.\n",
-                    -i, surf);
-        exit_mpi();
-      }
-    }
-    intersector[surf]->SetColor2ID(color2id[surf]);
-  }
 
 }
 

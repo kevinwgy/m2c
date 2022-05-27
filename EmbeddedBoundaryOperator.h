@@ -32,13 +32,9 @@ class EmbeddedBoundaryOperator {
   vector<vector<Vec3D> > F; //!< forces
   vector<vector<Vec3D> > F_prev; //!< forces at the previous time step
   vector<EmbeddedSurfaceData::Type> surface_type;
-  vector<std::map<int,int> > color2id; //!< maps each color to a material id
   vector<Intersector*> intersector; //!< one intersector for each embedded surface (initialized to NULL)
  
   vector<LagrangianOutput> lagout; //!< output displacement and *nodal load* on embedded surfaces
-
-  //! mapping from material ID (specified using "points") to <surface number, color>
-  std::map<int, std::pair<int,int> > id2color;
 
   //! inactive closures: pair of <surface number, color>
   std::set<std::pair<int,int> > inactive_colors;
@@ -85,8 +81,8 @@ public:
                           GlobalMeshInfo &global_mesh_);
   void SetupIntersectors();
 
-  //build id2color, color2id, inactive_colors, and inactive_elem_status
-  void GatherColorInfo(std::map<int, std::pair<int,int> > &id2closure_); 
+  //build inactive_colors, and inactive_elem_status
+  void FindSolidBodies(std::multimap<int, std::pair<int,int> > &id2closure); 
 
   void ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID);
 

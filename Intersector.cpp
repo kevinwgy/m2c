@@ -109,7 +109,6 @@ Intersector::GetPointerToResults()
   ebds->Phi_nLayer              = Phi_nLayer;
   ebds->Color_ptr               = &Color;
   ebds->ColorReachesBoundary_ptr= &ColorReachesBoundary;
-  ebds->color2id_ptr            = &color2id;
   ebds->hasInlet                = hasInlet;
   ebds->hasOutlet               = hasOutlet;
   ebds->nRegions                = nRegions;
@@ -1256,7 +1255,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
 
   // Step 0. Check if the domain (not just this subdomain) has the input color
   if((this_color==1 && !hasInlet) || (this_color==2 && !hasOutlet) || this_color>2 || this_color==0 ||
-     this_color<nRegions) {
+     this_color<-nRegions) {
     print_error("*** Error: (FindColorBoundary) Unable to find the boundary of an invalid color %d.\n",
                 this_color);
     exit_mpi();

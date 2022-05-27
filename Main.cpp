@@ -156,7 +156,6 @@ int main(int argc, char* argv[])
   } else
     INACTIVE_MATERIAL_ID = INT_MAX; //not used!
   
-
   //! Initialize interpolator
   InterpolatorBase *interp = NULL;
   if(true) //may add more choices later
@@ -178,10 +177,14 @@ int main(int argc, char* argv[])
   SpaceVariable3D ID(comm, &(dms.ghosted1_1dof)); //!< material id
 
   //! Impose initial condition
-  std::map<int, std::pair<int,int> >
+  std::multimap<int, std::pair<int,int> >
   id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
+  fprintf(stderr,"size = %d.\n", (int)id2closure.size());
+  for(auto&& p : id2closure)
+    fprintf(stderr,"%d -> (%d, %d).\n", p.first, p.second.first, p.second.second);
   if(embed)
-    embed->GatherColorInfo(id2closure);  //also tracks the colors of solid bodies
+    embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
+  fprintf(stderr,"I am here yeah.\n");
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -232,6 +235,11 @@ int main(int argc, char* argv[])
   }
   mpo.UpdateMaterialIDAtGhostNodes(ID); //ghost nodes (outside domain) get the ID of their image nodes
 
+
+  ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
+  V.StoreMeshCoordinates(spo.GetMeshCoordinates());
+  ID.WriteToVTRFile("ID.vtr","id");
+  V.WriteToVTRFile("V.vtr", "sol");
 
   print("I am here!\n");
   exit_mpi();

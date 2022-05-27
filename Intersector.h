@@ -63,7 +63,6 @@ class Intersector {
   TriangulatedSurface &surface; //!< the surface tracked by the intersector
   bool closed_surface; //!< whether the surface is closed AND normals are consistent
   double half_thickness; //!< half thickness of the surface
-  std::map<int,int> color2id; //!< mapping from color to material id
 
   std::vector<MyTriangle> scope; //!< triangles relevant to the current subdomain (no tol for the BB of triangles)
   KDTree<MyTriangle, 3> *tree; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
@@ -148,8 +147,6 @@ public:
   ~Intersector();
 
   void Destroy();
-
-  void SetColor2ID(std::map<int,int>& c2id) {color2id = c2id;}
 
   //! Check if a line segment intersects with any triangles inside scope
   bool Intersects(Vec3D &X0, Vec3D &X1);

@@ -16,6 +16,7 @@ using std::endl;
 using std::max;
 using std::min;
 using std::map;
+using std::multimap;
 using std::unique_ptr;
 using std::tuple;
 using std::get;
@@ -661,7 +662,7 @@ void SpaceOperator::SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, 
 //-----------------------------------------------------
 
 //apply IC within the real domain
-map<int, pair<int,int> > 
+multimap<int, pair<int,int> > 
 SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
                                    unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS)
 {
@@ -1257,7 +1258,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
     exit_mpi();
   }
 
-  map<int, pair<int,int> > id2closure;
+  multimap<int, pair<int,int> > id2closure;
   if(EBDS != nullptr) {
 
     for(auto it=ic.pointMap.dataMap.begin(); it!=ic.pointMap.dataMap.end(); it++) {
@@ -1265,7 +1266,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       print("- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
             it->second->x, it->second->y, it->second->z, it->second->initialConditions.materialid);
 
-      id2closure = ApplyPointBasedInitialCondition(*it->second, *EBDS, color, v, id);
+      id2closure.insert(ApplyPointBasedInitialCondition(*it->second, *EBDS, color, v, id));
     }
 
     // Verification (can be deleted): occluded nodes should have inactive_material_id
@@ -1314,15 +1315,13 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 //-----------------------------------------------------
 //! Apply boundary condition based on user-specified point and "flood-fill"
-map<int, pair<int,int> > 
+pair<int, pair<int,int> > 
 SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
                                                vector<unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
                                                vector<double***> &color,
                                                Vec5D*** v, double*** id)
 {
   assert(EBDS.size()>0);
-
-  map<int, pair<int,int> > id2closure;
 
   //Step 1. Locate the point within the mesh
   Vec3D this_point(point.x, point.y, point.z);
@@ -1453,10 +1452,6 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
   }
 
 
-  //Store the mapping from point-based materialid to the ruling surface and "color"
-  if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 0)
-    id2closure[point.initialConditions.materialid] = make_pair(ruling_surface, mycolor_final);
-
   //Step 4: Update state variables and ID
   double*** ruling_colors = color[ruling_surface];
   for(int k=k0; k<kmax; k++)
@@ -1472,7 +1467,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
           }
         }
 
-  return id2closure; //data will be copied; ok because the size should be very small
+  return make_pair(point.initialConditions.materialid, make_pair(ruling_surface, mycolor_final));
 }
 
 //-----------------------------------------------------

@@ -46,7 +46,7 @@ public:
   inline double ComputeTotalEnthalpyPerUnitMass(double *V) {return e0;}
   inline bool   ClipDensityAndPressure(double *V, double *U) {
     V[0] = rho0; V[1] = V[2] = V[3] = 0.0; V[4] = p0;
-    U[0] = rho0; U[1] = U[2] = U[3] = 0.0; U[4] = rho0*e0;
+    if(U) {U[0] = rho0; U[1] = U[2] = U[3] = 0.0; U[4] = rho0*e0;}
     return false;
   }
 
