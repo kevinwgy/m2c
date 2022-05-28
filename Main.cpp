@@ -182,9 +182,8 @@ int main(int argc, char* argv[])
   fprintf(stderr,"size = %d.\n", (int)id2closure.size());
   for(auto&& p : id2closure)
     fprintf(stderr,"%d -> (%d, %d).\n", p.first, p.second.first, p.second.second);
-  if(embed)
+  if(embed && !id2closure.empty())
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
-  fprintf(stderr,"I am here yeah.\n");
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -204,10 +203,14 @@ int main(int argc, char* argv[])
     lso.push_back(new LevelSetOperator(comm, dms, iod, *it->second, spo));
     Phi.push_back(new SpaceVariable3D(comm, &(dms.ghosted1_1dof)));
 
-    if(id2closure.find(matid) != id2closure.end()) {
+    auto closures = id2closure.equal_range(matid);
+    if(closures.first != closures.second) {//found this matid
+      vector<std::pair<int,int> > surf_and_color;
+      for(auto it2 = closures.first; it2 != closures.second; it2++)
+        surf_and_color.push_back(it2->second);
       lso.back()->SetInitialCondition(*Phi.back(), 
-                                      embed->GetPointerToEmbeddedBoundaryData(id2closure[matid].first),
-                                      id2closure[matid].second);
+                                      embed->GetPointerToEmbeddedBoundaryData(),
+                                      &surf_and_color);
     } else
       lso.back()->SetInitialCondition(*Phi.back());
 
@@ -236,14 +239,6 @@ int main(int argc, char* argv[])
   mpo.UpdateMaterialIDAtGhostNodes(ID); //ghost nodes (outside domain) get the ID of their image nodes
 
 
-  ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
-  V.StoreMeshCoordinates(spo.GetMeshCoordinates());
-  ID.WriteToVTRFile("ID.vtr","id");
-  V.WriteToVTRFile("V.vtr", "sol");
-
-  print("I am here!\n");
-  exit_mpi();
-
   //! Initialize laser radiation solver (if needed)
   LaserAbsorptionSolver* laser = NULL;
   SpaceVariable3D* L = NULL;  //laser radiance
@@ -270,6 +265,19 @@ int main(int argc, char* argv[])
   if(iod.ion.materialMap.dataMap.size() != 0)
     ion = new IonizationOperator(comm, dms, iod, vf);
 
+
+/*
+  ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
+  V.StoreMeshCoordinates(spo.GetMeshCoordinates());
+  ID.WriteToVTRFile("ID.vtr","id");
+  V.WriteToVTRFile("V.vtr", "sol");
+  if(Phi.size()>0) {
+    Phi[0]->StoreMeshCoordinates(spo.GetMeshCoordinates());
+    Phi[0]->WriteToVTRFile("Phi0.vtr", "phi0");
+  }
+  print("I am here!\n");
+  exit_mpi();
+*/
 
   //! Initialize output
   Output out(comm, dms, iod, vf, spo.GetMeshCellVolumes(), ion); 

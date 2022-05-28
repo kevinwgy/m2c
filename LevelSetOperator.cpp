@@ -12,6 +12,7 @@
 using std::min;
 using std::max;
 using std::pair;
+using std::unique_ptr;
 
 extern double domain_diagonal;
 //-----------------------------------------------------
@@ -279,7 +280,9 @@ void LevelSetOperator::CreateGhostNodeLists()
 
 //-----------------------------------------------------
 
-void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, std::unique_ptr<EmbeddedBoundaryDataSet> EBDS, int mycolor)
+void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, 
+                                           unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                           vector<pair<int,int> > *surf_and_color)
 {
   //get info
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
@@ -588,7 +591,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, std::unique_ptr
 
 
   int ebds_counter = 0;
-  if(EBDS != nullptr) {
+  if(EBDS && surf_and_color) {
     if(!reinit) {
       print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary. In this case, \n"
                   "           level set reinitialization must be turned on.\n", materialid);
@@ -600,65 +603,64 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, std::unique_ptr
                     "         it may be better to 'fix' the first layer nodes when reinitializing the level set.\n",
                     materialid);
 
-    int nLayer = EBDS->Phi_nLayer;
-    if(nLayer<2) 
-      print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary.\n"
-                    "         The intersector should compute unsigned distance ('phi') for at least two layers\n"
-                    "         of nodes. Currently, this value is set to %d.\n", EBDS->Phi_nLayer); 
 
-    double*** color = EBDS->Color_ptr->GetDataPointer();
-    double*** psi   = EBDS->Phi_ptr->GetDataPointer();
+    for(auto&& mypair : *surf_and_color) {
+
+      int surf = mypair.first;
+      int mycolor = mypair.second;
+
+      int nLayer = (*EBDS)[surf]->Phi_nLayer;
+      if(nLayer<2) 
+        print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary.\n"
+                      "         The intersector should compute unsigned distance ('phi') for at least two layers\n"
+                      "         of nodes. Currently, this value is set to %d.\n", (*EBDS)[surf]->Phi_nLayer); 
+
+      double*** color = (*EBDS)[surf]->Color_ptr->GetDataPointer();
+      double*** psi   = (*EBDS)[surf]->Phi_ptr->GetDataPointer();
      
-    int k1,j1,i1;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
     
-          //Check if this node is within nLayer of the interface
-          bool near = false;
-          for(int dk=-nLayer; dk<=nLayer; dk++) {
-            k1 = k + dk;
-            for(int dj=-nLayer; dj<=nLayer; dj++) {
-              j1 = j + dj;
-              for(int di=-nLayer; di<=nLayer; di++) {
-                i1 = i + di; 
-                if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
-                  continue;
-                if(color[k1][j1][i1] == mycolor) {
-                  near = true;
-                  goto DONE;  
+            //Check if this node is within nLayer of the interface
+            bool near = false;
+            for(int k1 = k-nLayer; k1 <= k+nLayer; k1++)
+              for(int j1 = j-nLayer; j1 <= j+nLayer; j1++)
+                for(int i1 = i-nLayer; i1 <= i+nLayer; i1++) {
+                  if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
+                    continue;
+                  if(color[k1][j1][i1] == mycolor) {
+                    near = true;
+                    goto DONE;  
+                  }
                 }
-              }
-            }
-          }
 DONE:
 
-          if(!near) 
-            continue; //nothing to do
+            if(!near) 
+              continue; //nothing to do
 
-          ebds_counter++;
+            ebds_counter++;
 
-          // determine phi at [k][j][i]
-          if(color[k][j][i] == mycolor) {//"inside"
-            if(phi[k][j][i]>=0) 
-              phi[k][j][i] = -psi[k][j][i];
-            else
-              phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
-          } else if(color[k][j][i] == 0) {//occluded
-            phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
-          } else { //"outside"
-            if(phi[k][j][i]>=0)
-              phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
-            else //this is really bad... the user should avoid this...
-              phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+            // determine phi at [k][j][i]
+            if(color[k][j][i] == mycolor) {//"inside"
+              if(phi[k][j][i]>=0) 
+                phi[k][j][i] = -psi[k][j][i];
+              else
+                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+            } else if(color[k][j][i] == 0) {//occluded
+              phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
+            } else { //"outside"
+              if(phi[k][j][i]>=0)
+                phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
+              else //this is really bad... the user should avoid this...
+                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+            }
           }
-        }
 
 
-    MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
-
-    EBDS->Color_ptr->RestoreDataPointerToLocalVector();
-    EBDS->Phi_ptr->RestoreDataPointerToLocalVector();
+      (*EBDS)[surf]->Color_ptr->RestoreDataPointerToLocalVector();
+      (*EBDS)[surf]->Phi_ptr->RestoreDataPointerToLocalVector();
+    }
   }
 
   coordinates.RestoreDataPointerToLocalVector();
@@ -671,7 +673,8 @@ DONE:
     reinit->ConstructNarrowBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
   }
 
-  if(EBDS && ebds_counter>0) {
+  MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
+  if(ebds_counter>0) {
     print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
           materialid, ebds_counter);
     Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"

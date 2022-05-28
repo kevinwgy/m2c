@@ -4,6 +4,7 @@
 #include <IoData.h>
 #include <Reconstructor.h>
 #include <LevelSetReinitializer.h>
+#include <memory> //unique_ptr
 /*******************************************
  * class LevelSetOperator drives the solution
  * of the level set equation
@@ -65,7 +66,9 @@ public:
                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo);
   ~LevelSetOperator();
 
-  void SetInitialCondition(SpaceVariable3D &Phi, std::unique_ptr<EmbeddedBoundaryDataSet> EBDS = nullptr, int mycolor = INT_MIN);
+  void SetInitialCondition(SpaceVariable3D &Phi, 
+                           std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr,
+                           vector<std::pair<int,int> > *surf_and_color = NULL);
 
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
 
