@@ -265,7 +265,6 @@ int main(int argc, char* argv[])
   if(iod.ion.materialMap.dataMap.size() != 0)
     ion = new IonizationOperator(comm, dms, iod, vf);
 
-
 /*
   ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
   V.StoreMeshCoordinates(spo.GetMeshCoordinates());
@@ -282,6 +281,8 @@ int main(int argc, char* argv[])
   //! Initialize output
   Output out(comm, dms, iod, vf, spo.GetMeshCellVolumes(), ion); 
   out.InitializeOutput(spo.GetMeshCoordinates());
+
+  print_warning("Got here :)\n");
 
   //! Initialize time integrator
   TimeIntegratorBase *integrator = NULL;
@@ -302,6 +303,8 @@ int main(int argc, char* argv[])
   }
 
 
+  print_warning("Got here 2:)\n");
+
 
   /*************************************
    * Main Loop 
@@ -318,6 +321,7 @@ int main(int argc, char* argv[])
   if(laser) //initialize L (otherwise the initial output will only have 0s)
     laser->ComputeLaserRadiance(V, ID, *L, t);
 
+  print_warning("Got here 3:)\n");
   //! Compute force on embedded surfaces (if any) using initial state
   if(embed) {
     embed->ComputeForces(V, ID);
@@ -327,6 +331,7 @@ int main(int argc, char* argv[])
     embed->OutputResults(t, dt, time_step, true/*force_write*/); //!< write displacement and nodal loads to file
   }
 
+  print_warning("Got here 4:)\n");
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
 
@@ -334,9 +339,13 @@ int main(int argc, char* argv[])
     concurrent.CommunicateBeforeTimeStepping(); 
   }
 
+  print_warning("Got here 5:)\n");
   if(embed) {
+    print_warning("I am here.\n");
     embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not conccurent solver)
+    print_warning("I am here 2.\n");
     embed->TrackUpdatedSurfaces();
+    print_warning("I am here 3.\n");
     int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                  embed->GetPointerToEmbeddedBoundaryData(),
                                  embed->GetPointerToIntersectors()); //update V, ID, Phi
@@ -348,6 +357,8 @@ int main(int argc, char* argv[])
     }
   }
 
+  print_warning("Got here 6:)\n");
+  exit_mpi();
   // find maxTime, and dts (meaningful only with concurrent programs)
   double tmax = iod.ts.maxTime;
   double dts = 0.0;

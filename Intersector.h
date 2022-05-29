@@ -196,7 +196,7 @@ public:
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();
 
   //! Get pointer to "scope"
-  void GetElementsInScope(std::vector<int> elems_in_scope);
+  void GetElementsInScope(std::vector<int> &elems_in_scope);
 
   //! Get colors
   void GetColors(bool *hasInlet_ = NULL, bool *hasOutlet_ = NULL, int *nRegions_ = NULL) {

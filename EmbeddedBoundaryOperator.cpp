@@ -36,7 +36,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
     F.resize(counter);
   }
 
-  surfaces.resize(surfaces.size());
+  surfaces_prev.resize(surfaces.size());
   F_prev.resize(F.size());
  
   // set default boundary type to "None"
@@ -187,6 +187,9 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 
   // Part 2: Find inactive_elem_status. Needed for force computation
   inactive_elem_status.resize(surfaces.size());
+  for(int surf=0; surf<surfaces.size(); surf++)
+    inactive_elem_status[surf].resize(surfaces[surf].elems.size(), 0);
+
   vector<bool> touched(surfaces.size(), false);
   for(auto it = inactive_colors.begin(); it != inactive_colors.end(); it++) {
     int surf = it->first;
@@ -524,13 +527,22 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
 
   // loop through all the surfaces
   for(int i = 0; i < F.size(); i++) {
+
+    if(F_prev[i].size()>0) //not the first time
+      assert(F[i].size() == F_prev[i].size());
+    else
+      F_prev[i].resize(F[i].size(),Vec3D(0.0));
+
     // copy force
-    assert(F[i].size() == F_prev[i].size());
     for(int j=0; j<F[i].size(); j++)
       F_prev[i][j] = F[i][j];
 
+    if(surfaces_prev[i].X.size()>0) //not the first time
+      assert(surfaces[i].X.size() == surfaces_prev[i].X.size());
+    else
+      surfaces_prev[i].X.resize(surfaces[i].X.size(),Vec3D(0.0));
+      
     // copy nodal coords
-    assert(surfaces[i].X.size() == surfaces_prev[i].X.size());
     for(int j=0; j<surfaces[i].X.size(); j++)
       surfaces_prev[i].X[j] = surfaces[i].X[j];
   }
@@ -607,7 +619,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
       vector<Vec3D> tg(np, 0.0); //traction at each Gauss point, (-pI + tau)n --> a Vec3D
 
-      assert(fabs(Ns[tid].norm()-1.0)<1.0-12); //normal must be valid!
+      assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
 
       for(int side=0; side<2; side++) { //loop through the two sides
 
@@ -622,6 +634,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
           // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
           double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
           xg += loft*normal;
+          //fprintf(stderr,"side = %d, p = %d, loft = %e, xg = %e %e %e.\n", side, p, loft,xg[0], xg[1], xg[2]);
           
           // Check if this Gauss point is in this subdomain.
           Int3 ijk;
@@ -632,9 +645,8 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
           // Calculate traction at Gauss point on this "side"
           if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
             tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
-          else
+          else 
             tg[p] += CalculateTractionAtPoint(xg, side, As[tid], normal, n, Xs, v, id); 
-
         }
 
       }
@@ -651,8 +663,19 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
     }
 
     // Processor 0 assembles the loads on the entire surface
-    MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+    if(mpi_rank==0)
+      MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+    else
+      MPI_Reduce((double*)Fs.data(), NULL, 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
 
+/*
+    Vec3D sum(0.0);
+    for(auto&& f : Fs) {
+      sum+= f;
+      print("%e %e %e\n", f[0], f[1], f[2]);
+    }
+    print("sum = %e %e %e.\n", sum[0], sum[1], sum[2]);
+*/
   }
   
   V.RestoreDataPointerToLocalVector();
@@ -853,6 +876,11 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
         k = ijk0[2] + dk;
 
         assert(coordinates_ptr->IsHere(i,j,k,true)); //Not in the ghosted subdomain? Something is wrong
+
+        if(coordinates_ptr->OutsidePhysicalDomainAndUnpopulated(i,j,k)) { //state variable unavailable here.
+          sameside[dk][dj][di] = false;
+          continue;
+        }
 
         if(id[k][j][i] == INACTIVE_MATERIAL_ID) {
           sameside[dk][dj][di] = false;

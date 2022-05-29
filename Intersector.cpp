@@ -126,7 +126,7 @@ Intersector::GetPointerToResults()
 //-------------------------------------------------------------------------
 
 void
-Intersector::GetElementsInScope(std::vector<int> elems_in_scope)
+Intersector::GetElementsInScope(std::vector<int> &elems_in_scope)
 {
   elems_in_scope.resize(scope.size());
   for(int i=0; i<scope.size(); i++)
