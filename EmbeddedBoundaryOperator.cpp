@@ -82,6 +82,9 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 
     surfaces[index].X0 = surfaces[index].X;
 
+    // initialize the velocity vector (to 0)
+    surfaces[index].Udot.resize(surfaces[index].X.size(), 0.0);
+
     surfaces[index].BuildConnectivities();
     surfaces[index].CalculateNormalsAndAreas();
 /*
@@ -723,17 +726,19 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 void
 EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
 {
-  for(int i=0; i<surfaces.size(); i++) {
-    if(strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+  for(int surf=0; surf<surfaces.size(); surf++) {
+    if(strcmp(iod_embedded_surfaces[surf]->dynamics_calculator, "") == 0)
       continue; //not specified for this surface
-    UserDefinedDynamics *calculator(std::get<0>(dynamics_calculator[i]));
+    UserDefinedDynamics *calculator(std::get<0>(dynamics_calculator[surf]));
     assert(calculator);
 
-    vector<Vec3D> &Xs(surfaces[i].X);
-    vector<Vec3D> &X0(surfaces[i].X0);
+    vector<Vec3D> &Xs(surfaces[surf].X);
+    vector<Vec3D> &X0(surfaces[surf].X0);
     vector<Vec3D> disp(Xs.size(), 0.0);
-    calculator->GetUserDefinedDynamics(t, Xs.size(), (double*)Xs.data(), 
-                                       (double*)disp.data(), (double*)surfaces[i].Udot.data());
+    fprintf(stderr,"Hello... udot size is %d\n", (int)surfaces[surf].Udot.size());
+    calculator->GetUserDefinedDynamics(t, disp.size(), (double*)X0.data(), (double*)Xs.data(),
+                                       (double*)disp.data(), (double*)surfaces[surf].Udot.data());
+    fprintf(stderr,"Hello again...\n");
     for(int i=0; i<Xs.size(); i++) {
       for(int j=0; j<3; j++)
         Xs[i][j] = X0[i][j] + disp[i][j];
