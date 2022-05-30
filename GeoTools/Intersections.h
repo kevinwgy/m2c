@@ -4,7 +4,7 @@
 
 namespace GeoTools {
 
-const double INTERSECTIONS_EPSILON = 1.0e-18;
+const double INTERSECTIONS_EPSILON = 1.0e-20;
 
 //! Moller-Trumbore intersection algorithm (Moller and Trumbore, 1997)
 bool RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray

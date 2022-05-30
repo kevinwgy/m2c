@@ -178,12 +178,16 @@ LineSegmentIntersectsTriangle(Vec3D X0, Vec3D X1, //!< vertices of line segment
                               Vec3D* baryCoords) //!< optional output: barycentric coords of intersection point
 {
   Vec3D D = X1 - X0;
+  double len = D.norm();
+  assert(len>0);
+  D /= len;
+
   double t(0.0);
-  bool intersect = RayIntersectsTriangle(X0, D, V0, V1, V2, &t, xp, baryCoords, false);
+  bool intersect = RayIntersectsTriangle(X0, D, V0, V1, V2, &t, xp, baryCoords, true);
 
   if(d) *d = t;
 
-  if(!intersect || t>1.0 - INTERSECTIONS_EPSILON)
+  if(!intersect || t>len - INTERSECTIONS_EPSILON)
     return false;
   else
     return true;
@@ -204,7 +208,7 @@ LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis
 
   if(d) *d = t;
 
-  if(!intersect || t>len - INTERSECTIONS_EPSILON*len)
+  if(!intersect || t>len - INTERSECTIONS_EPSILON)
     return false;
   else
     return true;

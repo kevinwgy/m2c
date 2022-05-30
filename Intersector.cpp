@@ -375,9 +375,6 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
     for(int j=jj0_in; j<jjmax_in; j++)
       for(int i=ii0_in; i<iimax_in; i++) {
   
-        // start with assuming it is outside
-        color[k][j][i] = 1;
-
         // start with a meaningless triangle id
         occid[k][j][i] = -1;
 
@@ -978,6 +975,14 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
     if(total_remaining_nodes == 0) //Yeah
       break;
   
+/*
+    if(total_remaining_nodes>0) {
+      fprintf(stderr,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
+      Color.StoreMeshCoordinates(coordinates);
+      Color.WriteToVTRFile("Color.vtr", "color");
+    }
+*/
+
     if(!color) //first iteration
       color = Color.GetDataPointer();
 
@@ -991,6 +996,11 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
       if(!coordinates.IsHere(i0,j0,k0,false))
         continue; //this is an internal ghost. we let its owner fix it.
 
+      if(color[k0][j0][i0] == 0) { //occluded
+        nodes2fill2.erase(nodes2fill2.find(*it)); 
+        continue;
+      }
+
       color[k0][j0][i0] = BAD_SIGN;
 
       // if this node is swept, candidates must exist. Otherwise, the surface moved too much!
@@ -1003,7 +1013,7 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
         for(int j=j0-1; j<=j0+1; j++)
           for(int i=i0-1; i<=i0+1; i++) {
 
-            if(!coordinates.OutsidePhysicalDomain(i,j,k) || (i==i0 && j==j0 && k==k0))
+            if(coordinates.OutsidePhysicalDomain(i,j,k) || (i==i0 && j==j0 && k==k0))
               continue; //this neighbor is out of physical domain, or just the same node
 
             if(nodes2fill2.find(Int3(i,j,k)) != nodes2fill2.end()) //uses "nodes2fill2", the latest updated list
@@ -1016,12 +1026,14 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
             for(auto it2 = cands.begin(); it2 != cands.end(); it2++) {
               int id = it2->trId();
               Int3 &nodes(Es[id]);
-              blocked = GeoTools::LineSegmentIntersectsTriangle(Vec3D(x_glob[i],y_glob[j],z_glob[k]),//inside physical domain (safe)
+              blocked = GeoTools::LineSegmentIntersectsTriangle(Vec3D(x_glob[i],y_glob[j],z_glob[k]),
                                                                 Vec3D(x_glob[i0],y_glob[j0],z_glob[k0]), 
                                                                 Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]]);
+
               if(blocked)
                 break;
             }
+
             if(blocked)
               continue; //this neighbor is blocked from me by the surface
 
@@ -1134,8 +1146,11 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
       Vec3D coords(x_glob[(*it)[0]], y_glob[(*it)[1]], z_glob[(*it)[2]]); //inside physical domain (safe)
       if(GeoTools::IsPointSweptByTriangle(coords, X0[nodes[0]], X0[nodes[1]], X0[nodes[2]],
                                           Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], &collision_time, half_thickness, 
-                                          NULL, NULL, &(As[id]), &(Ns[id])))
+                                          NULL, NULL, &(As[id]), &(Ns[id]))) {
         swept.insert(*it);
+        //fprintf(stderr,"Found swept node: [%d][%d][%d] [%e %e %e].\n", (*it)[2], (*it)[1], (*it)[0],
+        //        coords[0], coords[1], coords[2]);
+      }
     }
   }
       

@@ -639,7 +639,6 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
 void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
-  fprintf(stderr,"Started!\n");
 
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
@@ -768,7 +767,6 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
 
-  fprintf(stderr,"Done!\n");
 }
 
 //------------------------------------------------------------------------------------------------
@@ -820,10 +818,8 @@ EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
     vector<Vec3D> &Xs(surfaces[surf].X);
     vector<Vec3D> &X0(surfaces[surf].X0);
     vector<Vec3D> disp(Xs.size(), 0.0);
-    fprintf(stderr,"Hello... udot size is %d\n", (int)surfaces[surf].Udot.size());
     calculator->GetUserDefinedDynamics(t, disp.size(), (double*)X0.data(), (double*)Xs.data(),
                                        (double*)disp.data(), (double*)surfaces[surf].Udot.data());
-    fprintf(stderr,"Hello again...\n");
     for(int i=0; i<Xs.size(); i++) {
       for(int j=0; j<3; j++)
         Xs[i][j] = X0[i][j] + disp[i][j];

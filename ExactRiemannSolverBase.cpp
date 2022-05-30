@@ -1181,7 +1181,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticTheory(double
   success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl/*inputs*/,
                 rhol, rhol0/*initial guesses for Hugo. eq.*/,
                 rhol1, ul1/*outputs*/);
-  fprintf(stderr,"p1 = %e, success = %d.\n", p1, (int)success);
+//  fprintf(stderr,"p1 = %e, success = %d.\n", p1, (int)success);
   if(!success)
     return found;
 
