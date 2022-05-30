@@ -2434,6 +2434,8 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   heat_source = 0.0;
   dynamics_calculator = "";
 
+  wetting_output_filename = "";
+
   conRec_depth = 0.0;
 }
 
@@ -2442,7 +2444,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
@@ -2452,6 +2454,8 @@ Assigner *EmbeddedSurfaceData::getAssigner()
                                       &EmbeddedSurfaceData::surface_thickness);
 
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
+
+  new ClassStr<EmbeddedSurfaceData>(ca, "ContactSurfaceOutput", this, &EmbeddedSurfaceData::wetting_output_filename);
 
 
   new ClassToken<EmbeddedSurfaceData> (ca, "GaussQuadrature", this,

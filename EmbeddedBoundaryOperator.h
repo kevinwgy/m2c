@@ -36,7 +36,7 @@ class EmbeddedBoundaryOperator {
  
   vector<LagrangianOutput> lagout; //!< output displacement and *nodal load* on embedded surfaces
 
-  //! inactive closures: pair of <surface number, color>
+  //! inactive closures: pair of <surface number, color>, not including color = 0 (occluded)
   std::set<std::pair<int,int> > inactive_colors;
 
   //! for each surface (i), inactive_elem_status[i][j] (j: 0 -- surfaces[i].elems.size()) shows weather one or both

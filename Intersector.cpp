@@ -38,6 +38,11 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   XBackward.SetConstantValue(-1, true);
 
   half_thickness = 0.5*iod_surface.surface_thickness;
+  if(half_thickness==0) {
+    print_error("*** Error: Detected an embedded surface with 0 thickness. Even if the physical thickness is 0, \n"
+                "           a small numerical tolerance is needed to avoid round-off issues.\n");
+    exit_mpi();
+  }
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
@@ -1368,13 +1373,12 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
         for(int tri=0; tri<nFound; tri++) {
           int id = tmp[tri].trId();
           Int3& nodes(Es[id]);
-          if(!GeoTools::LineSegmentIntersectsTriangle(p, q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]])) {
-            intersect = false;
-            break; //as long as one "edge" does not cross the interface, the point p has "this_color"
-          } else 
+          if(GeoTools::LineSegmentIntersectsTriangle(p, q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]])) {
             intersect = true;
+            break;  //intersecting one triangle means intersecting the whole surface 
+          } 
         }  
-        if(!intersect) {
+        if(!intersect) { //if one <p,q> does not intersect the interface, it means they are on the same "side"
           if(side==0) 
             positive_side[triangle_id] = 1;
           else

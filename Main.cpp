@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
   fprintf(stderr,"size = %d.\n", (int)id2closure.size());
   for(auto&& p : id2closure)
     fprintf(stderr,"%d -> (%d, %d).\n", p.first, p.second.first, p.second.second);
-  if(embed && !id2closure.empty())
+  if(embed) //even if id2closure is empty, we must still still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
   //! Initialize Levelset(s)

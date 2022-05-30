@@ -1045,6 +1045,8 @@ struct EmbeddedSurfaceData {
   enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
   double heat_source;
 
+  const char *wetting_output_filename; //!< optional output file that shows the detected wetted side(s)
+
   double surface_thickness;
 
   //! tools

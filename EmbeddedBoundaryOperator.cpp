@@ -189,12 +189,14 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 
 
   // Part 2: Find inactive_elem_status. Needed for force computation
+  fprintf(stderr,"surfaces size = %d.\n", (int)surfaces.size());
   inactive_elem_status.resize(surfaces.size());
   for(int surf=0; surf<surfaces.size(); surf++)
     inactive_elem_status[surf].resize(surfaces[surf].elems.size(), 0);
 
   vector<bool> touched(surfaces.size(), false);
   for(auto it = inactive_colors.begin(); it != inactive_colors.end(); it++) {
+    fprintf(stderr,"Found inactive color %d.\n", it->second);
     int surf = it->first;
     int this_color = it->second;
     assert(intersector[surf]);
@@ -226,6 +228,87 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
     }
   }
 
+
+  // output the wetted sides (i.e. active_elem_status)
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+  for(int surf=0; surf<surfaces.size(); surf++) {
+
+    if(mpi_rank != 0)
+      continue;
+
+    if(strcmp(iod_embedded_surfaces[surf]->wetting_output_filename,"")) {
+
+      std::fstream out(iod_embedded_surfaces[surf]->wetting_output_filename, std::fstream::out);
+      if(!out.is_open()) {
+        fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", 
+                iod_embedded_surfaces[surf]->wetting_output_filename);
+        exit(-1);
+      }
+
+
+      vector<Vec3D>&  Xs(surfaces[surf].X);
+      vector<Int3>&   Es(surfaces[surf].elems);
+      vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
+
+      // find the median element "size" --> length of markers
+      vector<double> tmp = surfaces[surf].elemArea; //make a copy
+      auto mid = tmp.begin() + tmp.size()/2;
+      std::nth_element(tmp.begin(), mid, tmp.end()); //partial sort to find median
+      double midarea = tmp[tmp.size()/2];
+      assert(midarea>=0);
+      double amplification_factor = 2.0;
+      double marker_length = amplification_factor*sqrt(midarea*2.0);
+
+      vector<int> &status(inactive_elem_status[surf]);
+
+      // Write nodes
+      out << "Nodes WettedSurfacePoints" << std::endl;
+      Vec3D p,q;
+      for(int i=0; i<Es.size(); i++) {
+        Int3 &nod(Es[i]);
+        switch (status[i]) {
+          case 0 : //both sides are wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0 - marker_length*Ns[i];
+            q = p + 2.0*marker_length*Ns[i];
+            break;
+          case 1 : //positive side is wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
+            q = p + marker_length*Ns[i];
+            break;
+          case 2 : //negative side is wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
+            q = p - marker_length*Ns[i];
+            break;
+          case 3 : //neither side is wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
+            q = p;
+            break;
+        }
+        out << std::setw(10) << 2*i+1
+            << std::setw(14) << std::scientific << p[0]
+            << std::setw(14) << std::scientific << p[1]
+            << std::setw(14) << std::scientific << p[2] << "\n";
+        out << std::setw(10) << 2*i+2
+            << std::setw(14) << std::scientific << q[0]
+            << std::setw(14) << std::scientific << q[1]
+            << std::setw(14) << std::scientific << q[2] << "\n";
+      }
+
+      // Write line segments / "markers"
+      out << "Elements Markers using WettedSurfacePoints" << std::endl;
+      for(int i=0; i<Es.size(); i++) {
+        out << std::setw(10) << i+1 << "  1  "  //"1" for line segment 
+            << std::setw(10) << 2*i+1
+            << std::setw(10) << 2*i+2 << std::endl;
+      }
+
+      out.flush();
+      out.close();
+    }
+  }
+
+  MPI_Barrier(comm);
 
 }
 
@@ -556,6 +639,7 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
 void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
+  fprintf(stderr,"Started!\n");
 
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
@@ -684,6 +768,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
 
+  fprintf(stderr,"Done!\n");
 }
 
 //------------------------------------------------------------------------------------------------
