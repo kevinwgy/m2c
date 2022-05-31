@@ -1453,7 +1453,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   //----------------------------------------------------------------
   // Step 5: Figure out formula for ghost node update
   //----------------------------------------------------------------
-  ebm.ghostNodes1.resize(ordered.size()-far_nodes.size()-prob_nodes.size()+prob_nodes_owned_by_myself.size(), 
+  ebm.ghostNodes1.assign(ordered.size()-far_nodes.size()-prob_nodes.size()+prob_nodes_owned_by_myself.size(), 
                          std::make_pair(Int3(0), EmbeddedBoundaryFormula(eps)));
   int counter = 0;
   for(int o = 0; o < ordered.size(); o++) {
@@ -1484,10 +1484,10 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
 
   // Allocate space for storing laser radiance at ghost nodes
-  ebm.l1.resize(ebm.ghostNodes1.size(), 0.0);
+  ebm.l1.assign(ebm.ghostNodes1.size(), 0.0);
   ebm.l2.resize(ebm.ghostNodes2.size());
   for(int n1=0; n1<ebm.ghostNodes2.size(); n1++)
-    ebm.l2[n1].resize(ebm.ghostNodes2[n1].size(), 0.0);
+    ebm.l2[n1].assign(ebm.ghostNodes2[n1].size(), 0.0);
  
 }
 

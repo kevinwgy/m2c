@@ -40,8 +40,8 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   F_prev.resize(F.size());
  
   // set default boundary type to "None"
-  surface_type.resize(surfaces.size(), EmbeddedSurfaceData::None);
-  iod_embedded_surfaces.resize(surfaces.size(), NULL);
+  surface_type.assign(surfaces.size(), EmbeddedSurfaceData::None);
+  iod_embedded_surfaces.assign(surfaces.size(), NULL);
 
   // read surfaces from files
   for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
@@ -83,7 +83,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
     surfaces[index].X0 = surfaces[index].X;
 
     // initialize the velocity vector (to 0)
-    surfaces[index].Udot.resize(surfaces[index].X.size(), 0.0);
+    surfaces[index].Udot.assign(surfaces[index].X.size(), 0.0);
 
     surfaces[index].BuildConnectivities();
     surfaces[index].CalculateNormalsAndAreas();
@@ -97,7 +97,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
         surfaces.size(), surfaces.size() - counter); 
 
   // set NULL to intersector pointers
-  intersector.resize(surfaces.size(), NULL);
+  intersector.assign(surfaces.size(), NULL);
 
   // setup output
   for(int i=0; i<surfaces.size(); i++)
@@ -192,7 +192,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
   // Part 2: Find inactive_elem_status. Needed for force computation
   inactive_elem_status.resize(surfaces.size());
   for(int surf=0; surf<surfaces.size(); surf++)
-    inactive_elem_status[surf].resize(surfaces[surf].elems.size(), 0);
+    inactive_elem_status[surf].assign(surfaces[surf].elems.size(), 0);
 
   vector<bool> touched(surfaces.size(), false);
   for(auto it = inactive_colors.begin(); it != inactive_colors.end(); it++) {
@@ -616,7 +616,7 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
     if(F_prev[i].size()>0) //not the first time
       assert(F[i].size() == F_prev[i].size());
     else
-      F_prev[i].resize(F[i].size(),Vec3D(0.0));
+      F_prev[i].assign(F[i].size(),Vec3D(0.0));
 
     // copy force
     for(int j=0; j<F[i].size(); j++)
@@ -625,7 +625,7 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
     if(surfaces_prev[i].X.size()>0) //not the first time
       assert(surfaces[i].X.size() == surfaces_prev[i].X.size());
     else
-      surfaces_prev[i].X.resize(surfaces[i].X.size(),Vec3D(0.0));
+      surfaces_prev[i].X.assign(surfaces[i].X.size(),Vec3D(0.0));
       
     // copy nodal coords
     for(int j=0; j<surfaces[i].X.size(); j++)
@@ -650,7 +650,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
     // Clear force vector
     vector<Vec3D>&  Fs(F[surf]); //Nodal loads (TO BE COMPUTED)
-    Fs.resize(surfaces[surf].X.size(), 0.0);
+    Fs.assign(surfaces[surf].X.size(), 0.0);
 
     // Get quadrature info
     int np = 0; //number of Gauss points
@@ -719,7 +719,6 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
           // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
           double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
           xg += loft*normal;
-          //fprintf(stderr,"side = %d, p = %d, loft = %e, xg = %e %e %e.\n", side, p, loft,xg[0], xg[1], xg[2]);
           
           // Check if this Gauss point is in this subdomain.
           Int3 ijk;
@@ -732,6 +731,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
             tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
           else 
             tg[p] += CalculateTractionAtPoint(xg, side, As[tid], normal, n, Xs, v, id); 
+
         }
 
       }
@@ -856,7 +856,7 @@ EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData(int i)
 void
 EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
 {
-  dynamics_calculator.resize(surfaces.size(), std::make_tuple(nullptr,nullptr,nullptr));
+  dynamics_calculator.assign(surfaces.size(), std::make_tuple(nullptr,nullptr,nullptr));
   for(int i=0; i<surfaces.size(); i++) {
     if(strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
       continue; //not specified for this surface

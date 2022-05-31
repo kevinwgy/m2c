@@ -72,8 +72,8 @@ DynamicLoadCalculator::RunForAeroS()
   vector<Vec3D>       *force   = embed->GetPointerToForcesOnSurface(0);
 
   // Allocate memory for the (internal) force vector
-  F0.resize(surface->X.size(), Vec3D(0.0));
-  F1.resize(surface->X.size(), Vec3D(0.0)); //note that X may contain unused nodes (e.g., in fracture)
+  F0.assign(surface->X.size(), Vec3D(0.0));
+  F1.assign(surface->X.size(), Vec3D(0.0)); //note that X may contain unused nodes (e.g., in fracture)
 
   // ---------------------------------------------------
   // Main time loop (mimics the time loop in Main.cpp

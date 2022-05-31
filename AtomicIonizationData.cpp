@@ -155,10 +155,10 @@ AtomicIonizationData::InitializeInterpolation(MPI_Comm &comm)
   for(int r=0; r<rmax; r++) {
     Us.push_back(vector<double>(sample_size));
   }
-  UsCoeffs.resize(rmax, std::tuple<double,double,double>(0,0,0));
+  UsCoeffs.assign(rmax, std::tuple<double,double,double>(0,0,0));
 
   if(interpolation == 1) //cubic spline interpolation
-    spline.resize(rmax, NULL);
+    spline.assign(rmax, NULL);
 
   for(int r=0; r<rmax; r++)
     InitializeInterpolationForCharge(r, comm);

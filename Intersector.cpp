@@ -835,7 +835,7 @@ Intersector::FloodFillColors()
 
   vector<int> in_colors;
   if(max_inlet_color!=-1) {
-    in_colors.resize(max_inlet_color+1, -1);
+    in_colors.assign(max_inlet_color+1, -1);
     for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
       in_colors[*it] = 1;
     MPI_Allreduce(MPI_IN_PLACE, in_colors.data(), in_colors.size(), MPI_INT, MPI_MAX, comm);
@@ -854,7 +854,7 @@ Intersector::FloodFillColors()
 
   vector<int> out_colors;
   if(max_outlet_color!=-1) {
-    out_colors.resize(max_outlet_color+1, -1);
+    out_colors.assign(max_outlet_color+1, -1);
     for(auto it = outlet_color.begin(); it != outlet_color.end(); it++)
       out_colors[*it] = 1;
     MPI_Allreduce(MPI_IN_PLACE, out_colors.data(), out_colors.size(), MPI_INT, MPI_MAX, comm);
@@ -913,7 +913,7 @@ Intersector::FloodFillColors()
 
 
   // fill ColorReachesBoundary
-  ColorReachesBoundary.resize(nRegions, 0);
+  ColorReachesBoundary.assign(nRegions, 0);
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
     if(it->type_projection != GhostPoint::FACE)
       continue;
@@ -1415,7 +1415,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
 
   
   // Step 4. Finalize output
-  status.resize(Es.size(), 0);
+  status.assign(Es.size(), 0);
   for(int i=0; i<Es.size(); i++) {
     if(positive_side[i]>0) {
       if(negative_side[i]>0)

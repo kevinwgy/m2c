@@ -264,7 +264,7 @@ SahaEquationSolver::ZavEquation::ZavEquation(double kb, double T, double nh, dou
   double fcore = pow( (2.0*pi*(me/h)*(kbT/h)), 1.5)/nh;
 
   // compute fprod
-  fprod.resize(elem.size(), vector<double>());
+  fprod.assign(elem.size(), vector<double>());
   double Ur0, Ur1, f1;
   for(int j=0; j<fprod.size(); j++) {
 

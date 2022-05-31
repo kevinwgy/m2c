@@ -79,12 +79,12 @@ MeshMatcher::FindGlobalMeshInfo(SpaceVariable3D* coordinates, std::vector<double
   Vec3D*** coords = coordinates ? (Vec3D***)coordinates->GetDataPointer() : NULL;
 
   //collect x,y,z and the ghost coords
-  x.resize(info[0], -INT_MAX);
-  y.resize(info[1], -INT_MAX);
-  z.resize(info[2], -INT_MAX);
-  x_minus.resize(info[3], -INT_MAX);  x_plus.resize(info[3], -INT_MAX);
-  y_minus.resize(info[3], -INT_MAX);  y_plus.resize(info[3], -INT_MAX);
-  z_minus.resize(info[3], -INT_MAX);  z_plus.resize(info[3], -INT_MAX);
+  x.assign(info[0], -INT_MAX);
+  y.assign(info[1], -INT_MAX);
+  z.assign(info[2], -INT_MAX);
+  x_minus.assign(info[3], -INT_MAX);  x_plus.assign(info[3], -INT_MAX);
+  y_minus.assign(info[3], -INT_MAX);  y_plus.assign(info[3], -INT_MAX);
+  z_minus.assign(info[3], -INT_MAX);  z_plus.assign(info[3], -INT_MAX);
   if(coordinates) {
     for(int i=i0; i<imax; i++)  x[i] = coords[k0][j0][i][0];    
     for(int j=j0; j<jmax; j++)  y[j] = coords[k0][j][i0][1];

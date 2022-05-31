@@ -238,7 +238,7 @@ AerosMessenger::SplitQuads(int *quads, int nStElems, vector<Int3> &Tria)
       nTrias += 2;
     }
   }
-  Tria.resize(nTrias, Int3(0));
+  Tria.assign(nTrias, Int3(0));
   int count = 0;
   for(int i = 0; i < nStElems; ++i) {
     Tria[count][0] = quads[i * 4];
@@ -289,7 +289,7 @@ AerosMessenger::Negotiate()
   // receive the list of matched nodes that each structure CPU contains
   if(numCPUMatchedNodes > 0) {
 
-    local2pack.resize(totalNodes,-INT_MAX);
+    local2pack.assign(totalNodes,-INT_MAX);
 
     numStrNodes = new int[numAerosProcs][2];
     for(int proc = 0; proc < numAerosProcs; ++proc) {

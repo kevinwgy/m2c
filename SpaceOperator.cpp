@@ -1225,7 +1225,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   //! assign dummy state and "INACTIVE_MATERIAL_ID" to regions enclosed by any embedded surface
   if(EBDS != nullptr) {
 
-    color.resize(EBDS->size(), NULL);
+    color.assign(EBDS->size(), NULL);
     for(int i=0; i<EBDS->size(); i++) {
       assert((*EBDS)[i]->Color_ptr);
       color[i] = (*EBDS)[i]->Color_ptr->GetDataPointer();
@@ -2214,7 +2214,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   vector<double***> phi;
   if(Phi && ls_mat_id) {
-    phi.resize(Phi->size(), NULL);
+    phi.assign(Phi->size(), NULL);
     for(int i=0; i<phi.size(); i++)
       phi[i] = (*Phi)[i]->GetDataPointer();
   }
