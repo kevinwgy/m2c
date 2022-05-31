@@ -179,9 +179,6 @@ int main(int argc, char* argv[])
   //! Impose initial condition
   std::multimap<int, std::pair<int,int> >
   id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
-  fprintf(stderr,"size = %d.\n", (int)id2closure.size());
-  for(auto&& p : id2closure)
-    fprintf(stderr,"%d -> (%d, %d).\n", p.first, p.second.first, p.second.second);
   if(embed) //even if id2closure is empty, we must still still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
@@ -341,7 +338,6 @@ int main(int argc, char* argv[])
     int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                  embed->GetPointerToEmbeddedBoundaryData(),
                                  embed->GetPointerToIntersectors()); //update V, ID, Phi
-    fprintf(stderr,"boundary_swept = %d.\n", boundary_swept);
     spo.ClipDensityAndPressure(V,ID);
     if(boundary_swept) {
       spo.ApplyBoundaryConditions(V);
@@ -349,8 +345,6 @@ int main(int argc, char* argv[])
         lso[i]->ApplyBoundaryConditions(*Phi[i]);
     }
   }
-
-  print_warning("Got here:)\n");
 
   // find maxTime, and dts (meaningful only with concurrent programs)
   double tmax = iod.ts.maxTime;
@@ -397,19 +391,15 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      print_warning("Got here 2:)\n");
       integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
-      print_warning("Got here 3:)\n");
 
     } while (concurrent.Coupled() && dtleft != 0.0);
 
 
     if(embed) {
-      print_warning("Got here 4:)\n");
       embed->ComputeForces(V, ID);
-      print_warning("Got here 5:)\n");
       embed->UpdateSurfacesPrevAndFPrev();
 
       embed->OutputResults(t, dts, time_step, false/*force_write*/); //!< write displacement and nodal loads to file
@@ -430,13 +420,8 @@ int main(int argc, char* argv[])
     }
 
     if(embed) {
-      print_warning("Got here 6:)\n");
       embed->ApplyUserDefinedSurfaceDynamics(t, dts); //update surfaces provided through input (not conccurent solver)
-      print_warning("Got here 7:)\n");
       embed->TrackUpdatedSurfaces();
-      print_warning("Got here 8:)\n");
-
-
       int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                    embed->GetPointerToEmbeddedBoundaryData(),
                                    embed->GetPointerToIntersectors()); //update V, ID, Phi

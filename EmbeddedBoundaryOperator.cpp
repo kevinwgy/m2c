@@ -124,6 +124,7 @@ EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
       dlclose(std::get<1>(*it));
     }
   }
+
 }
 
 //------------------------------------------------------------------------------------------------
@@ -189,14 +190,12 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 
 
   // Part 2: Find inactive_elem_status. Needed for force computation
-  fprintf(stderr,"surfaces size = %d.\n", (int)surfaces.size());
   inactive_elem_status.resize(surfaces.size());
   for(int surf=0; surf<surfaces.size(); surf++)
     inactive_elem_status[surf].resize(surfaces[surf].elems.size(), 0);
 
   vector<bool> touched(surfaces.size(), false);
   for(auto it = inactive_colors.begin(); it != inactive_colors.end(); it++) {
-    fprintf(stderr,"Found inactive color %d.\n", it->second);
     int surf = it->first;
     int this_color = it->second;
     assert(intersector[surf]);

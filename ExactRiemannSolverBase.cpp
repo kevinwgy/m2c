@@ -82,7 +82,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 
   // Declare variables in the "star region"
   double p0(DBL_MIN), ul0(0.0), ur0(0.0), rhol0(DBL_MIN), rhor0(DBL_MIN);
-  double p1(DBL_MIN), ul1(0.0), ur1(0.0), rhol1(DBL_MIN), rhor1(DBL_MIN); //Secand Method ("k-1","k" in Kamm, (19))
+  double p1(DBL_MIN), ul1(0.0), ur1(0.0), rhol1(DBL_MIN), rhor1(DBL_MIN); //Secant Method ("k-1","k" in Kamm, (19))
   double p2(DBL_MIN), ul2(0.0), ur2(0.0), rhol2(DBL_MIN), rhor2(DBL_MIN); // "k+1"
   double f0(0.0), f1(0.0), f2(0.0); //difference between ul and ur
 
@@ -1881,7 +1881,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 
   // Declare variables in the "star region"
   double p0(DBL_MIN), ul0(0.0), rhol0(DBL_MIN);
-  double p1(DBL_MIN), ul1(0.0), rhol1(DBL_MIN); //Secand Method ("k-1","k" in Kamm, (19))
+  double p1(DBL_MIN), ul1(0.0), rhol1(DBL_MIN); //Secant Method ("k-1","k" in Kamm, (19))
   double p2(DBL_MIN), ul2(0.0), rhol2(DBL_MIN); // "k+1"
   double f0(0.0), f1(0.0), f2(0.0); //difference between ul and ur
 
@@ -1898,7 +1898,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 
 
   // A Trivial Case
-  if(ul == ustar) {
+  if(fabs(ul-ustar)<1.0e-20) {
     FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol, ul, pl, trans_rare, Vrare_x0, //inputs
                              Vs, id, Vsm/*outputs*/);
     return 0;
@@ -1985,9 +1985,8 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
     return 1;
   }
 
-
-  assert(p0>pl);
-  assert(p1>pl);
+  assert(p0>=pl);
+  assert(p1>=pl);
 
   f0 = ul0 - ustar;
   f1 = ul1 - ustar;

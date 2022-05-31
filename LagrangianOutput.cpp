@@ -21,8 +21,6 @@ LagrangianOutput::LagrangianOutput(MPI_Comm &comm_, LagrangianMeshOutputData &io
 
 LagrangianOutput::~LagrangianOutput()
 {
-  if(disp_file) delete disp_file;
-  if(sol_file) delete sol_file;
 }
 
 //------------------------------------------------------------------------------
