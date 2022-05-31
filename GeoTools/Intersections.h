@@ -4,7 +4,7 @@
 
 namespace GeoTools {
 
-const double INTERSECTIONS_EPSILON = 1.0e-20;
+const double INTERSECTIONS_EPSILON = 1.0e-14; //this should be a tolerance smaller than "half_thickness"
 
 //! Moller-Trumbore intersection algorithm (Moller and Trumbore, 1997)
 bool RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray

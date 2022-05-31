@@ -28,7 +28,7 @@ RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray
   P = D^E2;
   denom = P*E1;
 
-  if (denom > -INTERSECTIONS_EPSILON && denom < INTERSECTIONS_EPSILON) {
+  if (denom==0) {
     if(d)  *d  = DBL_MAX;
     if(xp) *xp = DBL_MAX;
     if(baryCoords) *baryCoords = DBL_MAX;
@@ -40,7 +40,7 @@ RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray
 
   // Calculate u
   u = f*(P*T);
-  if (u < 0.0 || u > 1.0) {
+  if (u < -INTERSECTIONS_EPSILON || u > 1.0+INTERSECTIONS_EPSILON) {
     if(d || xp || baryCoords) { // calculate optional outputs
       Q = T^E1;
       v = f*(Q*D);
@@ -55,7 +55,7 @@ RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray
   // Calculate v
   Q = T^E1;
   v = f*(Q*D);
-  if (v < 0.0 || u + v > 1.0) {
+  if (v < -INTERSECTIONS_EPSILON || u + v > 1.0+INTERSECTIONS_EPSILON) {
     if(d || xp || baryCoords) { // calculate optional outputs
       double t = f*(Q*E2);
       if(d)  *d  = t; 
@@ -70,7 +70,7 @@ RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray
   if(d)  *d  = t;
   if(xp) *xp = O + D * t;
   if(baryCoords) *baryCoords = Vec3D(1.0-u-v, u, v);
-  if (t > INTERSECTIONS_EPSILON) {
+  if (t > -INTERSECTIONS_EPSILON) {
     return true;
   } else 
     return false;
@@ -114,7 +114,7 @@ AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2
   }
 
   double denom = p1*q2 - p2*q1;
-  if(denom > -INTERSECTIONS_EPSILON && denom < INTERSECTIONS_EPSILON) {
+  if(denom==0) {
     if(d)  *d  = DBL_MAX;
     if(xp) *xp = DBL_MAX;
     if(baryCoords) *baryCoords = DBL_MAX;
@@ -136,7 +136,7 @@ AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2
   double f = 1.0/denom;
 
   double u = f*(r1*q2 - r2*q1);
-  if(u < 0.0 || u > 1.0) {
+  if(u < -INTERSECTIONS_EPSILON || u > 1.0+INTERSECTIONS_EPSILON) {
     if(d || xp || baryCoords) { // calculate optional outputs
       double v = f*(r2*p1 - r1*p2);
       if(d)  *d  = P[dir]*u + Q[dir]*v - R[dir]; 
@@ -147,7 +147,7 @@ AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2
   }
 
   double v = f*(r2*p1 - r1*p2);
-  if (v < 0.0 || u + v > 1.0) {
+  if (v < -INTERSECTIONS_EPSILON || u + v > 1.0+INTERSECTIONS_EPSILON) {
     if(d || xp || baryCoords) { // calculate optional outputs
       if(d)  *d  = P[dir]*u + Q[dir]*v - R[dir]; 
       if(xp) *xp = (1.0-u-v)*V0 + u*V1 + v*V2;
@@ -161,7 +161,7 @@ AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2
   if(d)  *d  = t;
   if(xp) *xp = (1.0-u-v)*V0 + u*V1 + v*V2;
   if(baryCoords) *baryCoords = Vec3D(1.0-u-v, u, v);
-  if (t > INTERSECTIONS_EPSILON) {
+  if (t > -INTERSECTIONS_EPSILON) {
     return true;
   } else 
     return false;
@@ -177,6 +177,7 @@ LineSegmentIntersectsTriangle(Vec3D X0, Vec3D X1, //!< vertices of line segment
                               Vec3D* xp, //!< optional output: intersection point
                               Vec3D* baryCoords) //!< optional output: barycentric coords of intersection point
 {
+
   Vec3D D = X1 - X0;
   double len = D.norm();
   assert(len>0);
@@ -187,7 +188,7 @@ LineSegmentIntersectsTriangle(Vec3D X0, Vec3D X1, //!< vertices of line segment
 
   if(d) *d = t;
 
-  if(!intersect || t>len - INTERSECTIONS_EPSILON)
+  if(!intersect || t>len + INTERSECTIONS_EPSILON)
     return false;
   else
     return true;
@@ -208,7 +209,7 @@ LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis
 
   if(d) *d = t;
 
-  if(!intersect || t>len - INTERSECTIONS_EPSILON)
+  if(!intersect || t>len + INTERSECTIONS_EPSILON)
     return false;
   else
     return true;
