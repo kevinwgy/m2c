@@ -28,13 +28,8 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   int counter = iod.ebm.embed_surfaces.surfaces.dataMap.size();
 
   // get the correct size of surfaces and F
-  if(surface_from_other_solver) {
-    surfaces.resize(counter+1);
-    F.resize(counter+1);
-  } else {
-    surfaces.resize(counter);
-    F.resize(counter);
-  }
+  surfaces.resize(counter);
+  F.resize(counter);
 
   surfaces_prev.resize(surfaces.size());
   F_prev.resize(F.size());

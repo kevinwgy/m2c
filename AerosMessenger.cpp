@@ -105,6 +105,11 @@ AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm
   for(int i = 0; i < nNodes; i++)
     surface.X[i] = surface.X0[i];
 
+
+  surface.BuildConnectivities();
+  surface.CalculateNormalsAndAreas();
+
+
   surface.active_nodes = nNodes;
   surface.active_elems = nElems;
 

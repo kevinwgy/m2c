@@ -139,8 +139,8 @@ RETRY_FullDomain:
 
   // apply failsafe
   if(iter==iod_ls.reinit.maxIts) {
-    print("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
-          residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+    print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
+                  "Tol = %e.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
     if(dphi_max<0.1) //ok...
       return;
     if(cfl < 0.02) {//failed...
@@ -249,8 +249,8 @@ RETRY_NarrowBand:
 
   //Failsafe
   if(iter==iod_ls.reinit.maxIts) {
-    print("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e. Retrying.\n", 
-          residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+    print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
+                  "Tol = %e. Retrying.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
     if(dphi_max<0.1) //ok...
       return; 
     if(cfl < 0.02) {//failed...
