@@ -2849,7 +2849,7 @@ SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int
       dir[d] = 1.0;
   }
 
-  if(dir[d]<=0.0) {
+  if(dir[d]<=-1e-16) {
     fprintf(stderr,"*** Error: (%d,%d,%d)(%d): dir = %e %e %e, myid = %d, neighid = %d.\n", 
             i,j,k, d, dir[0], dir[1], dir[2], myid, neighborid);
     exit(-1);

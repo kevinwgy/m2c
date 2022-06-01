@@ -415,7 +415,10 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     // Check & fix two things: (1) cells belonging to more than 1 subdomain; (2) cells isolated between
     // material boundaries. (2) is optional, and not done by default (frequency controlled by user).
     resolved_conflicts = mpo.ResolveConflictsInLevelSets(time_step, Phi);
-
+    if(resolved_conflicts) { //enforce b.c. for Phi (only necessary when boundary is touched, can be improved later)
+      for(int i=0; i<Phi.size(); i++)
+        lso[i]->ApplyBoundaryConditions(*Phi[i]);
+    }
 
     // Update ID, V, and possibly also Phi (skipped for single-material simulations)
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID

@@ -869,11 +869,11 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
   else if(upwind) {
     if(verbose>1) 
       fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions"
-              " w/ upwinding. Retrying.\n\033[0m", i,j,k);
+              " w/ upwinding. Retrying.\033[0m\n", i,j,k);
   } else {
     if(verbose>1) 
       fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions."
-              " Retrying.\n\033[0m", i,j,k);
+              " Retrying.\033[0m\n", i,j,k);
   }
 
   return counter;
