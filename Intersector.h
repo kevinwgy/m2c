@@ -64,9 +64,6 @@ class Intersector {
   bool closed_surface; //!< whether the surface is closed AND normals are consistent
   double half_thickness; //!< half thickness of the surface
 
-  std::vector<MyTriangle> scope; //!< triangles relevant to the current subdomain (no tol for the BB of triangles)
-  KDTree<MyTriangle, 3> *tree; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
-
   //! Mesh info
   SpaceVariable3D& coordinates;
 
@@ -80,12 +77,25 @@ class Intersector {
 
   GlobalMeshInfo &global_mesh;
 
-  SpaceVariable3D BBmin, BBmax; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
+
+  //! Infrastructure #1. One layer of neighbors
+  SpaceVariable3D BBmin_1, BBmax_1; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
                                      in the physical domain. For each node, the BB contains the \n
                                      node itself and all the edges (n layers, n TBD) that connect the node \n
                                      with other nodes IN THE PHYSICAL DOMAIN.*/
-  Vec3D subD_bbmin, subD_bbmax; //!< bounding box of the subdomain (n layers, n TBD)
-  int bblayer; //!< number of layers of neighbors included in the b.b.
+  Vec3D subD_bbmin_1, subD_bbmax_1; //!< bounding box of the subdomain (n layers, n TBD)
+
+  std::vector<MyTriangle> scope_1; //!< triangles relevant to the current subdomain (no tol for the BB of triangles)
+  KDTree<MyTriangle, 3> *tree_1; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
+
+
+  //! Infrastructure #1. N(>1) layer of neighbors
+  SpaceVariable3D BBmin_n, BBmax_n; 
+  Vec3D subD_bbmin_n, subD_bbmax_n;
+  std::vector<MyTriangle> scope_n;
+  KDTree<MyTriangle, 3> *tree_n;
+  int nLayer; //!< number of layers of neighbors included in the b.b. In most cases, should = Phi_nLayer
+
 
   SpaceVariable3D TMP, TMP2; //!< For temporary use.
 
@@ -93,8 +103,13 @@ class Intersector {
    * Results
    ************************/
   //! "CandidatesIndex" and "candidates" account for internal ghost nodes, but not ghost nodes outside physical domain.
-  SpaceVariable3D CandidatesIndex; //!< index in the vector "candidates" (-1 means no candidates)
-  std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates;
+  SpaceVariable3D CandidatesIndex_1; //!< index in the vector "candidates" (-1 means no candidates)
+  std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates_1;
+
+  SpaceVariable3D CandidatesIndex_n;
+  std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates_n;
+
+
 
   //! XForward/XBackward stores edge-surface intersections where both vertices of the edge are inside subdomain or inn. ghost
   SpaceVariable3D XForward; /**< Edge-surface intersections. X[k][j][i][0]: left-edge, [1]: bottom-edge, [2]: back-edge \n
@@ -148,6 +163,9 @@ public:
 
   void Destroy();
 
+  //! Get surface half thickness
+  inline double GetSurfaceHalfThickness() {return half_thickness;}
+
   //! Check if a line segment intersects with any triangles inside scope
   bool Intersects(Vec3D &X0, Vec3D &X1);
 
@@ -161,28 +179,33 @@ public:
  *  The functions below are not all independent with each other!*/
 public:
 
-  void BuildNodalAndSubdomainBoundingBoxes(int nLayer=1); //!< build BBmin, BBmax, subD_bbmin, subD_bbmax
+  void BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin, SpaceVariable3D &BBmax,
+                                           Vec3D &subD_bbmin, Vec3D &subD_bbmax); //!< build bounding boxes
 
-  void BuildSubdomainScopeAndKDTree(); //!< build "scope" and "tree". Requires subdomain bounding box
+  void BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &subD_bbmax,
+                                    std::vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree); //!< Requires bounding box
 
-  //! Many functions below assume that "BuildNodalBoundingBoxes" and "BuildSubdomainScopeAndKDTree" have been called.
+  //! Many functions below assume that bounding boxes, scope, and tree have already been constructed.
 
-  void FindNodalCandidates(); //!< find nearby triangles for each node based on bounding boxes and KDTree
+  //! find nearby triangles for each node based on bounding boxes and KDTree
+  void FindNodalCandidates(SpaceVariable3D &BBmin, SpaceVariable3D &BBmax, KDTree<MyTriangle, 3> *tree,
+                           SpaceVariable3D &CandidatesIndex,
+                           std::vector<std::pair<Int3, std::vector<MyTriangle> > > &candidates); 
 
-  void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
+  void FindIntersections(); //!< find occluded nodes, intersections, and first layer nodes
 
   bool FloodFillColors(); /**< determine the generalized color function ("Color").\n 
                                Returns whether some nodes are occluded.\n"*/
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
-  void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
+  void FindSweptNodes(std::vector<Vec3D> &X0); //!< candidates only need to account for 1 layer
 
   /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This function only recomputes
    *  the "Color" of swept nodes. It is faster, and also maintains the same "colors". Calling the original "FloodFill" function may 
    *  lead to color(tag) change for the same enclosure.
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
-  void RefillAfterSurfaceUpdate(bool nodal_cands_calculated = false);
+  void RefillAfterSurfaceUpdate();
 
-  void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
+  void CalculateUnsignedDistanceNearSurface(int nL); //!< Calculate "Phi" for small "nL"
 
   //! Find the elements of the embedded surface that constitute the boundary of a "color". For each element in\n
   //! in this set, determine which side(s) of it faces the interior of this color. "status" has the size of\n
@@ -195,8 +218,8 @@ public:
   //! Get pointers to all the results
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();
 
-  //! Get pointer to "scope"
-  void GetElementsInScope(std::vector<int> &elems_in_scope);
+  //! Get "scope_1" (copied to elems_in_scope)
+  void GetElementsInScope1(std::vector<int> &elems_in_scope);
 
   //! Get colors
   void GetColors(bool *hasInlet_ = NULL, bool *hasOutlet_ = NULL, int *nRegions_ = NULL) {

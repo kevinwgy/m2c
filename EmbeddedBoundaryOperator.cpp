@@ -689,7 +689,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
  
     
     vector<int> scope;
-    intersector[surf]->GetElementsInScope(scope);
+    intersector[surf]->GetElementsInScope1(scope);
 
     //Note that different subdomain scopes overlap. We need to avoid repetition!
     for(auto it = scope.begin(); it != scope.end(); it++) {
@@ -721,6 +721,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
           if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
             continue;
 
+//          fprintf(stderr,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
           // Calculate traction at Gauss point on this "side"
           if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
             tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
@@ -730,6 +731,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
         }
 
       }
+
+//      fprintf(stderr,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
+//              tg[0].norm());
 
       // Now, tg carries traction from both sides of the triangle
 
@@ -750,9 +754,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
 /*
     Vec3D sum(0.0);
-    for(auto&& f : Fs) {
-      sum+= f;
-      print("%e %e %e\n", f[0], f[1], f[2]);
+    for(int i=0; i<Fs.size(); i++) {
+      sum+= Fs[i];
+      print("Tri %d: %e %e %e (%e)\n", i, Fs[i][0], Fs[i][1], Fs[i][2], Fs[i].norm());
     }
     print("sum = %e %e %e.\n", sum[0], sum[1], sum[2]);
 */
@@ -939,6 +943,9 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
                                                    Vec3D &normal, Int3 &tnodes, vector<Vec3D> &Xs, 
                                                    Vec5D*** v, double*** id)
 {
+  //int mpi_rank;
+  //MPI_Comm_rank(comm, &mpi_rank);
+
 
   Int3 ijk0(INT_MAX);
   Vec3D xi;
@@ -947,6 +954,13 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
   int i,j,k;
 
   // find which nodes in the element are on the correct side given by "normal"
+  // first, we move the Gauss point (p) along the normal direction outside "wall_thickness"
+  double loft = 0.0;
+  for(auto&& xter : intersector)
+    loft = std::max(loft, xter->GetSurfaceHalfThickness());
+  loft *= 2.0; //moving out of half_thickness
+  Vec3D ref_point = p + loft*normal;
+
   bool sameside[2][2][2];
   for(int dk=0; dk<=1; dk++)
     for(int dj=0; dj<=1; dj++)
@@ -957,10 +971,12 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
 
         assert(coordinates_ptr->IsHere(i,j,k,true)); //Not in the ghosted subdomain? Something is wrong
 
-        if(coordinates_ptr->OutsidePhysicalDomainAndUnpopulated(i,j,k)) { //state variable unavailable here.
+        if(coordinates_ptr->OutsidePhysicalDomain(i,j,k)) { //state variable unavailable here.
           sameside[dk][dj][di] = false;
           continue;
-        }
+        } //NOTE: Must not check (external) ghost nodes, even if the state variable is correct (w/ b.c.).
+          //      This is because the surface may not extend into the ghost layer. Hence, the intersection
+          //      function may not work as expected!
 
         if(id[k][j][i] == INACTIVE_MATERIAL_ID) {
           sameside[dk][dj][di] = false;
@@ -969,14 +985,13 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
 
 
         Vec3D x(global_mesh_ptr->GetX(i), global_mesh_ptr->GetY(j), global_mesh_ptr->GetZ(k));
-        
-        double tmp[3]; 
-        double signed_distance = (side==0) ? GeoTools::ProjectPointToPlane(x, Xs[tnodes[0]], Xs[tnodes[1]],
-                                                           Xs[tnodes[2]], tmp, &area, &normal)
-                                           : GeoTools::ProjectPointToPlane(x, Xs[tnodes[1]], Xs[tnodes[0]],
-                                                           Xs[tnodes[2]], tmp, &area, &normal);
-
-        sameside[dk][dj][di] = (signed_distance>0);
+        sameside[dk][dj][di] = true; //start w/ true
+        for(auto&& xter : intersector) {
+          if(xter->Intersects(x, ref_point)) {
+            sameside[dk][dj][di] = false;
+            break;
+          }
+        }
       }
 
 
@@ -997,18 +1012,21 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
         j = ijk0[1] + dj;
         k = ijk0[2] + dk;
 
+        //fprintf(stderr,"[%d] side = %d: (%d,%d,%d), p = %e.\n", mpi_rank, side, i,j,k, v[k][j][i][4]);
         pressure[dk][dj][di] = v[k][j][i][4]; //get pressure
         total_pressure += pressure[dk][dj][di];
         n_pressure++;
       }
 
+  double avg_pressure;
   if(n_pressure==0) {
-    fprintf(stderr,"\033[0;31m*** Error: No valid active nodes for interpolating pressure at "
-                   "Gauss point (%e, %e, %e). Try reducing surface thickness.\n\033[0m", p[0], p[1], p[2]);
-    exit(-1);
-  }
+    fprintf(stderr,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
+                   "Gauss point (%e, %e, %e). Try reducing surface thickness or refining mesh.\n\033[0m",
+                   p[0], p[1], p[2]);
+    avg_pressure = 0.0;
+  } else
+    avg_pressure = total_pressure/n_pressure;
 
-  double avg_pressure = total_pressure/n_pressure;
   for(int dk=0; dk<=1; dk++)
     for(int dj=0; dj<=1; dj++)
       for(int di=0; di<=1; di++) {

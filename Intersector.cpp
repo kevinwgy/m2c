@@ -14,15 +14,18 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
                          TriangulatedSurface &surface_, SpaceVariable3D &coordinates_, 
                          vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
                          GlobalMeshInfo &global_mesh_)
-           : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree(NULL),
+           : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree_1(NULL), tree_n(NULL),
              coordinates(coordinates_), 
              ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
              global_mesh(global_mesh_),
-             BBmin(comm_, &(dms_.ghosted1_3dof)),
-             BBmax(comm_, &(dms_.ghosted1_3dof)),
+             BBmin_1(comm_, &(dms_.ghosted1_3dof)),
+             BBmax_1(comm_, &(dms_.ghosted1_3dof)),
+             BBmin_n(comm_, &(dms_.ghosted1_3dof)),
+             BBmax_n(comm_, &(dms_.ghosted1_3dof)),
              TMP(comm_, &(dms_.ghosted1_1dof)),
              TMP2(comm_, &(dms_.ghosted1_1dof)),
-             CandidatesIndex(comm_, &(dms_.ghosted1_1dof)),
+             CandidatesIndex_1(comm_, &(dms_.ghosted1_1dof)),
+             CandidatesIndex_n(comm_, &(dms_.ghosted1_1dof)),
              ClosestPointIndex(comm_, &(dms_.ghosted1_1dof)),
              XForward(comm_, &(dms_.ghosted1_3dof)),
              XBackward(comm_, &(dms_.ghosted1_3dof)),
@@ -32,7 +35,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              floodfiller(comm_, dms_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
 
-  CandidatesIndex.SetConstantValue(-1, true);
+  CandidatesIndex_1.SetConstantValue(-1, true);
+  CandidatesIndex_n.SetConstantValue(-1, true);
   ClosestPointIndex.SetConstantValue(-1, true);
   XForward.SetConstantValue(-1, true);
   XBackward.SetConstantValue(-1, true);
@@ -52,8 +56,10 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   // Set the capacity of internal vectors, so we don't frequently reallocate memory
   int capacity = (imax-i0)*(jmax-j0)*(kmax-k0)/4; //should be big enough
   intersections.reserve(capacity);
-  candidates.reserve(capacity*2);
-  scope.reserve(surface.elems.size());
+  candidates_1.reserve(capacity*2);
+  scope_1.reserve(surface.elems.size());
+  candidates_n.reserve(capacity*2);
+  scope_n.reserve(surface.elems.size());
 
   //sanity checks on the triangulated surface
   if(surface.degenerate) {
@@ -67,8 +73,9 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   closed_surface = surface.CheckSurfaceOrientationAndClosedness();
 
   //build nodal bounding boxes
-  bblayer = 1;
-  BuildNodalAndSubdomainBoundingBoxes(bblayer);
+  BuildNodalAndSubdomainBoundingBoxes(1, BBmin_1, BBmax_1, subD_bbmin_1, subD_bbmax_1);
+
+  nLayer = -1; //this will be the number of layers in BBmin_n, BBmax_n, etc.
 
 }
 
@@ -76,8 +83,10 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
 
 Intersector::~Intersector()
 {
-  if(tree)
-    delete tree;
+  if(tree_1)
+    delete tree_1;
+  if(tree_n)
+    delete tree_n;
 }
 
 //-------------------------------------------------------------------------
@@ -87,11 +96,14 @@ Intersector::Destroy()
 {
   floodfiller.Destroy();
 
-  BBmin.Destroy();
-  BBmax.Destroy();
+  BBmin_1.Destroy();
+  BBmax_1.Destroy();
+  BBmin_n.Destroy();
+  BBmax_n.Destroy();
   TMP.Destroy();
   TMP2.Destroy();
-  CandidatesIndex.Destroy();
+  CandidatesIndex_1.Destroy();
+  CandidatesIndex_n.Destroy();
   ClosestPointIndex.Destroy();
   XForward.Destroy();
   XBackward.Destroy();
@@ -131,11 +143,11 @@ Intersector::GetPointerToResults()
 //-------------------------------------------------------------------------
 
 void
-Intersector::GetElementsInScope(std::vector<int> &elems_in_scope)
+Intersector::GetElementsInScope1(std::vector<int> &elems_in_scope)
 {
-  elems_in_scope.resize(scope.size());
-  for(int i=0; i<scope.size(); i++)
-    elems_in_scope[i] = scope[i].trId();
+  elems_in_scope.resize(scope_1.size());
+  for(int i=0; i<scope_1.size(); i++)
+    elems_in_scope[i] = scope_1[i].trId();
 }
 
 //-------------------------------------------------------------------------
@@ -145,14 +157,20 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
 {
   assert(phi_layers>=1);
 
-  if(bblayer != 1)
-    BuildNodalAndSubdomainBoundingBoxes(1); //1 layer
+  // This (smaller) one is for edge-surface intersections
+  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1);
 
-  BuildSubdomainScopeAndKDTree();
-  FindNodalCandidates();
-  FindIntersections(true);
+  FindIntersections(); //using scope_1 and tree_1
+
   bool hasOcc = FloodFillColors();
-  CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
+
+  // Calculate unsigned distance
+  if(nLayer != phi_layers) {
+    BuildNodalAndSubdomainBoundingBoxes(phi_layers, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
+    nLayer = phi_layers;
+  }
+  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
+  CalculateUnsignedDistanceNearSurface(phi_layers);
 
   hasInlet_  = hasInlet;
   hasOutlet_ = hasOutlet;
@@ -186,22 +204,25 @@ Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
 {
   assert(phi_layers>=1);
 
-  if(bblayer != 1)
-    BuildNodalAndSubdomainBoundingBoxes(1); //1 layer
+  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1);
+  FindIntersections();
+  FindSweptNodes(Xprev);
+  RefillAfterSurfaceUpdate();
 
-  BuildSubdomainScopeAndKDTree();
-  FindNodalCandidates();
-  FindIntersections(true);
-  FindSweptNodes(Xprev, true);
-  RefillAfterSurfaceUpdate(true);
-  CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
+  if(nLayer != phi_layers) {
+    BuildNodalAndSubdomainBoundingBoxes(phi_layers, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
+    nLayer = phi_layers;
+  }
+  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
+  CalculateUnsignedDistanceNearSurface(phi_layers);
 
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
+Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin, SpaceVariable3D &BBmax,
+                                                 Vec3D &subD_bbmin, Vec3D &subD_bbmax)
 {
   double tol = 0.1;  //i.e. tolerance = 10% of element size (plus 50% of surface thickness)
   double thicker = (1.0+tol)*half_thickness;
@@ -222,16 +243,16 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
       for(int i=ii0_in; i<iimax; i++) {
 
         delta = tol*dx_glob[i] + thicker;
-        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nLayer)] - tol;
-        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nLayer)] + tol;
+        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - tol;
+        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nL)] + tol;
 
         delta = tol*dy_glob[j] + thicker;
-        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nLayer)] - tol;
-        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nLayer)] + tol;
+        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nL)] - tol;
+        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nL)] + tol;
 
         delta = tol*dz_glob[k] + thicker;
-        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nLayer)] - tol;
-        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nLayer)] + tol;
+        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nL)] - tol;
+        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nL)] + tol;
       }
 
   //subD_bb includes the ghost boundary
@@ -243,13 +264,13 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
   BBmin.RestoreDataPointerToLocalVector();
   BBmax.RestoreDataPointerToLocalVector();
 
-  bblayer = nLayer;
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::BuildSubdomainScopeAndKDTree()
+Intersector::BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &subD_bbmax, 
+                                          vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree)//updating the tree itself
 {
   scope.clear();
 
@@ -271,19 +292,21 @@ Intersector::BuildSubdomainScopeAndKDTree()
 //  fprintf(stderr,"scope size: %d.\n", (int)scope.size());
 
   // build the tree
-  if(tree)
-    delete tree;
+  if(*tree)
+    delete *tree;
 
   if(scope.size()!=0)
-    tree = new KDTree<MyTriangle,3>(scope.size(), scope.data());
+    *tree = new KDTree<MyTriangle,3>(scope.size(), scope.data());
   else
-    tree = NULL;
+    *tree = NULL;
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::FindNodalCandidates()
+Intersector::FindNodalCandidates(SpaceVariable3D &BBmin, SpaceVariable3D &BBmax, KDTree<MyTriangle, 3> *tree,
+                                 SpaceVariable3D &CandidatesIndex, 
+                                 vector<pair<Int3, vector<MyTriangle> > > &candidates)
 {
 
   candidates.clear();
@@ -327,13 +350,17 @@ Intersector::FindNodalCandidates()
 //-------------------------------------------------------------------------
 
 void
-Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and first layer nodes
+Intersector::FindIntersections() //also finds occluded and first layer nodes
 {
+
+  // Find nodal candidates, layer = 1
+  FindNodalCandidates(BBmin_1, BBmax_1, tree_1, CandidatesIndex_1, candidates_1);
+
 
   Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
   Vec3D*** xf      = (Vec3D***) XForward.GetDataPointer();
   Vec3D*** xb      = (Vec3D***) XBackward.GetDataPointer();
-  double*** candid = with_nodal_cands ? CandidatesIndex.GetDataPointer() : NULL;
+  double*** candid = CandidatesIndex_1.GetDataPointer();
   double*** color  = Color.GetDataPointer();
   
   double*** occid  = TMP.GetDataPointer(); //occluding triangle id
@@ -380,10 +407,10 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
         layer[k][j][i] = -1;
 
-        if(!tree) //this subdomain is entirely away from surface, just set color, occid, and layer to default values
+        if(!tree_1) //this subdomain is entirely away from surface, just set color, occid, and layer to default values
           continue; 
 
-        if(candid && k<kmax && j<jmax && i<imax && //candid has a valid value @ i,j,k
+        if(k<kmax && j<jmax && i<imax && //candid has a valid value @ i,j,k
            candid[k][j][i] < 0)  //no nodal candidates, intersection impossible, occlusion also impossible
           continue;
  
@@ -394,15 +421,15 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         found_left = found_bottom = found_back = 0;
 
         if(i-1>=ii0_in) { //the edge [k][j][i-1] -> [k][j][i] is inside the physical domain
-          found_left = FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
+          found_left = FindCandidatesInBox(tree_1, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
         }
 
         if(j-1>=jj0_in) { //the edge [k][j-1][i] -> [k][j][i] is inside the physical domain
-          found_bottom = FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
+          found_bottom = FindCandidatesInBox(tree_1, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
         }
 
         if(k-1>=kk0_in) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
-          found_back = FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
+          found_back = FindCandidatesInBox(tree_1, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
         }
 
         //--------------------------------------------
@@ -504,7 +531,7 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
       }
 
   // Exchange Color and TMP so internal ghost nodes are accounted for
-  if(candid) CandidatesIndex.RestoreDataPointerToLocalVector();
+  CandidatesIndex_1.RestoreDataPointerToLocalVector();
   Color.RestoreDataPointerAndInsert();
   TMP.RestoreDataPointerAndInsert();
   TMP2.RestoreDataPointerAndInsert();
@@ -936,23 +963,17 @@ Intersector::FloodFillColors()
 //-------------------------------------------------------------------------
 
 void
-Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
+Intersector::RefillAfterSurfaceUpdate()
 {
   // "FindSweptNodes" should be called before calling this function. So, in most cases, "nodal_cands_calculated" should be true
   
   // Assuming occluded nodes already have the correct color. We do not deal with them here.
   
-  if(!nodal_cands_calculated) {
-    BuildNodalAndSubdomainBoundingBoxes(1);
-    BuildSubdomainScopeAndKDTree();
-    FindNodalCandidates();
-  }
-
   vector<double> &x_glob(global_mesh.x_glob);
   vector<double> &y_glob(global_mesh.y_glob);
   vector<double> &z_glob(global_mesh.z_glob);
 
-  double*** candid = CandidatesIndex.GetDataPointer();
+  double*** candid = CandidatesIndex_1.GetDataPointer();
   
   //add swept nodes to nodes2fill (including internal ghosts)
   std::set<Int3> nodes2fill = swept;
@@ -1005,7 +1026,7 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
 
       // if this node is swept, candidates must exist. Otherwise, the surface moved too much!
       assert(candid[k0][j0][i0]>=0);
-      vector<MyTriangle> &cands(candidates[candid[k0][j0][i0]].second);
+      vector<MyTriangle> &cands(candidates_1[candid[k0][j0][i0]].second);
       assert(cands.size()>0);
 
       //go over first layer neighbors, find a nonblocked reliable neighbor
@@ -1097,20 +1118,15 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
   if(color)
     Color.RestoreDataPointerToLocalVector();
 
-  CandidatesIndex.RestoreDataPointerToLocalVector();
+  CandidatesIndex_1.RestoreDataPointerToLocalVector();
 
 }
 
 //-------------------------------------------------------------------------
  
 void
-Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
+Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
 {
-  if(!nodal_cands_calculated) {
-    BuildNodalAndSubdomainBoundingBoxes(1);
-    BuildSubdomainScopeAndKDTree();
-    FindNodalCandidates();
-  }
   
   vector<double> &x_glob(global_mesh.x_glob);
   vector<double> &y_glob(global_mesh.y_glob);
@@ -1118,7 +1134,7 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
 
   swept.clear();
 
-  double*** candid = CandidatesIndex.GetDataPointer();
+  double*** candid = CandidatesIndex_1.GetDataPointer();
 
   vector<Vec3D>&  Xs(surface.X);
   vector<Int3>&   Es(surface.elems);
@@ -1137,7 +1153,7 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
     k = (*it)[2];
 
     assert(candid[k][j][i]>=0);
-    vector<MyTriangle> &cands(candidates[candid[k][j][i]].second);
+    vector<MyTriangle> &cands(candidates_1[candid[k][j][i]].second);
     assert(cands.size()>0);
 
     for(auto it2 = cands.begin(); it2 != cands.end(); it2++) {
@@ -1154,20 +1170,18 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
     }
   }
       
-  CandidatesIndex.RestoreDataPointerToLocalVector();
+  CandidatesIndex_1.RestoreDataPointerToLocalVector();
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated)
+Intersector::CalculateUnsignedDistanceNearSurface(int nL)
 {
 
-  if(!nodal_cands_calculated) {
-    BuildNodalAndSubdomainBoundingBoxes(nLayer);
-    BuildSubdomainScopeAndKDTree();
-    FindNodalCandidates();
-  }
+  assert(nLayer = nL);
+
+  FindNodalCandidates(BBmin_n, BBmax_n, tree_n, CandidatesIndex_n, candidates_n);
 
   vector<double> &x_glob(global_mesh.x_glob);
   vector<double> &y_glob(global_mesh.y_glob);
@@ -1175,7 +1189,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
 
   Phi_nLayer = nLayer;
 
-  double*** candid = CandidatesIndex.GetDataPointer();
+  double*** candid = CandidatesIndex_n.GetDataPointer();
   double*** phi    = Phi.GetDataPointer();
   double*** cpi    = ClosestPointIndex.GetDataPointer();
   
@@ -1212,7 +1226,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
       k = (*it)[2];
 
       assert(candid[k][j][i]>=0);
-      vector<MyTriangle> &cands(candidates[candid[k][j][i]].second);
+      vector<MyTriangle> &cands(candidates_n[candid[k][j][i]].second);
       assert(cands.size()>0);
 
       double dist = DBL_MAX, new_dist;
@@ -1261,7 +1275,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
   }
 
 
-  CandidatesIndex.RestoreDataPointerToLocalVector();
+  CandidatesIndex_n.RestoreDataPointerToLocalVector();
   ClosestPointIndex.RestoreDataPointerToLocalVector(); //cannot communicate, because "closest_points" do not.
   Phi.RestoreDataPointerAndInsert(); 
 
@@ -1479,7 +1493,8 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 bool
 Intersector::Intersects(Vec3D &X0, Vec3D &X1)
 {
-  assert(tree);
+  assert(tree_n);
+  assert(nLayer>=1);
 
   // Step 1: Find candidates using the KDTree
   Vec3D bmin(std::min(X0[0],X1[0]), std::min(X0[1],X1[1]), std::min(X0[2],X1[2]));
@@ -1487,13 +1502,13 @@ Intersector::Intersects(Vec3D &X0, Vec3D &X1)
   bmin -= half_thickness;
   bmax += half_thickness;
 
-  int maxCand = 500;
+  int maxCand = 1000;
   vector<MyTriangle> cands(maxCand);
-  int found = tree->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+  int found = tree_n->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
   if(found>maxCand) {
     maxCand = found;
     cands.resize(maxCand);
-    found = tree->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+    found = tree_n->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
   }
 
   if(!found)
