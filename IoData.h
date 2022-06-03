@@ -1002,6 +1002,8 @@ struct OutputData {
 
   const char *mesh_filename; //!< file for nodal coordinates
 
+  const char *mesh_partition; //!< file for nodal coordinates
+
   OutputData();
   ~OutputData() {}
 

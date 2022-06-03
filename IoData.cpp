@@ -2207,6 +2207,8 @@ OutputData::OutputData()
 
   mesh_filename = "";
 
+  mesh_partition = "";
+
   verbose = LOW;
 }
 
@@ -2214,7 +2216,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 21+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 22+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2292,6 +2294,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
 
   new ClassStr<OutputData>(ca, "MeshInformation", this, &OutputData::mesh_filename);
+
+  new ClassStr<OutputData>(ca, "MeshPartition", this, &OutputData::mesh_partition);
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::verbose), 3,

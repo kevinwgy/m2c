@@ -17,6 +17,8 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
 {
   for(int i=0; i<lso.size(); i++) {
     ls_mat_id.push_back(lso[i]->GetMaterialID());
+
+    Phi_tmp.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
 }
 
@@ -32,6 +34,11 @@ void
 TimeIntegratorBase::Destroy()
 {
   IDn.Destroy();
+
+  for(int i=0; i<Phi_tmp.size(); i++) {
+    Phi_tmp[i]->Destroy(); 
+    delete Phi_tmp[i];
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -78,6 +85,15 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
+  // Make a copy of Phi for update of material ID. 
+  if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
+    for(int i=0; i<Phi.size(); i++)
+      Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
+  } else {
+    for(int i=0; i<Phi.size(); i++)
+      lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
+  }
 
   // Get embedded boundary data
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
@@ -162,6 +178,15 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
+  // Make a copy of Phi for update of material ID. 
+  if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
+    for(int i=0; i<Phi.size(); i++)
+      Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
+  } else {
+    for(int i=0; i<Phi.size(); i++)
+      lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
+  }
 
   // Get embedded boundary data
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
@@ -286,6 +311,15 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
 
+  // Make a copy of Phi for update of material ID. 
+  if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
+    for(int i=0; i<Phi.size(); i++)
+      Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
+  } else {
+    for(int i=0; i<Phi.size(); i++)
+      lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
+  }
+
   // Get embedded boundary data
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
@@ -406,7 +440,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
                                                     SpaceVariable3D *L,
                                                     double time, int time_step, int subcycle, double dts)
 {
-
+  // Assumes Phi_tmp carries the previous values of Phi (before time-stepping)
    
   if(lso.size()) {
 
@@ -423,7 +457,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     // Update ID, V, and possibly also Phi (skipped for single-material simulations)
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
 
-    mpo.UpdateMaterialIDByLevelSet(Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
+    mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
 
     // Correct ID and Phi to be consistent with embedded surfaces (to avoid "leaking")
     if(EBDS) {
@@ -447,13 +481,25 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     int nUnresolved = mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions,
                               embed ? embed->GetPointerToIntersectors() : nullptr, unresolved); //update V
     if(nUnresolved) {//note that "unresolved" is not combined over all the subdomains, could be empty for some
+
       //update phi(s) at the unresolved cells
       if(!embed) {//if embed, directly jump to fixing resolved nodes with "apply_failsafe_density = true"!
+
+        // Make a copy of Phi for update of material ID. 
+        if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
+          for(int i=0; i<Phi.size(); i++)
+            Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
+        } else {
+          for(int i=0; i<Phi.size(); i++)
+            lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
+        }
+
         mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
         for(int i=0; i<Phi.size(); i++)
           lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true); //will NOT change sign of phi
-        mpo.UpdateMaterialIDByLevelSet(Phi, ID); //should only update ID of unresolved cells      
+        mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, ID); //should only update ID of unresolved cells      
       }
+
       mpo.FixUnresolvedNodes(unresolved, IDn, ID, V, embed ? embed->GetPointerToIntersectors() : nullptr,
                              unresolved/*not used*/, true); 
     }

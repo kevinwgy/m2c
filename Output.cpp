@@ -81,6 +81,9 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 
   if(iod.output.mesh_filename[0] != 0)
     OutputMeshInformation(coordinates);
+
+  if(iod.output.mesh_partition[0] != 0)
+    OutputMeshPartition();
 }
 
 //--------------------------------------------------------------------------
@@ -427,6 +430,36 @@ void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
 
   coordinates.RestoreDataPointerToLocalVector();
   fclose(file);
+}
+
+//--------------------------------------------------------------------------
+
+void Output::OutputMeshPartition()
+{
+  if(iod.output.mesh_partition[0] == 0)
+    return; //nothing to do
+
+  char fname[256];
+  sprintf(fname, "%s%s.vtr", iod.output.prefix, iod.output.mesh_partition);
+
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+
+  int i0, j0, k0, imax, jmax, kmax;
+  scalar.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
+  double*** s  = (double***) scalar.GetDataPointer();
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        s[k][j][i] = mpi_rank;
+  scalar.RestoreDataPointerAndInsert();
+
+  scalar.WriteToVTRFile(fname, "partition");
+  
+  MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
+
+  scalar.SetConstantValue(0.0); //clean up the internal variable (not necessary)
 }
 
 //--------------------------------------------------------------------------

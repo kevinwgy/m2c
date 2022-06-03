@@ -119,7 +119,8 @@ MultiPhaseOperator::Destroy()
 //-----------------------------------------------------
 
 void 
-MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID)
+MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
+                                               vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID)
 {
 
 #ifdef LEVELSET_TEST
@@ -128,7 +129,6 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, Sp
 
   // reset tag to 0
   Tag.SetConstantValue(0, true/*workOnGhost*/);
-  ID.SetConstantValue(0, true/*workOnGhost*/);
   int overlap = 0;
 
   double*** tag = (double***)Tag.GetDataPointer();
@@ -138,6 +138,10 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, Sp
   vector<double***> phi(ls_size, NULL);
   for(int ls=0; ls<ls_size; ls++) 
     phi[ls] = Phi[ls]->GetDataPointer();
+  
+  vector<double***> phi0(ls_size, NULL);
+  for(int ls=0; ls<ls_size; ls++) 
+    phi0[ls] = Phi0[ls]->GetDataPointer();
   
 
   for(int ls = 0; ls<ls_size; ls++) {//loop through all the level set functions
@@ -150,6 +154,10 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, Sp
 
           if(id[k][j][i] == INACTIVE_MATERIAL_ID)
             continue; //if occluded, id should not be changed
+
+          if(phi[ls][k][j][i]*phi0[ls][k][j][i]>=0.0)
+            continue; // no sign change: Should not update ID, particularly important if there are also embedded surfaces
+                      // that affect ID.
 
           if(phi[ls][k][j][i]<0) {
             if(id[k][j][i] != 0) {
@@ -175,6 +183,9 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, Sp
 
   for(int ls=0; ls<ls_size; ls++) 
     Phi[ls]->RestoreDataPointerToLocalVector(); //no changes made
+
+  for(int ls=0; ls<ls_size; ls++) 
+    Phi0[ls]->RestoreDataPointerToLocalVector(); //no changes made
 
   MPI_Allreduce(MPI_IN_PLACE, &overlap, 1, MPI_INT, MPI_SUM, comm);
 
@@ -207,11 +218,25 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
 
   set<Int3> corrected;
 
+/*
+  IDn.StoreMeshCoordinates(coordinates);
+  IDn.WriteToVTRFile("IDn.vtr", "IDn");
+  ID.StoreMeshCoordinates(coordinates);
+  ID.WriteToVTRFile("ID.vtr", "ID");
+  print("I am here.\n");
+  exit_mpi();
+*/
+
   double*** idn = (double***)IDn.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
 
   vector<double***> phi; //may remain empty if there are no orphans
   vector<double***> phi_ebm; //..
+  for(int ls=0; ls<Phi.size(); ls++) 
+    phi.push_back(Phi[ls]->GetDataPointer());
+  for(auto&& ebds : *EBDS)
+    phi_ebm.push_back(ebds->Phi_ptr->GetDataPointer()); //unsigned distance, always>=0
+
 
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
@@ -223,13 +248,6 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
         // check on nodes who have changed ID (due to level sets)
         
         if(IsOrphanAcrossEmbeddedSurfaces(i,j,k,idn,id,intersector)) {
-
-          if(phi.empty() && phi_ebm.empty()) { //first orphan
-            for(int ls=0; ls<Phi.size(); ls++) 
-              phi.push_back(Phi[ls]->GetDataPointer());
-            for(auto&& ebds : *EBDS)
-              phi_ebm.push_back(ebds->Phi_ptr->GetDataPointer()); //unsigned distance, always>=0
-          }
 
           // update phi first (id will be switched back later)
           // first, we determine the absolute value of phi (checking both level sets and dist to surf)
@@ -295,7 +313,10 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
     ID.RestoreDataPointerToLocalVector();
   }
     
-
+/*
+  MPI_Barrier(comm);
+  print("Good 6. total_corrected = %d\n", total_corrected);
+*/
   return total_corrected;
 
 }

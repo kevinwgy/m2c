@@ -55,6 +55,8 @@ public:
 private:
   void OutputMeshInformation(SpaceVariable3D& coordinates);
 
+  void OutputMeshPartition();
+
 };
 
 #endif

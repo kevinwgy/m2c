@@ -61,7 +61,8 @@ public:
   void UpdateMaterialIDAtGhostNodes(SpaceVariable3D &ID);
 
   //! update material id including the ghost region
-  void UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
+  void UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
+                                  vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID);
 
   //! update V due to interface motion
   int UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID,

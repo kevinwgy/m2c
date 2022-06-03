@@ -1493,7 +1493,10 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 bool
 Intersector::Intersects(Vec3D &X0, Vec3D &X1)
 {
-  assert(tree_n);
+
+  if(!tree_n) //this subdomain is not even close to the embedded surface.
+    return false;
+
   assert(nLayer>=1);
 
   // Step 1: Find candidates using the KDTree

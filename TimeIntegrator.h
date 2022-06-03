@@ -31,6 +31,9 @@ protected:
   //!< Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
+  //!< Internal variable to temporarily store Phi (e.g., for material ID updates)
+  vector<SpaceVariable3D*> Phi_tmp;
+
   //!< Internal variable to store the mat. ID tracked by each level set
   vector<int> ls_mat_id;
 
