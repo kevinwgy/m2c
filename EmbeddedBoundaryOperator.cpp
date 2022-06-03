@@ -16,6 +16,7 @@ using std::vector;
 using std::unique_ptr;
 
 extern int INACTIVE_MATERIAL_ID;
+extern int verbose;
 
 //------------------------------------------------------------------------------------------------
 
@@ -959,41 +960,63 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
   for(auto&& xter : intersector)
     loft = std::max(loft, xter->GetSurfaceHalfThickness());
   loft *= 2.0; //moving out of half_thickness
-  Vec3D ref_point = p + loft*normal;
 
+  int iter, max_iter = 10;
   bool sameside[2][2][2];
-  for(int dk=0; dk<=1; dk++)
-    for(int dj=0; dj<=1; dj++)
-      for(int di=0; di<=1; di++) {
-        i = ijk0[0] + di;
-        j = ijk0[1] + dj;
-        k = ijk0[2] + dk;
+  bool found_sameside;
+  for(iter=0; iter<max_iter; iter++) {//gradually increase "loft", if necessary
 
-        assert(coordinates_ptr->IsHere(i,j,k,true)); //Not in the ghosted subdomain? Something is wrong
+    Vec3D ref_point = p + loft*normal;
 
-        if(coordinates_ptr->OutsidePhysicalDomain(i,j,k)) { //state variable unavailable here.
-          sameside[dk][dj][di] = false;
-          continue;
-        } //NOTE: Must not check (external) ghost nodes, even if the state variable is correct (w/ b.c.).
-          //      This is because the surface may not extend into the ghost layer. Hence, the intersection
-          //      function may not work as expected!
+    found_sameside = false;
+    for(int dk=0; dk<=1; dk++)
+      for(int dj=0; dj<=1; dj++)
+        for(int di=0; di<=1; di++) {
+          i = ijk0[0] + di;
+          j = ijk0[1] + dj;
+          k = ijk0[2] + dk;
 
-        if(id[k][j][i] == INACTIVE_MATERIAL_ID) {
-          sameside[dk][dj][di] = false;
-          continue;
-        }
+          assert(coordinates_ptr->IsHere(i,j,k,true)); //Not in the ghosted subdomain? Something is wrong
 
-
-        Vec3D x(global_mesh_ptr->GetX(i), global_mesh_ptr->GetY(j), global_mesh_ptr->GetZ(k));
-        sameside[dk][dj][di] = true; //start w/ true
-        for(auto&& xter : intersector) {
-          if(xter->Intersects(x, ref_point)) {
+          if(coordinates_ptr->OutsidePhysicalDomain(i,j,k)) { //state variable unavailable here.
             sameside[dk][dj][di] = false;
-            break;
-          }
-        }
-      }
+            continue;
+          } //NOTE: Must not check (external) ghost nodes, even if the state variable is correct (w/ b.c.).
+            //      This is because the surface may not extend into the ghost layer. Hence, the intersection
+            //      function may not work as expected!
 
+          if(id[k][j][i] == INACTIVE_MATERIAL_ID) {
+            sameside[dk][dj][di] = false;
+            continue;
+          }
+
+
+          Vec3D x(global_mesh_ptr->GetX(i), global_mesh_ptr->GetY(j), global_mesh_ptr->GetZ(k));
+          sameside[dk][dj][di] = true; //start w/ true
+          for(auto&& xter : intersector) {
+            if(xter->Intersects(x, ref_point)) {
+              sameside[dk][dj][di] = false;
+              break;
+            }
+          }
+
+          if(sameside[dk][dj][di])
+            found_sameside = true; //at least found one on the "same side"
+        }
+
+    if(found_sameside)
+      break;
+    else
+      loft *= 2.0; //increase lofting distance
+  }
+
+  if(iter>=5 && verbose>=1) {
+    if(found_sameside)
+      fprintf(stderr,"\033[0;35mWarning: Applied a lofting height of %e (iter=%d) to find valid nodes for interpolating \n"
+                               "         pressure at Gauss point (%e, %e, %e).\033[0m\n",
+              loft, iter, p[0], p[1], p[2]);
+    //if found_sameside == false, will trigger another warning message below.
+  }
 
   // interpolate pressure at the point
   // We populate opposite side and inactive nodes by average of same side / active nodes.
@@ -1021,7 +1044,7 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double ar
   double avg_pressure;
   if(n_pressure==0) {
     fprintf(stderr,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
-                   "Gauss point (%e, %e, %e). Try reducing surface thickness or refining mesh.\n\033[0m",
+                   "Gauss point (%e, %e, %e). Try adjusting surface thickness.\033[0m\n",
                    p[0], p[1], p[2]);
     avg_pressure = 0.0;
   } else

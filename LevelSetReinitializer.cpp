@@ -101,11 +101,15 @@ RETRY_FullDomain:
 
     //************** Step 1 of RK3 *****************
     residual = ComputeResidualFullDomain(Phi, R, cfl);  //R = R(Phi)
-    if(verbose>=1)
+    if(verbose>1)
       print("  o Iter. %d: Residual = %e, Relative Error = %e, Tol = %e.\n", iter, residual, 
             dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
+    if(residual < iod_ls.reinit.convergence_tolerance) {//residual itself is nondimensional
+      if(verbose==1)
+        print("  o Completed (%d iter.): Residual = %e, Rel. Error = %e, Tol = %e.\n", 
+              iter, residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       break;
+    }
 
     Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
     Phi1.AXPlusBY(1.0, 1.0, R);   //Phi1 = Phi + R(Phi)
@@ -133,8 +137,12 @@ RETRY_FullDomain:
     //*********************************************
 
     dphi_max = CalculateMaximumRelativeErrorFullDomain(Phi0, Phi);    
-    if(dphi_max < iod_ls.reinit.convergence_tolerance) //converged (using the same tolerance)
+    if(dphi_max < iod_ls.reinit.convergence_tolerance) {//converged (using the same tolerance)
+      if(verbose==1)
+        print("  o Completed (%d iter.): Residual = %e, Rel. Error = %e, Tol = %e.\n", 
+              iter, residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       break;
+    }
   }
 
   // apply failsafe
@@ -205,11 +213,15 @@ RETRY_NarrowBand:
 
     //************** Step 1 of RK3 *****************
     residual = ComputeResidualInBand(Phi, UsefulG2, useful_nodes, R, cfl);  //R = R(Phi)
-    if(verbose>=1)
+    if(verbose>1)
       print("  o Iter. %d: Residual = %e, Relative Error = %e, Tol = %e.\n", iter, residual, 
             dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(residual < iod_ls.reinit.convergence_tolerance) //residual itself is nondimensional
+    if(residual < iod_ls.reinit.convergence_tolerance) {//residual itself is nondimensional
+      if(verbose==1)
+        print("  o Completed (%d iter.): Residual = %e, Rel. Error = %e, Tol = %e.\n", 
+              iter, residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       break;
+    }
 
     AXPlusBYInBandPlusOne(0.0, Phi1, 1.0, Phi); //Phi1 = Phi
     //Phi1.AXPlusBY(0.0, 1.0, Phi); //Phi1 = Phi
@@ -243,8 +255,12 @@ RETRY_NarrowBand:
     //*********************************************
 
     dphi_max = CalculateMaximumRelativeErrorInBand(Phi0, Phi, useful_nodes);    
-    if(dphi_max < iod_ls.reinit.convergence_tolerance) //converged (using the same tolerance)
+    if(dphi_max < iod_ls.reinit.convergence_tolerance) {//converged (using the same tolerance)
+      if(verbose==1)
+        print("  o Completed (%d iter.): Residual = %e, Rel. Error = %e, Tol = %e.\n", 
+              iter, residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       break;
+    }
   }
 
   //Failsafe

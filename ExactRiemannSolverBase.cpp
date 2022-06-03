@@ -772,8 +772,8 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
     return false;
   }
 
-  assert(p0>pl);
-  assert(p1>pl);
+  assert(p0>=pl);
+  assert(p1>=pl);
   
 #if PRINT_RIEMANN_SOLUTION == 1
   fprintf(stderr, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ustar, p1, ul1-ustar);
