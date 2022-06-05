@@ -1140,7 +1140,7 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
   new ClassToken<MultiPhaseData>
     (ca, "RiemannNormal", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::riemann_normal), 3,
-     "EmbeddedSurface", 0, "Mesh", 1, "Average", 2);
+     "LevelSet", 0, "Mesh", 1, "Average", 2);
 
   new ClassToken<MultiPhaseData>
     (ca, "LatentHeatTransfer", this,
