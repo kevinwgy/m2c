@@ -773,6 +773,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 void
 EmbeddedBoundaryOperator::TrackSurfaces()
 {
+  for(auto&& surf : surfaces)
+    surf.CalculateNormalsAndAreas();
+
   vector<bool> hasInlet(intersector.size(), false);
   vector<bool> hasOutlet(intersector.size(), false);
   vector<bool> hasOccluded(intersector.size(), false);
@@ -799,6 +802,9 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
     if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
        strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
       continue; //this surface is fixed...
+
+    surfaces[i].CalculateNormalsAndAreas();
+
     intersector[i]->RecomputeFullCourse(surfaces_prev[i].X, phi_layers);
   }
 }

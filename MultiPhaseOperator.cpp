@@ -632,7 +632,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
       print("- Performed a large number (%d) of iterations to update nodes/cells swept by embedded surfaces.\n",
             iter);
   }
-  if(last_resort && total_count==0)
+  if(last_resort && total_count==0 && verbose>=1)
     print_warning("Warning: Activated the fail-safe procedure to update nodes swept by embedded surfaces.\n");
   if(total_count>0) {
     print_error("*** Error: Unable to update %d cells/nodes swept by embedded surfaces.\n", total_count);

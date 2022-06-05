@@ -151,6 +151,9 @@ class Intersector {
   //! Does not include nodes that are occluded at present. Includes internal ghost nodes.
   std::set<Int3> swept;
 
+  //! an internally used vector
+  std::set<Int3> previously_occluded_but_not_now;
+
 public:
 
   Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,

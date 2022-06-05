@@ -40,6 +40,7 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   ClosestPointIndex.SetConstantValue(-1, true);
   XForward.SetConstantValue(-1, true);
   XBackward.SetConstantValue(-1, true);
+  Color.SetConstantValue(-1, true);
 
   half_thickness = 0.5*iod_surface.surface_thickness;
   if(half_thickness==0) {
@@ -369,6 +370,8 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
   //Clear previous values
   intersections.clear();
 
+  previously_occluded_but_not_now.clear();
+
   //Preparation
   Vec3D tol(half_thickness*1.5, half_thickness*1.5, half_thickness*1.5); //a tolerance
 
@@ -442,6 +445,12 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
           color[k][j][i] = 0;
           occid[k][j][i] = tid;
           layer[k][j][i] = 0;          
+        }
+        else {
+          if(color[k][j][i]==0) {// previously occluded!
+            color[k][j][i] = -1; // to be corrected in "Refill"
+            previously_occluded_but_not_now.insert(Int3(i,j,k));
+          }
         }
 
         //--------------------------------------------
@@ -1170,6 +1179,15 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
     }
   }
       
+  // Verification
+  for(auto&& ijk : previously_occluded_but_not_now) {
+    if(swept.find(ijk) == swept.end()) {
+      fprintf(stderr,"\033[0;31m*** Error: Conflict between 'swept' and 'occluded': %d %d %d. A software bug.\033[0m\n",
+              ijk[0], ijk[1], ijk[2]);
+      exit(-1);
+    } 
+  }
+  
   CandidatesIndex_1.RestoreDataPointerToLocalVector();
 }
 
