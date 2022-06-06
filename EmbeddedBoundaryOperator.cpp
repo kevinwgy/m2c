@@ -267,13 +267,13 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
             p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0 - marker_length*Ns[i];
             q = p + 2.0*marker_length*Ns[i];
             break;
-          case 1 : //positive side is wetted
-            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
-            q = p + marker_length*Ns[i];
-            break;
-          case 2 : //negative side is wetted
+          case 1 : //negative side is wetted
             p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
             q = p - marker_length*Ns[i];
+            break;
+          case 2 : //positive side is wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
+            q = p + marker_length*Ns[i];
             break;
           case 3 : //neither side is wetted
             p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
