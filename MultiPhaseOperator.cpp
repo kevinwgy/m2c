@@ -128,10 +128,10 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
 #endif
 
   // reset tag to 0
-  Tag.SetConstantValue(0, true/*workOnGhost*/);
+  //Tag.SetConstantValue(0, true/*workOnGhost*/);
   int overlap = 0;
 
-  double*** tag = (double***)Tag.GetDataPointer();
+//  double*** tag = (double***)Tag.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
 
   int ls_size = Phi.size();
@@ -160,10 +160,12 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
                       // that affect ID.
 
           if(phi[ls][k][j][i]<0) {
+/*
             if(id[k][j][i] != 0) {
               overlap++;
               tag[k][j][i] = 1;
             } 
+*/
             id[k][j][i] = matid; 
           }
           //check if this node (i,j,k) is EXACTLY at the interface of two subdomains. If yes, give it the ID
@@ -187,6 +189,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
   for(int ls=0; ls<ls_size; ls++) 
     Phi0[ls]->RestoreDataPointerToLocalVector(); //no changes made
 
+/*
   MPI_Allreduce(MPI_IN_PLACE, &overlap, 1, MPI_INT, MPI_SUM, comm);
 
 
@@ -194,12 +197,14 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
     print_error("*** Error: Found overlapping material interfaces. Number of overlapped cells: %d.\n", overlap);
     exit_mpi();
   } 
+*/
 
-
+/*
   if(overlap) 
     Tag.RestoreDataPointerAndInsert();
   else
     Tag.RestoreDataPointerToLocalVector();
+*/
 
   ID.RestoreDataPointerAndInsert();
 
