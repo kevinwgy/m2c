@@ -30,8 +30,6 @@ extern int NSTP_2ND_IT;
 extern int CURRENT_STEP_NUMBER;
 extern int MAX_STEP_NUMBER; 
 extern int verbose;
-//extern std::ofstream testFile1;
-//extern std::ofstream testFile3;
 
 //-----------------------------------------------------
 
@@ -876,7 +874,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     // prepare for numerical integration
     double rhos_0 = rho, us_0 = u, ps_0 = p, xi_0; //start point of each step
     double rhos_1 = rho, us_1 = u, ps_1 = p, xi_1; //end point of each step
-    double dp = (p-ps)/numSteps_rarefaction;
+    double dp = (p-ps)/numSteps_rarefaction;  // initial step size
 
     double e = vf[id]->GetInternalEnergyPerUnitMass(rho,p);
     double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
@@ -892,13 +890,9 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       std::cout << wavenumber << "-wave: It# " << It_wave << std::endl;
 #endif
 
-/*    for (size_t j = 0; j < integrationPath1[0].size(); j++) {
-      std::cout << integrationPath1[0][j] << ", " << integrationPath1[1][j] << ", " << integrationPath1[2][j] << std::endl;
-    }
-*/
-
-    int index0 = 0;
-    if (integrationPath.size() > 1) {
+    int index0 = 0; // index of new starting point
+    // find the new starting point, and update dp accordingly
+    if (integrationPath.size() > 1) { 
 	    for (int j = integrationPath.size()-1; j >= 0; j--) {
 		    if (integrationPath[j][0] > ps) {
 			    index0 = j;
@@ -908,15 +902,12 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	    ps_0 = integrationPath[index0][0];
 	    rhos_0 = integrationPath[index0][1];
 	    us_0 = integrationPath[index0][2];
-	    //dp = std::min(10*dp, ps_0 - ps);
-	    if (index0 != integrationPath.size()-1) {
+	    if (index0 != integrationPath.size()-1) { // new starting point is not the last on the trajectory
               dp = ps_0-ps; 
-            } else { 
+            } else { // dp from the last step 
               dp = std::min( integrationPath[index0-1][0]-integrationPath[index0][0], ps_0-ps );
             }
     }
-    double pStart_new = ps_0;
-    double dpStart = dp;
  
     double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
     xi_0 = xi;
@@ -936,15 +927,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
      
     for(int i=0; i<numSteps_rarefaction*moreSteps; i++) {
  
-/*
-      if (wavenumber == 1) {
-        testFile1 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
-      } 
-      else {
-        testFile3 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
-      }      
-*/
-     bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
+    bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
                              rhos_0, us_0, ps_0 /*start state*/, dp /*step size*/,
                              rhos_1, us_1, ps_1, xi_1 /*output: end state*/,
                              uErr, rhoErr /*output: absolute error in us*/);
@@ -955,8 +938,8 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         dp = dp/2.0;
         continueTimes = continueTimes + 1;
         if (continueTimes > continueTolerance || dp == 0.0) {
-//          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
-//                       continueTimes, id, p, ps, pStart_new, dpStart, dp, ps_1, c, rho, integrationPath.size());
+//          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
+//                       continueTimes, id, p, ps, dp, ps_1, c, rho, integrationPath.size());
            break;
         }
         continue;
@@ -967,6 +950,45 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         continue;
       }
 
+      double tiny = 1.e-30; // a small number, used to prevent uErrScaled and rhoErrScaled from being zero
+      double errBar = tol_rarefaction; // user specified one-step error of numerical integration 
+      double uErrScaled = uErr / c + tiny;
+      double rhoErrScaled = rhoErr / rho + tiny;
+      if (isnan(rhoErrScaled)==1) {
+        fprintf(stderr,"*** Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+                       id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhos_0, rhos_1, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
+        exit (EXIT_FAILURE);
+      }  
+ 
+      if (isnan(uErrScaled)==1) {
+        fprintf(stderr,"*** Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+                       id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
+        exit (EXIT_FAILURE);
+      }  
+
+      double dpTemp = dp; // temporary dp used for step adaption
+      double safety = 0.9; // safety factor for step adaption
+
+      if (rhoErrScaled >= errBar) { 
+        dpTemp = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.25 );
+        dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
+        dp = std::min(dpTemp, ps_0-ps);
+        continue;
+      }
+ 
+      if (uErrScaled >= errBar) {
+        dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.25 );
+        dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
+        dp = std::min(dpTemp, ps_0-ps);
+        continue;
+      }
+
+      if (ps_1 < integrationPath[integrationPath.size()-1][0]) { // store the new point if necessary
+	      std::vector<double> currentVect = {ps_1, rhos_1, us_1};
+	      integrationPath.push_back(currentVect);
+      }
+ 
+ 
 #if PRINT_RIEMANN_SOLUTION == 1
       sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1, (double)id});
 #endif
@@ -1007,32 +1029,11 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
         cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
 #endif
-//        if (It_wave > 0 && i > 1) {
-//          std::cout << "It# " << It_wave << ": " << i << " steps." << std::endl;
-//          exit(1);
-//        }
-        done = true;
+       done = true;
         
-	if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
-		std::vector<double> currentVect = {ps_1, rhos_1, us_1};
-		integrationPath.push_back(currentVect);
-	}  
-	It_wave = It_wave + 1;
+       It_wave = It_wave + 1;
         
-/*         
-        if (wavenumber == 1) {
-	  testFile1 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
-          testFile1.close();
-        }
-        else {
-          testFile3 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
-          testFile3.close();
-        }
-*/
-#if PRINT_RIEMANN_SOLUTION == 1
-        std::cout << "RKstep " << i << ": dp = " << dp << ", ps_0 - ps = " << ps_0 - ps << ", uErr = " << uErr << "." << std::endl;
-#endif
-        CURRENT_STEP_NUMBER = std::max(i, CURRENT_STEP_NUMBER);
+       CURRENT_STEP_NUMBER = std::max(i, CURRENT_STEP_NUMBER);
         MAX_STEP_NUMBER = std::max(i, MAX_STEP_NUMBER);
         double i_double = (double) i;
         dp_avg = (p - ps) / (i_double+1.0);
@@ -1047,69 +1048,25 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       // If the solver gets here, it means it hasn't reached the final pressure ps.
       // Adjust step size, then update state
       //
-//      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
      
-      double tiny = 1.e-30;
-      double errBar = tol_rarefaction; 
-      double uErrScaled = uErr / c + tiny;
-      double rhoErrScaled = rhoErr / rho + tiny;
-      if (isnan(rhoErrScaled)==1) {
-        fprintf(stderr,"*** Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
-                       id, p, ps, pStart_new, dpStart, dp, ps_0, ps_1, uErr, uErrScaled, rhos_0, rhos_1, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
-        exit (EXIT_FAILURE);
-      }  
- 
-      if (isnan(uErrScaled)==1) {
-        fprintf(stderr,"*** Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
-                       id, p, ps, pStart_new, dpStart, dp, ps_0, ps_1, uErr, uErrScaled, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
-        exit (EXIT_FAILURE);
-      }  
-
-     // std::cout << "uErrScaled = " << uErrScaled << "." << std::endl;
-      double dpTemp = dp;
-      double safety = 0.9;
-      if (i == moreSteps*numSteps_rarefaction-1) {
-	      fprintf(stderr,"*** Warning: integrator used up all the steps specified. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, uErrScaled = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
-                       id, p, ps, pStart_new, dpStart, dp, ps_1, uErrScaled, rhoErrScaled, c, rho, integrationPath.size());
+     if (i == moreSteps*numSteps_rarefaction-1) {
+	      fprintf(stderr,"*** Warning: integrator used up all the steps specified. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, uErrScaled = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+                       id, p, ps, dp, ps_1, uErrScaled, rhoErrScaled, c, rho, integrationPath.size());
       }        
-          
-      if (rhoErrScaled > errBar) { 
-        dpTemp = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.25 );
-        dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
-        dp = std::min(dpTemp, ps_0-ps);
-        continue;
-      } 
-      else if (uErrScaled > errBar) {
-        dpTemp = safety * dp * pow( fabs(errBar/uErrScaled) , 0.25 );
-        dpTemp = std::max(dpTemp, 0.2*dp); //don't decrease dp too much
-        dp = std::min(dpTemp, ps_0-ps);
-        continue;
-      }
-      else {
-        double dpTemp_rho = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.2 );
-        double dpTemp_u = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
-        dpTemp = std::min(dpTemp_rho, dpTemp_u);        
-        dpTemp = std::min(dpTemp, 10*dp); //don't increase dp too much
-      }
+   
+     // increase dp is allowed 
+     double dpTemp_rho = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.2 );
+     double dpTemp_u = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
+     dpTemp = std::min(dpTemp_rho, dpTemp_u);        
+     dpTemp = std::min(dpTemp, 10*dp); //don't increase dp too much
 
-#if PRINT_RIEMANN_SOLUTION == 1
-      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErr = " << uErr << ", uErrScaled = " << uErrScaled << "." << std::endl;
-      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", rhoErr = " << rhoErr << ", rhoErrScaled = " << rhoErrScaled << std::endl;
-#endif
+     dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
 
-      dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
-
-//      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps
-//                       dp*4.0 ); //don't increase too much in one step
-      rhos_0 = rhos_1;
-      us_0   = us_1;
-      ps_0   = ps_1;
-      xi_0   = xi_1;
-      if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
-	      std::vector<double> currentVect = {ps_1, rhos_1, us_1};
-	      integrationPath.push_back(currentVect);
-      }
-    }
+     rhos_0 = rhos_1;
+     us_0   = us_1;
+     ps_0   = ps_1;
+     xi_0   = xi_1;
+   }
 
     if(!done) {
       if(vf[id]->CheckState(rhos_1,ps_1,true)) {
@@ -1340,9 +1297,6 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                             double &rho, double &u, double &p, double &xi /*output*/,
                             double & uErr, double & rhoErr /*output*/)
 {
-  bool test = false;
-  double testErr = 1.e-6;
-
   dp = -dp; // dp is positive when passed in. It is actually negative if we follow Kamm's paper 
             // Equations (36 - 42)
   
@@ -1458,122 +1412,11 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   c = sqrt(c);
   
   xi = (wavenumber == 1) ? u - c : u + c;
- 
 
-//------------------------------------------------------------
-//                Test integration in rho
-//------------------------------------------------------------
-  if (test) {
-    double rhoNew, uNew, pNew, xiNew;
-	    bool successTest = Rarefaction_OneStepRK4_ODEtest(wavenumber/*1 or 3*/, id, 
-                     	    rho_0, u_0, p_0 /*start state*/, -drho /*step size*/,
-                            rhoNew, uNew, pNew, xiNew /*output:end state*/);
-	    if (!successTest) {
-		    //std::cout << "Test for integration rho failed" << std::endl;
-                    return false;
-	    } else if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
-                    return false;
-		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
-		    std::cout << "rho = " << rho << ", u = " << u << ", p = " << p << std::endl;
-		    std::cout << "rhoNew = " << rhoNew << ", uNew = " << uNew << ", pNew = " << pNew << std::endl;   
-	    }
-            if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
-		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
-	    }	
-  }
- 
   return true;
 }
 
 //-----------------------------------------------------------------------------------------------------------
-bool
-ExactRiemannSolverBase::Rarefaction_OneStepRK4_ODEtest(int wavenumber/*1 or 3*/, int id,
-                            double rho_0, double u_0, double p_0 /*start state*/, 
-                            double drho /*step size*/,
-                            double &rho, double &u, double &p, double &xi /*output*/)
-{
-  drho = -drho; //drho is positive when passed in. It is actually negative if we follow Kamm's paper
-                // Equations (36 - 42)
-                
-  double e_0 = vf[id]->GetInternalEnergyPerUnitMass(rho_0, p_0);
-  double c_0_square = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
-
-  if(rho_0<=0 || c_0_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(0)." 
-//            " rho = %e, p = %e, e = %e, id = %d.\n",
-//            c_0_square, rho_0, p_0, e_0, id);
-    return false;
-  } 
-
-  double c_0 = sqrt(c_0_square);
-
-  double p_1 = p_0 + 0.5*drho*c_0_square;
-  double rho_1 = rho_0 + 0.5*drho;
-  double e_1 = vf[id]->GetInternalEnergyPerUnitMass(rho_1, p_1);
-  double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
-
-  if(rho_1<=0 || c_1_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(1)." 
-//                   " rho = %e, p = %e, e = %e, id = %d.\n",
-//                   c_1_square, rho_1, p_1, e_1, id);
-    return false;
-  } 
-
-  double c_1 = sqrt(c_1_square);
-
-  double p_2 = p_0 + 0.5*drho*c_1_square;
-  double rho_2 = rho_1;
-  double e_2 = vf[id]->GetInternalEnergyPerUnitMass(rho_2, p_2);
-  double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
-
-  if(rho_2<=0 || c_2_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(2)." 
-//            " rho = %e, p = %e, e = %e, id = %d.\n",
-//            c_2_square, rho_2, p_2, e_2, id);
-    return false;
-  } 
-
-  double c_2 = sqrt(c_2_square);
- 
-  double p_3 = p_0 + drho*c_2_square;
-  double rho_3 = rho_0 + drho;
-  double e_3 = vf[id]->GetInternalEnergyPerUnitMass(rho_3, p_3);
-  double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
-
-  if(rho_3<=0 || c_3_square<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(3)." 
-//            " rho = %e, p = %e, e = %e, id = %d.\n",
-//            c_3_square, rho_3, p_3, e_3, id);
-    return false;
-  } 
-
-  double c_3 = sqrt(c_3_square);
-
-  // now, calculate the outputs
-  //
-  p = p_0 + 1.0/6.0*drho*(c_0_square + 2.0*(c_1_square+c_2_square) + c_3_square);
-
-  double du = 1.0/6.0*drho*( c_0/rho_0 + 2.0*(c_1/rho_1 + c_2/rho_2) + c_3/rho_3);
-  u = (wavenumber == 1) ? u_0 - du : u_0 + du;
-
-  rho = rho_0 + drho;  //KW: Note that if drho is tiny compared to rho_0, then rho = rho_0 due to roundoff (I have observed this!)
-
-  double e = vf[id]->GetInternalEnergyPerUnitMass(rho, p);
-  double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
-
-  if(rho<=0 || c<0) {
-//    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4_ODEtest(final)." 
-//            " rho = %e, p = %e, e = %e, id = %d.\n",
-//            c, rho, p, e, id);
-    return false;
-  } else
-    c = sqrt(c);
-
-  xi = (wavenumber == 1) ? u - c : u + c;
-
-  return true;
-}
-
 //----------------------------------------------------------------------------------
 
 void
@@ -1990,8 +1833,6 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	    //dp = std::min(10*dp, ps_0 - ps);
 	    dp = std::min( (p-ps)/numSteps_rarefaction, ps_0 - ps );
     }
-    double pStart_new = ps_0;
-    double dpStart = dp;
  
     double xi = (wavenumber == 1) ? u - c : u + c; // xi = u -/+ c
     xi_0 = xi;
@@ -2004,20 +1845,10 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     // integration by Runge-Kutta 4
     bool done = false;
     int moreSteps = 5;
-   // int continueTimes = 0;
-   // int continueTolerance = moreSteps*numSteps_rarefaction;
  
     for(int i=0; i<numSteps_rarefaction*moreSteps; i++) {
  
-/*
-      if (wavenumber == 1) {
-        testFile1 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
-      } 
-      else {
-        testFile3 << std::setw(16) << rhos_0 << std::setw(16) << us_0 << std::setw(16) << ps_0 << std::setw(16) << dp << std::setw(16) << ps << std::endl;
-      }      
-*/
-     bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
+    bool success = Rarefaction_OneStepRK4(wavenumber/*1 or 3*/, id,
                              rhos_0, us_0, ps_0 /*start state*/, dp /*step size*/,
                              rhos_1, us_1, ps_1, xi_1 /*output: end state*/);
                              
@@ -2025,10 +1856,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 //              rhos_0, us_0, ps_0, drho, rhos_1, us_1, ps_1, ps, success);
       if(!success) {
         dp = dp/2.0;
-      // continueTimes = continueTimes + 1;
         if (dp == 0.0) {
-//          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, pStart_new = %e, dpStart = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
-//                       continueTimes, id, p, ps, pStart_new, dpStart, dp, ps_1, c, rho, integrationPath.size());
           break;
         }
         continue;
@@ -2079,11 +1907,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
         cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
 #endif
-//        if (It_wave > 0 && i > 1) {
-//          std::cout << "It# " << It_wave << ": " << i << " steps." << std::endl;
-//          exit(1);
-//        }
-        done = true;
+       done = true;
 
 	if (ps_1 < integrationPath[integrationPath.size()-1][0]) {
 		std::vector<double> currentVect = {ps_1, rhos_1, us_1};
@@ -2091,20 +1915,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	}  
 	It_wave = It_wave + 1;
         
-/*         
-        if (wavenumber == 1) {
-	  testFile1 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
-          testFile1.close();
-        }
-        else {
-          testFile3 << std::setw(16) << rhos_1 << std::setw(16) << us_1 << std::setw(16) << ps_1 << std::endl;
-          testFile3.close();
-        }
-*/
-#if PRINT_RIEMANN_SOLUTION == 1
-        std::cout << "RKstep " << i << ": dp = " << dp << ", ps_0 - ps = " << ps_0 - ps << ", uErr = " << uErr << "." << std::endl;
-#endif
-        CURRENT_STEP_NUMBER = std::max(i, CURRENT_STEP_NUMBER);
+       CURRENT_STEP_NUMBER = std::max(i, CURRENT_STEP_NUMBER);
         MAX_STEP_NUMBER = std::max(i, MAX_STEP_NUMBER);
         //std::cout << "MAX_STEP_NUMBER = " << MAX_STEP_NUMBER << std::endl;
         break; //done!
@@ -2116,11 +1927,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 //      fprintf(stderr,"RK4 step: adjusting drho. old drho: %e, rhos_0 - rhos_1 = %e, a = %e, b = %e.\n", drho, rhos_0 - rhos_1, (rhos_0-rhos_1)/dp*std::min(dp_target,ps_1-ps), drho*4.0);
      //double tiny = 1.e-14;
     
-#if PRINT_RIEMANN_SOLUTION == 1
-      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", uErr = " << uErr << ", uErrScaled = " << uErrScaled << "." << std::endl;
-      std::cout << "RKstep " << i << ": dp = " << dp << ", dpTemp = " << dpTemp << ", ps_1 - ps = " << ps_1 - ps << ", rhoErr = " << rhoErr << ", rhoErrScaled = " << rhoErrScaled << std::endl;
-#endif
-      dp = std::min( std::min(dp_target, ps_1-ps), //don't go beyond ps
+     dp = std::min( std::min(dp_target, ps_1-ps), //don't go beyond ps
                      4.0*dp ); //don't increase too much in one step
 
 //      dp = std::min( std::min(dp_target,ps_1-ps), //don't go beyond ps
@@ -2364,9 +2171,6 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
                             double dp /*step*/,
                             double &rho, double &u, double &p, double &xi /*output*/)
 {
-  bool test = false;
-  double testErr = 1.e-6;
-
   dp = -dp; // dp is positive when passed in. It is actually negative if we follow Kamm's paper 
             // Equations (36 - 42)
   
@@ -2452,29 +2256,6 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
   c = sqrt(c);
   
   xi = (wavenumber == 1) ? u - c : u + c;
- 
-
-//------------------------------------------------------------
-//                Test integration in rho
-//------------------------------------------------------------
-  if (test) {
-    double rhoNew, uNew, pNew, xiNew;
-	    bool successTest = Rarefaction_OneStepRK4_ODEtest(wavenumber/*1 or 3*/, id, 
-                     	    rho_0, u_0, p_0 /*start state*/, -drho /*step size*/,
-                            rhoNew, uNew, pNew, xiNew /*output:end state*/);
-	    if (!successTest) {
-		    //std::cout << "Test for integration rho failed" << std::endl;
-                    return false;
-	    } else if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
-                    return false;
-		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
-		    std::cout << "rho = " << rho << ", u = " << u << ", p = " << p << std::endl;
-		    std::cout << "rhoNew = " << rhoNew << ", uNew = " << uNew << ", pNew = " << pNew << std::endl;   
-	    }
-            if (fabs(p-pNew)/p > testErr && fabs(p-pNew) > testErr) {
-		    fprintf(stderr, "alternative rarefaction integration: p error larger than the bar set -- %e, absolute error = %e.\n", fabs(p-pNew)/p, fabs(p-pNew) );
-	    }	
-  }
  
   return true;
 }

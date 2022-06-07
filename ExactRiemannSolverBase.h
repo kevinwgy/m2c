@@ -91,11 +91,6 @@ protected: //internal functions
                    double &rhos, double &us/*outputs*/,
                    bool *trans_rare = NULL, double *Vrare_x0 = NULL/*filled only if found tran rf*/);
 
-  virtual bool Rarefaction_OneStepRK4_ODEtest(int wavenumber/*1 or 3*/, int id,
-                   double rho_0, double u_0, double p_0 /*start state*/,
-                   double drho /*step size*/,
-                   double &rho, double &u, double &p, double &xi /*output*/);
-
   virtual bool Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                             double rho_0, double u_0, double p_0 /*start state*/, 
                             double dp /*step size*/,
