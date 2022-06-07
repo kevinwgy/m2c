@@ -15,21 +15,6 @@ using std::min;
 using std::map;
 using namespace GeoTools;
 
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
-using std::chrono::duration;
-using std::chrono::milliseconds;
-
-extern int EXACT_RIEMANN_COUNT;
-extern int APPRO_RIEMANN_COUNT;
-extern double DP_MIN_CURRENT;
-extern double DP_MIN_GLOBAL;
-extern int NSTP_3RD_IT;
-extern int NSTP_2ND_IT;
-extern int CURRENT_STEP_NUMBER;
-extern int MAX_STEP_NUMBER;
-extern double FLUX_TIME;
-extern double EXACT_RIEMANN_TIME;
 extern int verbose;
 //-----------------------------------------------------
 
@@ -1887,9 +1872,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                            vector<SpaceVariable3D*> *Phi)
 {
-  double delta_exactRiemannTime = 0.; // for recording the computation time of Exact Riemann solver
-  int countExact = 0;                 // for counting the total number of exact Riemann problems  
-  int countApproximate = 0;           // for counting the total number of approximate Riemann problems  
   //------------------------------------
   // Preparation: Delete previous riemann_solutions
   //------------------------------------
@@ -1966,7 +1948,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
-  auto time_1 = high_resolution_clock::now();
   for(int k=k0; k<kkmax; k++) {
     for(int j=j0; j<jjmax; j++) {
       for(int i=i0; i<iimax; i++) {
@@ -1983,7 +1964,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           if(neighborid==myid) {
 
             fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux1);
-            countApproximate++;
             localflux2 = localflux1;
 
           } else {//material interface
@@ -2004,19 +1984,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             }
 
             //Solve 1D Riemann problem
-            auto time_r1_start = high_resolution_clock::now();
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
               err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              countExact++;
-            }
-            else {//linear reconstruction w/ limitor
+            else//linear reconstruction w/ limitor
               err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              countExact++;
-            }
-            auto time_r1_end = high_resolution_clock::now();
-            duration<double, std::milli> time_r1 = time_r1_end - time_r1_start;
-	    double delta_exactRiemannTime1 = time_r1.count();
-            delta_exactRiemannTime = delta_exactRiemannTime + delta_exactRiemannTime1;
 
             if(err)  {
               riemann_errors++;
@@ -2045,14 +2016,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
               if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                countApproximate++;
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                countApproximate++;
               } else {//linear reconstruction w/ limiter
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                countApproximate++;
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux2);
-                countApproximate++;
               }
 
             }
@@ -2076,7 +2043,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           if(neighborid==myid) {
 
             fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux1);
-            countApproximate++;
             localflux2 = localflux1;
 
           } else {//material interface
@@ -2097,19 +2063,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             }
 
             //Solve 1D Riemann problem
-            auto time_r2_start = high_resolution_clock::now();
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
               err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              countExact++;
-            }
-            else {
+            else
               err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              countExact++;
-            }
-            auto time_r2_end = high_resolution_clock::now();
-            duration<double, std::milli> time_r2 = time_r2_end - time_r2_start;
-            double delta_exactRiemannTime2 = time_r2.count();
-            delta_exactRiemannTime = delta_exactRiemannTime + delta_exactRiemannTime2;
 
             if(err) {
               riemann_errors++;
@@ -2138,14 +2095,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
               if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
                 fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                countApproximate++;    
                 fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                countApproximate++;
               } else {
                 fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                countApproximate++;
                 fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux2);
-                countApproximate++;
               }
 
             }
@@ -2168,7 +2121,6 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           if(neighborid==myid) {
 
             fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux1);
-            countApproximate++;
             localflux2 = localflux1;
 
           } else {//material interface
@@ -2189,19 +2141,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
             }
 
             //Solve 1D Riemann problem
-            auto time_r3_start = high_resolution_clock::now();
-            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+            if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
               err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              countExact++;
-            }
-            else {
+            else
               err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              countExact++;
-            }
-	    auto time_r3_end = high_resolution_clock::now();
-            duration<double, std::milli> time_r3 = time_r3_end - time_r3_start;
-            double delta_exactRiemannTime3 = time_r3.count();
-            delta_exactRiemannTime = delta_exactRiemannTime + delta_exactRiemannTime3;             
 
             if(err) {
               riemann_errors++;
@@ -2230,14 +2173,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
               if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
                 fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                countApproximate++;
                 fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                countApproximate++;
               } else {
                 fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                countApproximate++;   
                 fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux2);
-                countApproximate++;
               }
 
             }
@@ -2251,50 +2190,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
       }
     }
   }
+        
   
-  auto time_2 = high_resolution_clock::now();
-  duration<double, std::milli> thisCycle = time_2 - time_1;
-
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
- 
-  struct LocalTime_t {
-    double cycle_time;
-    int local_rank;
-  };
-  
-  struct LocalTime_t  LocalTime;
-  LocalTime.cycle_time = thisCycle.count();
-  LocalTime.local_rank = rank; 
-
-  MPI_Allreduce(MPI_IN_PLACE, &LocalTime, 1, MPI_DOUBLE_INT, MPI_MAXLOC, comm);
-  FLUX_TIME = FLUX_TIME + LocalTime.cycle_time;      
-/*
-  if (rank == 0) {
-    printf("Maximum cycle time %e ms, from rank %d.\n", LocalTime.cycle_time, LocalTime.local_rank);
-  }  
-*/
-  MPI_Bcast(&delta_exactRiemannTime, 1, MPI_DOUBLE, LocalTime.local_rank, comm); 
-  EXACT_RIEMANN_TIME = EXACT_RIEMANN_TIME + delta_exactRiemannTime;
-/*
-  if (rank == 0) { 
-    printf("Exact Riemann time %e ms during current cycle, from rank %d.\n", delta_exactRiemannTime, LocalTime.local_rank);
-  } 
-*/
-
-  MPI_Bcast(&countExact, 1, MPI_INT, LocalTime.local_rank, comm);
-  MPI_Bcast(&countApproximate, 1, MPI_INT, LocalTime.local_rank, comm);
-  EXACT_RIEMANN_COUNT += countExact;
-  APPRO_RIEMANN_COUNT += countApproximate;
- 
-  MPI_Allreduce(MPI_IN_PLACE, &DP_MIN_CURRENT, 1, MPI_DOUBLE, MPI_MIN, comm);
-  DP_MIN_GLOBAL = std::min(DP_MIN_GLOBAL, DP_MIN_CURRENT);
- 
-  MPI_Allreduce(MPI_IN_PLACE, &MAX_STEP_NUMBER, 1, MPI_INT, MPI_MAX, comm);
-  MPI_Allreduce(MPI_IN_PLACE, &CURRENT_STEP_NUMBER, 1, MPI_INT, MPI_MAX, comm);
-  MPI_Allreduce(MPI_IN_PLACE, &NSTP_2ND_IT, 1, MPI_INT, MPI_MAX, comm);
-  MPI_Allreduce(MPI_IN_PLACE, &NSTP_3RD_IT, 1, MPI_INT, MPI_MAX, comm);
-
   MPI_Allreduce(MPI_IN_PLACE, &riemann_errors, 1, MPI_INT, MPI_SUM, comm);
   if(riemann_errors>0) 
     print("Warning: Riemann solver failed to find a bracketing interval or to converge on %d edge(s).\n", riemann_errors);
