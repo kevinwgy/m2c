@@ -3,10 +3,8 @@
 #include<utility> //std::pair
 #include<bits/stdc++.h> //std::swap
 #include<iostream>
-#include<fstream>
-#include<string>
 
-#include <chrono> // for timing
+//#include <chrono> // for timing
 
 #ifndef WITHOUT_BOOST
 #include<boost/math/tools/roots.hpp>
@@ -18,10 +16,10 @@ using std::cout;
 using std::endl;
 
 // for timing
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
-using std::chrono::duration;
-using std::chrono::milliseconds;
+//using std::chrono::high_resolution_clock;
+//using std::chrono::duration_cast;
+//using std::chrono::duration;
+//using std::chrono::milliseconds;
 
 extern int verbose;
 
@@ -40,8 +38,8 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   min_pressure         = iod_riemann.min_pressure;
   failure_threshold    = iod_riemann.failure_threshold;
   pressure_at_failure  = iod_riemann.pressure_at_failure;
-  integrationPath1.reserve(100);
-  integrationPath3.reserve(100);
+  integrationPath1.reserve(500);
+  integrationPath3.reserve(500);
 }
 
 //-----------------------------------------------------
@@ -67,7 +65,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
   double pr    = Vp[4];
   //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
-  
+
   integrationPath1.clear();
   integrationPath3.clear();
   std::vector<double> vectL{pl, rhol, ul};
@@ -168,7 +166,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 
       ExactRiemannSolverNonAdaptive riemannNonAdaptive(vf, iod_riemann); 
       int retryRiemann = riemannNonAdaptive.ComputeRiemannSolution(dir, Vm, idl, Vp, idr, Vs, id, Vsm, Vsp);
-      cout << "*Warning: Riemann solver failed to find an initial bracketing interval. Retried with non-adaptive version!" << endl; 
+      if(verbose>=1)
+        cout << "Warning: Riemann solver failed to find an initial bracketing interval. Activated the non-adaptive version." << endl; 
       return retryRiemann;
     }
 
@@ -178,7 +177,8 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 
     ExactRiemannSolverNonAdaptive riemannNonAdaptive(vf, iod_riemann); 
     int retryRiemann = riemannNonAdaptive.ComputeRiemannSolution(dir, Vm, idl, Vp, idr, Vs, id, Vsm, Vsp);
-    cout << "*Warning: Riemann solver failed to find an initial bracketing interval. Retried with non-adaptive version!" << endl;
+    if(verbose>=1)
+      cout << "Warning: Riemann solver failed to find an initial bracketing interval. Activated the non-adaptive version." << endl;
     return retryRiemann;
   }
 
@@ -320,7 +320,8 @@ try_again:
    
     ExactRiemannSolverNonAdaptive riemannNonAdaptive(vf, iod_riemann);
     int retryRiemann = riemannNonAdaptive.ComputeRiemannSolution(dir, Vm, idl, Vp, idr, Vs, id, Vsm, Vsp);
-    cout << "*Warning: Exact Riemann solver failed to converge. retried with non-adaptive version!" << endl;
+    if(verbose>=1)
+      cout << "Warning: Exact Riemann solver (adaptive) failed to converge. Activated the non-adaptive version." << endl;
     return retryRiemann;
   }
 
@@ -933,16 +934,16 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       double errBar = tol_rarefaction; // user specified one-step error of numerical integration 
       double uErrScaled = uErr / c + tiny;
       double rhoErrScaled = rhoErr / rho + tiny;
-      if (isnan(rhoErrScaled)==1) {
-        fprintf(stderr,"*** Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+      if (isnan(rhoErrScaled)) {
+        fprintf(stderr,"Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
                        id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhos_0, rhos_1, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
-        exit (EXIT_FAILURE);
+        exit(-1);
       }  
  
-      if (isnan(uErrScaled)==1) {
-        fprintf(stderr,"*** Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+      if (isnan(uErrScaled)) {
+        fprintf(stderr,"Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
                        id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
-        exit (EXIT_FAILURE);
+        exit(-1);
       }  
 
       double dpTemp = dp; // temporary dp used for step adaption
@@ -963,11 +964,10 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       }
 
       if (ps_1 < integrationPath[integrationPath.size()-1][0]) { // store the new point if necessary
-	      std::vector<double> currentVect = {ps_1, rhos_1, us_1};
-	      integrationPath.push_back(currentVect);
+        std::vector<double> currentVect = {ps_1, rhos_1, us_1};
+        integrationPath.push_back(currentVect);
       }
- 
- 
+
 #if PRINT_RIEMANN_SOLUTION == 1
       sol1d.push_back(vector<double>{xi_1, rhos_1, us_1, ps_1, (double)id});
 #endif
@@ -989,7 +989,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       }
 
       //fprintf(stderr,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
- 
+
       // Check if we have reached the final pressure ps
       if(fabs(ps_1 - ps) <= 1.e-14) {
         rhos = rhos_1;
@@ -1006,33 +1006,33 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
         cout << "  " << wavenumber << "-wave: rarefaction, integration completed in " << i << " steps" << endl;
         cout << "rhos_1, us_1, ps_1: " << rhos_1 << ", " << us_1 << ", " << ps_1 << "." << endl;
 #endif
-       done = true;
+        done = true;
         
-       break; //done!
+        break; //done!
       }
 
       // If the solver gets here, it means it hasn't reached the final pressure ps.
       // Adjust step size, then update state
       //
      
-     if (i == moreSteps*numSteps_rarefaction-1) {
-	      fprintf(stderr,"*** Warning: integrator used up all the steps specified. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, uErrScaled = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
-                       id, p, ps, dp, ps_1, uErrScaled, rhoErrScaled, c, rho, integrationPath.size());
+      if(i == moreSteps*numSteps_rarefaction-1) {
+        fprintf(stderr,"Warning: integrator used up all the steps specified. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, uErrScaled = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+                id, p, ps, dp, ps_1, uErrScaled, rhoErrScaled, c, rho, integrationPath.size());
       }        
    
-     // increase dp is allowed 
-     double dpTemp_rho = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.2 );
-     double dpTemp_u = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
-     dpTemp = std::min(dpTemp_rho, dpTemp_u);        
-     dpTemp = std::min(dpTemp, 10*dp); //don't increase dp too much
+      // increase dp is allowed 
+      double dpTemp_rho = safety * dp * pow( fabs(errBar/rhoErrScaled) , 0.2 );
+      double dpTemp_u = safety * dp * pow( fabs(errBar/uErrScaled) , 0.2 );
+      dpTemp = std::min(dpTemp_rho, dpTemp_u);        
+      dpTemp = std::min(dpTemp, 10*dp); //don't increase dp too much
 
-     dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
+      dp = std::min(dpTemp, ps_1-ps); //don't go beyond ps
 
-     rhos_0 = rhos_1;
-     us_0   = us_1;
-     ps_0   = ps_1;
-     xi_0   = xi_1;
-   }
+      rhos_0 = rhos_1;
+      us_0   = us_1;
+      ps_0   = ps_1;
+      xi_0   = xi_1;
+    }
 
     if(!done) {
       if(vf[id]->CheckState(rhos_1,ps_1,true)) {
@@ -1287,7 +1287,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
 //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
 //                   " rho = %e, p = %e, e = %e, id = %d.\n",
 //                   c_1_square, rho_1, p_1, e_1, id);
-	  return false;
+    return false;
   } 
 
   double c_1 = sqrt(c_1_square);
@@ -1305,7 +1305,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   }
 
   double c_2 = sqrt(c_2_square); 
-  
+ 
   double rho_3 = rho_0 + 3./10.*dp/c_0_square - 9./10.*dp/c_1_square + 6./5.*dp/c_2_square;
   double p_3 = p_0 + 3./5.*dp;
   double e_3 = vf[id]->GetInternalEnergyPerUnitMass(rho_3, p_3);

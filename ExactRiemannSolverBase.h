@@ -6,7 +6,7 @@
 /*****************************************************************************************
  * Base class for solving one-dimensional, single- or two-material Riemann problems
  *****************************************************************************************/
-#define PRINT_RIEMANN_SOLUTION 0
+//#define PRINT_RIEMANN_SOLUTION 0
 
 class ExactRiemannSolverBase {
 
@@ -20,8 +20,8 @@ protected:
   double tol_shock;
   double tol_rarefaction; //has the dimension of pressure, should be specified as a "pressure tolerance"
   double min_pressure, failure_threshold, pressure_at_failure;
-  std::vector<std::vector<double>> integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
-  std::vector<std::vector<double>> integrationPath3;
+  std::vector<std::vector<double> > integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
+  std::vector<std::vector<double> > integrationPath3;
 
 public:
   ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_);
@@ -99,6 +99,13 @@ protected: //internal functions
            double *Vs, int &id, double *Vsm, double *Vsp /*outputs*/);
 
 };
+
+
+/*****************************************************************************************
+ * A derived class that contains an older version of the Riemann solver that does not apply
+ * adapative Runge-Kutta for integrating the isentropic relations in the case of rarefaction.
+ * Slower, but *may* be more robust. Used as a fail-safe procedure.
+ *****************************************************************************************/
 
 class ExactRiemannSolverNonAdaptive: public ExactRiemannSolverBase {
 
