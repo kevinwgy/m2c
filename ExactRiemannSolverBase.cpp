@@ -1016,77 +1016,6 @@ myLabel:
 
 //----------------------------------------------------------------------------------
 
-bool
-ExactRiemannSolverBase::FindInitialFeasiblePointsOneSided(double rhol, double ul, double pl, double el, 
-                            double cl, int idl, double ustar, double &p0, double &rhol0, double &ul0, 
-                            double &p1, double &rhol1, double &ul1)
-{
-  double dp;
-  int found = 0;
-  bool success = true;
-
-  // Method 1: Use the acoustic theory (Eqs. (20)-(22) of Kamm) to find p0, p1
-  found = FindInitialFeasiblePointsOneSidedByAcousticTheory(rhol, ul, pl, el, cl, idl, ustar,
-              p0, rhol0, ul0, p1, rhol1, ul1/*outputs*/);
-
-  if(found==2)
-    return true; //yeah
-
-  if(found==1) //the first one (p0) is good --> only need to find p1
-    goto myLabel;
-
-  // Method 2: based on dp (fixed width search)
-
-  // 2.1. find the first one (p0)
-  dp = ul>ustar ? 0.5*pl : -0.5*pl;
-  for(int i=0; i<maxIts_bracket; i++) {
-    p0 = pl + 0.01*(i+1)*(i+1)*dp;
-
-    if(p0<min_pressure)
-      p0 = pressure_at_failure; 
-    success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
-                              rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
-                              rhol0, ul0);
-    if(success)
-      break;
-  }
-  if(!success) {
-    if(verbose>=1)
-      fprintf(stderr,"Warning: Failed to find the first initial guess (p0) in the 1D half-Riemann solver (it = %d). "
-                     "Left: %e %e %e (%d), ustar: %e.\n",
-                      maxIts_bracket, rhol, ul, pl, idl, ustar);
-    return false;
-  }
-      
-myLabel:
-  // 2.2. find the second one (p1)
-  dp = p0-pl;
-  for(int i=0; i<maxIts_bracket; i++) {
-    p1 = p0 + 0.01*(i+1)*(i+1)*dp;
-    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
-    if(success)
-      break;
-  }
-  if(!success) {
-    if(verbose>=1)
-      fprintf(stderr,"Warning: Failed to find the second initial guess (p1) in the 1D half-Riemann solver (it = %d). "
-                     "Left: %e %e %e (%d), ustar: %e.\n",
-                      maxIts_bracket, rhol, ul, pl, idl, ustar);
-    return false;
-  }
- 
-  // Make sure p0<p1
-  if(p0>p1) {
-    std::swap(p0,p1);
-    std::swap(rhol0, rhol1);
-    std::swap(ul0, ul1);
-  } 
-
-  return true;
-}
-
-//----------------------------------------------------------------------------------
-
 int
 ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, 
                             double pl, double el, double cl, int idl,
@@ -2110,6 +2039,77 @@ try_again:
 
 }
 
+//----------------------------------------------------------------------------------
 
+bool
+ExactRiemannSolverBase::FindInitialFeasiblePointsOneSided(double rhol, double ul, double pl, double el, 
+                            double cl, int idl, double ustar, double &p0, double &rhol0, double &ul0, 
+                            double &p1, double &rhol1, double &ul1)
+{
+  double dp;
+  int found = 0;
+  bool success = true;
+
+  // Method 1: Use the acoustic theory (Eqs. (20)-(22) of Kamm) to find p0, p1
+  found = FindInitialFeasiblePointsOneSidedByAcousticTheory(rhol, ul, pl, el, cl, idl, ustar,
+              p0, rhol0, ul0, p1, rhol1, ul1/*outputs*/);
+
+  if(found==2)
+    return true; //yeah
+
+  if(found==1) //the first one (p0) is good --> only need to find p1
+    goto myLabel;
+
+  // Method 2: based on dp (fixed width search)
+
+  // 2.1. find the first one (p0)
+  dp = ul>ustar ? 0.5*pl : -0.5*pl;
+  for(int i=0; i<maxIts_bracket; i++) {
+    p0 = pl + 0.01*(i+1)*(i+1)*dp;
+
+    if(p0<min_pressure)
+      p0 = pressure_at_failure; 
+    success = ComputeRhoUStar(1, rhol, ul, pl, p0, idl, 
+                              rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
+                              rhol0, ul0);
+    if(success)
+      break;
+  }
+  if(!success) {
+    if(verbose>=1)
+      fprintf(stderr,"Warning: Failed to find the first initial guess (p0) in the 1D half-Riemann solver (it = %d). "
+                     "Left: %e %e %e (%d), ustar: %e.\n",
+                      maxIts_bracket, rhol, ul, pl, idl, ustar);
+    return false;
+  }
+      
+myLabel:
+  // 2.2. find the second one (p1)
+  dp = p0-pl;
+  for(int i=0; i<maxIts_bracket; i++) {
+    p1 = p0 + 0.01*(i+1)*(i+1)*dp;
+    success = ComputeRhoUStar(1, rhol, ul, pl, p1, idl, rhol, rhol0, rhol1, ul1);
+    if(success)
+      break;
+  }
+  if(!success) {
+    if(verbose>=1)
+      fprintf(stderr,"Warning: Failed to find the second initial guess (p1) in the 1D half-Riemann solver (it = %d). "
+                     "Left: %e %e %e (%d), ustar: %e.\n",
+                      maxIts_bracket, rhol, ul, pl, idl, ustar);
+    return false;
+  }
+ 
+  // Make sure p0<p1
+  if(p0>p1) {
+    std::swap(p0,p1);
+    std::swap(rhol0, rhol1);
+    std::swap(ul0, ul1);
+  } 
+
+  return true;
+}
 
 //----------------------------------------------------------------------------------
+
+
