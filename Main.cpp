@@ -22,8 +22,19 @@
 #include <EmbeddedBoundaryOperator.h>
 #include <SpecialToolsDriver.h>
 #include <set>
+#include <limits>
+
 using std::cout;
 using std::endl;
+// for timing
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::milliseconds;
+
+
+
+
 int verbose;
 double domain_diagonal;
 clock_t start_time;
@@ -380,11 +391,9 @@ int main(int argc, char* argv[])
         dts = dt;
  
       if(dts<=dt)
-        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, 
-              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
       else
-        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, 
-              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
       //----------------------------------------------------
       // Move forward by one time-step: Update V, Phi, and ID
