@@ -607,7 +607,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
   if(nClipped && verbose>0) {
-    print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
+    print_warning("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
     V.RestoreDataPointerAndInsert();
   } else
     V.RestoreDataPointerToLocalVector();
@@ -2631,7 +2631,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   
   MPI_Allreduce(MPI_IN_PLACE, &riemann_errors, 1, MPI_INT, MPI_SUM, comm);
   if(riemann_errors>0) 
-    print("Warning: Riemann solver failed to find a bracketing interval or to converge on %d edge(s).\n", riemann_errors);
+    print_warning("Warning: Riemann solver failed to find a bracketing interval or to "
+                  "converge on %d edge(s).\n", riemann_errors);
 
 
   //------------------------------------
@@ -3147,7 +3148,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
   }
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
   if(nClipped && verbose>0)
-    print("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
+    print_warning("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
  
   V.RestoreDataPointerToLocalVector(); //no changes made
   Vl.RestoreDataPointerToLocalVector(); //no need to communicate

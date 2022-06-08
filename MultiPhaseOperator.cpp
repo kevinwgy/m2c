@@ -119,19 +119,16 @@ MultiPhaseOperator::Destroy()
 //-----------------------------------------------------
 
 void 
-MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
-                                               vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID)
+MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, vector<SpaceVariable3D*> &Phi,
+                                               vector<Intersector*> *intersector, SpaceVariable3D &ID)
 {
 
 #ifdef LEVELSET_TEST
   return; //testing the level set solver w/o solving the N-S / Euler equations
 #endif
 
-  // reset tag to 0
-  //Tag.SetConstantValue(0, true/*workOnGhost*/);
-  int overlap = 0;
 
-//  double*** tag = (double***)Tag.GetDataPointer();
+  double*** tag = (double***)Tag.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
 
   int ls_size = Phi.size();
@@ -144,43 +141,168 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
     phi0[ls] = Phi0[ls]->GetDataPointer();
   
 
-  for(int ls = 0; ls<ls_size; ls++) {//loop through all the level set functions
-  
-    int matid = ls2matid[ls];
+  int myls(-1);
+  int total_swept_nodes = 0;
+  set<std::pair<int,int> > swept; //pairs "ls" with -1 = phi[ls]<0 / 0 = phi[ls]=0 / 1 = phi[ls] > 0
+  set<Int3> remaining_nodes;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
 
-    for(int k=kk0; k<kkmax; k++)
-      for(int j=jj0; j<jjmax; j++)
-        for(int i=ii0; i<iimax; i++) {
+        tag[k][j][i] = 0;
 
-          if(id[k][j][i] == INACTIVE_MATERIAL_ID)
-            continue; //if occluded, id should not be changed
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+          continue; //if occluded, id should not be changed
 
-          if(phi[ls][k][j][i]*phi0[ls][k][j][i]>=0.0)
-            continue; // no sign change: Should not update ID, particularly important if there are also embedded surfaces
-                      // that affect ID.
-
-          if(phi[ls][k][j][i]<0) {
-/*
-            if(id[k][j][i] != 0) {
-              overlap++;
-              tag[k][j][i] = 1;
-            } 
-*/
-            id[k][j][i] = matid; 
+        swept.clear();
+        for(int ls=0; ls<ls_size; ls++) {
+          if(phi[ls][k][j][i]*phi0[ls][k][j][i]>0.0)
+            continue; //no change
+          else {
+            if     (phi[ls][k][j][i]<0)  swept.insert(std::make_pair(ls, -1));
+            else if(phi[ls][k][j][i]==0) swept.insert(std::make_pair(ls, 0));
+            else                         swept.insert(std::make_pair(ls, 1));
           }
-          //check if this node (i,j,k) is EXACTLY at the interface of two subdomains. If yes, give it the ID
-          //of one of the two materials that has a smaller ID. (Without this check, it would get ID = 0.)
-          else if(ls_size>1 && phi[ls][k][j][i]==0) {
-            for(int other_ls=ls+1; other_ls<ls_size; other_ls++) {
-              if(phi[other_ls][k][j][i]==0) {
-                id[k][j][i] = matid;
-                break;
-              }
-            }
-          }
-
         }
+
+        if(swept.empty())
+          continue; // no sign change: Should not update ID, particularly important if there are also embedded surfaces
+                      // that also influence material ID
+
+        total_swept_nodes++;
+
+        myls = -1;
+        for(auto&& ls_status : swept) {
+          if(ls_status.second == -1) {
+            if(myls!=-1) {
+              fprintf(stderr,"\033[0;31m*** Error: Node (%d,%d,%d) belongs to two material subdomains. "
+                             "phi[%d(matid:%d)] = %e, phi[%d(matid:%d)] = %e.\033[0m\n", i,j,k, myls, ls2matid[myls],
+                             phi[myls][k][j][i], ls_status.first, ls2matid[ls_status.first],
+                             phi[ls_status.first][k][j][i]); 
+              exit(-1);
+            }
+            myls = ls_status.first;
+          } 
+        }
+
+        if(myls != -1)
+          id[k][j][i] = ls2matid[myls];
+        else {// the node does not belong to any subdomain tracked by level set(s) ==> tag it
+          tag[k][j][i] = 1;
+          remaining_nodes.insert(Int3(i,j,k));
+        }
+      }
+
+  int total_remaining = remaining_nodes.size();
+  int progress(0);
+  MPI_Allreduce(MPI_IN_PLACE, &total_remaining, 1, MPI_INT, MPI_SUM, comm);
+  if(total_remaining>0)
+    Tag.RestoreDataPointerAndInsert();
+  else
+    Tag.RestoreDataPointerToLocalVector();
+
+  MPI_Allreduce(MPI_IN_PLACE, &total_swept_nodes, 1, MPI_INT, MPI_SUM, comm);
+  if(total_swept_nodes>0)
+    ID.RestoreDataPointerAndInsert();
+  else
+    ID.RestoreDataPointerToLocalVector();
+
+
+  // Fix "remaining" nodes, which are swept nodes that do not belong to any subdomains tracked by level sets
+  set<int> ids_tracked_by_levelsets;
+  for(auto&& ls2id : ls2matid)
+    ids_tracked_by_levelsets.insert(ls2id.second);
+
+  for(int iter = 0; iter < 100; iter++) {// usually one iteration should be enough
+
+    if(total_remaining==0)
+      break; //done
+
+    set<int> matid_cands;
+     
+    tag = Tag.GetDataPointer();
+    id  = ID.GetDataPointer();
+
+    progress = 0;
+
+    set<Int3> tmp;
+    tmp = remaining_nodes;
+ 
+    int i,j,k, neighborid;
+    for(auto&& ijk : tmp) {
+      i = ijk[0];
+      j = ijk[1];
+      k = ijk[2];
+
+      // check neighbors
+      Vec3D x0(global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k));
+      matid_cands.clear();
+      for(int neighk = k-1; neighk <= k+1; neighk++)         
+        for(int neighj = j-1; neighj <= j+1; neighj++)
+          for(int neighi = i-1; neighi <= i+1; neighi++) {
+            if(ID.OutsidePhysicalDomain(neighi, neighj, neighk))
+              continue; //this neighbor is outside the physical domain. Skip.
+            if(tag[neighk][neighj][neighi]==1)
+              continue; //this neighbor is undecided too
+
+            neighborid = id[neighk][neighj][neighi];
+
+            if(neighborid==INACTIVE_MATERIAL_ID)
+              continue; //this neighbor is occluded
+            if(ids_tracked_by_levelsets.find(neighborid) != ids_tracked_by_levelsets.end())
+              continue; //this neighbor is inside a subdomain tracked by a level set --> not my material
+
+            if(intersector) {
+              Vec3D x1(global_mesh.GetX(neighi), global_mesh.GetY(neighj), global_mesh.GetZ(neighk));
+              bool connected = true;
+              for(auto&& xter : *intersector) {
+                if(xter->Intersects(x0,x1)) {
+                  connected = false;
+                  break; //this neighbor is blocked to current node by an embedded surface
+                }
+              }
+              if(!connected)
+                continue;
+            }
+
+            matid_cands.insert(neighborid);
+          }
+
+      if(matid_cands.empty())
+        continue; //nothing I can do
+      else {
+        id[k][j][i] = *(matid_cands.begin());  //take the first one, if multiple
+        tag[k][j][i] = 0;
+        remaining_nodes.erase(remaining_nodes.find(ijk));
+        //fprintf(stderr,"  o Giving node (%d,%d,%d) ID %d.\n", i,j,k, (int)id[k][j][i]);
+        progress++;
+
+        if(matid_cands.size()>1)
+          fprintf(stderr,"\033[0;35mWarning: Detected a node with multiple possible material IDs (%d,%d,%d), "
+                  "setting to %d.\n\033[0m\n", i,j,k, (int)id[k][j][i]);
+      }
+    }
+
+
+    MPI_Allreduce(MPI_IN_PLACE, &progress, 1, MPI_INT, MPI_SUM, comm);
+    if(progress>0) {
+      Tag.RestoreDataPointerAndInsert();
+      ID.RestoreDataPointerAndInsert();
+      total_remaining = remaining_nodes.size();
+      MPI_Allreduce(MPI_IN_PLACE, &total_remaining, 1, MPI_INT, MPI_SUM, comm);
+    } else {
+      Tag.RestoreDataPointerToLocalVector();
+      ID.RestoreDataPointerToLocalVector();
+      print_error("*** Error: Unable to update material ID at %d nodes swept by interfaces tracked by level sets.\n",
+                  total_remaining);
+      exit(-1);
+    }
+
   }
+
+
+  // update external ghosts
+  UpdateMaterialIDAtGhostNodes(ID);
 
 
   for(int ls=0; ls<ls_size; ls++) 
@@ -188,25 +310,6 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0,
 
   for(int ls=0; ls<ls_size; ls++) 
     Phi0[ls]->RestoreDataPointerToLocalVector(); //no changes made
-
-/*
-  MPI_Allreduce(MPI_IN_PLACE, &overlap, 1, MPI_INT, MPI_SUM, comm);
-
-
-  if(overlap) {
-    print_error("*** Error: Found overlapping material interfaces. Number of overlapped cells: %d.\n", overlap);
-    exit_mpi();
-  } 
-*/
-
-/*
-  if(overlap) 
-    Tag.RestoreDataPointerAndInsert();
-  else
-    Tag.RestoreDataPointerToLocalVector();
-*/
-
-  ID.RestoreDataPointerAndInsert();
 
 }
 
@@ -962,9 +1065,15 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
               Vec3D& x1(coords[neighk][neighj][neighi]);
 
               if(intersector) {
-                for(auto&& xter : *intersector)
-                  if(xter->Intersects(x0,x1))
-                    continue; //this neighbor is blocked to current node by an embedded surface
+                bool connected = true;
+                for(auto&& xter : *intersector) {
+                  if(xter->Intersects(x0,x1)) {
+                    connected = false;
+                    break; //this neighbor is blocked to current node by an embedded surface
+                  }
+                }
+                if(!connected)
+                  continue;
               }
 
               if(iod.multiphase.phasechange_dir == MultiPhaseData::ALL) 
@@ -1097,11 +1206,16 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
           // coordinates and velocity at the neighbor node
           Vec3D& x1(coords[neighk][neighj][neighi]);
 
-
           if(intersector) {
-            for(auto&& xter : *intersector)
-              if(xter->Intersects(x0,x1))
-                continue; //this neighbor is blocked to current node by an embedded surface
+            bool connected = true; 
+            for(auto&& xter : *intersector) {
+              if(xter->Intersects(x0,x1)) {
+                connected = false;
+                break; //this neighbor is blocked to current node by an embedded surface
+              }
+            }
+            if(!connected)
+              continue;
           }
 
 
@@ -1195,9 +1309,15 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
             Vec3D& x1(coords[neighk][neighj][neighi]);
 
             if(intersector) {
-              for(auto&& xter : *intersector)
-                if(xter->Intersects(x0,x1))
-                  continue; //this neighbor is blocked to current node by an embedded surface
+              bool connected = true;
+              for(auto&& xter : *intersector) {
+                if(xter->Intersects(x0,x1)) {
+                  connected = false;
+                  break; //this neighbor is blocked to current node by an embedded surface
+                }
+              }
+              if(!connected)
+                continue;
             }
 
             double dist = (x1-x0).norm();

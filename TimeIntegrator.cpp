@@ -457,7 +457,8 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     // Update ID, V, and possibly also Phi (skipped for single-material simulations)
     IDn.AXPlusBY(0.0, 1.0, ID);  //IDn = ID
 
-    mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, ID); //update mat. id. (including the ghost layer outside the physical domain)
+    mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, embed ? embed->GetPointerToIntersectors() : nullptr,
+                                   ID); //update mat. id. (including the ghost layer outside the physical domain)
 
     // Correct ID and Phi to be consistent with embedded surfaces (to avoid "leaking")
     if(EBDS) {
@@ -497,7 +498,8 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
         mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
         for(int i=0; i<Phi.size(); i++)
           lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true); //will NOT change sign of phi
-        mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, ID); //should only update ID of unresolved cells      
+        mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, embed ? embed->GetPointerToIntersectors() : nullptr,
+                                       ID); //should only update ID of unresolved cells      
       }
 
       mpo.FixUnresolvedNodes(unresolved, IDn, ID, V, embed ? embed->GetPointerToIntersectors() : nullptr,
