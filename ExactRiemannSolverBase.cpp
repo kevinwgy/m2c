@@ -1720,7 +1720,8 @@ ExactRiemannSolverBase::ComputeOneSidedRarefaction(double rho, double u, double 
 }
 
 //----------------------------------------------------------------------------------
-// Ref. *** NEED A REF ***
+// Adaptive Runge-Kutta (aka. Runge-Kutta-Fehlberg). Ref. Section 25.5.2 of Chapra and Canale,
+// Numerical Methods for Engineers (7th Edition)
 bool
 ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
                             double rho_0, double u_0, double p_0 /*start state*/, 
