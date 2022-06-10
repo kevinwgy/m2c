@@ -607,7 +607,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
   if(nClipped && verbose>0) {
-    print_warning("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
+    print_warning(comm, "Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
     V.RestoreDataPointerAndInsert();
   } else
     V.RestoreDataPointerToLocalVector();
@@ -673,7 +673,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //! 1. apply the inlet (i.e. farfield) state
   if(iod.bc.inlet.materialid != 0) {
-    print_error("*** Error: Material at the inlet boundary should have MaterialID = 0. (Found %d instead.)\n", 
+    print_error(comm, "*** Error: Material at the inlet boundary should have MaterialID = 0. (Found %d instead.)\n", 
                 iod.bc.inlet.materialid);
     exit_mpi();
   }
@@ -690,7 +690,242 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 
 
-  //! 2. apply user-specified function
+  //! 2. apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
+  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
+
+  // planes
+  for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
+
+    print(comm, "- Applying initial condition on one side of a plane (material id: %d).\n\n", 
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+    double dist;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = (coords[k][j][i]-x0)*dir;
+          if(dist>0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+  // cylinder-cone
+  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
+
+    print(comm, "- Applying initial condition within a cylinder-cone (material id: %d).\n\n",
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder radius
+    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
+    double Hmax = R/tan_alpha;
+    double H = min(it->second->cone_height, Hmax); //cone's height
+
+    double x, r;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) {//inside
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  // cylinder with spherical cap(s)
+  for(auto it=ic.cylindersphereMap.dataMap.begin(); it!=ic.cylindersphereMap.dataMap.end(); it++) {
+
+    print(comm, "- Applying initial condition within a cylinder-sphere (material id: %d).\n\n",
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+    dir /= dir.norm();
+
+    double L = it->second->L; //cylinder height
+    double R = it->second->r; //cylinder & sphere's radius
+    double Lhalf = 0.5*L;
+    bool front_cap = (it->second->front_cap == CylinderSphereData::On);
+    bool back_cap = (it->second->back_cap == CylinderSphereData::On);
+
+    Vec3D xf = x0 + Lhalf*dir;
+    Vec3D xb = x0 - Lhalf*dir;
+    double x, r;
+    bool inside;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          inside = false;
+          x = (coords[k][j][i]-x0)*dir;
+          r = (coords[k][j][i] - x0 - x*dir).norm();
+          if(x>-Lhalf && x<Lhalf && r<R)
+            inside = true;
+          else if(front_cap && x>=Lhalf && (coords[k][j][i]-xf).norm() < R)
+            inside = true;
+          else if(back_cap && x<=-Lhalf && (coords[k][j][i]-xb).norm() < R)
+            inside = true;
+
+          if(inside) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  // spheres
+  for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
+
+    print(comm, "- Applying initial condition within a sphere (material id: %d).\n\n",
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
+          if (dist<0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  // spheroids 
+  for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
+
+    print(comm, "- Applying initial condition within a spheroid (material id: %d).\n\n",
+          it->second->initialConditions.materialid);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
+    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          if (dist<0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  }
+
+
+  //Now, deal with embedded boundaries
+  vector<double***> color;
+
+  //! assign dummy state and "INACTIVE_MATERIAL_ID" to regions enclosed by any embedded surface
+  if(EBDS != nullptr) {
+
+    color.assign(EBDS->size(), NULL);
+    for(int i=0; i<EBDS->size(); i++) {
+      assert((*EBDS)[i]->Color_ptr);
+      color[i] = (*EBDS)[i]->Color_ptr->GetDataPointer();
+    }
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+
+          for(int surf=0; surf<color.size(); surf++) {
+            if(color[surf][k][j][i] <= 0) {//occluded or enclosed
+              v[k][j][i][0] = iod.eqs.dummy_state.density;
+              v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
+              v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
+              v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
+              v[k][j][i][4] = iod.eqs.dummy_state.pressure;
+              id[k][j][i] = INACTIVE_MATERIAL_ID;
+              break;
+            }
+          }
+        }
+  }
+
+
+  //! specify point-based initial condition
+  if(!ic.pointMap.dataMap.empty() && EBDS == nullptr) {
+    print_error(comm, "*** Error: Unable to specify point-based initial conditions without embedded boundaries.\n"
+                "           Background state can be specified using the 'Farfield' or 'Inlet' structure, even\n"
+                "           if the domain does not contain a far-field or inlet boundary.\n");
+    exit_mpi();
+  }
+
+  multimap<int, pair<int,int> > id2closure;
+  if(EBDS != nullptr) {
+
+    for(auto it=ic.pointMap.dataMap.begin(); it!=ic.pointMap.dataMap.end(); it++) {
+
+      print(comm, "- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
+            it->second->x, it->second->y, it->second->z, it->second->initialConditions.materialid);
+
+      id2closure.insert(ApplyPointBasedInitialCondition(*it->second, *EBDS, color, v, id));
+    }
+
+    // Verification (can be deleted): occluded nodes should have inactive_material_id
+    int i,j,k;
+    for(int surf=0; surf<EBDS->size(); surf++) {
+      set<Int3> *occluded = (*EBDS)[surf]->occluded_ptr;
+      set<Int3> *imposed_occluded = (*EBDS)[surf]->imposed_occluded_ptr;
+      for(auto it = occluded->begin(); it != occluded->end(); it++) {
+        i = (*it)[0];
+        j = (*it)[1];
+        k = (*it)[2];
+        if(!coordinates.IsHere(i,j,k,false))
+          continue;
+        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
+      }
+      for(auto it = imposed_occluded->begin(); it != imposed_occluded->end(); it++) {
+        i = (*it)[0];
+        j = (*it)[1];
+        k = (*it)[2];
+        if(!coordinates.IsHere(i,j,k,false))
+          continue;
+        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
+      }
+    }
+
+  }
+
+  if(EBDS != nullptr) {
+    for(int i=0; i<EBDS->size(); i++)
+      (*EBDS)[i]->Color_ptr->RestoreDataPointerToLocalVector();
+  }
+
+
+
+  //! 3. apply user-specified function
   if(iod.ic.type != IcData::NONE) {
 
     //! Get coordinates
@@ -699,10 +934,10 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
     if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
 
       if(iod.ic.type == IcData::PLANAR)
-        print("- Applying the initial condition specified in %s (planar).\n", 
+        print(comm, "- Applying the initial condition specified in %s (planar).\n", 
               iod.ic.user_specified_ic);
       else
-        print("- Applying the initial condition specified in %s (with cylindrical symmetry).\n", 
+        print(comm, "- Applying the initial condition specified in %s (with cylindrical symmetry).\n", 
               iod.ic.user_specified_ic);
  
       Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
@@ -808,7 +1043,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
       int N = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
 
-      print("- Applying the initial condition specified in %s (%d points, cylindrical symmetry).\n", 
+      print(comm, "- Applying the initial condition specified in %s (%d points, cylindrical symmetry).\n", 
             iod.ic.user_specified_ic, N);
 
       //Store sample points in a KDTree (K = 2)
@@ -819,7 +1054,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
         p[i]  = PointIn2D(i, xy[i]);
       }
       KDTree<PointIn2D,2/*dim*/> tree(N, p); //"tree" uses "p" and changes its ordering. "p" cannot be deleted before "tree"
-      print("    o Constructed a KDTree (K=2) to store the data points.\n");
+      print(comm, "    o Constructed a KDTree (K=2) to store the data points.\n");
 
       int numPoints = 15; //this is the number of points for interpolation
       int maxCand = numPoints*20;
@@ -1003,7 +1238,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     else if (iod.ic.type == IcData::SPHERICAL) {
 
-      print("- Applying the initial condition specified in %s (with spherical symmetry).\n", 
+      print(comm, "- Applying the initial condition specified in %s (with spherical symmetry).\n", 
             iod.ic.user_specified_ic);
  
       double x;
@@ -1066,241 +1301,6 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 
 
-  //! 3. apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
-  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
-
-  // planes
-  for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
-
-    print("- Applying initial condition on one side of a plane (material id: %d).\n\n", 
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-    double dist;
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0)*dir;
-          if(dist>0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-  // cylinder-cone
-  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
-
-    print("- Applying initial condition within a cylinder-cone (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-
-    double L = it->second->L; //cylinder height
-    double R = it->second->r; //cylinder radius
-    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
-    double Hmax = R/tan_alpha;
-    double H = min(it->second->cone_height, Hmax); //cone's height
-
-    double x, r;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          x = (coords[k][j][i]-x0)*dir;
-          r = (coords[k][j][i] - x0 - x*dir).norm();
-          if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) {//inside
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  // cylinder with spherical cap(s)
-  for(auto it=ic.cylindersphereMap.dataMap.begin(); it!=ic.cylindersphereMap.dataMap.end(); it++) {
-
-    print("- Applying initial condition within a cylinder-sphere (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-
-    double L = it->second->L; //cylinder height
-    double R = it->second->r; //cylinder & sphere's radius
-    double Lhalf = 0.5*L;
-    bool front_cap = (it->second->front_cap == CylinderSphereData::On);
-    bool back_cap = (it->second->back_cap == CylinderSphereData::On);
-
-    Vec3D xf = x0 + Lhalf*dir;
-    Vec3D xb = x0 - Lhalf*dir;
-    double x, r;
-    bool inside;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          inside = false;
-          x = (coords[k][j][i]-x0)*dir;
-          r = (coords[k][j][i] - x0 - x*dir).norm();
-          if(x>-Lhalf && x<Lhalf && r<R)
-            inside = true;
-          else if(front_cap && x>=Lhalf && (coords[k][j][i]-xf).norm() < R)
-            inside = true;
-          else if(back_cap && x<=-Lhalf && (coords[k][j][i]-xb).norm() < R)
-            inside = true;
-
-          if(inside) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  // spheres
-  for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
-
-    print("- Applying initial condition within a sphere (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    double dist;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
-          if (dist<0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  // spheroids 
-  for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
-
-    print("- Applying initial condition within a spheroid (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
-    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
-    double dist;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
-          if (dist<0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  //Now, deal with embedded boundaries
-  vector<double***> color;
-
-  //! assign dummy state and "INACTIVE_MATERIAL_ID" to regions enclosed by any embedded surface
-  if(EBDS != nullptr) {
-
-    color.assign(EBDS->size(), NULL);
-    for(int i=0; i<EBDS->size(); i++) {
-      assert((*EBDS)[i]->Color_ptr);
-      color[i] = (*EBDS)[i]->Color_ptr->GetDataPointer();
-    }
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-
-          for(int surf=0; surf<color.size(); surf++) {
-            if(color[surf][k][j][i] <= 0) {//occluded or enclosed
-              v[k][j][i][0] = iod.eqs.dummy_state.density;
-              v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
-              v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
-              v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
-              v[k][j][i][4] = iod.eqs.dummy_state.pressure;
-              id[k][j][i] = INACTIVE_MATERIAL_ID;
-              break;
-            }
-          }
-        }
-  }
-
-
-  //! specify point-based initial condition
-  if(!ic.pointMap.dataMap.empty() && EBDS == nullptr) {
-    print_error("*** Error: Unable to specify point-based initial conditions without embedded boundaries.\n"
-                "           Background state can be specified using the 'Farfield' or 'Inlet' structure, even\n"
-                "           if the domain does not contain a far-field or inlet boundary.\n");
-    exit_mpi();
-  }
-
-  multimap<int, pair<int,int> > id2closure;
-  if(EBDS != nullptr) {
-
-    for(auto it=ic.pointMap.dataMap.begin(); it!=ic.pointMap.dataMap.end(); it++) {
-
-      print("- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
-            it->second->x, it->second->y, it->second->z, it->second->initialConditions.materialid);
-
-      id2closure.insert(ApplyPointBasedInitialCondition(*it->second, *EBDS, color, v, id));
-    }
-
-    // Verification (can be deleted): occluded nodes should have inactive_material_id
-    int i,j,k;
-    for(int surf=0; surf<EBDS->size(); surf++) {
-      set<Int3> *occluded = (*EBDS)[surf]->occluded_ptr;
-      set<Int3> *imposed_occluded = (*EBDS)[surf]->imposed_occluded_ptr;
-      for(auto it = occluded->begin(); it != occluded->end(); it++) {
-        i = (*it)[0];
-        j = (*it)[1];
-        k = (*it)[2];
-        if(!coordinates.IsHere(i,j,k,false))
-          continue;
-        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
-      }
-      for(auto it = imposed_occluded->begin(); it != imposed_occluded->end(); it++) {
-        i = (*it)[0];
-        j = (*it)[1];
-        k = (*it)[2];
-        if(!coordinates.IsHere(i,j,k,false))
-          continue;
-        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
-      }
-    }
-
-  }
-
-  if(EBDS != nullptr) {
-    for(int i=0; i<EBDS->size(); i++)
-      (*EBDS)[i]->Color_ptr->RestoreDataPointerToLocalVector();
-  }
-
-
-
   V.RestoreDataPointerAndInsert();
   ID.RestoreDataPointerAndInsert();
   coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
@@ -1328,7 +1328,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
   Int3 ijk0;
   bool validpoint = global_mesh.FindElementCoveringPoint(this_point, ijk0, NULL, true);
   if(!validpoint) {
-    print_error("*** Error: User-specified point (%e %e %e) is outside the computational domain.\n",
+    print_error(comm, "*** Error: User-specified point (%e %e %e) is outside the computational domain.\n",
                 point.x, point.y, point.z);
     exit_mpi();
   }
@@ -1376,7 +1376,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
     // check if any node in the box is occluded. If yes, exit.
     for(int n=0; n<8; n++) {
       if(occluded[n]>0) {
-        print_error("*** Error: User-specified point (%e %e %e) is too close to embedded surface %d.\n",
+        print_error(comm, "*** Error: User-specified point (%e %e %e) is too close to embedded surface %d.\n",
                     point.x, point.y, point.z, surf);
         exit_mpi();
       }
@@ -1391,23 +1391,23 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
       }
     }
     if(mycolor[surf] == INT_MIN) {
-      print_error("*** Error: Unable to determine the 'color' of point (%e %e %e) from surface %d.\n",
+      print_error(comm, "*** Error: Unable to determine the 'color' of point (%e %e %e) from surface %d.\n",
                   point.x, point.y, point.z, surf);
       exit_mpi();
     }
     for(int n=0; n<8; n++) {
       if(max_color[n] != INT_MIN && max_color[n] != mycolor[surf]) {
-        print_error("*** Error: Found different colors (%d and %d) around point (%e %e %e), using surface %d.\n",
+        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), using surface %d.\n",
                     mycolor[surf], max_color[n], point.x, point.y, point.z, surf);
-        print_error("           This point may be too close to the embedded surface.\n");
+        print_error(comm, "           This point may be too close to the embedded surface.\n");
         exit_mpi();
       }
     }
     for(int n=0; n<8; n++) {
       if(min_color[n] != INT_MAX && min_color[n] != mycolor[surf]) {
-        print_error("*** Error: Found different colors (%d and %d) around point (%e %e %e), using embedded surface %d.\n",
+        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), using embedded surface %d.\n",
                     mycolor[surf], min_color[n], point.x, point.y, point.z, surf);
-        print_error("           This point may be too close to the embedded surface.\n");
+        print_error(comm, "           This point may be too close to the embedded surface.\n");
         exit_mpi();
       }
     }
@@ -1427,7 +1427,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
       else { //need to resolve a "conflict"
         if((*EBDS[i]->ColorReachesBoundary_ptr)[-mycolor[i]] == 0) {
           if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 0)
-            print_warning("Warning: User-specified point (%e %e %e) is inside isolated regions in "
+            print_warning(comm, "Warning: User-specified point (%e %e %e) is inside isolated regions in "
                           "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
                           ruling_surface, i);
           ruling_surface = i;
@@ -1435,7 +1435,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
         }
         else {
           if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 1) {
-            print_warning("Warning: User-specified point (%e %e %e) is inside isolated(*) regions in "
+            print_warning(comm, "Warning: User-specified point (%e %e %e) is inside isolated(*) regions in "
                           "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
                           ruling_surface, i);
             ruling_surface = i;
@@ -1446,7 +1446,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
     }
   }
   if(ruling_surface<0) {
-    print_error("*** Error: Unable to impose boundary condition based on point (%e %e %e). This point is connected"
+    print_error(comm, "*** Error: Unable to impose boundary condition based on point (%e %e %e). This point is connected"
                 " to the far-field.\n", point.x, point.y, point.z);
     exit_mpi();
   }
@@ -1511,7 +1511,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("*** Error: Boundary condition at x=x0 cannot be specified!\n");
+        print_error(comm, "*** Error: Boundary condition at x=x0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -1551,7 +1551,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("*** Error: Boundary condition at x=xmax cannot be specified!\n");
+        print_error(comm, "*** Error: Boundary condition at x=xmax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -1591,7 +1591,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("*** Error: Boundary condition at y=y0 cannot be specified!\n");
+        print_error(comm, "*** Error: Boundary condition at y=y0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -1631,7 +1631,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("*** Error: Boundary condition at y=ymax cannot be specified!\n");
+        print_error(comm, "*** Error: Boundary condition at y=ymax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -1671,7 +1671,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("*** Error: Boundary condition at z=z0 cannot be specified!\n");
+        print_error(comm, "*** Error: Boundary condition at z=z0 cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -1711,7 +1711,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           }
         break;
       default :
-        print_error("*** Error: Boundary condition at z=zmax cannot be specified!\n");
+        print_error(comm, "*** Error: Boundary condition at z=zmax cannot be specified!\n");
         exit_mpi();
     }
   }
@@ -1733,7 +1733,7 @@ SpaceOperator::ApplySmoothingFilter(double time, double dt, int time_step, Space
                     iod.schemes.ns.smooth.frequency, 0.0, false))
     return; //nothing to do (not the right time)
   
-  print("- Applying a smoothing filter to the N-S state variables. (Iterations: %d)\n", 
+  print(comm, "- Applying a smoothing filter to the N-S state variables. (Iterations: %d)\n", 
         iod.schemes.ns.smooth.iteration);
 
   for(int iter = 0; iter < iod.schemes.ns.smooth.iteration; iter++) {
@@ -2152,7 +2152,7 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
   FindExtremeValuesOfFlowVariables(V, ID, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
 
   if(verbose>1)
-    print("- Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
+    print(comm, "- Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n", 
           Vmax[0], Vmax[4], cmax, Machmax, char_speed_max);
 
   if(iod.ts.timestep > 0) {
@@ -2631,7 +2631,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   
   MPI_Allreduce(MPI_IN_PLACE, &riemann_errors, 1, MPI_INT, MPI_SUM, comm);
   if(riemann_errors>0) 
-    print_warning("Warning: Riemann solver failed to find a bracketing interval or to "
+    print_warning(comm, "Warning: Riemann solver failed to find a bracketing interval or to "
                   "converge on %d edge(s).\n", riemann_errors);
 
 
@@ -2684,7 +2684,7 @@ SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
            it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
     if(it->second->conRec_depth>0) {
       if(!EBDS || EBDS->size()<=it->first || (*EBDS)[it->first]->Phi_nLayer<1) {
-        print_error("*** Error: Cannot impose constant reconstruction for cells near Embedded Surface %d.\n",
+        print_error(comm, "*** Error: Cannot impose constant reconstruction for cells near Embedded Surface %d.\n",
                     it->first);
         exit_mpi();
       }
@@ -3148,7 +3148,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
   }
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
   if(nClipped && verbose>0)
-    print_warning("Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
+    print_warning(comm, "Warning: Clipped pressure and/or density in %d reconstructed states.\n", nClipped);
  
   V.RestoreDataPointerToLocalVector(); //no changes made
   Vl.RestoreDataPointerToLocalVector(); //no need to communicate
@@ -3185,7 +3185,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
 
   if(symm) {//cylindrical or spherical symmetry
     if(visco || heat_diffusion) {
-      print_error("*** Error: SymmetryOperator must be extended to account for diffusion fluxes.\n");
+      print_error(comm, "*** Error: SymmetryOperator must be extended to account for diffusion fluxes.\n");
       exit_mpi();
     }
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
