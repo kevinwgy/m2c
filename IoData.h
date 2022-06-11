@@ -954,6 +954,38 @@ struct MaterialVolumes {
   void setup(const char *, ClassAssigner * = 0);
 };
 
+
+//------------------------------------------------------------------------------
+
+struct TerminalVisualizationData {
+
+  enum ColorMap {GRAYSCALE = 0, TURBO = 1} colormap;
+
+  enum Plane {NONE = 0, YZ = 1, XZ = 2, XY = 3} plane;
+  double coordinate;
+
+  const char *filename; //!< filename with path (if not specified, print to the screen (stdout))
+
+  enum Vars  {DENSITY = 0, VELOCITY = 1, PRESSURE = 2, TEMPERATURE = 3, 
+              MATERIALID = 4, LASERRADIANCE = 5, LEVELSET0 = 6, LEVELSET1 = 7, 
+              LEVELSET2 = 8, MEANCHARGE = 9}  variable;
+
+  double horizontal_min, horizontal_max;
+  double vertical_min, vertical_max;
+  double dx;
+  
+  int frequency;
+  double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
+  double frequency_clocktime; //!< clock time, in seconds
+  double pause; //!< pause after printing each snapshot, relevant only if filename is stdout or stderr 
+
+  TerminalVisualizationData();
+  ~TerminalVisualizationData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
 //------------------------------------------------------------------------------
 
 struct OutputData {
@@ -1201,6 +1233,8 @@ public:
   OutputData output;
 
   SpecialToolsData special_tools;
+
+  TerminalVisualizationData terminal_visualization;
 
 public:
 

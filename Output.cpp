@@ -5,15 +5,17 @@
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, 
+Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
+               vector<VarFcnBase*> &vf_, 
                SpaceVariable3D &cell_volume, IonizationOperator* ion_) : 
     comm(comm_), 
-    iod(iod_), vf(vf_),
+    iod(iod_), global_mesh(global_mesh_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
     probe_output(comm_, iod_.output, vf_, ion_),
     matvol_output(comm_, iod_, cell_volume),
-    ion(ion_)
+    ion(ion_),
+    terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
 {
   iFrame = 0;
 
@@ -92,6 +94,7 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
                              SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
                              SpaceVariable3D *L, bool force_write)
 {
+
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
@@ -106,6 +109,10 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
 
   //write material volumes
   matvol_output.WriteSolution(time, dt, time_step, ID, force_write);
+
+  //write terminal visualization 
+  terminal.PrintSolutionSnapshot(time, dt, time_step, V, ID, Phi, L, force_write);
+
 }
 //--------------------------------------------------------------------------
 

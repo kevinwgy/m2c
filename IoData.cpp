@@ -2216,7 +2216,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 22+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 23+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2306,6 +2306,7 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   linePlots.setup("LinePlot", ca);
 
   materialVolumes.setup("MaterialVolumes", ca);
+
 }
 
 //------------------------------------------------------------------------------
@@ -2635,6 +2636,82 @@ void TransientInputData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+TerminalVisualizationData::TerminalVisualizationData()
+{
+  colormap = TURBO;
+  plane = NONE;
+  filename = "";
+  variable = PRESSURE;
+  coordinate     = DBL_MAX;
+  horizontal_min = -DBL_MAX;
+  horizontal_max = DBL_MAX;
+  vertical_min   = -DBL_MAX;
+  vertical_max   = DBL_MAX;
+  dx = 0.0;
+
+  frequency = 0;
+  frequency_dt = -1.0;
+  frequency_clocktime = 60; //seconds
+  pause = 2.0; //seconds 
+}
+
+//------------------------------------------------------------------------------
+
+void TerminalVisualizationData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 14, father);
+
+  new ClassToken<TerminalVisualizationData> (ca, "ColorMap", this,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::colormap), 2,
+      "GrayScale", 0, "Turbo", 1);
+
+  new ClassToken<TerminalVisualizationData> (ca, "Plane", this,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::plane), 4,
+      "None", 0, "YZ", 1, "XZ", 2, "XY", 3);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "Coordinate", this, 
+      &TerminalVisualizationData::horizontal_min);
+
+  new ClassStr<TerminalVisualizationData>(ca, "FileName", this, 
+      &TerminalVisualizationData::filename);
+
+  new ClassToken<TerminalVisualizationData> (ca, "Variable", this,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::variable), 10,
+      "Density", 0, "Velocity", 1, "Pressure", 2, "Temperature", 3, "MaterialID", 4, "LaserRadiance", 5,
+      "LevelSet0", 6, "LevelSet1", 7, "LevelSet2", 8, "MeanCharge", 9);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "HorizontalMin", this, 
+      &TerminalVisualizationData::horizontal_min);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "HorizontalMax", this, 
+      &TerminalVisualizationData::horizontal_max);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "VerticalMin", this, 
+      &TerminalVisualizationData::vertical_min);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "VerticalMax", this, 
+      &TerminalVisualizationData::vertical_max);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "Resolution", this, 
+      &TerminalVisualizationData::dx);
+
+  new ClassInt<TerminalVisualizationData>(ca, "Frequency", this, 
+      &TerminalVisualizationData::frequency);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "TimeInterval", this, 
+      &TerminalVisualizationData::frequency_dt);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "ClockTimeInterval", this, 
+      &TerminalVisualizationData::frequency_clocktime);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "Pause", this, 
+      &TerminalVisualizationData::pause);
+
+}
+
+//------------------------------------------------------------------------------
+
 SpecialToolsData::SpecialToolsData()
 {
   type = NONE;
@@ -2757,6 +2834,8 @@ void IoData::setupCmdFileVariables()
   output.setup("Output");
 
   special_tools.setup("SpecialTools");
+
+  terminal_visualization.setup("TerminalVisualization");
 
 }
 

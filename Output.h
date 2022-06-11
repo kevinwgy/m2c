@@ -2,6 +2,7 @@
 #define _OUTPUT_H_
 #include <IoData.h>
 #include <VarFcnBase.h>
+#include <GlobalMeshInfo.h>
 #include <SpaceVariable.h>
 #include <ProbeOutput.h>
 #include <MaterialVolumeOutput.h>
@@ -17,6 +18,9 @@ class Output
   MPI_Comm& comm;
   IoData& iod;
   vector<VarFcnBase*> &vf;
+
+  //! Global mesh
+  GlobalMeshInfo &global_mesh;
 
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
@@ -36,8 +40,12 @@ class Output
 
   MaterialVolumeOutput matvol_output;
 
+  TerminalVisualization terminal;
+
 public:
-  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
+
+  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
+         vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
          IonizationOperator* ion_ = NULL);
   ~Output();
 

@@ -105,6 +105,7 @@ TimeIntegrator.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
 LagrangianOutput.cpp
+TerminalVisualization.cpp
 Utils.cpp
 ClosestTriangle.cpp
 MathTools/r8lib.cpp
