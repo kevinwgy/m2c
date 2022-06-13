@@ -1,12 +1,8 @@
 #ifndef _OUTPUT_H_
 #define _OUTPUT_H_
-#include <IoData.h>
-#include <VarFcnBase.h>
-#include <GlobalMeshInfo.h>
-#include <SpaceVariable.h>
 #include <ProbeOutput.h>
 #include <MaterialVolumeOutput.h>
-#include <IonizationOperator.h>
+#include <TerminalVisualization.h>
 #include <stdio.h>
 
 /** Class Output is responsible  for writing solutions to files. It uses PETSc functionalities

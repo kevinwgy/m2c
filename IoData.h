@@ -968,7 +968,7 @@ struct TerminalVisualizationData {
 
   enum Vars  {DENSITY = 0, VELOCITY = 1, PRESSURE = 2, TEMPERATURE = 3, 
               MATERIALID = 4, LASERRADIANCE = 5, LEVELSET0 = 6, LEVELSET1 = 7, 
-              LEVELSET2 = 8, MEANCHARGE = 9}  variable;
+              MEANCHARGE = 8}  variable;
 
   double horizontal_min, horizontal_max;
   double vertical_min, vertical_max;

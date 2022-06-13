@@ -1,5 +1,8 @@
 #include<TerminalVisualization.h>
 #include<string.h>
+#include<Vector5D.h>
+#include<bits/stdc++.h>
+#include<unistd.h> //sleep
 
 using std::vector;
 
@@ -8,11 +11,19 @@ using std::vector;
 TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizationData &iod_terminal_, 
                                              GlobalMeshInfo &global_mesh_, vector<VarFcnBase*> &vf_, 
                                              IonizationOperator* ion_)
-                     : comm(comm_), iod_terminal(iod_terminal_), global_mesh(global_mesh_), vf(vf_), ion(ion_)
+                     : comm(comm_), iod_terminal(iod_terminal_), global_mesh(global_mesh_), vf(vf_), ion(ion_),
+                       myout(NULL)
 {
   
   if(iod_terminal.plane == TerminalVisualizationData::NONE)
     return; //not activated
+
+  if(strcmp(iod_terminal.filename, "")) {
+    print(comm, "\n- Initializing terminal visualization in %s.\n", iod_terminal.filename);
+    print(comm, "  o Command for visualization: 'tail -f %s'\n"
+                "    or 'less -R %s' (then, press shift+f)\n", iod_terminal.filename, iod_terminal.filename);
+  } else
+    print(comm, "\n- Initializing terminal visualization.\n");
 
 
   // check for user errors
@@ -25,15 +36,28 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
     exit(-1);
   }
 
+  // get mpi info
+  MPI_Comm_rank(comm, &mpi_rank);
+  MPI_Comm_size(comm, &mpi_size);
+
   iFrame = 0;
   last_snapshot_time = -1.0;
   last_snapshot_clocktime = -1.0;
 
+  // determine whether use the clock time or the simulation/physical time
+  if(iod_terminal.frequency<=0.0 && iod_terminal.frequency_dt<=0.0) {
+    if(iod_terminal.frequency_clocktime<=0) {
+      print_error(comm, "*** Error: Frequency of terminal visualization is not specified properly.\n");
+      exit(-1);
+    }
+    use_clocktime = true;
+  } else
+    use_clocktime = false; 
 
   // determine the region to visualize
-  double coord;
-  double hmin, hmax, vmin, vmax;
-  int hindex, vindex, pindex; //0,1,2
+  double coord(0.0);
+  double hmin(0.0), hmax(0.0), vmin(0.0), vmax(0.0);
+  int hindex(-1), vindex(-1), pindex(-1); //0,1,2
   switch (iod_terminal.plane) {
     case TerminalVisualizationData::YZ :
       if(iod_terminal.coordinate < global_mesh.x_glob.front() || 
@@ -100,6 +124,9 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
       pindex = 2; //z
 
       break;
+
+    case TerminalVisualizationData::NONE : //just to avoid compiler warning
+      break;
   }
 
   //default dimensions 
@@ -108,43 +135,38 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
 
   //calculate dx (same for y and z);
   dx = iod_terminal.dx;
-  if(dx<=0.0) {
-    for(int i=0; i<3; i+) {
-      if(xyzmin[i] == xyzmax[i])
-        continue;
-      double dx_min = (xyzmax[i] - xyzmin[i])/(nmax-1);
-      double dx_max = (xyzmax[i] - xyzmin[i])/(nmin-1);
-      if(dx<dx_min)
-        dx = dx_min
-      else if(dx>dx_max)
-        dx = dx_max;
-    }
+  for(int i=0; i<3; i++) {
+    if(xyzmin[i] == xyzmax[i])
+      continue;
+    double dx_min = (xyzmax[i] - xyzmin[i])/(nmax-1);
+    double dx_max = (xyzmax[i] - xyzmin[i])/(nmin-1);
+    if(dx<dx_min)
+      dx = dx_min;
+    else if(dx>dx_max)
+      dx = dx_max;
   }
   if(iod_terminal.dx>0 && iod_terminal.dx != dx)
     print(comm, "- Adjusted the resolution for terminal visualization. dx: %e -> %e.\n", 
           iod_terminal.dx, dx);
 
-
   // determine nrows and ncols
-  nrows = (int)((vmax - vmin)/dx);
-  ncols = (int)((hmax - hmin)/dx);
+  nrows = (int)((vmax - vmin)/dx) + 1;
+  ncols = (int)((hmax - hmin)/dx) + 1;
   dv = (vmax - vmin)/(nrows-1);
   dh = (hmax - hmin)/(ncols-1); //dv and dh should be similar, and similar to dx
 
   // determine ijk
   ijk.resize(nrows*ncols);
   Vec3D xyz;
-  xyz[hindex] = hmin;
-  xyz[vindex] = vmin;
   xyz[pindex] = coord;
   double h = hmin, v = vmin;
   for(int j=0; j<nrows; j++) {
+    xyz[vindex] = vmax - j*dv;
     for(int i=0; i<ncols; i++) {
+      xyz[hindex] = hmin + i*dh;
       // find closest node to xyz
       ijk[j*ncols+i] = global_mesh.FindClosestNodeToPoint(xyz, false); //not including ghosts
-      xyz[hindex] += dh;
     }
-    xyz[vindex] += dv;
   }
 
 
@@ -155,14 +177,33 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
     SetupTurboColorMap();
 
 
-  ticks.resize(number_colors, 0);
+
+  // create ostream
+  std::streambuf *buf;
+  if(strcmp(iod_terminal.filename, "")) {
+    outfile.open(iod_terminal.filename, std::ofstream::out);
+    if(!outfile.is_open()) {
+      fprintf(stderr,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
+      exit(-1);
+    }
+    buf = outfile.rdbuf();
+  } else
+    buf = std::cout.rdbuf();
+
+  myout = new std::ostream(buf);
 
 }
 
 //------------------------------------------------------------------
 
 TerminalVisualization::~TerminalVisualization()
-{ }
+{
+  if(outfile.is_open())
+    outfile.close();  
+  if(myout) {
+    delete myout;
+  }
+}
 
 //------------------------------------------------------------------
 // The 5; (256 color) format starts with the 16 original colors as colors 0-15. 
@@ -185,8 +226,11 @@ TerminalVisualization::SetupGrayColorMap()
   number_colors = 24;
   gray_ANSI.reserve(number_colors);
 
-  for(int i=0; i<number_colors)
+  for(int i=0; i<number_colors; i++)
     gray_ANSI.push_back(232+i);
+
+  under_color_ANSI = 0; //black
+  over_color_ANSI  = 15; //white
 }
 
 //------------------------------------------------------------------
@@ -199,15 +243,19 @@ TerminalVisualization::SetupTurboColorMap()
   number_colors = 24;
   turbo_ANSI.reserve(number_colors);
 
-  double step = turbo_rgb.size()/(number_colors-1); //this is "double"
-
+  double step = turbo_rgb.size()/number_colors; //this is "double"
+  int r,g,b;
   for(int i=0; i<number_colors; i++) {
-
-
-
-
+    Vec3D& rgb(turbo_rgb[round((i+0.5)*step)]);
+    // map each color (r,g,b) from (0-1) -> (0,1,2,3,4,5)
+    r = (int)(rgb[0]*6 - 1e-8); //to avoid r = 6
+    g = (int)(rgb[1]*6 - 1e-8);
+    b = (int)(rgb[2]*6 - 1e-8);
+    turbo_ANSI.push_back(16 + 36*r + 6*g + b);
   }
 
+  under_color_ANSI = 0; //black
+  over_color_ANSI  = 15; //white
 }
 
 //------------------------------------------------------------------
@@ -489,7 +537,311 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
   if(iod_terminal.plane == TerminalVisualizationData::NONE) //not activated
     return;
 
+  // do we need to print at this time?
+  if(!force_write) {
+    if(use_clocktime) {
+      double current_time = (double)clock();
+      MPI_Allreduce(MPI_IN_PLACE, &current_time, 1, MPI_DOUBLE, MPI_MAX, comm); 
+      if((current_time-last_snapshot_clocktime)/CLOCKS_PER_SEC < iod_terminal.frequency_clocktime)
+        return;
+    } else {
+      if(!isTimeToWrite(time, dt, time_step, iod_terminal.frequency_dt, iod_terminal.frequency, 
+                        last_snapshot_time, force_write))
+        return;
+    }
+  }
 
+
+  string solution_name;
+  sol.assign(nrows*ncols, 0.0);
+
+  if(iod_terminal.variable == TerminalVisualizationData::DENSITY) {
+    int i,j,k;
+    solution_name = "Density";
+    Vec5D*** v = (Vec5D***)V.GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false))
+        sol[n] = v[k][j][i][0];
+    }
+    V.RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::VELOCITY) {
+    int i,j,k;
+    solution_name = "Velocity (Magnitude)";
+    Vec5D*** v = (Vec5D***)V.GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false))
+        sol[n] = sqrt(v[k][j][i][1]*v[k][j][i][1] + v[k][j][i][2]*v[k][j][i][2] +
+                      v[k][j][i][3]*v[k][j][i][3]);
+    }
+    V.RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::PRESSURE) {
+    int i,j,k;
+    solution_name = "Pressure";
+    Vec5D*** v = (Vec5D***)V.GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false))
+        sol[n] = v[k][j][i][4]; 
+    }
+    V.RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::TEMPERATURE) {
+    int i,j,k;
+    solution_name = "Temperature";
+    Vec5D*** v = (Vec5D***)V.GetDataPointer();
+    double*** id = ID.GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false)) {
+        double e = vf[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0],
+                                            v[k][j][i][4]);
+        sol[n] = vf[id[k][j][i]]->GetTemperature(v[k][j][i][0], e);
+      }
+    }
+    V.RestoreDataPointerToLocalVector();
+    ID.RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::MATERIALID) {
+    int i,j,k;
+    solution_name = "Material ID";
+    double*** id = ID.GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false))
+        sol[n] = id[k][j][i];
+    }
+    ID.RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::LASERRADIANCE) {
+    int i,j,k;
+    solution_name = "Laser Radiance";
+    if(!L) {
+      print_error("*** Error: Unable to visualize laser radiance (not activated).\n");
+      exit(-1);
+    }
+    double*** laser = L->GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false))
+        sol[n] = laser[k][j][i];
+    }
+    L->RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::LEVELSET0) {
+    int i,j,k;
+    solution_name = "Level Set (0)";
+    if(Phi.size()<1) {
+      print_error("*** Error: Unable to visualize level set phi[0] (not activated).\n");
+      exit(-1);
+    }
+    double*** phi = Phi[0]->GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false))
+        sol[n] = phi[k][j][i];
+    }
+    Phi[0]->RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::LEVELSET1) {
+    int i,j,k;
+    solution_name = "Level Set (1)";
+    if(Phi.size()<2) {
+      print_error("*** Error: Unable to visualize level set phi[1] (not activated).\n");
+      exit(-1);
+    }
+    double*** phi = Phi[1]->GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false))
+        sol[n] = phi[k][j][i];
+    }
+    Phi[1]->RestoreDataPointerToLocalVector();
+  }
+  else if(iod_terminal.variable == TerminalVisualizationData::MEANCHARGE) {
+    int i,j,k;
+    solution_name = "Mean Charge Number";
+    if(!ion) {
+      print_error("*** Error: Unable to visualize mean charge number (not activated).\n");
+      exit(-1);
+    }
+    Vec5D*** v = (Vec5D***)V.GetDataPointer();
+    double*** id = ID.GetDataPointer();
+    for(int n=0; n<ijk.size(); n++) {
+      i = ijk[n][0];
+      j = ijk[n][1];
+      k = ijk[n][2];
+      if(ID.IsHere(i,j,k,false)) 
+        sol[n] = (ion->ComputeIonizationAtOnePoint((int)id[k][j][i], v[k][j][i][0], v[k][j][i][4]))[0];
+    }
+    V.RestoreDataPointerToLocalVector();
+    ID.RestoreDataPointerToLocalVector();
+  }
+
+  if(mpi_rank==0)
+    MPI_Reduce(MPI_IN_PLACE, (double*)sol.data(), sol.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+  else
+    MPI_Reduce((double*)sol.data(), NULL, sol.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+
+
+  // proc #0 prints
+  if(!mpi_rank) {
+
+    // determine the scale
+    vector<double> tmp = sol;
+    std::sort(tmp.begin(), tmp.end());
+
+    double smin = tmp.front();
+    double smax = tmp.back();
+    double s01  = tmp[2];
+    double s99  = tmp[tmp.size()-3];
+    double range = s99 - s01;
+    bool below_min(false), above_max(false);
+    if(smin < s01 - 0.5*range) {
+      smin = s01;
+      below_min = true;
+    }
+    if(smax > s99 + 0.5*range) {
+      smax = s99;
+      above_max = true;
+    }
+    double denom = std::max(1.0, std::max(fabs(smax), fabs(smin)));
+    if((smax-smin)/denom<1e-8) //min and max are almost the same
+    smax = smin + 1e-8*denom;
+    tmp.back() += 1e-8*denom;
+    range = smax - smin;
+
+    // plotting
+    /*
+    std::ofstream outfile;
+    std::streambuf *buf;
+    if(strcmp(iod_terminal.filename, "")) {
+      if(first_time_open_file) {
+        outfile.open(iod_terminal.filename, std::ofstream::out);
+        first_time_open_file = false;
+      } else
+        outfile.open(iod_terminal.filename, std::ofstream::app);
+
+      if(!outfile.is_open()) {
+        fprintf(stderr,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
+        exit(-1);
+      }
+      buf = outfile.rdbuf();
+    } else
+      buf = std::cout.rdbuf();
+
+    std::ostream myout(buf);
+*/
+    *myout << "\n";
+    *myout << "\033[0;32m==========================================\n";
+    *myout << " " << solution_name << " at " << std::scientific << std::setprecision(4)
+          << time << " (Step " << time_step << ")\n";
+    *myout << "\033[0;32m==========================================\033[0m\n";
+
+    if(iod_terminal.plane == TerminalVisualizationData::YZ)
+      *myout << "The Y-Z plane. x: " << std::scientific << std::setprecision(2) << xyzmin[0] 
+            << ", y (horiz.): [" << std::scientific << std::setprecision(2) << xyzmin[1] 
+            << ", " << std::scientific << std::setprecision(2) << xyzmax[1]
+            << "], z (vert.): [" << std::scientific << std::setprecision(2) << xyzmin[2] 
+            << ", " << std::scientific << std::setprecision(2) << xyzmax[2] << "].\n";
+    else if(iod_terminal.plane == TerminalVisualizationData::XZ)
+      *myout << "The X-Z plane. y: " << std::scientific << std::setprecision(2) << xyzmin[1] 
+            << ", x (horiz.): [" << std::scientific << std::setprecision(2) << xyzmin[0] 
+            << ", " << std::scientific << std::setprecision(2) << xyzmax[0]
+            << "], z (vert.): [" << std::scientific << std::setprecision(2) << xyzmin[2] 
+            << ", " << std::scientific << std::setprecision(2) << xyzmax[2] << "].\n";
+    else //XY
+      *myout << "The X-Y plane. z: " << std::scientific << std::setprecision(2) << xyzmin[2] 
+            << ", x (horiz.): [" << std::scientific << std::setprecision(2) << xyzmin[0] 
+            << ", " << std::scientific << std::setprecision(2) << xyzmax[0]
+            << "], y (vert.): [" << std::scientific << std::setprecision(2) << xyzmin[1] 
+            << ", " << std::scientific << std::setprecision(2) << xyzmax[1] << "].\n";
+
+    int color_code;
+    double rel_value;
+    std::vector<int>* ANSI_codes = (iod_terminal.colormap==TerminalVisualizationData::GRAYSCALE) ?
+                                   &gray_ANSI : &turbo_ANSI;
+
+    for(int i=0; i<ncols+1; i++) 
+      *myout << "--";
+    *myout << "\n";
+
+    for(int j=0; j<nrows; j++) {
+      *myout << "\u001b[0m|";
+      for(int i=0; i<ncols; i++) {
+
+        rel_value = (sol[j*ncols+i] - smin)/(smax - smin);
+        if(rel_value<0)
+          color_code = under_color_ANSI;
+        else if(rel_value>1)
+          color_code = over_color_ANSI;
+        else 
+          color_code = (*ANSI_codes)[round(rel_value*(ANSI_codes->size()-1))];
+       
+        *myout << "\u001b[48;5;" << color_code << "m  "; 
+      }
+      *myout << "\u001b[0m|\n";
+    }
+    for(int i=0; i<ncols+1; i++)
+      *myout << "--";
+    *myout << "\n";
+
+    if(below_min)
+      *myout << "\u001b[48;5;" << under_color_ANSI << "m " << std::scientific << std::setprecision(2)
+            << tmp.front() << " ";
+    int counter = 0;
+    double step_size = (smax - smin)/(ANSI_codes->size()-1);
+    double my_tick = smin;
+    for(auto&& mycode : *ANSI_codes) {
+      *myout << "\u001b[48;5;" << mycode << "m " << std::scientific << std::setprecision(2)
+            << my_tick << " ";
+      my_tick += step_size;
+      if(++counter>8) {
+        *myout << "\u001b[0m\n";
+        counter = 0;
+      }
+    } 
+    if(above_max)
+      *myout << "\u001b[48;5;" << over_color_ANSI << "m " << std::scientific << std::setprecision(2)
+            << tmp.back() << " ";
+
+    *myout << "\u001b[0m\n" << std::endl;
+
+    *myout << std::flush;
+
+    if(outfile.is_open())
+      outfile.flush();
+  }
+
+  MPI_Barrier(comm);
+
+  if(strcmp(iod_terminal.filename, "") == 0) {
+    sleep(iod_terminal.pause);
+  }
+
+  iFrame++;
+  last_snapshot_time = time;
+  last_snapshot_clocktime = (double)clock();
+  MPI_Allreduce(MPI_IN_PLACE, &last_snapshot_clocktime, 1, MPI_DOUBLE, MPI_MAX, comm); 
 
 }
 

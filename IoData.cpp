@@ -2647,7 +2647,7 @@ TerminalVisualizationData::TerminalVisualizationData()
   horizontal_max = DBL_MAX;
   vertical_min   = -DBL_MAX;
   vertical_max   = DBL_MAX;
-  dx = 0.0;
+  dx = DBL_MAX;
 
   frequency = 0;
   frequency_dt = -1.0;
@@ -2671,15 +2671,15 @@ void TerminalVisualizationData::setup(const char *name, ClassAssigner *father)
       "None", 0, "YZ", 1, "XZ", 2, "XY", 3);
 
   new ClassDouble<TerminalVisualizationData>(ca, "Coordinate", this, 
-      &TerminalVisualizationData::horizontal_min);
+      &TerminalVisualizationData::coordinate);
 
   new ClassStr<TerminalVisualizationData>(ca, "FileName", this, 
       &TerminalVisualizationData::filename);
 
   new ClassToken<TerminalVisualizationData> (ca, "Variable", this,
-      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::variable), 10,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::variable), 9,
       "Density", 0, "Velocity", 1, "Pressure", 2, "Temperature", 3, "MaterialID", 4, "LaserRadiance", 5,
-      "LevelSet0", 6, "LevelSet1", 7, "LevelSet2", 8, "MeanCharge", 9);
+      "LevelSet0", 6, "LevelSet1", 7, "MeanCharge", 8);
 
   new ClassDouble<TerminalVisualizationData>(ca, "HorizontalMin", this, 
       &TerminalVisualizationData::horizontal_min);

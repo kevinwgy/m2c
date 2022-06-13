@@ -3,6 +3,7 @@
 
 #include<GlobalMeshInfo.h>
 #include<IonizationOperator.h>
+#include<fstream>
 #include<time.h>
 
 /*****************************************************************
@@ -29,19 +30,20 @@ class TerminalVisualization
   //! post-processor
   IonizationOperator* ion;
 
-  int frequency;
-  double frequency_dt;
-  double frequency_clocktime;
+  //! output stream
+  std::ofstream outfile;
+  std::ostream *myout;
+
   int iFrame;
   double last_snapshot_time;
-  clock_t last_snapshot_clocktime;
+  bool use_clocktime;
+  double last_snapshot_clocktime;
 
   //! colormap
   std::vector<Vec3D> turbo_rgb;
   std::vector<int>   turbo_ANSI;
   std::vector<int>   gray_ANSI;
-
-  std::vector<double> ticks; //varying in time
+  int under_color_ANSI, over_color_ANSI; //!< for values below/over the min/max.
 
   //! visualization grid
   int nrows, ncols;
@@ -61,7 +63,7 @@ public:
   void PrintSolutionSnapshot(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
                              std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, bool force_write);
 
-prviate:
+private:
 
   void SetupGrayColorMap();
   void SetupTurboColorMap();
