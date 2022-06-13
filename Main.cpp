@@ -20,8 +20,10 @@
 #include <EmbeddedBoundaryOperator.h>
 #include <SpecialToolsDriver.h>
 #include <set>
+#include <string>
 using std::cout;
 using std::endl;
+using std::to_string;
 int verbose;
 double domain_diagonal;
 clock_t start_time;
@@ -356,6 +358,18 @@ int main(int argc, char* argv[])
     }
 
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);
+
+    //For debug
+    /*
+    if(time_step > 50800 && time_step < 51100){
+      char* filename;
+      string fname = "Snapshots_";
+      fname += to_string(time_step);
+      fname.append(".vtr");
+      filename = &fname[0];
+      V.StoreMeshCoordinates(spo.GetMeshCoordinates());
+      V.WriteToVTRFile(filename,"V");
+    }*/
 
   }
 

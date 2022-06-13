@@ -432,6 +432,7 @@ StiffenedGasModelData::StiffenedGasModelData()
 
   specificHeatRatio = 1.4;
   pressureConstant = 0.0;
+  enthalpyConstant = 0.0;
 
   cv = 0.0;
   T0 = 0.0;
@@ -453,6 +454,8 @@ void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
                                 &StiffenedGasModelData::specificHeatRatio);
   new ClassDouble<StiffenedGasModelData>(ca, "PressureConstant", this,
                                 &StiffenedGasModelData::pressureConstant);
+  new ClassDouble<StiffenedGasModelData>(ca, "EnthalpyConstant", this,
+                                &StiffenedGasModelData::enthalpyConstant);
 
   new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatAtConstantVolume", this,
                                 &StiffenedGasModelData::cv);

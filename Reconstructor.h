@@ -18,6 +18,7 @@ using std::max;
  ****************************************************************************/
 class Reconstructor
 {
+  MPI_Comm& comm; //note this may not contain all the processors (e.g., see LaserOperator::SetupLoadBalancing)
   ReconstructionData& iod_rec;
 
   /** Variable functions and flux functions. This is optional, only used for

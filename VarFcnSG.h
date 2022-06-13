@@ -26,6 +26,7 @@ class VarFcnSG : public VarFcnBase {
 private:
   double gam;
   double Pstiff;
+  double q;
 
   double invgam;  //!< 1/gamma
   double gam1;    //!< gamma-1
@@ -46,30 +47,31 @@ public:
   ~VarFcnSG() {}
 
   //! ----- EOS-Specific Functions -----
-  inline double GetPressure(double rho, double e) const {return gam1*rho*e - gam*Pstiff;}
-  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {return (p+gam*Pstiff)/(gam1*rho);}
-  inline double GetDensity(double p, double e) const {return (p+gam*Pstiff)/(gam1*e);}
-  inline double GetDpdrho(double rho, double e) const{return gam1*e;}
+  inline double GetPressure(double rho, double e) const {return gam1*rho*(e-q) - gam*Pstiff;}
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {return (p+gam*Pstiff)/(gam1*rho)+q;}
+  inline double GetDensity(double p, double e) const {return (p+gam*Pstiff)/(gam1*(e-q));}
+  inline double GetDpdrho(double rho, double e) const{return gam1*(e-q);}
   inline double GetBigGamma(double rho, double e) const {return gam1;}
 
   inline double GetTemperature(double rho, double e) const {
+    double p = GetPressure(rho, e);
     if(use_cp) {
-      double p = GetPressure(rho, e);
-      return T0 + invcp*(e + p/rho - h0);
+    //  double p = GetPressure(rho, e);
+      return invcp*(e + p/rho - q);
     } else
-      return T0 + invcv*(e-e0);
+      return invcv*(e + p/rho - q)/gam;
   }
 
   inline double GetReferenceTemperature() const {return T0;}
 
   inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {
     if(use_cp) 
-      return invgam*(h0 + cp*(T-T0)) + Pstiff/rho;
+      return invgam*cp*T + q + Pstiff/rho;
     else
-      return e0 + cv*(T-T0);
+      return cv*T + q + Pstiff/rho;
   }
   
-  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return invgam*h+Pstiff/rho;}
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return invgam*h+Pstiff/rho+gam1*invgam*q;}
 
 
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + Pstiff < 0 (Not p + gamma*Pstiff). 
@@ -106,6 +108,7 @@ VarFcnSG::VarFcnSG(MaterialModelData &data) : VarFcnBase(data) {
   gam1 = gam -1.0;
   invgam1 = 1.0/gam1;
   Pstiff = data.sgModel.pressureConstant;
+  q = data.sgModel.enthalpyConstant;
 
   cv = data.sgModel.cv;
   invcv = cv==0.0 ? 0.0 : 1.0/cv;

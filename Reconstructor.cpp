@@ -2,13 +2,12 @@
 #include <DistancePointToSpheroid.h>
 using std::round;
 
-
 //--------------------------------------------------------------------------
 
 Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, ReconstructionData &iod_rec_, 
                              SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
                              vector<VarFcnBase*>* vf_, FluxFcnBase* ff_)
-                   : iod_rec(iod_rec_), coordinates(coordinates_),
+                   : comm(comm_), iod_rec(iod_rec_), coordinates(coordinates_),
                      delta_xyz(delta_xyz_), varFcn(vf_), fluxFcn(ff_),
                      CoeffA(comm_, &(dm_all_.ghosted1_3dof)), 
                      CoeffB(comm_, &(dm_all_.ghosted1_3dof)), 
@@ -18,7 +17,7 @@ Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, Reconstru
                      FixedByUser(NULL)
 {
   if(iod_rec.varType != ReconstructionData::PRIMITIVE && (!varFcn || !fluxFcn)) {
-    print_error("*** Error: Reconstructor needs to know VarFcn and FluxFcn. (Software bug)\n");
+    print_error(comm, "*** Error: Reconstructor needs to know VarFcn and FluxFcn. (Software bug)\n");
     exit_mpi();
   }
 
@@ -101,7 +100,7 @@ int Reconstructor::CalculateSlopeLimiterCoefficientK(double A, double B)
       if(B <= rhs) break;
     }
     if(k>=999) {
-      print_error("*** Error: Cannot setup slope limiter parameter k for A = %e, B = %e.\n", A, B);
+      print_error(comm, "*** Error: Cannot setup slope limiter parameter k for A = %e, B = %e.\n", A, B);
       exit_mpi();
     }
     return k;
@@ -134,8 +133,8 @@ void Reconstructor::TagNodesFixedByUser()
 
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
 
-    print("- Applying constant reconstruction within sphere %d:\n", it->first);
-    print("  o center: %e %e %e;  radius: %e.\n", x0[0], x0[1], x0[2], it->second->radius);
+    print(comm, "- Applying constant reconstruction within sphere %d:\n", it->first);
+    print(comm, "  o center: %e %e %e;  radius: %e.\n", x0[0], x0[1], x0[2], it->second->radius);
 
     double dist;
     // loop through the subdomain interior (i.e. No tags applied to ghost nodes outside physical domain)
@@ -155,9 +154,9 @@ void Reconstructor::TagNodesFixedByUser()
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
 
-    print("- Applying constant reconstruction within spheroid %d:\n", it->first);
-    print("  o center: %e %e %e;  axis: %e %e %e.\n", x0[0], x0[1], x0[2], axis[0], axis[1], axis[2]);
-    print("  o length: %e;  diameter: %e.\n", it->second->length, it->second->diameter);
+    print(comm, "- Applying constant reconstruction within spheroid %d:\n", it->first);
+    print(comm, "  o center: %e %e %e;  axis: %e %e %e.\n", x0[0], x0[1], x0[2], axis[0], axis[1], axis[2]);
+    print(comm, "  o length: %e;  diameter: %e.\n", it->second->length, it->second->diameter);
 
     GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
 
@@ -185,10 +184,10 @@ void Reconstructor::TagNodesFixedByUser()
     double Hmax = R/tan_alpha;
     double H = min(it->second->cone_height, Hmax); //cone's height
 
-    print("- Applying constant reconstruction within cylinder-cone %d:\n", it->first);
-    print("  o base center: %e %e %e;  axis: %e %e %e.\n", 
+    print(comm, "- Applying constant reconstruction within cylinder-cone %d:\n", it->first);
+    print(comm, "  o base center: %e %e %e;  axis: %e %e %e.\n", 
           x0[0], x0[1], x0[2], dir[0], dir[1], dir[2]);
-    print("  o cylinder height %e;  radius: %e;  openning angle: %e.\n", 
+    print(comm, "  o cylinder height %e;  radius: %e;  openning angle: %e.\n", 
           L, R, it->second->opening_angle_degrees);
 
     double x, r;
@@ -217,10 +216,10 @@ void Reconstructor::TagNodesFixedByUser()
     bool front_cap = (it->second->front_cap == CylinderSphereData::On);
     bool back_cap = (it->second->back_cap == CylinderSphereData::On);
 
-    print("- Applying constant reconstruction within cylinder-sphere %d:\n", it->first);
-    print("  o cylinder center: %e %e %e;  axis: %e %e %e.\n", 
+    print(comm, "- Applying constant reconstruction within cylinder-sphere %d:\n", it->first);
+    print(comm, "  o cylinder center: %e %e %e;  axis: %e %e %e.\n", 
           x0[0], x0[1], x0[2], dir[0], dir[1], dir[2]);
-    print("  o cylinder height %e;  radius: %e.\n", L, R);
+    print(comm, "  o cylinder height %e;  radius: %e.\n", L, R);
 
     Vec3D xf = x0 + Lhalf*dir;
     Vec3D xb = x0 - Lhalf*dir;
@@ -285,11 +284,11 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
 
   //! Check for obvious errors
   if(iod_rec.varType != ReconstructionData::PRIMITIVE && ID == NULL) {
-    print_error("*** Error: Reconstructor::Reconstruct needs materiald ID, which is not provided.\n");
+    print_error(comm, "*** Error: Reconstructor::Reconstruct needs materiald ID, which is not provided.\n");
     exit_mpi();
   }
   if(iod_rec.varType != ReconstructionData::PRIMITIVE && V.NumDOF() != 5) {
-    print_error("*** Error: In Reconstructor::Reconstruct, expect NumDOF = 5, but got %d.\n", V.NumDOF());
+    print_error(comm, "*** Error: In Reconstructor::Reconstruct, expect NumDOF = 5, but got %d.\n", V.NumDOF());
     exit_mpi();
   }
   //! Get mesh info
@@ -734,7 +733,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
                                     SpaceVariable3D *Selected)
 {
   if(iod_rec.varType != ReconstructionData::PRIMITIVE) {
-    print_error("*** Error: Calling Reconstructor::ReconstructIn1D to reconstruct a 'non-primitive' variable.\n");
+    print_error(comm, "*** Error: Calling Reconstructor::ReconstructIn1D to reconstruct a 'non-primitive' variable.\n");
     exit_mpi();
   }
 
@@ -760,7 +759,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
   //! Number of DOF per cell
   int nDOF = U.NumDOF();
   if(nDOF != 1) {
-    print_error("*** Error: ReconstructIn1D only works with nDOF = 1 at the moment. "
+    print_error(comm, "*** Error: ReconstructIn1D only works with nDOF = 1 at the moment. "
                 "Detected nDOF = %d.\n", nDOF);
     exit_mpi();
   }
@@ -811,7 +810,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
                 dq1 = (u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof]);
                 break;
               default:
-                print_error("*** Error: dir(%d) not recognized.\n", dir);
+                print_error(comm, "*** Error: dir(%d) not recognized.\n", dir);
                 exit_mpi();
             }
 

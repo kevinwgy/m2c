@@ -598,7 +598,7 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
   MPI_Allreduce(MPI_IN_PLACE, &nClipped, 1, MPI_INT, MPI_SUM, comm);
   if(nClipped && verbose>0) {
-    print("Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
+    print(comm, "Warning: Clipped pressure and/or density in %d cells.\n", nClipped);
     V.RestoreDataPointerAndInsert();
   } else
     V.RestoreDataPointerToLocalVector();
@@ -645,7 +645,7 @@ void SpaceOperator::SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, 
   if(needit) {
     assert(interpolator_); //make sure it is not NULL
     assert(grad_);
-    heat_diffusion = new HeatDiffusionOperator(comm, dm_all, iod.eqs, varFcn, coordinates, delta_xyz,
+    heat_diffusion = new HeatDiffusionOperator(comm, dm_all, iod.mesh, iod.eqs, varFcn, coordinates, delta_xyz, volume,
                                                *interpolator_, *grad_);
   }
 }
@@ -2669,7 +2669,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
-                                    RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *Phi)
+                                    RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, vector<SpaceVariable3D*> *Phi, bool run_heat)
 {
 
 #ifdef LEVELSET_TEST
@@ -2684,8 +2684,10 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   if(visco)
     visco->AddDiffusionFluxes(V, ID, R);
 
-  if(heat_diffusion)
+  if(heat_diffusion && run_heat)
     heat_diffusion->AddDiffusionFluxes(V, ID, R);
+  else if(heat_diffusion)
+    print("Skipping heat diffusion.\n");
 
   if(symm) //cylindrical or spherical symmetry
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side

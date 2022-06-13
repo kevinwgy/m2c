@@ -201,6 +201,7 @@ struct StiffenedGasModelData {
 
   double specificHeatRatio;
   double pressureConstant;
+  double enthalpyConstant;
 
   //! parameters related to temperature
   double cv; //!< specific heat at constant volume

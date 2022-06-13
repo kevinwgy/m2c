@@ -103,7 +103,7 @@ public:
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,
-                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL);
+                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL, bool run_heat = true);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}
