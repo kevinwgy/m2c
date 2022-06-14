@@ -185,6 +185,10 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
           } 
         }
 
+     //   fprintf(stderr,"(%d,%d,%d)(%e,%e,%e) is swept, phi0: %e -> %e, phi1: %e -> %e. myls = %d\n", i,j,k,
+     //           global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k),
+     //           phi0[0][k][j][i], phi[0][k][j][i], phi0[1][k][j][i], phi[1][k][j][i], myls);
+
         if(myls != -1)
           id[k][j][i] = ls2matid[myls];
         else {// the node does not belong to any subdomain tracked by level set(s) ==> tag it
@@ -247,6 +251,8 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
 
             neighborid = id[neighk][neighj][neighi];
 
+            //fprintf(stderr,"(%d,%d,%d): neighbor (%d %d %d), id = %d.\n", i,j,k, neighi, neighj, neighk, neighborid);
+
             if(neighborid==INACTIVE_MATERIAL_ID)
               continue; //this neighbor is occluded
             if(ids_tracked_by_levelsets.find(neighborid) != ids_tracked_by_levelsets.end())
@@ -290,12 +296,19 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
       ID.RestoreDataPointerAndInsert();
       total_remaining = remaining_nodes.size();
       MPI_Allreduce(MPI_IN_PLACE, &total_remaining, 1, MPI_INT, MPI_SUM, comm);
-    } else {
+    } 
+    else {
+      // Likely some orphans. Material ID should be 0 (best guess)
+      for(auto&& ijk : tmp)
+        id[ijk[2]][ijk[1]][ijk[0]] = 0;
+
       Tag.RestoreDataPointerToLocalVector();
       ID.RestoreDataPointerToLocalVector();
-      print_error("*** Error: Unable to update material ID at %d nodes swept by interfaces tracked by level sets.\n",
-                  total_remaining);
-      exit(-1);
+      if(verbose>=1)
+        print_warning("Warning: Found %d orphan nodes swept by interfaces tracked by level sets. Set ID = 0.\n",
+                      total_remaining);
+      //exit(-1);
+      break;
     }
 
   }
