@@ -62,6 +62,11 @@ public:
     fprintf(stderr,"\033[0;31m*** Error:  GetInternalEnergyPerUnitMass Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
+  //! get e - e0 from density (rho) and pressure (p)
+  virtual double GetReferenceInternalEnergyPerUnitMass() const{
+    fprintf(stderr,"\033[0;31m*** Error:  GetReferenceInternalEnergyPerUnitMass Function not defined\n\033[0m");
+    exit(-1); return 0.0;}
+
   //! get rho (density) from p (pressure) and p (internal energy per unit mass)
   virtual double GetDensity(double p, double e) const{
     fprintf(stderr,"\033[0;31m*** Error:  GetDensity Function not defined\n\033[0m");

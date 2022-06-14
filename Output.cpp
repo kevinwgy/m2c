@@ -241,6 +241,18 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     VecView(scalar.GetRefToGlobalVec(), viewer);
   }
 
+  if(iod.output.delta_internal_energy==OutputData::ON) {
+    double*** s  = (double***) scalar.GetDataPointer();
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++)
+          s[k][j][i] = vf[(int)id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4])
+                     - vf[(int)id[k][j][i]]->GetReferenceInternalEnergyPerUnitMass();
+    scalar.RestoreDataPointerAndInsert();
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "delta_internal_energy");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
+  }
+
   if(iod.output.materialid==OutputData::ON) {
     
 // TODO(KW): not sure why this does not work...

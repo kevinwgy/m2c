@@ -15,11 +15,19 @@
  *   e  : internal energy per unit mass.
  *   Pc : pressure constant. (named Pstiff below)
  *
- *   The default temperature law is de = cv*dT, where cv is assumed to be a constant
- *   For a perfect gas, this leads to dh = cp*dT, where cp = gamma*cv is the
+ * Note: Three different temperature laws have been implemented. 
+ *       Method 1 assumes de = cv*dT, and T is a function of only e. 
+ *       Method 2 assumes dh = cp*dT, and T is a function of only h.
+ *       Method 3 assumes de = cv*dT, but T is a function of rho and e. (See K.W. notes)
+ *
+ *   For a perfect gas, Method 1 leads to dh = cp*dT, where cp = gamma*cv is the
  *   specific heat at constant pressure. For a general stiffened gas,
  *   dh =/= cp*dT! See KW's notes. (One could have assumed dh = cp*dT, but then
  *   de =/= cv*dT.)
+ *
+ *   If      cv>0  && rho0>0 ==> Method 3
+ *   Else if cv<=0 && cp>0   ==> Method 2
+ *   Else                    ==> Method 1
  ********************************************************************************/
 class VarFcnSG : public VarFcnBase {
 
@@ -35,6 +43,8 @@ private:
   double invcv;
   double T0; //!< ref. temperature
   double e0; //!< ref. internal energy corresponding to T0
+  double rho0; //!< ref. density (for T = T(rho,e))
+  bool use_cv_advanced;
 
   bool use_cp; //!< whether cp (instead of cv) is used in the temperature law
   double cp;   //!< specific heat at constant pressure
@@ -53,17 +63,22 @@ public:
   inline double GetBigGamma(double rho, double e) const {return gam1;}
 
   inline double GetTemperature(double rho, double e) const {
-    if(use_cp) {
+    if(use_cv_advanced) { //Method 3
+      return invcv*(e + Pstiff/rho) + pow(rho/rho0, gam1)*(T0 - invcv*(e0 + Pstiff/rho0));
+    } else if(use_cp) { //Method 2
       double p = GetPressure(rho, e);
       return T0 + invcp*(e + p/rho - h0);
-    } else
+    } else //Method 1
       return T0 + invcv*(e-e0);
   }
 
   inline double GetReferenceTemperature() const {return T0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() const {return e0;}
 
   inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {
-    if(use_cp) 
+    if(use_cv_advanced) {
+      return cv*T - Pstiff/rho - pow(rho/rho0, gam1)*(cv*T0 - (e0 + Pstiff/rho0));
+    } else if(use_cp) 
       return invgam*(h0 + cp*(T-T0)) + Pstiff/rho;
     else
       return e0 + cv*(T-T0);
@@ -116,6 +131,9 @@ VarFcnSG::VarFcnSG(MaterialModelData &data) : VarFcnBase(data) {
   invcp = cp==0.0 ? 0.0 : 1.0/cp;
   h0 = data.sgModel.h0;
 
+  rho0 = data.sgModel.rho0;
+
+  use_cv_advanced = (cv>0 && rho0>0) ? true : false;
   use_cp = (cp>0 && cv<=0.0) ? true : false;
     
 }

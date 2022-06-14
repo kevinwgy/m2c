@@ -442,6 +442,8 @@ StiffenedGasModelData::StiffenedGasModelData()
   cp = 0.0;
   h0 = 0.0;
 
+  rho0 = 0.0;
+
 }
 
 //------------------------------------------------------------------------------
@@ -449,7 +451,7 @@ StiffenedGasModelData::StiffenedGasModelData()
 void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 8, father);
 
   new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatRatio", this,
                                 &StiffenedGasModelData::specificHeatRatio);
@@ -467,6 +469,10 @@ void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
                                 &StiffenedGasModelData::cp);
   new ClassDouble<StiffenedGasModelData>(ca, "ReferenceSpecificEnthalpy", this,
                                 &StiffenedGasModelData::h0);
+
+  new ClassDouble<StiffenedGasModelData>(ca, "ReferenceDensity", this,
+                                &StiffenedGasModelData::rho0);
+
 }
 
 //------------------------------------------------------------------------------
@@ -1351,6 +1357,8 @@ IcData::IcData()
 {
   user_specified_ic = "";
 
+  apply_user_file_before_geometries = NO;
+
   rbf = MULTIQUADRIC;
 
   type = NONE;
@@ -1363,9 +1371,13 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
+
+  new ClassToken<IcData> (ca, "ApplyUserDataBeforeGeometricEntities", this,
+        reinterpret_cast<int IcData::*>(&IcData::apply_user_file_before_geometries), 2, 
+        "No", 0, "Yes", 1);
 
   new ClassToken<IcData> (ca, "InterpolationFunction", this,
         reinterpret_cast<int IcData::*>(&IcData::rbf), 4, "Multiquadric", 0, 
@@ -2182,6 +2194,7 @@ OutputData::OutputData()
   temperature = OFF;
   delta_temperature = OFF;
   internal_energy = OFF;
+  delta_internal_energy = OFF;
   laser_radiance = OFF;
   levelset0 = OFF;
   levelset1 = OFF;
@@ -2216,7 +2229,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 23+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 24+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2244,6 +2257,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "InternalEnergyPerUnitMass", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::internal_energy), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "DeltaInternalEnergyPerUnitMass", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::delta_internal_energy), 2,
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LaserRadiance", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,

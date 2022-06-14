@@ -671,7 +671,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
   double*** id = (double***) ID.GetDataPointer();
 
-  //! 1. apply the inlet (i.e. farfield) state
+  //! apply the inlet (i.e. farfield) state
   if(iod.bc.inlet.materialid != 0) {
     print_error(comm, "*** Error: Material at the inlet boundary should have MaterialID = 0. (Found %d instead.)\n", 
                 iod.bc.inlet.materialid);
@@ -689,8 +689,13 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       }
 
 
+  //! apply user-specified function
+  if(iod.ic.apply_user_file_before_geometries==IcData::YES)
+    ApplyUserSpecifiedInitialConditionFile(coords, v, id);
 
-  //! 2. apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
+
+
+  //! apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
   MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
 
   // planes
@@ -924,8 +929,29 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
 
+  //! apply user-specified function
+  if(iod.ic.apply_user_file_before_geometries==IcData::NO)
+    ApplyUserSpecifiedInitialConditionFile(coords, v, id);
 
-  //! 3. apply user-specified function
+
+  V.RestoreDataPointerAndInsert();
+  ID.RestoreDataPointerAndInsert();
+  coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
+
+  //! Apply boundary condition to populate ghost nodes (no need to do this for ID)
+  ClipDensityAndPressure(V, ID);
+  ApplyBoundaryConditions(V);   
+
+  return id2closure;
+
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** v, double*** id)
+{
+
   if(iod.ic.type != IcData::NONE) {
 
     //! Get coordinates
@@ -1298,18 +1324,6 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     }
   }
-
-
-
-  V.RestoreDataPointerAndInsert();
-  ID.RestoreDataPointerAndInsert();
-  coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
-
-  //! Apply boundary condition to populate ghost nodes (no need to do this for ID)
-  ClipDensityAndPressure(V, ID);
-  ApplyBoundaryConditions(V);   
-
-  return id2closure;
 
 }
 

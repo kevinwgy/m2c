@@ -204,6 +204,7 @@ struct StiffenedGasModelData {
   double pressureConstant;
 
   //! parameters related to temperature
+  //! Method 1: Assume constant cv or cp, and T as a function of only e.
   double cv; //!< specific heat at constant volume
   double T0;  //!< temperature is T0 when internal energy (per mass) is e0
   double e0;  //!< internal energy per specific mass at T0
@@ -214,6 +215,9 @@ struct StiffenedGasModelData {
   //      equivalent to using (cp, T0, h0). See KW's note. By default, cv is used. But if cv
   //      is 0 while cp>0, cp will be used.
  
+  //! Method 2: Assume constant cv, but T depends on both e and rho.
+  double rho0; //!< for temperature calculation. If specified (>0) and cv>0, will activate the
+               //!< temperature law that depends on both rho and e
 
   StiffenedGasModelData();
   ~StiffenedGasModelData() {}
@@ -714,6 +718,8 @@ struct IcData {
   //! user-specified file
   const char *user_specified_ic;
 
+  enum YesNo {NO = 0, YES = 1} apply_user_file_before_geometries;
+
   enum RadialBasisFunction {MULTIQUADRIC = 0, INVERSE_MULTIQUADRIC = 1, 
                             THIN_PLATE_SPLINE = 2, GAUSSIAN = 3} rbf; //radial basis function for interpolation
 
@@ -994,7 +1000,8 @@ struct OutputData {
   const char *solution_filename_base; //!< filename without path
 
   enum Options {OFF = 0, ON = 1};
-  Options density, velocity, pressure, materialid, internal_energy, temperature, delta_temperature, laser_radiance;
+  Options density, velocity, pressure, materialid, internal_energy, delta_internal_energy,
+          temperature, delta_temperature, laser_radiance;
 
   enum VerbosityLevel {LOW = 0, MEDIUM = 1, HIGH = 2} verbose;
 

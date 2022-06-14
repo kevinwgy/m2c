@@ -130,11 +130,13 @@ private:
 
   void CreateGhostNodeLists(bool screenout);
 
+  void ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** v, double*** id);
+
   std::pair<int, std::pair<int,int> >
   ApplyPointBasedInitialCondition(PointData& point, 
                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
                                   vector<double***> &color,
-                                       Vec5D*** v, double*** id);
+                                  Vec5D*** v, double*** id);
                                        
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
 

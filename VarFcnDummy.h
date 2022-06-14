@@ -28,6 +28,7 @@ public:
   inline double GetBigGamma(double rho, double e) const {return 0.0;}
   inline double GetTemperature(double rho, double e) const {return T0;}
   inline double GetReferenceTemperature() const {return T0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() const {return e0;}
   inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {return e0;}
   inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return e0;}
   inline bool   CheckState(double rho, double p, bool silence = false) const {return false;}
