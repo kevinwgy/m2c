@@ -34,7 +34,7 @@ private:
   double me; //electron_mass;
   double kb; //boltzmann_constant;
 
-  //! Method for partition function invaluation
+  //! Method for partition function evaluation
   int interpolation; //!< 0~not used, 1~cubic spline, 2~piecewise linear
   std::vector<std::vector<double> > Us; //!< partition function at sample Temperatures 
   std::vector<std::tuple<double,double,double> > UsCoeffs; //!< for each r: ("factor", "expmin", "delta_exp")

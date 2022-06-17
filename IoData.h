@@ -866,6 +866,7 @@ struct IonizationData {
   double electron_charge; //needed?
   double electron_mass;
   double boltzmann_constant;
+  double vacuum_permittivity;
   
   ObjectMap<MaterialIonizationModel> materialMap;
   

@@ -2133,10 +2133,11 @@ Assigner* MaterialIonizationModel::getAssigner()
 
 IonizationData::IonizationData()
 {
-  planck_constant = 6.62607004e-25;  //unit: (mm^2).g/s  (dim: [energy]/[freq])
-  electron_charge = 1.60217662e-19;  //unit: A.s (Coulombs)
-  electron_mass = 9.10938356e-28; //unit: g
+  planck_constant = 6.62607015e-25;  //unit: (mm^2).g/s  (dim: [energy]/[freq])
+  electron_charge = 1.602176634e-19;  //unit: A.s (Coulombs)
+  electron_mass = 9.1093837015e-28; //unit: g
   boltzmann_constant = 1.38064852e-14; //unit: (mm^2).g/(s^2*K)  (dim: [energy]/[temperature])
+  vacuum_permittivity = 8.8541878128e-9; //unit: g/(s^2)  (dim: [force]/[length])
 }
 
 //------------------------------------------------------------------------------
@@ -2144,12 +2145,13 @@ IonizationData::IonizationData()
 void IonizationData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassDouble<IonizationData>(ca, "PlanckConstant", this, &IonizationData::planck_constant);
   new ClassDouble<IonizationData>(ca, "ElectronCharge", this, &IonizationData::electron_charge);
   new ClassDouble<IonizationData>(ca, "ElectronMass", this, &IonizationData::electron_mass);
   new ClassDouble<IonizationData>(ca, "BoltzmannConstant", this, &IonizationData::boltzmann_constant);
+  new ClassDouble<IonizationData>(ca, "VacuumPermittivity", this, &IonizationData::vacuum_permittivity);
 
   materialMap.setup("Material", ca);
 

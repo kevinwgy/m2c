@@ -323,10 +323,11 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
   print(file, "## Number of points: %d (h = %e)\n", line->numPoints, h);
   print(file, "## Time: %e, Time step: %d.\n", time, time_step);
   if(L) 
-    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  "
+    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Temperature  |  Material ID  "
                 "|  Laser Radiance  |  LevelSet(s)");
   else
-    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Material ID  |  LevelSet(s)");
+    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Temperature  |  Material ID  "
+                "|  LevelSet(s)");
 
   if(ion)
     print(file, "  |  Mean Charge  |  Heavy Particles Density");
@@ -349,9 +350,10 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
     double vy  = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 2);
     double vz  = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 3);
     double p   = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 4);
+    double T   = CalculateTemperatureAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
     double myid= InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], id, 1, 0);
-    print(file, "%16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  ", 
-                iNode*h, rho, vx, vy, vz, p, myid);
+    print(file, "%16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e", 
+                iNode*h, rho, vx, vy, vz, p, T, myid);
     if(l) {
       double laser_rad = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], l, 1, 0);
       print(file, "%16.8e  ", laser_rad);
