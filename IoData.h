@@ -833,7 +833,9 @@ struct AtomicIonizationModel {
 
 struct MaterialIonizationModel{
 
-  enum Type {NONE = 0, SAHA_IDEAL = 1, SAHA_NONIDEAL = 2, SIZE = 3} type;
+  enum Type {NONE = 0, SAHA_IDEAL = 1, SAHA_NONIDEAL = 2} type;
+
+  enum DepressionModel {NO_DEPRESSION = 0, GRIEM = 1, EBELING = 2} depression;
 
   int maxIts;
   double convergence_tol;
