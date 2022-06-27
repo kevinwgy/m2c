@@ -2789,7 +2789,7 @@ SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
 }
 
 //-----------------------------------------------------
-
+// Note that there is also a function in LevelSetOperator (ComputeNormalDirection) that does similar things
 Vec3D
 SpaceOperator::GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
                                              int myid, int neighborid, vector<int> *ls_mat_id,

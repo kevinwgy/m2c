@@ -102,6 +102,7 @@ SahaEquationSolver.cpp
 NonIdealSahaEquationSolver.cpp
 AtomicIonizationData.cpp
 EmbeddedBoundaryFormula.cpp
+ReferenceMapOperator.cpp
 TimeIntegrator.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
