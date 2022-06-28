@@ -14,7 +14,7 @@
 #include <TimeIntegrator.h>
 #include <GradientCalculatorCentral.h>
 #include <IonizationOperator.h>
-#include <ViscoelasticityOperator.h>
+#include <HyperelasticityOperator.h>
 #include <SpecialToolsDriver.h>
 #include <set>
 #include <limits>
@@ -269,22 +269,22 @@ int main(int argc, char* argv[])
     ion = new IonizationOperator(comm, dms, iod, vf);
 
 
-  //! Initialize viscoelasticity solver and reference map (if needed)
-  ViscoelasticityOperator* veo = NULL;
+  //! Initialize hyperelasticity solver and reference map (if needed)
+  HyperelasticityOperator* heo = NULL;
   SpaceVariable3D* Xi = NULL; //reference map
-  bool activate_veo = false;
+  bool activate_heo = false;
   for(auto&& material : iod.eqs.materials.dataMap)
     if(material.second.hyperelasticity.type != HyperelasticityModelData::NONE) {
-      activate_veo = true;
+      activate_heo = true;
       break;
     }
-  if(activate_veo) {
-    veo = new ViscoelasticityOperator(comm, dms, iod, spo.GetMeshCoordinates(),
+  if(activate_heo) {
+    heo = new HyperelasticityOperator(comm, dms, iod, spo.GetMeshCoordinates(),
                                       spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
                                       *(spo.GetPointerToInnerGhostNodes()),
                                       *(spo.GetPointerToOuterGhostNodes()));
     Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
-    veo->InitializeReferenceMap(*Xi);
+    heo->InitializeReferenceMap(*Xi);
   }
        
 /*
@@ -309,11 +309,11 @@ int main(int argc, char* argv[])
   TimeIntegratorBase *integrator = NULL;
   if(iod.ts.type == TsData::EXPLICIT) {
     if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
-      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed, veo);
+      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed, heo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
-      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed, veo);
+      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed, heo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
-      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed, veo);
+      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed, heo);
     else {
       print_error("*** Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();
@@ -499,7 +499,7 @@ int main(int argc, char* argv[])
     lso[ls]->Destroy(); delete lso[ls];
   }
 
-  if(veo) {veo->Destroy(); delete veo;}
+  if(heo) {heo->Destroy(); delete heo;}
   if(Xi) {Xi->Destroy(); delete Xi;}
 
   out.FinalizeOutput();

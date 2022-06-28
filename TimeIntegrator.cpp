@@ -12,9 +12,9 @@ using std::unique_ptr;
 TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                         SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
                         LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                        ViscoelasticityOperator* veo_)
+                        HyperelasticityOperator* heo_)
                   : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_), embed(embed_),
-                    veo(veo_), IDn(comm_, &(dms_.ghosted1_1dof)) 
+                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)) 
 {
   for(int i=0; i<lso.size(); i++) {
     ls_mat_id.push_back(lso[i]->GetMaterialID());
@@ -52,8 +52,8 @@ TimeIntegratorBase::Destroy()
 TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                       SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
                       LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                      ViscoelasticityOperator* veo_)
-                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, veo_),
+                      HyperelasticityOperator* heo_)
+                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_),
                   Un(comm_, &(dms_.ghosted1_5dof)),
                   Rn(comm_, &(dms_.ghosted1_5dof)), Rn_xi(NULL)
 {
@@ -61,7 +61,7 @@ TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D
     Rn_ls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
 
-  if(veo_)
+  if(heo_)
     Rn_xi = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
 }
 
@@ -149,10 +149,10 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Forward Euler step for the reference map equation: Xi(n+1) = Xi(n) + dt*R(Xi(n))
   // -------------------------------------------------------------------------------
   if(Xi) {
-    assert(veo);
-    veo->ComputeReferenceMapResidual(V, *Xi, *Rn_xi);
+    assert(heo);
+    heo->ComputeReferenceMapResidual(V, *Xi, *Rn_xi);
     Xi->AXPlusBY(1.0, dt, *Rn_xi); 
-    veo->ApplyBoundaryConditionsToReferenceMap(*Xi);
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi, t); //pass t(n+1)
   }
 
 
@@ -170,8 +170,8 @@ TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers
                                      SpaceOperator& spo_ ,vector<LevelSetOperator*>& lso_,
                                      MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_,
                                      EmbeddedBoundaryOperator* embed_,
-                                     ViscoelasticityOperator* veo_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, veo_),
+                                     HyperelasticityOperator* heo_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
@@ -183,7 +183,7 @@ TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers
     Rls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
 
-  if(veo_) {
+  if(heo_) {
     Xi1 = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
     Rxi = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
   }
@@ -286,11 +286,11 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR Xi ****************** 
   // Forward Euler step for the reference map equation: Xi1 = Xi(n) + dt*R(Xi(n))
   if(Xi) {
-    assert(veo);
-    veo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
+    assert(heo);
+    heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
     Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
-    veo->ApplyBoundaryConditionsToReferenceMap(*Xi1);
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1, t); //pass t(n+1)
   }
   //***************************************************
 
@@ -330,11 +330,11 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR Xi ****************** 
   // Step 2 for the reference map equation: Xi(n+1) = 0.5*Xi(n) + 0.5*Xi1 + 0.5*dt*R(Xi1)
   if(Xi) {
-    assert(veo);
-    veo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
+    assert(heo);
+    heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
     Xi->AXPlusBY(0.5, 0.5, *Xi1); 
     Xi->AXPlusBY(1.0, 0.5*dt, *Rxi); 
-    veo->ApplyBoundaryConditionsToReferenceMap(*Xi);
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi, t); //pass t(n+1)
   }
   //***************************************************
 
@@ -352,11 +352,12 @@ TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers
                                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_,
                                      MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_,
                                      EmbeddedBoundaryOperator* embed_,
-                                     ViscoelasticityOperator* veo_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, veo_),
+                                     HyperelasticityOperator* heo_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
+                   V2(comm_, &(dms_.ghosted1_5dof)), 
                    R(comm_, &(dms_.ghosted1_5dof)),
                    Xi1(NULL), Rxi(NULL)
                 
@@ -366,7 +367,7 @@ TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers
     Rls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
 
-  if(veo_) {
+  if(heo_) {
     Xi1 = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
     Rxi = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
   }
@@ -392,6 +393,7 @@ void TimeIntegratorRK3::Destroy()
   Un.Destroy();
   U1.Destroy();
   V1.Destroy();
+  V2.Destroy();
   R.Destroy();
 
   for(int i=0; i<Rls.size(); i++) {
@@ -431,6 +433,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
+
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
@@ -469,11 +472,11 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR Xi ****************** 
   // Forward Euler step for the reference map equation: Xi1 = Xi(n) + dt*R(Xi(n))
   if(Xi) {
-    assert(veo);
-    veo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
+    assert(heo);
+    heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
     Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
-    veo->ApplyBoundaryConditionsToReferenceMap(*Xi1);
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1, t); //pass t(n+1)
   }
   //***************************************************
 
@@ -495,13 +498,13 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   U1.AXPlusBY(1.0, 0.25*dt, R); //U2 = U2 + 0.25*dt*R(V1)
   
   // Check & clip the intermediate state (U2/V2)
-  spo.ConservativeToPrimitive(U1, ID, V1); //get V2
-  clipped = spo.ClipDensityAndPressure(V1, ID);
+  spo.ConservativeToPrimitive(U1, ID, V2); //get V2
+  clipped = spo.ClipDensityAndPressure(V2, ID);
   if(clipped)
-    spo.PrimitiveToConservative(V1, ID, U1); //update U2 after clipping
+    spo.PrimitiveToConservative(V2, ID, U1); //update U2 after clipping
 
   // Apply B.C. to the intermediate state (fill ghost cells)
-  spo.ApplyBoundaryConditions(V1); //apply B.C. by populating the ghost layer
+  spo.ApplyBoundaryConditions(V2); //apply B.C. by populating the ghost layer
   //***************************************************
 
 
@@ -519,11 +522,11 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR Xi ****************** 
   // Step 2: Xi2 = 0.75*Xi(n) + 0.25*Xi1 + 0.25*dt*R(Xi1)
   if(Xi) {
-    assert(veo);
-    veo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
-    Xi1->AXPlusBY(0.25, 0.75, *Xi); 
+    assert(heo);
+    heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
+    Xi1->AXPlusBY(0.25, 0.75, *Xi);  //re-use Xi1 to store Xi2
     Xi1->AXPlusBY(1.0, 0.25*dt, *Rxi); 
-    veo->ApplyBoundaryConditionsToReferenceMap(*Xi1);
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1, t); //t(n+1)
   }
   //***************************************************
 
@@ -532,12 +535,12 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get()); //compute R(V1) using prev.Phi,"loose coupling"
+    spo.ComputeResidual(V2, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get()); //compute R(V2) using prev.Phi,"loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V2)
+    spo.ComputeResidual(V2, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V2)
 
   if(laser) {
-    laser->ComputeLaserRadiance(V1,ID,*L,time);
+    laser->ComputeLaserRadiance(V2,ID,*L,time);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
   U1.AXPlusBY(2.0/3.0, 1.0/3.0, Un); //U2 = 1/3*U(n) + 2/3*U2;
@@ -552,7 +555,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 3 FOR LS ******************
   // Step 3: Phi(n+1) = 1/3*Phi(n) + 2/3*Phi2 + 2/3*dt*R(Phi2)
   for(int i=0; i<Phi.size(); i++) {
-    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
+    lso[i]->ComputeResidual(V2, *Phi1[i], *Rls[i], time, dt);
     lso[i]->AXPlusBY(1.0/3.0, *Phi[i], 2.0/3.0, *Phi1[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi[i], 2.0/3.0*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
@@ -563,11 +566,11 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 3 FOR Xi ****************** 
   // Step 3: Xi(n+1) = 1/3*Xi(n) + 2/3*Xi2 + 2/3*dt*R(Xi2)
   if(Xi) {
-    assert(veo);
-    veo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
+    assert(heo);
+    heo->ComputeReferenceMapResidual(V2, *Xi1, *Rxi);
     Xi->AXPlusBY(1.0/3.0, 2.0/3.0, *Xi1); 
     Xi->AXPlusBY(1.0, 2.0/3.0*dt, *Rxi); 
-    veo->ApplyBoundaryConditionsToReferenceMap(*Xi);
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi, t); //t(n+1)
   }
   //***************************************************
 

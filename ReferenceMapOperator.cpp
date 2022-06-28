@@ -4,7 +4,7 @@
 
 ReferenceMapOperator::ReferenceMapOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                            SpaceVariable3D &coordinates_,
-                                           SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+                                           SpaceVariable3D &delta_xyz_, 
                                            std::vector<GhostPoint> &ghost_nodes_inner_,
                                            std::vector<GhostPoint> &ghost_nodes_outer_)
                     : comm(comm_), iod(iod_), coordinates(coordinates_),
@@ -43,9 +43,10 @@ ReferenceMapOperator::SetInitialCondition(SpaceVariable3D &Xi)
 
 // Apply boundary conditions by populating ghost cells of Xi
 void
-ReferenceMapOperator::ApplyBoundaryConditions(SpaceVariable3D &Xi)
+ReferenceMapOperator::ApplyBoundaryConditions(SpaceVariable3D &Xi, double time)
 {
 
+  Vec3D*** xi = (Vec3D***)Xi.GetDataPointer();
 
 }
 

@@ -1,8 +1,8 @@
-#include<ViscoelasticityOperator.h>
+#include<HyperelasticityOperator.h>
 
 //------------------------------------------------------------
 
-ViscoelasticityOperator::ViscoelasticityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, 
+HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, 
                              IoData &iod_, SpaceVariable3D &coordinates_,
                              SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
                              std::vector<GhostPoint> &ghost_nodes_inner_,
@@ -17,13 +17,13 @@ ViscoelasticityOperator::ViscoelasticityOperator(MPI_Comm &comm_, DataManagers3D
 
 //------------------------------------------------------------
 
-ViscoelasticityOperator::~ViscoelasticityOperator()
+HyperelasticityOperator::~HyperelasticityOperator()
 { }
 
 //------------------------------------------------------------
 
 void
-ViscoelasticityOperator::Destroy()
+HyperelasticityOperator::Destroy()
 {
   refmap.Destroy();
 }
@@ -31,7 +31,7 @@ ViscoelasticityOperator::Destroy()
 //------------------------------------------------------------
 
 void
-ViscoelasticityOperator::InitializeReferenceMap(SpaceVariable3D &Xi)
+HyperelasticityOperator::InitializeReferenceMap(SpaceVariable3D &Xi)
 {
   refmap.SetInitialCondition(Xi);
 }
@@ -39,7 +39,7 @@ ViscoelasticityOperator::InitializeReferenceMap(SpaceVariable3D &Xi)
 //------------------------------------------------------------
 
 void
-ViscoelasticityOperator::ApplyBoundaryConditionsToReferenceMap(SpaceVariable3D &Xi)
+HyperelasticityOperator::ApplyBoundaryConditionsToReferenceMap(SpaceVariable3D &Xi)
 {
   refmap.ApplyBoundaryConditions(Xi);
 }
@@ -47,7 +47,7 @@ ViscoelasticityOperator::ApplyBoundaryConditionsToReferenceMap(SpaceVariable3D &
 //------------------------------------------------------------
 
 void
-ViscoelasticityOperator::ComputeReferenceMapResidual(SpaceVariable3D &V, 
+HyperelasticityOperator::ComputeReferenceMapResidual(SpaceVariable3D &V, 
                                                      SpaceVariable3D &Xi, SpaceVariable3D &R)
 {
   refmap.ComputeResidual(V,Xi,R);

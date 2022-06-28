@@ -50,7 +50,7 @@ public:
   void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
                        SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
                        SpaceVariable3D *L/*laser radiance*/, 
-                       SpaceVariable3D *Xi/*ref map for viscoelasticity*/,
+                       SpaceVariable3D *Xi/*ref map for hyperelasticity*/,
                        bool force_write);
 
   void FinalizeOutput();

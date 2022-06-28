@@ -102,7 +102,7 @@ SahaEquationSolver.cpp
 NonIdealSahaEquationSolver.cpp
 AtomicIonizationData.cpp
 EmbeddedBoundaryFormula.cpp
-ViscoelasticityOperator.cpp
+HyperelasticityOperator.cpp
 ReferenceMapOperator.cpp
 TimeIntegrator.cpp
 SpecialToolsDriver.cpp
