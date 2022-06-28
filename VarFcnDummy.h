@@ -6,8 +6,8 @@
 
 /********************************************************************************
  * This class is the VarFcn class for an 'inactive' material, often assigned to
- * nodes that are inside a solid body or 'covered' by an embedded surface with
- * finite, but small, thickness.
+ * nodes that are inside an embedded solid body or 'covered' by an embedded surface 
+ * with finite, but small, thickness.
  * This dummy material should only be instantiated internally, not by the user.
  ********************************************************************************/
 class VarFcnDummy : public VarFcnBase {

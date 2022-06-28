@@ -287,6 +287,7 @@ struct ViscosityModelData {
   double Cav, Cth; 
 
   ViscosityModelData();
+  ~ViscosityModelData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 
@@ -302,6 +303,20 @@ struct HeatDiffusionModelData {
   double diffusivity;
 
   HeatDiffusionModelData();
+  ~HeatDiffusionModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct HyperelasticityModelData {
+
+  enum Type {NONE = 0, CONSTANT = 1} type;
+
+  HyperelasticityModelData();
+  ~HyperelasticityModelData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 
@@ -327,6 +342,8 @@ struct MaterialModelData {
   ViscosityModelData viscosity;
 
   HeatDiffusionModelData heat_diffusion;
+
+  HyperelasticityModelData hyperelasticity;
 
   MaterialModelData();
   ~MaterialModelData() {}
@@ -1197,6 +1214,18 @@ struct TransientInputData {
 
 //------------------------------------------------------------------------------
 
+struct ReferenceMapData {
+
+  enum FiniteDifferenceMethod {NONE = 0, UPWIND_CENTRAL_3 = 1} fd;
+
+  ReferenceMapData();
+  ~ReferenceMapData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
 struct SpecialToolsData {
 
   enum Type {NONE = 0, DYNAMIC_LOAD_CALCULATION = 1, SIZE = 2} type;
@@ -1239,6 +1268,8 @@ public:
   IonizationData ion;
 
   TsData ts;
+
+  ReferenceMapData refmap;
 
   OutputData output;
 

@@ -565,6 +565,25 @@ void JonesWilkinsLeeModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+HyperelasticityModelData::HyperelasticityModelData()
+{
+  type = NONE;
+}
+
+//------------------------------------------------------------------------------
+
+void HyperelasticityModelData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassToken<HyperelasticityModelData>(ca, "Type", this,
+           reinterpret_cast<int HyperelasticityModelData::*>(&HyperelasticityModelData::type), 2,
+           "None",     HyperelasticityModelData::NONE,
+           "Constant", HyperelasticityModelData::CONSTANT);
+}
+
+//------------------------------------------------------------------------------
+
 MaterialModelData::MaterialModelData()
 {
 
@@ -583,7 +602,7 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
@@ -605,7 +624,10 @@ Assigner *MaterialModelData::getAssigner()
   
   heat_diffusion.setup("HeatDiffusionModel", ca);
   
+  hyperelasticity.setup("HyperelasticityModel", ca);
+  
   return ca;
+
 };
 
 //------------------------------------------------------------------------------
@@ -2735,6 +2757,24 @@ void TerminalVisualizationData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+ReferenceMapData::ReferenceMapData()
+{
+  fd = UPWIND_CENTRAL_3;
+}
+
+//------------------------------------------------------------------------------
+
+void ReferenceMapData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassToken<ReferenceMapData> (ca, "FiniteDifference", this,
+     reinterpret_cast<int ReferenceMapData::*>(&ReferenceMapData::fd), 2,
+     "None", 0, "ThirdOrderUpwind", 1);
+}
+
+//------------------------------------------------------------------------------
+
 SpecialToolsData::SpecialToolsData()
 {
   type = NONE;
@@ -2832,12 +2872,14 @@ void IoData::setupCmdFileVariables()
 
   concurrent.setup("ConcurrentPrograms");
 
+  ebm.setup("EmbeddedBoundary");
   ebm.setup("EmbeddedBoundaryMethod");
 
   eqs.setup("Equations");
   eqs.setup("NavierStokesEquations");
 
   ic.setup("InitialCondition");
+
   bc.setup("BoundaryConditions");
 
   mesh.setup("Mesh");
@@ -2853,6 +2895,8 @@ void IoData::setupCmdFileVariables()
   ts.setup("Time");
 
   multiphase.setup("MultiPhase");
+
+  refmap.setup("ReferenceMap");
 
   output.setup("Output");
 

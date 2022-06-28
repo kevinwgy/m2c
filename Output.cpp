@@ -92,13 +92,13 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 
 void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
                              SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
-                             SpaceVariable3D *L, bool force_write)
+                             SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
 {
 
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
-    WriteSolutionSnapshot(time, time_step, V, ID, Phi, L);
+    WriteSolutionSnapshot(time, time_step, V, ID, Phi, L, Xi);
 
   //write solutions at probes
   probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, force_write);
@@ -118,7 +118,7 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
 
 void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
                                    SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
-                                   SpaceVariable3D *L)
+                                   SpaceVariable3D *L, SpaceVariable3D *Xi)
 {
   //! Post-processing
   if(iod.output.ionization_output_requested())
@@ -317,7 +317,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
 
   if(iod.output.laser_radiance==OutputData::ON) {
     if(L == NULL) {
-      print_error("*** Error: Requested output of laser radiance, but the laser source is not specified.\n");
+      print_error("*** Error: Cannot output laser radiance. Solver is not activated.\n");
       exit_mpi();
     }
     PetscObjectSetName((PetscObject)(L->GetRefToGlobalVec()), "laser_radiance");
@@ -348,6 +348,16 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
     VecView(Ne.GetRefToGlobalVec(), viewer);
   }
+
+  if(iod.output.reference_map==OutputData::ON) {
+    if(Xi == NULL) {
+      print_error("*** Error: Cannot output reference map. Solver is not activated.\n");
+      exit_mpi();
+    }
+    PetscObjectSetName((PetscObject)(Xi->GetRefToGlobalVec()), "reference_map");
+    VecView(Xi->GetRefToGlobalVec(), viewer);
+  }
+
 
   MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
 

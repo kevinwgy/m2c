@@ -2,7 +2,8 @@
 #define _REFERENCE_MAP_OPERATOR_H_
 
 #include<IoData.h>
-#include<Reconstructor.h>
+#include<GradientCalculatorBase.h>
+#include<GhostPoint.h>
 
 /*********************************************************
  * class ReferenceMapOperator is responsible for
@@ -22,7 +23,7 @@ class ReferenceMapOperator
   SpaceVariable3D& delta_xyz;
   SpaceVariable3D& volume; //!< volume of node-centered control volumes
 
-  //! The ghost node vectors are almost the same as those in SpaceOperator, except bcType
+  //! ghost nodes
   vector<GhostPoint> ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   vector<GhostPoint> ghost_nodes_outer; //!< ghost nodes outside the physical domain
 
@@ -37,8 +38,12 @@ class ReferenceMapOperator
 public:
 
   ReferenceMapOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, SpaceVariable3D &coordinates_,
-                       SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_);  
+                       SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_, 
+                       std::vector<GhostPoint> &ghost_nodes_inner_,
+                       std::vector<GhostPoint> &ghost_nodes_outer_);  
   ~ReferenceMapOperator();
+
+  void Destroy();
 
   void SetInitialCondition(SpaceVariable3D &Xi);
 

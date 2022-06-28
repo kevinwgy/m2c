@@ -11,15 +11,10 @@
 #include <FluxFcnLLF.h>
 #include <FluxFcnHLLC.h>
 #include <FluxFcnGodunov.h>
-#include <GlobalMeshInfo.h>
-#include <SpaceOperator.h>
 #include <TimeIntegrator.h>
-#include <MultiPhaseOperator.h>
 #include <GradientCalculatorCentral.h>
-#include <LaserAbsorptionSolver.h>
 #include <IonizationOperator.h>
-#include <TriangulatedSurface.h>
-#include <EmbeddedBoundaryOperator.h>
+#include <ViscoelasticityOperator.h>
 #include <SpecialToolsDriver.h>
 #include <set>
 #include <limits>
@@ -273,6 +268,25 @@ int main(int argc, char* argv[])
   if(iod.ion.materialMap.dataMap.size() != 0)
     ion = new IonizationOperator(comm, dms, iod, vf);
 
+
+  //! Initialize viscoelasticity solver and reference map (if needed)
+  ViscoelasticityOperator* veo = NULL;
+  SpaceVariable3D* Xi = NULL; //reference map
+  bool activate_veo = false;
+  for(auto&& material : iod.eqs.materials.dataMap)
+    if(material.second.hyperelasticity.type != HyperelasticityModelData::NONE) {
+      activate_veo = true;
+      break;
+    }
+  if(activate_veo) {
+    veo = new ViscoelasticityOperator(comm, dms, iod, spo.GetMeshCoordinates(),
+                                      spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
+                                      *(spo.GetPointerToInnerGhostNodes()),
+                                      *(spo.GetPointerToOuterGhostNodes()));
+    Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
+    veo->InitializeReferenceMap(*Xi);
+  }
+       
 /*
   ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
   V.StoreMeshCoordinates(spo.GetMeshCoordinates());
@@ -295,11 +309,11 @@ int main(int argc, char* argv[])
   TimeIntegratorBase *integrator = NULL;
   if(iod.ts.type == TsData::EXPLICIT) {
     if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
-      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed);
+      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed, veo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
-      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed);
+      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed, veo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
-      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed);
+      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed, veo);
     else {
       print_error("*** Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();
@@ -337,7 +351,7 @@ int main(int argc, char* argv[])
   }
 
   //! write initial condition to file
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, true/*force_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
 
   if(concurrent.Coupled()) {
     concurrent.CommunicateBeforeTimeStepping(); 
@@ -400,7 +414,7 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      integrator->AdvanceOneTimeStep(V, ID, Phi, L, t, dt, time_step, subcycle, dts); 
+      integrator->AdvanceOneTimeStep(V, ID, Phi, L, Xi, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 
@@ -442,7 +456,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, false/*force_write*/);
+    out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
 
   }
 
@@ -455,7 +469,7 @@ int main(int argc, char* argv[])
   if(embed)
     embed->OutputResults(t, dt, time_step, true/*force_write*/);
 
-  out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, true/*force_write*/);
+  out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");
@@ -484,6 +498,9 @@ int main(int argc, char* argv[])
     Phi[ls]->Destroy(); delete Phi[ls];
     lso[ls]->Destroy(); delete lso[ls];
   }
+
+  if(veo) {veo->Destroy(); delete veo;}
+  if(Xi) {Xi->Destroy(); delete Xi;}
 
   out.FinalizeOutput();
   integrator->Destroy();

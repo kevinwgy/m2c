@@ -49,15 +49,18 @@ public:
 
   void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
                        SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
-                       SpaceVariable3D *L/*laser radiance*/, bool force_write);
-
-  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                             vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L); //!< write solution to file
+                       SpaceVariable3D *L/*laser radiance*/, 
+                       SpaceVariable3D *Xi/*ref map for viscoelasticity*/,
+                       bool force_write);
 
   void FinalizeOutput();
 
 private:
   void OutputMeshInformation(SpaceVariable3D& coordinates);
+
+  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
+                             vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
+                             SpaceVariable3D *Xi); //!< write solution to file
 
   void OutputMeshPartition();
 

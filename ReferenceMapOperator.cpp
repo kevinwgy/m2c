@@ -4,10 +4,16 @@
 
 ReferenceMapOperator::ReferenceMapOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                            SpaceVariable3D &coordinates_,
-                                           SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_)
+                                           SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+                                           std::vector<GhostPoint> &ghost_nodes_inner_,
+                                           std::vector<GhostPoint> &ghost_nodes_outer_)
                     : comm(comm_), iod(iod_), coordinates(coordinates_),
-                      delta_xyz(delta_xyz_)
+                      delta_xyz(delta_xyz_), ghost_nodes_inner(ghost_nodes_inner_),
+                      ghost_nodes_outer(ghost_nodes_outer_)
 {
+
+  coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
   //set up gradient calculator
   if(iod.refmap.fd == ReferenceMapData::UPWIND_CENTRAL_3) { //currently the only option
