@@ -76,6 +76,62 @@ GlobalMeshInfo::GetDz(int k) {
 
 //------------------------------------------------------------------
 
+double
+GlobalMeshInfo::GetX(Int3 ijk)
+{
+  return GetX(ijk[0]);
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetY(Int3 ijk)
+{
+  return GetY(ijk[1]);
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetZ(Int3 ijk)
+{
+  return GetZ(ijk[2]);
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetDx(Int3 ijk)
+{
+  return GetDx(ijk[0]);
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetDy(Int3 ijk)
+{
+  return GetDy(ijk[1]);
+}
+
+//------------------------------------------------------------------
+
+double
+GlobalMeshInfo::GetDz(Int3 ijk)
+{
+  return GetDz(ijk[2]);
+}
+
+//------------------------------------------------------------------
+
+Vec3D
+GlobalMeshInfo::GetXYZ(Int3 ijk)
+{
+  return Vec3D(GetX(ijk[0]), GetY(ijk[1]), GetZ(ijk[2]));
+}
+
+//------------------------------------------------------------------
+
 bool
 GlobalMeshInfo::IsPointInDomain(Vec3D &p, bool include_ghost_layer)
 {

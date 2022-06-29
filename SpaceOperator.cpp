@@ -1513,7 +1513,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][j][ii0][4] = iod.bc.outlet.pressure;
           }
         break; 
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
       case MeshData::SYMMETRY :
         for(int k=k0; k<kmax; k++)
           for(int j=j0; j<jmax; j++) {
@@ -1524,7 +1524,17 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][j][ii0][4] =      v[k][j][ii0+1][4];
           }
         break;
-      default :
+      case MeshData::STICKWALL :
+        for(int k=k0; k<kmax; k++)
+          for(int j=j0; j<jmax; j++) {
+            v[k][j][ii0][0] =      v[k][j][ii0+1][0];
+            v[k][j][ii0][1] = -1.0*v[k][j][ii0+1][1];
+            v[k][j][ii0][2] = -1.0*v[k][j][ii0+1][2];
+            v[k][j][ii0][3] = -1.0*v[k][j][ii0+1][3]; 
+            v[k][j][ii0][4] =      v[k][j][ii0+1][4];
+          }
+        break;
+       default :
         print_error(comm, "*** Error: Boundary condition at x=x0 cannot be specified!\n");
         exit_mpi();
     }
@@ -1553,7 +1563,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][j][iimax-1][4] = iod.bc.outlet.pressure;
           }
         break; 
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
       case MeshData::SYMMETRY :
         for(int k=k0; k<kmax; k++)
           for(int j=j0; j<jmax; j++) {
@@ -1564,7 +1574,17 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][j][iimax-1][4] =      v[k][j][iimax-2][4];
           }
         break;
-      default :
+      case MeshData::STICKWALL :
+        for(int k=k0; k<kmax; k++)
+          for(int j=j0; j<jmax; j++) {
+            v[k][j][iimax-1][0] =      v[k][j][iimax-2][0];
+            v[k][j][iimax-1][1] = -1.0*v[k][j][iimax-2][1];
+            v[k][j][iimax-1][2] = -1.0*v[k][j][iimax-2][2];
+            v[k][j][iimax-1][3] = -1.0*v[k][j][iimax-2][3]; 
+            v[k][j][iimax-1][4] =      v[k][j][iimax-2][4];
+          }
+        break;
+       default :
         print_error(comm, "*** Error: Boundary condition at x=xmax cannot be specified!\n");
         exit_mpi();
     }
@@ -1593,7 +1613,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][jj0][i][4] = iod.bc.outlet.pressure;
           }
         break; 
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
       case MeshData::SYMMETRY :
         for(int k=k0; k<kmax; k++)
           for(int i=i0; i<imax; i++) {
@@ -1601,6 +1621,16 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][jj0][i][1] =      v[k][jj0+1][i][1];
             v[k][jj0][i][2] = -1.0*v[k][jj0+1][i][2];
             v[k][jj0][i][3] =      v[k][jj0+1][i][3]; 
+            v[k][jj0][i][4] =      v[k][jj0+1][i][4];
+          }
+        break;
+      case MeshData::STICKWALL :
+        for(int k=k0; k<kmax; k++)
+          for(int i=i0; i<imax; i++) {
+            v[k][jj0][i][0] =      v[k][jj0+1][i][0];
+            v[k][jj0][i][1] = -1.0*v[k][jj0+1][i][1];
+            v[k][jj0][i][2] = -1.0*v[k][jj0+1][i][2];
+            v[k][jj0][i][3] = -1.0*v[k][jj0+1][i][3]; 
             v[k][jj0][i][4] =      v[k][jj0+1][i][4];
           }
         break;
@@ -1633,7 +1663,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][jjmax-1][i][4] = iod.bc.outlet.pressure;
           }
         break; 
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
       case MeshData::SYMMETRY :
         for(int k=k0; k<kmax; k++)
           for(int i=i0; i<imax; i++) {
@@ -1641,6 +1671,16 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[k][jjmax-1][i][1] =      v[k][jjmax-2][i][1];
             v[k][jjmax-1][i][2] = -1.0*v[k][jjmax-2][i][2];
             v[k][jjmax-1][i][3] =      v[k][jjmax-2][i][3]; 
+            v[k][jjmax-1][i][4] =      v[k][jjmax-2][i][4];
+          }
+        break;
+      case MeshData::STICKWALL :
+        for(int k=k0; k<kmax; k++)
+          for(int i=i0; i<imax; i++) {
+            v[k][jjmax-1][i][0] =      v[k][jjmax-2][i][0];
+            v[k][jjmax-1][i][1] = -1.0*v[k][jjmax-2][i][1];
+            v[k][jjmax-1][i][2] = -1.0*v[k][jjmax-2][i][2];
+            v[k][jjmax-1][i][3] = -1.0*v[k][jjmax-2][i][3]; 
             v[k][jjmax-1][i][4] =      v[k][jjmax-2][i][4];
           }
         break;
@@ -1673,13 +1713,23 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[kk0][j][i][4] = iod.bc.outlet.pressure;
           }
         break; 
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
       case MeshData::SYMMETRY :
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
             v[kk0][j][i][0] =      v[kk0+1][j][i][0];
             v[kk0][j][i][1] =      v[kk0+1][j][i][1];
             v[kk0][j][i][2] =      v[kk0+1][j][i][2];
+            v[kk0][j][i][3] = -1.0*v[kk0+1][j][i][3]; 
+            v[kk0][j][i][4] =      v[kk0+1][j][i][4];
+          }
+        break;
+      case MeshData::STICKWALL :
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            v[kk0][j][i][0] =      v[kk0+1][j][i][0];
+            v[kk0][j][i][1] = -1.0*v[kk0+1][j][i][1];
+            v[kk0][j][i][2] = -1.0*v[kk0+1][j][i][2];
             v[kk0][j][i][3] = -1.0*v[kk0+1][j][i][3]; 
             v[kk0][j][i][4] =      v[kk0+1][j][i][4];
           }
@@ -1713,13 +1763,23 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
             v[kkmax-1][j][i][4] = iod.bc.outlet.pressure;
           }
         break; 
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
       case MeshData::SYMMETRY :
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
             v[kkmax-1][j][i][0] =      v[kkmax-2][j][i][0];
             v[kkmax-1][j][i][1] =      v[kkmax-2][j][i][1];
             v[kkmax-1][j][i][2] =      v[kkmax-2][j][i][2];
+            v[kkmax-1][j][i][3] = -1.0*v[kkmax-2][j][i][3]; 
+            v[kkmax-1][j][i][4] =      v[kkmax-2][j][i][4];
+          }
+        break;
+      case MeshData::STICKWALL :
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            v[kkmax-1][j][i][0] =      v[kkmax-2][j][i][0];
+            v[kkmax-1][j][i][1] = -1.0*v[kkmax-2][j][i][1];
+            v[kkmax-1][j][i][2] = -1.0*v[kkmax-2][j][i][2];
             v[kkmax-1][j][i][3] = -1.0*v[kkmax-2][j][i][3]; 
             v[kkmax-1][j][i][4] =      v[kkmax-2][j][i][4];
           }
@@ -1774,7 +1834,8 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
   if(ii0==-1) { 
-    if (iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET || iod.mesh.bc_x0 == MeshData::WALL) {
+    if (iod.mesh.bc_x0 == MeshData::INLET    || iod.mesh.bc_x0 == MeshData::OUTLET ||
+        iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
@@ -1824,7 +1885,8 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(iimax==NX+1) { 
-    if (iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET || iod.mesh.bc_xmax == MeshData::WALL) {
+    if (iod.mesh.bc_xmax == MeshData::INLET    || iod.mesh.bc_xmax == MeshData::OUTLET ||
+        iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
@@ -1876,7 +1938,8 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(jj0==-1) { 
-    if (iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET || iod.mesh.bc_y0 == MeshData::WALL) {
+    if (iod.mesh.bc_y0 == MeshData::INLET    || iod.mesh.bc_y0 == MeshData::OUTLET ||
+        iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
@@ -1926,7 +1989,8 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(jjmax==NY+1) { 
-    if (iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET || iod.mesh.bc_ymax == MeshData::WALL) {
+    if (iod.mesh.bc_ymax == MeshData::INLET    || iod.mesh.bc_ymax == MeshData::OUTLET ||
+        iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
@@ -1978,7 +2042,8 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(kk0==-1) { 
-    if (iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET || iod.mesh.bc_z0 == MeshData::WALL) {
+    if (iod.mesh.bc_z0 == MeshData::INLET    || iod.mesh.bc_z0 == MeshData::OUTLET ||
+        iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)
@@ -2029,7 +2094,8 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(kkmax==NZ+1) { 
-    if (iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET || iod.mesh.bc_zmax == MeshData::WALL) {
+    if (iod.mesh.bc_zmax == MeshData::INLET    || iod.mesh.bc_zmax == MeshData::OUTLET ||
+        iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
       for(auto it=disks.begin(); it!=disks.end(); it++)

@@ -4,15 +4,15 @@
 
 HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, 
                              IoData &iod_, SpaceVariable3D &coordinates_,
-                             SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+                             SpaceVariable3D &delta_xyz_, GlobalMeshInfo &global_mesh_,
                              std::vector<GhostPoint> &ghost_nodes_inner_,
                              std::vector<GhostPoint> &ghost_nodes_outer_)
-                       : comm(comm_), iod(iod_),
+                       : comm(comm_), iod(iod_), global_mesh(global_mesh_),
                          refmap(comm_, dm_all_, iod_, coordinates_, delta_xyz_,
-                                volume_, ghost_nodes_inner_, ghost_nodes_outer_)
+                                global_mesh_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
-  coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
-  coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+  coordinates_.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  coordinates_.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 }
 
 //------------------------------------------------------------

@@ -1,15 +1,24 @@
 #include<ReferenceMapOperator.h>
+#include<GradientCalculatorFD3.h>
+#include<GeoTools.h>
+#include<Vector5D.h>
 
 //-------------------------------------------------------------------
 
 ReferenceMapOperator::ReferenceMapOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                            SpaceVariable3D &coordinates_,
-                                           SpaceVariable3D &delta_xyz_, 
+                                           SpaceVariable3D &delta_xyz_, GlobalMeshInfo &global_mesh_,
                                            std::vector<GhostPoint> &ghost_nodes_inner_,
                                            std::vector<GhostPoint> &ghost_nodes_outer_)
-                    : comm(comm_), iod(iod_), coordinates(coordinates_),
-                      delta_xyz(delta_xyz_), ghost_nodes_inner(ghost_nodes_inner_),
-                      ghost_nodes_outer(ghost_nodes_outer_)
+                    : comm(comm_), iod(iod_), coordinates(coordinates_), global_mesh(global_mesh_),
+                      ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
+                      scalarG2(comm_, &(dm_all_.ghosted2_3dof)),    
+                      Xil(comm_, &(dm_all_.ghosted1_3dof)),
+                      Xir(comm_, &(dm_all_.ghosted1_3dof)),
+                      Xib(comm_, &(dm_all_.ghosted1_3dof)),
+                      Xit(comm_, &(dm_all_.ghosted1_3dof)),
+                      Xik(comm_, &(dm_all_.ghosted1_3dof)),
+                      Xif(comm_, &(dm_all_.ghosted1_3dof))
 {
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -17,10 +26,11 @@ ReferenceMapOperator::ReferenceMapOperator(MPI_Comm &comm_, DataManagers3D &dm_a
 
   //set up gradient calculator
   if(iod.refmap.fd == ReferenceMapData::UPWIND_CENTRAL_3) { //currently the only option
-    grad_minus = new GradientCalculatorFD3(comm, dm_all_, coordinates, delta_xyz, -1);
-    grad_plus  = new GradientCalculatorFD3(comm, dm_all_, coordinates, delta_xyz,  1);
+    grad_minus = new GradientCalculatorFD3(comm, dm_all_, coordinates, delta_xyz_, -1);
+    grad_plus  = new GradientCalculatorFD3(comm, dm_all_, coordinates, delta_xyz_,  1);
   }
 
+  TagExternalGhostNodes();
 }
 
 //-------------------------------------------------------------------
@@ -32,22 +42,250 @@ ReferenceMapOperator::~ReferenceMapOperator()
 }
 
 //-------------------------------------------------------------------
+
+void
+ReferenceMapOperator::Destroy()
+{
+  scalarG2.Destroy();
+  Xil.Destroy();
+  Xir.Destroy();
+  Xib.Destroy();
+  Xit.Destroy();
+  Xik.Destroy();
+  Xif.Destroy();
+}
+
+//-------------------------------------------------------------------
+
+void
+ReferenceMapOperator::TagExternalGhostNodes()
+{
+  //tag ghost nodes outside open boundaries, which require special treatment when imposing b.c.
+  ghost_nodes_outer_tag.assign(ghost_nodes_outer.size(), -1);
+
+  map<int, DiskData* >& disks(iod.bc.multiBoundaryConditions.diskMap.dataMap);
+  map<int, RectangleData* >& rectangles(iod.bc.multiBoundaryConditions.rectangleMap.dataMap);
+
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    if(it->bcType == MeshData::SYMMETRY) {
+      ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 0;
+    }
+    else if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+      ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;      
+    }
+    else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::STICKWALL) {
+      
+      ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = (it->bcType == MeshData::SLIPWALL) ?
+                                                                 0 : 1; 
+      // Note that we allow user to make "windows" on a wall
+
+      // Loop through user-specified disks (if any) and make correction if necessary
+      for(auto&& disk : disks) {
+        if((it->side == GhostPoint::LEFT  && disk.second->cen_x == iod.mesh.x0) ||
+           (it->side == GhostPoint::RIGHT && disk.second->cen_x == iod.mesh.xmax)) {
+          Vec3D n(disk.second->normal_x, disk.second->normal_y, disk.second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8) {
+            if(GeoTools::IsPointInDisk(global_mesh.GetY(it->ijk), global_mesh.GetZ(it->ijk),
+                                       disk.second->cen_y, disk.second->cen_z, disk.second->radius)) {
+              ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;
+              break;
+            }
+          }
+        }
+        if((it->side == GhostPoint::BOTTOM && disk.second->cen_y == iod.mesh.y0) ||
+           (it->side == GhostPoint::TOP    && disk.second->cen_y == iod.mesh.ymax)) {
+          Vec3D n(disk.second->normal_x, disk.second->normal_y, disk.second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8) {
+            if(GeoTools::IsPointInDisk(global_mesh.GetZ(it->ijk), global_mesh.GetX(it->ijk),
+                                       disk.second->cen_z, disk.second->cen_x, disk.second->radius)) {
+              ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;
+              break;
+            }
+          }
+        }
+        if((it->side == GhostPoint::BACK  && disk.second->cen_z == iod.mesh.z0) ||
+           (it->side == GhostPoint::FRONT && disk.second->cen_z == iod.mesh.zmax)) {
+          Vec3D n(disk.second->normal_x, disk.second->normal_y, disk.second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8) {
+            if(GeoTools::IsPointInDisk(global_mesh.GetX(it->ijk), global_mesh.GetY(it->ijk),
+                                       disk.second->cen_x, disk.second->cen_y, disk.second->radius)) {
+              ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;
+              break;
+            }
+          }
+        }
+      } 
+
+      if(ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] == 2) //already corrected
+        continue;
+
+      // Loop through user-specified rectangles (if any)
+      for(auto&& rect : rectangles) {
+        if((it->side == GhostPoint::LEFT  && rect.second->cen_x == iod.mesh.x0) ||
+           (it->side == GhostPoint::RIGHT && rect.second->cen_x == iod.mesh.xmax)) {
+          Vec3D n(rect.second->normal_x, rect.second->normal_y, rect.second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8) {
+            if(GeoTools::IsPointInRectangle(global_mesh.GetY(it->ijk), global_mesh.GetZ(it->ijk),
+                                            rect.second->cen_y, rect.second->cen_z, 
+                                            rect.second->a, rect.second->b)) {
+              ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;
+              break;
+            }
+          }
+        }
+        if((it->side == GhostPoint::BOTTOM && rect.second->cen_y == iod.mesh.y0) ||
+           (it->side == GhostPoint::TOP    && rect.second->cen_y == iod.mesh.ymax)) {
+          Vec3D n(rect.second->normal_x, rect.second->normal_y, rect.second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8) {
+            if(GeoTools::IsPointInRectangle(global_mesh.GetZ(it->ijk), global_mesh.GetX(it->ijk),
+                                            rect.second->cen_z, rect.second->cen_x, 
+                                            rect.second->a, rect.second->b)) {
+              ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;
+              break;
+            }
+          }
+        }
+        if((it->side == GhostPoint::BACK  && rect.second->cen_z == iod.mesh.z0) ||
+           (it->side == GhostPoint::FRONT && rect.second->cen_z == iod.mesh.zmax)) {
+          Vec3D n(rect.second->normal_x, rect.second->normal_y, rect.second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8) {
+            if(GeoTools::IsPointInRectangle(global_mesh.GetX(it->ijk), global_mesh.GetY(it->ijk),
+                                            rect.second->cen_x, rect.second->cen_y, 
+                                            rect.second->a, rect.second->b)) {
+              ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;
+              break;
+            }
+          }
+        }
+      }
+
+    }
+    else {
+      fprintf(stderr,"\033[0;31m*** Error: Detected unknown boundary type (%d).\033[0m\n",(int)it->bcType);
+      exit(-1);
+    }
+
+  }
+}
+
+
+//-------------------------------------------------------------------
 // Initialize Xi to coords
 void
 ReferenceMapOperator::SetInitialCondition(SpaceVariable3D &Xi)
 {
-  Xi.AXPlusBY(0.0, 1.0, coordinates, true);
+  Xi.AXPlusBY(0.0, 1.0, coordinates, true); //also populating ghost nodes
 }
 
 //-------------------------------------------------------------------
 
 // Apply boundary conditions by populating ghost cells of Xi
 void
-ReferenceMapOperator::ApplyBoundaryConditions(SpaceVariable3D &Xi, double time)
+ReferenceMapOperator::ApplyBoundaryConditions(SpaceVariable3D &Xi)
 {
 
-  Vec3D*** xi = (Vec3D***)Xi.GetDataPointer();
+  int NX, NY, NZ;
+  coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
+  Vec3D*** xi = (Vec3D***)Xi.GetDataPointer();
+  
+  int i,j,k;
+  double r, r1, r2;
+  Vec3D xi1, xi2;
+
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    i = it->ijk[0];
+    j = it->ijk[1];
+    k = it->ijk[2];
+
+    Vec3D& xi_im(xi[it->image_ijk[2]][it->image_ijk[1]][it->image_ijk[0]]);
+    Vec3D& normal(it->outward_normal);
+    Vec3D& p(it->boundary_projection);
+
+    switch(ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())]) {
+
+      case 0: //slip wall or symmetry
+        xi[k][j][i] = 2.0*(p*normal - xi_im*normal)*normal + xi_im;
+        break;
+
+      case 1: //no-slip wall
+        xi[k][j][i] = 2.0*p - xi_im;
+        break;
+
+      case 2: //"open"-->linear extrapolation
+        if(it->side == GhostPoint::LEFT) {
+          if(i+2<NX) {
+            r  = global_mesh.GetX(i);
+            r1 = global_mesh.GetX(i+1);  xi1 = xi[k][j][i+1];
+            r2 = global_mesh.GetX(i+2);  xi2 = xi[k][j][i+2];
+            xi[k][j][i] = xi1 + (xi2-xi1)/(r2-r1)*(r-r1);
+          } else
+            xi[k][j][i] = xi_im;
+        }
+        else if(it->side == GhostPoint::RIGHT) {
+          if(i-2>=0) {
+            r  = global_mesh.GetX(i);
+            r1 = global_mesh.GetX(i-1);  xi1 = xi[k][j][i-1];
+            r2 = global_mesh.GetX(i-2);  xi2 = xi[k][j][i-2];
+            xi[k][j][i] = xi1 + (xi2-xi1)/(r2-r1)*(r-r1);
+          } else
+            xi[k][j][i] = xi_im;
+        }
+        else if(it->side == GhostPoint::BOTTOM) {
+          if(j+2<NY) {
+            r  = global_mesh.GetY(j);
+            r1 = global_mesh.GetY(j+1);  xi1 = xi[k][j+1][i];
+            r2 = global_mesh.GetY(j+2);  xi2 = xi[k][j+2][i];
+            xi[k][j][i] = xi1 + (xi2-xi1)/(r2-r1)*(r-r1);
+          } else
+            xi[k][j][i] = xi_im;
+        }
+        else if(it->side == GhostPoint::TOP) {
+          if(j-2>=0) {
+            r  = global_mesh.GetY(j);
+            r1 = global_mesh.GetY(j-1);  xi1 = xi[k][j-1][i];
+            r2 = global_mesh.GetY(j-2);  xi2 = xi[k][j-2][i];
+            xi[k][j][i] = xi1 + (xi2-xi1)/(r2-r1)*(r-r1);
+          } else
+            xi[k][j][i] = xi_im;
+        }
+        else if(it->side == GhostPoint::BACK) {
+          if(k+2<NZ) {
+            r  = global_mesh.GetZ(k);
+            r1 = global_mesh.GetZ(k+1);  xi1 = xi[k+1][j][i];
+            r2 = global_mesh.GetZ(k+2);  xi2 = xi[k+2][j][i];
+            xi[k][j][i] = xi1 + (xi2-xi1)/(r2-r1)*(r-r1);
+          } else
+            xi[k][j][i] = xi_im;
+        }
+        else if(it->side == GhostPoint::FRONT) {
+          if(k-2>=0) {
+            r  = global_mesh.GetZ(k);
+            r1 = global_mesh.GetZ(k-1);  xi1 = xi[k-1][j][i];
+            r2 = global_mesh.GetZ(k-2);  xi2 = xi[k-2][j][i];
+            xi[k][j][i] = xi1 + (xi2-xi1)/(r2-r1)*(r-r1);
+          } else
+            xi[k][j][i] = xi_im;
+        }
+        break;
+      
+      default:
+        fprintf(stderr,"\033[0;31m*** Error: Unable to impose boundary conditions "
+                       "for reference map.\033[0m\n");
+        exit(-1);
+    }
+
+  }
+
+  Xi.RestoreDataPointerAndInsert();
 }
 
 //-------------------------------------------------------------------
@@ -64,7 +302,7 @@ ReferenceMapOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, S
   //***************************************************************
   vector<int> ind0{0,1,2};
 
-  Vec3D*** s = scalarG2.GetDataPointer();
+  Vec3D*** s = (Vec3D***)scalarG2.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
@@ -85,15 +323,15 @@ ReferenceMapOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, S
   int NX, NY, NZ;
   coordinates.GetGlobalSize(&NX, &NY, &NZ);
 
-  Vec3D*** xil = Xil.GetDataPointer(); //d(Xi)/dx, left-biased
-  Vec3D*** xir = Xir.GetDataPointer(); //d(Xi)/dx, right-biased
-  Vec3D*** xib = Xib.GetDataPointer();
-  Vec3D*** xit = Xit.GetDataPointer();
-  Vec3D*** xik = Xik.GetDataPointer();
-  Vec3D*** xif = Xif.GetDataPointer();
+  Vec3D*** xil = (Vec3D***)Xil.GetDataPointer(); //d(Xi)/dx, left-biased
+  Vec3D*** xir = (Vec3D***)Xir.GetDataPointer(); //d(Xi)/dx, right-biased
+  Vec3D*** xib = (Vec3D***)Xib.GetDataPointer();
+  Vec3D*** xit = (Vec3D***)Xit.GetDataPointer();
+  Vec3D*** xik = (Vec3D***)Xik.GetDataPointer();
+  Vec3D*** xif = (Vec3D***)Xif.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
-  double a, b, c, d, e, f;
+  Vec3D a, b, c, d, e, f;
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {

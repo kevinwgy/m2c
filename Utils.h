@@ -75,6 +75,13 @@ inline void copyarray_flip(double* in, double* out, int dim, int flipdim)
     out[i] = (i == flipdim) ? -in[i] : in[i];
 }
 //--------------------------------------------------
+//! Copy a double array of known dimension, flip the sign of multiple consecutive elements 
+inline void copyarray_flip(double* in, double* out, int dim, int flipdim0, int flipsize)
+{
+  for(int i=0; i<dim; i++) 
+    out[i] = (i>=flipdim0 && i<flipdim0+flipsize) ? -in[i] : in[i];
+}
+//--------------------------------------------------
 //! Give a constant value to an array of known dimension
 inline void setValue(double* out, double in, int dim)
 {

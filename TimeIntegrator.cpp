@@ -152,7 +152,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     assert(heo);
     heo->ComputeReferenceMapResidual(V, *Xi, *Rn_xi);
     Xi->AXPlusBY(1.0, dt, *Rn_xi); 
-    heo->ApplyBoundaryConditionsToReferenceMap(*Xi, t); //pass t(n+1)
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi);
   }
 
 
@@ -290,7 +290,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
     Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
-    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1, t); //pass t(n+1)
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1);
   }
   //***************************************************
 
@@ -334,7 +334,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
     Xi->AXPlusBY(0.5, 0.5, *Xi1); 
     Xi->AXPlusBY(1.0, 0.5*dt, *Rxi); 
-    heo->ApplyBoundaryConditionsToReferenceMap(*Xi, t); //pass t(n+1)
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi); //pass t(n+1)
   }
   //***************************************************
 
@@ -476,7 +476,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
     Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
-    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1, t); //pass t(n+1)
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1);
   }
   //***************************************************
 
@@ -526,7 +526,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
     Xi1->AXPlusBY(0.25, 0.75, *Xi);  //re-use Xi1 to store Xi2
     Xi1->AXPlusBY(1.0, 0.25*dt, *Rxi); 
-    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1, t); //t(n+1)
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi1); //t(n+1)
   }
   //***************************************************
 
@@ -570,7 +570,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     heo->ComputeReferenceMapResidual(V2, *Xi1, *Rxi);
     Xi->AXPlusBY(1.0/3.0, 2.0/3.0, *Xi1); 
     Xi->AXPlusBY(1.0, 2.0/3.0*dt, *Rxi); 
-    heo->ApplyBoundaryConditionsToReferenceMap(*Xi, t); //t(n+1)
+    heo->ApplyBoundaryConditionsToReferenceMap(*Xi); //t(n+1)
   }
   //***************************************************
 

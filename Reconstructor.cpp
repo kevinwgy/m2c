@@ -770,7 +770,7 @@ RETRY:
         break;
 
       case MeshData::SYMMETRY :
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
         //constant or linear reconstruction, matching the image
 
         if     (i<0)   copyarray_flip(&vl[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF, 1);
@@ -779,6 +779,16 @@ RETRY:
         else if(j>=NY) copyarray_flip(&vt[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF, 2);
         else if(k<0)   copyarray_flip(&vk[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF, 3);
         else if(k>=NZ) copyarray_flip(&vf[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF, 3);
+
+        break;
+
+      case MeshData::STICKWALL :
+        if     (i<0)   copyarray_flip(&vl[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF, 1, 3);
+        else if(i>=NX) copyarray_flip(&vr[kk][jj][ii*nDOF], &vl[k][j][i*nDOF], nDOF, 1, 3);
+        else if(j<0)   copyarray_flip(&vb[kk][jj][ii*nDOF], &vt[k][j][i*nDOF], nDOF, 1, 3);
+        else if(j>=NY) copyarray_flip(&vt[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF, 1, 3);
+        else if(k<0)   copyarray_flip(&vk[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF, 1, 3);
+        else if(k>=NZ) copyarray_flip(&vf[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF, 1, 3);
 
         break;
 
@@ -984,7 +994,8 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
         break;
 
       case MeshData::SYMMETRY :
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
+      case MeshData::STICKWALL : //TODO: Correct??
         //constant or linear reconstruction, matching the image
 
         //relying on nDOF = 1!!

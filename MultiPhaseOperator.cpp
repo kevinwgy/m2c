@@ -1494,19 +1494,25 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 
 
             // if node is next to a symmetry or wall boundary, update the ID of the ghost node (V will be updated by spo)
-            if(i==0 && (iod.mesh.bc_x0==MeshData::WALL || iod.mesh.bc_x0==MeshData::SYMMETRY))  
+            if(i==0 && (iod.mesh.bc_x0==MeshData::SLIPWALL || iod.mesh.bc_x0==MeshData::STICKWALL ||
+                        iod.mesh.bc_x0==MeshData::SYMMETRY))  
               id[k][j][i-1] = id[k][j][i];
-            if(i==NX-1 && (iod.mesh.bc_xmax==MeshData::WALL || iod.mesh.bc_xmax==MeshData::SYMMETRY))
+            if(i==NX-1 && (iod.mesh.bc_xmax==MeshData::SLIPWALL || iod.mesh.bc_xmax==MeshData::STICKWALL || 
+                           iod.mesh.bc_xmax==MeshData::SYMMETRY))
               id[k][j][i+1] = id[k][j][i];
          
-            if(j==0 && (iod.mesh.bc_y0==MeshData::WALL || iod.mesh.bc_y0==MeshData::SYMMETRY))  
+            if(j==0 && (iod.mesh.bc_y0==MeshData::SLIPWALL || iod.mesh.bc_y0==MeshData::STICKWALL || 
+                        iod.mesh.bc_y0==MeshData::SYMMETRY))  
               id[k][j-1][i] = id[k][j][i];
-            if(j==NY-1 && (iod.mesh.bc_ymax==MeshData::WALL || iod.mesh.bc_ymax==MeshData::SYMMETRY))
+            if(j==NY-1 && (iod.mesh.bc_ymax==MeshData::SLIPWALL || iod.mesh.bc_ymax==MeshData::STICKWALL || 
+                           iod.mesh.bc_ymax==MeshData::SYMMETRY))
               id[k][j+1][i] = id[k][j][i];
          
-            if(k==0 && (iod.mesh.bc_z0==MeshData::WALL || iod.mesh.bc_z0==MeshData::SYMMETRY))  
+            if(k==0 && (iod.mesh.bc_z0==MeshData::SLIPWALL || iod.mesh.bc_z0==MeshData::STICKWALL || 
+                        iod.mesh.bc_z0==MeshData::SYMMETRY))  
               id[k-1][j][i] = id[k][j][i];
-            if(k==NZ-1 && (iod.mesh.bc_zmax==MeshData::WALL || iod.mesh.bc_zmax==MeshData::SYMMETRY))
+            if(k==NZ-1 && (iod.mesh.bc_zmax==MeshData::SLIPWALL || iod.mesh.bc_zmax==MeshData::STICKWALL ||
+                           iod.mesh.bc_zmax==MeshData::SYMMETRY))
               id[k+1][j][i] = id[k][j][i];
          
 

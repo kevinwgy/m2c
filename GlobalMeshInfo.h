@@ -50,6 +50,15 @@ public:
   double GetDy(int j);
   double GetDz(int k);
 
+  double GetX(Int3 ijk);
+  double GetY(Int3 ijk);
+  double GetZ(Int3 ijk);
+  double GetDx(Int3 ijk);
+  double GetDy(Int3 ijk);
+  double GetDz(Int3 ijk);
+
+  Vec3D GetXYZ(Int3 ijk);
+
   //! Determine is a point is inside the domain (formed by control volumes / cells)
   bool IsPointInDomain(Vec3D &p, bool include_ghost_layer = false);
 

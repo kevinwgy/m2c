@@ -16,13 +16,16 @@ class HyperelasticityOperator
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
+  //! global mesh
+  GlobalMeshInfo& global_mesh;
+
   //! Solver of the reference map
   ReferenceMapOperator refmap;
 
 public:
 
   HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, SpaceVariable3D &coordinates_,
-                          SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+                          SpaceVariable3D &delta_xyz_, GlobalMeshInfo &global_mesh_,
                           std::vector<GhostPoint> &ghost_nodes_inner_,
                           std::vector<GhostPoint> &ghost_nodes_outer_);
   ~HyperelasticityOperator();
@@ -31,7 +34,7 @@ public:
 
   void InitializeReferenceMap(SpaceVariable3D &Xi);
 
-  void ApplyBoundaryConditionsToReferenceMap(SpaceVariable3D &Xi, double time);
+  void ApplyBoundaryConditionsToReferenceMap(SpaceVariable3D &Xi);
 
   void ComputeReferenceMapResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, SpaceVariable3D &R);
 

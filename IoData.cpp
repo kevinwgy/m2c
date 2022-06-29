@@ -354,47 +354,65 @@ void MeshData::setup(const char *name, ClassAssigner *father)
 
   // Inside the code: Farfield0 = Farfield = Inlet, Farfield1 = Outlet
   new ClassToken<MeshData>(ca, "BoundaryConditionX0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionXmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionY0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionYmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionZ0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionZmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
  } 
 
 //------------------------------------------------------------------------------
@@ -2225,6 +2243,7 @@ OutputData::OutputData()
   internal_energy = OFF;
   delta_internal_energy = OFF;
   laser_radiance = OFF;
+  reference_map = OFF;
   levelset0 = OFF;
   levelset1 = OFF;
   levelset2 = OFF;
@@ -2258,7 +2277,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 24+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 25+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2292,6 +2311,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                                "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LaserRadiance", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "ReferenceMap", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::reference_map), 2,
                                "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "LevelSet0", this,

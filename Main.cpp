@@ -274,13 +274,13 @@ int main(int argc, char* argv[])
   SpaceVariable3D* Xi = NULL; //reference map
   bool activate_heo = false;
   for(auto&& material : iod.eqs.materials.dataMap)
-    if(material.second.hyperelasticity.type != HyperelasticityModelData::NONE) {
+    if(material.second->hyperelasticity.type != HyperelasticityModelData::NONE) {
       activate_heo = true;
       break;
     }
   if(activate_heo) {
     heo = new HyperelasticityOperator(comm, dms, iod, spo.GetMeshCoordinates(),
-                                      spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
+                                      spo.GetMeshDeltaXYZ(), global_mesh,
                                       *(spo.GetPointerToInnerGhostNodes()),
                                       *(spo.GetPointerToOuterGhostNodes()));
     Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
