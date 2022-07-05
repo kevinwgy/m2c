@@ -152,7 +152,7 @@ void TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
 
 
-  bool run_heat = time_step< 50000000;
+  bool run_heat = time_step< 1;
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)

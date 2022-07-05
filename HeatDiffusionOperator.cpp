@@ -89,6 +89,9 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
 
+        //if(v[k][j][i][0] - 0.0 < 1e-13)
+        //   std::cout << "before rho = " << v[k][j][i][0] << "p = " << v[k][j][i][4] << std::endl;
+
         myid = id[k][j][i]; 
         e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
         Te[k][j][i] = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
@@ -116,40 +119,52 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
   double myk = 0.0;
   double neighk = 0.0;
   double denom = 0.0;
-  double myp, myrho, neighp, neighrho;
+  double myp, myrho;
   double rhomin, rhomax, pmin, pmax;
+  double plimit;
+  int limit_factor = 1000;
   for(int k=k0; k<kkmax; k++)
     for(int j=j0; j<jjmax; j++)
       for(int i=i0; i<iimax; i++) {
 
-        myid = id[k][j][i];
+        myid = (int)id[k][j][i];
         dx   = dxyz[k][j][i][0];
         dy   = dxyz[k][j][i][1];
         dz   = dxyz[k][j][i][2];
 
         myk = heatdiffFcn[myid]->conduct;
+
         myp = v[k][j][i][4];
         myrho = v[k][j][i][0];
+      /*
+      if(myid == 1){
         rhomin = varFcn[myid]->rhomin;
         rhomax = varFcn[myid]->rhomax;
         pmin = varFcn[myid]->pmin;
         pmax = varFcn[myid]->pmax;
-        if(pmin < myp && myp < pmin + 10*fabs(pmin)){
+        if(pmin <0)
+           plimit = pmin/limit_factor;
+        else
+           plimit = pmin*limit_factor;
+
+        if(myp < plimit){
           myk = 0.0;
-          fprintf(stderr,"Warning: The pressure at node (%d %d %d) is %e which is too low, so the diffusivity is set to zero\n", k, j, i, myp);
+         // fprintf(stderr,"Warning: The pressure at node (%d %d %d) is %e which is too low, so the diffusivity is set to %e\n", k, j, i, myp, myk);
         }
-        if(rhomin < myrho && myrho < rhomin + 10*fabs(rhomin)){
+        if(myrho < limit_factor*rhomin){
           myk = 0.0;
-          fprintf(stderr,"Warning: The density at node (%d %d %d) is %e which is too low, so the diffusivity is set to zero\n", k, j, i, myrho);
+         // fprintf(stderr,"Warning: The density at node (%d %d %d) is %e which is too low, so the diffusivity is set to %e\n", k, j, i, myrho, myk);
         }
-        if(pmax/10 < myp && myp < pmax){
+       if(myp > pmax/limit_factor){
           myk = 0.0;
-          fprintf(stderr,"Warning: The pressure at node (%d %d %d) is %e which is too high, so the diffusivity is set to zero\n", k, j, i, myp);
+         // fprintf(stderr,"Warning: The pressure at node (%d %d %d) is %e which is too high, so the diffusivity is set to zero\n", k, j, i, myp);
         }
-        if(rhomax/10 < myrho && myrho < rhomax){
+        if(myrho > rhomax/limit_factor){
           myk = 0.0;
-          fprintf(stderr,"Warning: The density at node (%d %d %d) is %e which is too high, so the diffusivity is set to zero\n", k, j, i, myrho);
+         // fprintf(stderr,"Warning: The density at node (%d %d %d) is %e which is too high, so the diffusivity is set to zero\n", k, j, i, myrho);
         }
+      }
+      */
 
         //*****************************************
         // calculate flux function F_{i-1/2,j,k}
