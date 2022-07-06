@@ -26,12 +26,13 @@ StateVariable::StateVariable()
 {
 
   materialid  = 0;
-  density     = -1.0;
+  density     = 1.0e-6;
   velocity_x  = 0.0;
   velocity_y  = 0.0;
   velocity_z  = 0.0;
-  pressure    = -1.0;
-  temperature = -1.0;
+  pressure    = 0.0;
+  temperature = 0.0;
+  internal_energy_per_mass = 0.0;
 
 }
 
@@ -40,7 +41,7 @@ StateVariable::StateVariable()
 void StateVariable::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 8, father);
 
   new ClassInt<StateVariable>(ca, "MaterialID", this, &StateVariable::materialid);
   new ClassDouble<StateVariable>(ca, "Density", this, &StateVariable::density);
@@ -49,6 +50,7 @@ void StateVariable::setup(const char *name, ClassAssigner *father)
   new ClassDouble<StateVariable>(ca, "VelocityZ", this, &StateVariable::velocity_z);
   new ClassDouble<StateVariable>(ca, "Pressure", this, &StateVariable::pressure);
   new ClassDouble<StateVariable>(ca, "Temperature", this, &StateVariable::temperature);
+  new ClassDouble<StateVariable>(ca, "InternalEnergyPerUnitMass", this, &StateVariable::internal_energy_per_mass);
 
 }
 
@@ -352,47 +354,65 @@ void MeshData::setup(const char *name, ClassAssigner *father)
 
   // Inside the code: Farfield0 = Farfield = Inlet, Farfield1 = Outlet
   new ClassToken<MeshData>(ca, "BoundaryConditionX0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionXmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionY0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionYmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionZ0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
   new ClassToken<MeshData>(ca, "BoundaryConditionZmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 8,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 11,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
                                "Farfield", 1,//option 3
-                               "Wall", 3, "Symmetry", 4);
+                               "Wall", 3, //slip wall
+                               "SlipWall", 3, //slip wall,
+                               "StickWall", 4, //no-slip wall
+                               "NoSlipWall", 4, "Symmetry", 5);
  } 
 
 //------------------------------------------------------------------------------
@@ -441,6 +461,8 @@ StiffenedGasModelData::StiffenedGasModelData()
   cp = 0.0;
   h0 = 0.0;
 
+  rho0 = 0.0;
+
 }
 
 //------------------------------------------------------------------------------
@@ -448,7 +470,7 @@ StiffenedGasModelData::StiffenedGasModelData()
 void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
   new ClassDouble<StiffenedGasModelData>(ca, "SpecificHeatRatio", this,
                                 &StiffenedGasModelData::specificHeatRatio);
@@ -468,6 +490,10 @@ void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
                                 &StiffenedGasModelData::cp);
   new ClassDouble<StiffenedGasModelData>(ca, "ReferenceSpecificEnthalpy", this,
                                 &StiffenedGasModelData::h0);
+
+  new ClassDouble<StiffenedGasModelData>(ca, "ReferenceDensity", this,
+                                &StiffenedGasModelData::rho0);
+
 }
 
 //------------------------------------------------------------------------------
@@ -560,6 +586,25 @@ void JonesWilkinsLeeModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+HyperelasticityModelData::HyperelasticityModelData()
+{
+  type = NONE;
+}
+
+//------------------------------------------------------------------------------
+
+void HyperelasticityModelData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassToken<HyperelasticityModelData>(ca, "Type", this,
+           reinterpret_cast<int HyperelasticityModelData::*>(&HyperelasticityModelData::type), 2,
+           "None",     HyperelasticityModelData::NONE,
+           "Constant", HyperelasticityModelData::CONSTANT);
+}
+
+//------------------------------------------------------------------------------
+
 MaterialModelData::MaterialModelData()
 {
 
@@ -578,7 +623,7 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
                                  reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
@@ -600,7 +645,10 @@ Assigner *MaterialModelData::getAssigner()
   
   heat_diffusion.setup("HeatDiffusionModel", ca);
   
+  hyperelasticity.setup("HyperelasticityModel", ca);
+  
   return ca;
+
 };
 
 //------------------------------------------------------------------------------
@@ -731,12 +779,13 @@ EquationsData::EquationsData()
 
 void EquationsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 3, father); 
 
   materials.setup("Material", ca);
 
   transitions.setup("MaterialTransition", ca);
 
+  dummy_state.setup("DummyState", ca);
 }
 
 //------------------------------------------------------------------------------
@@ -1044,7 +1093,7 @@ ExactRiemannSolverData::ExactRiemannSolverData()
   numSteps_rarefaction = 200;
   tol_main = 1.0e-4; //applied to both pressure and velocity
   tol_shock = 1.0e-12; //a density tolerance (non-D)
-  tol_rarefaction = 1.0e-12; //a pressure tolerance (non-D); (for one-sided riemann, it is applied to velocity)
+  tol_rarefaction = 1.0e-8; //a density and velocity tolerance (non-D); 
   min_pressure = -1.0e8;
   failure_threshold = 0.2;
   pressure_at_failure = 1.0e-8;
@@ -1095,7 +1144,9 @@ MultiPhaseData::MultiPhaseData()
 {
   flux = NUMERICAL;
   recon = CONSTANT;
+
   phasechange_type = RIEMANN_SOLUTION;
+  phasechange_dir  = UPWIND;
 
   riemann_normal = MESH;
 
@@ -1113,7 +1164,7 @@ MultiPhaseData::MultiPhaseData()
 void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 8, father);
+  ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
@@ -1129,6 +1180,11 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
     (ca, "PhaseChange", this,
      reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_type), 2,
      "RiemannSolution", 0, "Extrapolation", 1);
+
+  new ClassToken<MultiPhaseData>
+    (ca, "PhaseChangeDirection", this,
+     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_dir), 2,
+     "All", 0, "Upwind", 1);
 
   new ClassToken<MultiPhaseData>
     (ca, "RiemannNormal", this,
@@ -1344,6 +1400,8 @@ IcData::IcData()
 {
   user_specified_ic = "";
 
+  apply_user_file_before_geometries = NO;
+
   rbf = MULTIQUADRIC;
 
   type = NONE;
@@ -1356,9 +1414,13 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
+
+  new ClassToken<IcData> (ca, "ApplyUserDataBeforeGeometricEntities", this,
+        reinterpret_cast<int IcData::*>(&IcData::apply_user_file_before_geometries), 2, 
+        "No", 0, "Yes", 1);
 
   new ClassToken<IcData> (ca, "InterpolationFunction", this,
         reinterpret_cast<int IcData::*>(&IcData::rbf), 4, "Multiquadric", 0, 
@@ -2063,6 +2125,7 @@ Assigner* AtomicIonizationModel::getAssigner()
 MaterialIonizationModel::MaterialIonizationModel()
 {
   type = NONE;
+  depression = GRIEM; //relevant only to non-ideal Saha
   maxIts = 200;
   convergence_tol = 1.0e-5;
 
@@ -2079,11 +2142,15 @@ MaterialIonizationModel::MaterialIonizationModel()
 
 Assigner* MaterialIonizationModel::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 10, nullAssigner);
 
   new ClassToken<MaterialIonizationModel> (ca, "Type", this,
         reinterpret_cast<int MaterialIonizationModel::*>(&MaterialIonizationModel::type), 
         3, "None", 0, "IdealSahaEquation", 1, "NonIdealSahaEquation", 2);
+
+  new ClassToken<MaterialIonizationModel> (ca, "DepressionModel", this,
+        reinterpret_cast<int MaterialIonizationModel::*>(&MaterialIonizationModel::depression), 
+        3, "None", 0, "Griem", 1, "Ebeling", 2);
 
   new ClassToken<MaterialIonizationModel> (ca, "PartitionFunctionEvaluation", this,
         reinterpret_cast<int MaterialIonizationModel::*>(&MaterialIonizationModel::partition_evaluation), 
@@ -2114,10 +2181,11 @@ Assigner* MaterialIonizationModel::getAssigner()
 
 IonizationData::IonizationData()
 {
-  planck_constant = 6.62607004e-25;  //unit: (mm^2).g/s  (dim: [energy]/[freq])
-  electron_charge = 1.60217662e-19;  //unit: A.s (Coulombs)
-  electron_mass = 9.10938356e-28; //unit: g
+  planck_constant = 6.62607015e-25;  //unit: (mm^2).g/s  (dim: [energy]/[freq])
+  electron_charge = 1.602176634e-19;  //unit: A.s (Coulombs)
+  electron_mass = 9.1093837015e-28; //unit: g
   boltzmann_constant = 1.38064852e-14; //unit: (mm^2).g/(s^2*K)  (dim: [energy]/[temperature])
+  vacuum_permittivity = 8.8541878128e-9; //unit: g/(s^2)  (dim: [force]/[length])
 }
 
 //------------------------------------------------------------------------------
@@ -2125,12 +2193,13 @@ IonizationData::IonizationData()
 void IonizationData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassDouble<IonizationData>(ca, "PlanckConstant", this, &IonizationData::planck_constant);
   new ClassDouble<IonizationData>(ca, "ElectronCharge", this, &IonizationData::electron_charge);
   new ClassDouble<IonizationData>(ca, "ElectronMass", this, &IonizationData::electron_mass);
   new ClassDouble<IonizationData>(ca, "BoltzmannConstant", this, &IonizationData::boltzmann_constant);
+  new ClassDouble<IonizationData>(ca, "VacuumPermittivity", this, &IonizationData::vacuum_permittivity);
 
   materialMap.setup("Material", ca);
 
@@ -2175,7 +2244,9 @@ OutputData::OutputData()
   temperature = OFF;
   delta_temperature = OFF;
   internal_energy = OFF;
+  delta_internal_energy = OFF;
   laser_radiance = OFF;
+  reference_map = OFF;
   levelset0 = OFF;
   levelset1 = OFF;
   levelset2 = OFF;
@@ -2200,6 +2271,8 @@ OutputData::OutputData()
 
   mesh_filename = "";
 
+  mesh_partition = "";
+
   verbose = LOW;
 }
 
@@ -2207,7 +2280,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 21+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 25+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2236,8 +2309,14 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   new ClassToken<OutputData>(ca, "InternalEnergyPerUnitMass", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::internal_energy), 2,
                                "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "DeltaInternalEnergyPerUnitMass", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::delta_internal_energy), 2,
+                               "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LaserRadiance", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,
+                               "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "ReferenceMap", this,
+                               reinterpret_cast<int OutputData::*>(&OutputData::reference_map), 2,
                                "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "LevelSet0", this,
@@ -2286,6 +2365,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   new ClassStr<OutputData>(ca, "MeshInformation", this, &OutputData::mesh_filename);
 
+  new ClassStr<OutputData>(ca, "MeshPartition", this, &OutputData::mesh_partition);
+
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
                                reinterpret_cast<int OutputData::*>(&OutputData::verbose), 3,
                                "Low", 0, "Medium", 1, "High", 2);
@@ -2295,6 +2376,7 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   linePlots.setup("LinePlot", ca);
 
   materialVolumes.setup("MaterialVolumes", ca);
+
 }
 
 //------------------------------------------------------------------------------
@@ -2410,30 +2492,26 @@ Assigner* LinePlot::getAssigner()
 
 //------------------------------------------------------------------------------
 
-SurfaceTrackerData::SurfaceTrackerData()
-{
-  surface_thickness = 1.0e-8;
-}
-
-//------------------------------------------------------------------------------
-
-void SurfaceTrackerData::setup(const char *name, ClassAssigner *father)
-{
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
-
-  new ClassDouble<SurfaceTrackerData>(ca, "SurfaceThickness", this, 
-                                      &SurfaceTrackerData::surface_thickness);
-}
-
-//------------------------------------------------------------------------------
-
 EmbeddedSurfaceData::EmbeddedSurfaceData()
 {
-  surface_provided_by_other_solver = NO;
+  provided_by_another_solver = NO;
+
+  surface_thickness = 1.0e-8;
+
+  // force calculation
+  gauss_points_lofting = 0.0;
+  internal_pressure = 0.0;
+  quadrature = ONE_POINT;
+
   filename = "";
   type = None;
   thermal  = Adiabatic;
   heat_source = 0.0;
+  dynamics_calculator = "";
+
+  wetting_output_filename = "";
+
+  conRec_depth = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -2441,13 +2519,28 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
 
-  new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByOtherSolver", this,
-     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::surface_provided_by_other_solver), 2,
+  new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
      "No", 0, "Yes", 1);
 
+  new ClassDouble<EmbeddedSurfaceData>(ca, "SurfaceThickness", this, 
+                                      &EmbeddedSurfaceData::surface_thickness);
+
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
+
+  new ClassStr<EmbeddedSurfaceData>(ca, "ContactSurfaceOutput", this, &EmbeddedSurfaceData::wetting_output_filename);
+
+
+  new ClassToken<EmbeddedSurfaceData> (ca, "GaussQuadrature", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::quadrature), 8,
+     "None", 0, "OnePoint", 1, "ThreePoint", 2, "ThreePoints", 2,
+     "FourPoint", 3, "FourPoints", 3, "SixPoint", 4, "SixPoints", 4);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "GaussPointsLofting", this, &EmbeddedSurfaceData::gauss_points_lofting);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "InternalPressure", this, &EmbeddedSurfaceData::internal_pressure);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "BoundaryCondition", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::type), 6,
@@ -2459,8 +2552,14 @@ Assigner *EmbeddedSurfaceData::getAssigner()
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "HeatSource", this, &EmbeddedSurfaceData::heat_source);
 
-  tracker.setup("SurfaceTracker", ca);
-  
+  new ClassStr<EmbeddedSurfaceData>(ca, "UserDefinedDynamicsCalculator", this, 
+                                    &EmbeddedSurfaceData::dynamics_calculator);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "ConstantReconstructionDepth", 
+                                       this, &EmbeddedSurfaceData::conRec_depth);
+
+  output.setup("Output", ca); //there is another "Output", must provide "ca" to distinguish
+
   return ca;
 }
 
@@ -2484,16 +2583,27 @@ void EmbeddedSurfacesData::setup(const char *name, ClassAssigner *father)
 
 EmbeddedBoundaryMethodData::EmbeddedBoundaryMethodData()
 {
-
+  riemann_normal = MESH;
+  recon = CONSTANT;
 }
 
 //------------------------------------------------------------------------------
 
 void EmbeddedBoundaryMethodData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
   embed_surfaces.setup("EmbeddedSurfaces");
+
+  new ClassToken<EmbeddedBoundaryMethodData>
+    (ca, "RiemannNormal", this,
+     reinterpret_cast<int EmbeddedBoundaryMethodData::*>(&EmbeddedBoundaryMethodData::riemann_normal), 
+     3, "EmbeddedSurface", 0, "Mesh", 1, "Average", 2);
+
+  new ClassToken<EmbeddedBoundaryMethodData>
+    (ca, "ReconstructionAtInterface", this,
+     reinterpret_cast<int EmbeddedBoundaryMethodData::*>(&EmbeddedBoundaryMethodData::recon),
+     2, "Constant", 0, "Linear", 1);
 }
 
 //------------------------------------------------------------------------------
@@ -2596,6 +2706,100 @@ void TransientInputData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+TerminalVisualizationData::TerminalVisualizationData()
+{
+  colormap = TURBO;
+  plane = NONE;
+  filename = "";
+  variable = PRESSURE;
+  coordinate     = DBL_MAX;
+  horizontal_min = -DBL_MAX;
+  horizontal_max = DBL_MAX;
+  vertical_min   = -DBL_MAX;
+  vertical_max   = DBL_MAX;
+  dx = DBL_MAX;
+
+  frequency = 0;
+  frequency_dt = -1.0;
+  frequency_clocktime = 60; //seconds
+  pause = 2.0; //seconds 
+}
+
+//------------------------------------------------------------------------------
+
+void TerminalVisualizationData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 14, father);
+
+  new ClassToken<TerminalVisualizationData> (ca, "ColorMap", this,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::colormap), 2,
+      "GrayScale", 0, "Turbo", 1);
+
+  new ClassToken<TerminalVisualizationData> (ca, "Plane", this,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::plane), 4,
+      "None", 0, "YZ", 1, "XZ", 2, "XY", 3);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "Coordinate", this, 
+      &TerminalVisualizationData::coordinate);
+
+  new ClassStr<TerminalVisualizationData>(ca, "FileName", this, 
+      &TerminalVisualizationData::filename);
+
+  new ClassToken<TerminalVisualizationData> (ca, "Variable", this,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::variable), 9,
+      "Density", 0, "Velocity", 1, "Pressure", 2, "Temperature", 3, "MaterialID", 4, "LaserRadiance", 5,
+      "LevelSet0", 6, "LevelSet1", 7, "MeanCharge", 8);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "HorizontalMin", this, 
+      &TerminalVisualizationData::horizontal_min);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "HorizontalMax", this, 
+      &TerminalVisualizationData::horizontal_max);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "VerticalMin", this, 
+      &TerminalVisualizationData::vertical_min);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "VerticalMax", this, 
+      &TerminalVisualizationData::vertical_max);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "Resolution", this, 
+      &TerminalVisualizationData::dx);
+
+  new ClassInt<TerminalVisualizationData>(ca, "Frequency", this, 
+      &TerminalVisualizationData::frequency);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "TimeInterval", this, 
+      &TerminalVisualizationData::frequency_dt);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "ClockTimeInterval", this, 
+      &TerminalVisualizationData::frequency_clocktime);
+
+  new ClassDouble<TerminalVisualizationData>(ca, "Pause", this, 
+      &TerminalVisualizationData::pause);
+
+}
+
+//------------------------------------------------------------------------------
+
+ReferenceMapData::ReferenceMapData()
+{
+  fd = UPWIND_CENTRAL_3;
+}
+
+//------------------------------------------------------------------------------
+
+void ReferenceMapData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassToken<ReferenceMapData> (ca, "FiniteDifference", this,
+     reinterpret_cast<int ReferenceMapData::*>(&ReferenceMapData::fd), 2,
+     "None", 0, "ThirdOrderUpwind", 1);
+}
+
+//------------------------------------------------------------------------------
+
 SpecialToolsData::SpecialToolsData()
 {
   type = NONE;
@@ -2693,12 +2897,14 @@ void IoData::setupCmdFileVariables()
 
   concurrent.setup("ConcurrentPrograms");
 
+  ebm.setup("EmbeddedBoundary");
   ebm.setup("EmbeddedBoundaryMethod");
 
   eqs.setup("Equations");
   eqs.setup("NavierStokesEquations");
 
   ic.setup("InitialCondition");
+
   bc.setup("BoundaryConditions");
 
   mesh.setup("Mesh");
@@ -2715,9 +2921,13 @@ void IoData::setupCmdFileVariables()
 
   multiphase.setup("MultiPhase");
 
+  refmap.setup("ReferenceMap");
+
   output.setup("Output");
 
   special_tools.setup("SpecialTools");
+
+  terminal_visualization.setup("TerminalVisualization");
 
 }
 

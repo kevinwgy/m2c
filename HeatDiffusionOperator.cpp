@@ -1,6 +1,10 @@
 #include <HeatDiffusionOperator.h>
+#include <EmbeddedBoundaryDataSet.h>
 #include <Vector5D.h>
 #include <Utils.h>
+using std::unique_ptr;
+
+extern int INACTIVE_MATERIAL_ID;
 
 //--------------------------------------------------------------------------
 
@@ -35,8 +39,7 @@ HeatDiffusionOperator::HeatDiffusionOperator(MPI_Comm &comm_, DataManagers3D &dm
   // HeatDiffusionFcn for those materials without heat diffusion. If all the materials are not specified heat
   // diffusion, this constructor should not be called in the first place.
   //
-  for(auto it = iod_eqs.materials.dataMap.begin(); it != iod_eqs.materials.dataMap.end(); it++)
-    heatdiffFcn.push_back(NULL);//allocate space
+  heatdiffFcn.resize(varFcn.size(), NULL);
   for(auto it = iod_eqs.materials.dataMap.begin(); it != iod_eqs.materials.dataMap.end(); it++){
     int matid = it->first;
     if(matid < 0 || matid >= heatdiffFcn.size()) {
@@ -44,12 +47,17 @@ HeatDiffusionOperator::HeatDiffusionOperator(MPI_Comm &comm_, DataManagers3D &dm
     }
     switch (it->second->heat_diffusion.type) {
       case HeatDiffusionModelData::NONE :
-        heatdiffFcn[matid] = new HeatDiffuFcnBase(*varFcn[matid]);
+        heatdiffFcn[matid] = new HeatDiffuFcnBase();
         break;
       case HeatDiffusionModelData::CONSTANT :
-        heatdiffFcn[matid] = new HeatDiffuFcnConstant(it->second->heat_diffusion,*varFcn[matid]);
+        heatdiffFcn[matid] = new HeatDiffuFcnConstant(it->second->heat_diffusion);
     }
   }
+  for(auto&& diff : heatdiffFcn)
+    if(!diff)
+     diff = new HeatDiffuFcnBase();
+
+
 }
 
 //--------------------------------------------------------------------------
@@ -75,7 +83,9 @@ HeatDiffusionOperator::Destroy()
 //--------------------------------------------------------------------------
 // Add diffusion fluxes on the left hand side of the N-S equations
 void
-HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
+HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                          SpaceVariable3D &R)
 {
 
   //1. Calculate the temperature at node
@@ -113,8 +123,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
   Vec5D*** res  = (Vec5D***)R.GetDataPointer();
 
   double dx = 0.0, dy = 0.0, dz = 0.0;
-  Vec5D flux;
-  flux[0] = flux[1] = flux[2] = flux[3] = 0.0;
+  Vec5D flux(0.0);
   int neighid = 0;
   double myk = 0.0;
   double neighk = 0.0;
@@ -128,6 +137,10 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
       for(int i=i0; i<iimax; i++) {
 
         myid = (int)id[k][j][i];
+
+        if(myid==INACTIVE_MATERIAL_ID)
+          continue; 
+
         dx   = dxyz[k][j][i][0];
         dy   = dxyz[k][j][i][1];
         dz   = dxyz[k][j][i][2];
@@ -173,7 +186,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
           neighid = id[k][j][i-1];
           neighk = heatdiffFcn[neighid]->conduct;
           denom = myk + neighk;
-          flux[4] = (denom == 0) ? 0.0 : 2*myk*neighk/denom*dTdx_i[k][j][i];
+          flux[4] = (denom == 0) ? 0.0 : 2*myk*neighk/denom*dTdx_i[k][j][i]; //If neigh is "iactive", neighk = 0, so flux = 0
           flux *= dy*dz;
           res[k][j][i]   += flux;
           res[k][j][i-1] -= flux;

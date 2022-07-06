@@ -4,6 +4,9 @@
 #include <GradientCalculatorBase.h>
 #include <Interpolator.h>
 #include <ViscoFcn.h>
+#include <memory>
+
+class EmbeddedBoundaryDataSet;
 
 /***************************************************
  * class ViscosityOperator calculates the viscous
@@ -60,7 +63,9 @@ public:
   ~ViscosityOperator();
 
   //! calculate diffusion fluxes (on the left-hand-side of the N-S equations; add them to R) 
-  void AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R);
+  void AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                          SpaceVariable3D &R);
 
   //! destroy internal variables
   void Destroy() {

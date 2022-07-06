@@ -163,6 +163,13 @@ public:
     return false;
   }
 
+  inline bool IsHereOrInternalGhost(int i, int j, int k)
+  {
+    return i>=internal_ghost_i0 && i<internal_ghost_imax && 
+           j>=internal_ghost_j0 && j<internal_ghost_jmax && 
+           k>=internal_ghost_k0 && k<internal_ghost_kmax;
+  }
+
   //! operators
   void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
   void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y

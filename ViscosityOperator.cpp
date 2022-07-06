@@ -2,7 +2,7 @@
 #include <Vector5D.h>
 #include <Utils.h>
 #include <bits/stdc++.h>
-
+using std::unique_ptr;
 //--------------------------------------------------------------------------
 
 ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, 
@@ -86,8 +86,15 @@ ViscosityOperator::~ViscosityOperator()
 
 //--------------------------------------------------------------------------
 // Add diffusion fluxes on the left hand side of the N-S equations
-void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
+void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                                           vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                           SpaceVariable3D &R)
 {
+
+  if(EBDS) 
+    print_warning("Warning: ViscosityOperator::AddDiffusionFluxes: Not able to account for embedded surfaces.\n");
+
+
   std::vector<int> i123{1,2,3}, i012{0,1,2}; 
   //1. Calculate the x, y, and z velocities at cell interfaces by interpolation 
   interpolator.InterpolateAtCellInterfaces(0/*x-dir*/, V, i123, V_i_minus_half, i012);

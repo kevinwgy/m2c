@@ -12,16 +12,20 @@ AtomicIonizationData::AtomicIonizationData() : interpolation(0), molar_fraction(
 AtomicIonizationData::~AtomicIonizationData()
 { 
   for(auto it = spline.begin(); it != spline.end(); it++)
-    if(*it)
-      delete *it;
+    for(auto it2 = it->begin(); it2 != it->end(); it2++)
+      if(*it2)
+        delete *it2;
 }
 
 //--------------------------------------------------------------------------
 
 void
 AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_, double me_, double kb_,
-                            int interp, double sample_Tmin_, double sample_Tmax_, int sample_size_, MPI_Comm* comm)
+                            bool ideal_, int interp, double sample_Tmin_, double sample_Tmax_, int sample_size_, 
+                            MPI_Comm* comm)
 {
+
+  ideal = ideal_;
 
   // Step 0: Get constants
   h = h_;
@@ -111,6 +115,14 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
     rmax = data_size;
 
 
+
+  // find out the max number of terms involved in the summation (up to E[r][n] <= I[r])
+  max_terms.resize(rmax, 0); 
+  for(int r=0; r<rmax; r++)
+    max_terms[r] = std::min(int(std::upper_bound(E[r].begin(), E[r].end(), I[r]) - E[r].begin()),
+                            (int)g[r].size());
+ 
+
   // if interpolation is true, create the interpolation database
   interpolation = interp;
   if(interpolation && sample_Tmax_<=sample_Tmin_){
@@ -152,13 +164,17 @@ AtomicIonizationData::GetDataInFile(std::fstream& file, vector<T> &X, int MaxCou
 void
 AtomicIonizationData::InitializeInterpolation(MPI_Comm &comm)
 {
-  for(int r=0; r<rmax; r++) {
-    Us.push_back(vector<double>(sample_size));
-  }
-  UsCoeffs.resize(rmax, std::tuple<double,double,double>(0,0,0));
 
-  if(interpolation == 1) //cubic spline interpolation
-    spline.resize(rmax, NULL);
+  for(int r=0; r<rmax; r++) {
+    Us.push_back(vector<vector<double> >(ideal ? 1 : max_terms[r], vector<double>(sample_size)));
+  }
+  UsCoeffs.assign(rmax, std::tuple<double,double,double>(0,0,0));
+
+  spline.clear();
+  if(interpolation == 1) {//cubic spline interpolation
+    for(int r=0; r<rmax; r++) 
+      spline.push_back(vector<boost::math::cubic_b_spline<double>*>(ideal ? 1 : max_terms[r], NULL));
+  }
 
   for(int r=0; r<rmax; r++)
     InitializeInterpolationForCharge(r, comm);
@@ -166,15 +182,12 @@ AtomicIonizationData::InitializeInterpolation(MPI_Comm &comm)
 }
 
 //--------------------------------------------------------------------------
-// KW: I was originally planning to do linear interpolation w/ a lot of sample
-// points (millions...), which is why MPI is involved. Later, it looked like 
-// cubic splines are sufficiently accurate with thousands of sample points, 
-// which makes MPI unnecessary.
+
 void
 AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
 {
 
-  vector<double>& U(Us[r]); 
+  vector<vector<double> >& U(Us[r]); 
   std::tuple<double,double,double>& coeffs(UsCoeffs[r]);
 
   double factor(0);
@@ -213,21 +226,25 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
 
   int my_start_id = displacements[mpi_rank];
   int my_block_size = counts[mpi_rank];
-  double T;
-  for(int i=0; i<my_block_size; i++) {
-    T = (my_start_id+i==0) ? sample_Tmin : factor/log(expmin+(my_start_id+i)*delta_exp); //expmin can be 0 if Tmin is small (but nonzero)
-    U[my_start_id+i] = CalculatePartitionFunctionOnTheFly(r, T);
-  }
 
+  vector<double> T(my_block_size,0.0);
+  for(int i=0; i<my_block_size; i++)
+    T[i] = (my_start_id+i==0) ? sample_Tmin : factor/log(expmin+(my_start_id+i)*delta_exp); 
+            //expmin can be 0 if Tmin is small (but nonzero)
+                
+  for(int k=0; k<U.size(); k++) {
 
-  //communication
-  MPI_Allgatherv(MPI_IN_PLACE, my_block_size, MPI_DOUBLE, U.data(), counts, displacements, MPI_DOUBLE, comm);
+    for(int i=0; i<my_block_size; i++)
+      U[k][my_start_id+i] = CalculatePartitionFunctionOnTheFly2(r, T[i], max_terms[r] - k); 
+
+    //communication
+    MPI_Allgatherv(MPI_IN_PLACE, my_block_size, MPI_DOUBLE, U[k].data(), counts, displacements, MPI_DOUBLE, comm);
  
+    //initialize spline interpolation
+    if(interpolation == 1)
+      spline[r][k] = new boost::math::cubic_b_spline<double>(U[k].begin(), U[k].end(), expmin, delta_exp);
 
-  //initialize spline interpolation
-  if(interpolation == 1)
-    spline[r] = new boost::math::cubic_b_spline<double>(U.begin(), U.end(), expmin, delta_exp);
-
+  }
 
   delete [] counts;
   delete [] displacements;
@@ -237,7 +254,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
 //--------------------------------------------------------------------------
 
 double
-AtomicIonizationData::CalculatePartitionFunction(int r, double T)
+AtomicIonizationData::CalculatePartitionFunction(int r, double T, double deltaI)
 {
   assert(r<=rmax);
 
@@ -245,28 +262,29 @@ AtomicIonizationData::CalculatePartitionFunction(int r, double T)
     return 1.0; //per Shafquat
 
   if(interpolation && T>=sample_Tmin && T<=sample_Tmax)
-    return CalculatePartitionFunctionByInterpolation(r, T);
+    return CalculatePartitionFunctionByInterpolation(r, T, deltaI);
 
-  return CalculatePartitionFunctionOnTheFly(r, T);
+  return CalculatePartitionFunctionOnTheFly(r, T, deltaI);
 }
 
 //--------------------------------------------------------------------------
 
 double
-AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T)
+AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T, double deltaI)
 {
 
   double Ur = 0.0;
-  int nsize = std::max(g[r].size(), E[r].size());
-  for(int n=0; n<nsize; n++) {
 
-    if(I[r]<E[r][n]) {
-      assert(n>0);
-      break;
-    }
+  //upper_bound returns an iterator to the first element that is greater than I[r]-deltaI
+  int nsize = std::min(int(std::upper_bound(E[r].begin(), E[r].end(), I[r]-deltaI) - E[r].begin()),
+                       (int)g[r].size());
 
+  //fprintf(stderr,"I[%d] = %e, nsize = %d, E[%d][%d] = %e, Ieff-E = %e | %e.\n", r, I[r], nsize, r, 
+  //        nsize-1, E[r][nsize-1],
+  //        I[r]-deltaI-E[r][nsize-1], I[r]-deltaI-E[r][std::min(nsize, (int)E[r].size()-1)]);
+
+  for(int n=0; n<nsize; n++)
     Ur += g[r][n]*exp(-E[r][n]/(kb*T));
-  }
 
   return Ur;
 
@@ -275,15 +293,44 @@ AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T)
 //--------------------------------------------------------------------------
 
 double
-AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T)
+AtomicIonizationData::CalculatePartitionFunctionOnTheFly2(int r, double T, int nterms)
+{
+
+  assert(nterms>=1);
+
+  double Ur = 0.0;
+  int nsize = std::min(nterms, std::min((int)g[r].size(), (int)E[r].size()));
+  for(int n=0; n<nsize; n++)
+    Ur += g[r][n]*exp(-E[r][n]/(kb*T));
+
+  return Ur;
+
+}
+
+//--------------------------------------------------------------------------
+
+double
+AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T, double deltaI)
 {
 
   double factor = std::get<0>(UsCoeffs[r]);
   double expT = exp(factor/T);
 
+  int k;
+  if(ideal) {
+    assert(deltaI==0.0);
+    k = 0;
+  }
+  else {
+    int nsize = std::min(int(std::upper_bound(E[r].begin(), E[r].end(), I[r]-deltaI) - E[r].begin()),
+                         (int)g[r].size());
+    k = max_terms[r] - nsize;
+    assert(k>=0 && k<spline[r].size());
+  }
+
   if(interpolation==1) 
 
-    return (*spline[r])(expT); 
+    return (*spline[r][k])(expT); 
 
   else if(interpolation==2) { //linear
 
@@ -294,11 +341,11 @@ AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T)
     assert(i>=0 && i<=sample_size-1);
 
     if(i==sample_size-1)
-      return Us[r][sample_size-1];
+      return Us[r][k][sample_size-1];
 
     double d = ((expT-expmin) - i*delta_exp)/delta_exp;
 
-    return (1.0-d)*Us[r][i] + d*Us[r][i+1];
+    return (1.0-d)*Us[r][k][i] + d*Us[r][k][i+1];
 
   } else {
     fprintf(stderr,"\033[0;31m*** Error: Encountered unknown interpolation code (%d).\n\033[0m", 

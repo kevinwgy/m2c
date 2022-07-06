@@ -82,6 +82,7 @@ MultiPhaseOperator.cpp
 SymmetryOperator.cpp
 SmoothingOperator.cpp
 Interpolator.cpp
+GlobalMeshInfo.cpp
 GradientCalculatorCentral.cpp
 GradientCalculatorFD3.cpp
 ViscosityOperator.cpp
@@ -98,12 +99,16 @@ LevelSetReinitializer.cpp
 LaserAbsorptionSolver.cpp
 IonizationOperator.cpp
 SahaEquationSolver.cpp
+NonIdealSahaEquationSolver.cpp
 AtomicIonizationData.cpp
 EmbeddedBoundaryFormula.cpp
+HyperelasticityOperator.cpp
+ReferenceMapOperator.cpp
 TimeIntegrator.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
 LagrangianOutput.cpp
+TerminalVisualization.cpp
 Utils.cpp
 ClosestTriangle.cpp
 MathTools/r8lib.cpp
@@ -115,5 +120,6 @@ GeoTools/Intersections.cpp)
 
 # link to libraries
 target_link_libraries(m2c petsc mpi parser)
+target_link_libraries(m2c ${CMAKE_DL_LIBS}) #linking to the dl library (-ldl)
 add_dependencies(m2c extern_lib)
 add_dependencies(m2c VersionHeader)

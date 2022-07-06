@@ -1,6 +1,9 @@
-#include<Reconstructor.h>
+#include <Reconstructor.h>
 #include <DistancePointToSpheroid.h>
+#include <memory> //std::unique_ptr
 using std::round;
+
+extern int INACTIVE_MATERIAL_ID;
 
 //--------------------------------------------------------------------------
 
@@ -265,7 +268,8 @@ void Reconstructor::Destroy()
  *  performed within this function. */
 void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVariable3D &Vr,
            SpaceVariable3D &Vb, SpaceVariable3D &Vt, SpaceVariable3D &Vk, SpaceVariable3D &Vf,
-           SpaceVariable3D *ID, SpaceVariable3D *Selected, bool do_nothing_if_not_selected)
+           SpaceVariable3D *ID, vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+           SpaceVariable3D *Selected, bool do_nothing_if_not_selected)
 {
 
   //! Constant reconstruction is trivial.
@@ -291,6 +295,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
     print_error(comm, "*** Error: In Reconstructor::Reconstruct, expect NumDOF = 5, but got %d.\n", V.NumDOF());
     exit_mpi();
   }
+
   //! Get mesh info
   int i0, j0, k0, imax, jmax, kmax, ii0, jj0, kk0, iimax, jjmax, kkmax, NX, NY, NZ;
   delta_xyz.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -317,6 +322,12 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
   //selected cells specified
   double*** sel = Selected ? Selected->GetDataPointer() : NULL;
 
+  //May need intersections
+  vector<Vec3D***> xf;
+  if(EBDS && iod_rec.slopeNearInterface == ReconstructionData::ZERO)
+    for(auto it = EBDS->begin(); it != EBDS->end(); it++) 
+      xf.push_back((Vec3D***)(*it)->XForward_ptr->GetDataPointer());
+
   //! Number of DOF per cell
   int nDOF = V.NumDOF();
 
@@ -329,6 +340,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
         for(int i=ii0; i<iimax; i++)
           (*varFcn)[id[k][j][i]]->PrimitiveToConservative(&v[k][j][i*nDOF], &u[k][j][i*nDOF]);          
   }
+
 
   /***************************************************************
    *  Loop through all the real cells.
@@ -371,6 +383,21 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
           continue;
         }
 
+        //---------------------------
+        // If node is occluded, nothing needs to be done
+        //---------------------------
+        if(id && ((int)id[k][j][i] == INACTIVE_MATERIAL_ID)) {
+          for(int dof=0; dof<nDOF; dof++) {
+            vl[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vr[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vb[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vt[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vk[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+            vf[k][j][i*nDOF+dof] = v[k][j][i*nDOF+dof];
+          }
+          continue;
+        }
+
         // Get variable type
         vType = iod_rec.varType;
 
@@ -382,12 +409,35 @@ RETRY:
            vType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
 
           for(int dof=0; dof<nDOF; dof++) {
-            dql[dof] = v[k][j][i*nDOF+dof]     - v[k][j][(i-1)*nDOF+dof];
-            dqr[dof] = v[k][j][(i+1)*nDOF+dof] - v[k][j][i*nDOF+dof];
-            dqb[dof] = v[k][j][i*nDOF+dof]     - v[k][j-1][i*nDOF+dof];
-            dqt[dof] = v[k][j+1][i*nDOF+dof]   - v[k][j][i*nDOF+dof];
-            dqk[dof] = v[k][j][i*nDOF+dof]     - v[k-1][j][i*nDOF+dof];
-            dqf[dof] = v[k+1][j][i*nDOF+dof]   - v[k][j][i*nDOF+dof];
+            if(id && ((int)id[k][j][i-1] == INACTIVE_MATERIAL_ID))
+              dql[dof] = 0.0;
+            else
+              dql[dof] = v[k][j][i*nDOF+dof]     - v[k][j][(i-1)*nDOF+dof];
+
+            if(id && ((int)id[k][j][i+1] == INACTIVE_MATERIAL_ID))
+              dqr[dof] = 0.0;
+            else
+              dqr[dof] = v[k][j][(i+1)*nDOF+dof] - v[k][j][i*nDOF+dof];
+
+            if(id && ((int)id[k][j-1][i] == INACTIVE_MATERIAL_ID))
+              dqb[dof] = 0.0;
+            else
+              dqb[dof] = v[k][j][i*nDOF+dof]     - v[k][j-1][i*nDOF+dof];
+
+            if(id && ((int)id[k][j+1][i] == INACTIVE_MATERIAL_ID))
+              dqt[dof] = 0.0;
+            else
+              dqt[dof] = v[k][j+1][i*nDOF+dof]   - v[k][j][i*nDOF+dof];
+
+            if(id && ((int)id[k-1][j][i] == INACTIVE_MATERIAL_ID))
+              dqk[dof] = 0.0;
+            else
+              dqk[dof] = v[k][j][i*nDOF+dof]     - v[k-1][j][i*nDOF+dof];
+
+            if(id && ((int)id[k+1][j][i] == INACTIVE_MATERIAL_ID))
+              dqf[dof] = 0.0;
+            else
+              dqf[dof] = v[k+1][j][i*nDOF+dof]   - v[k][j][i*nDOF+dof];
           }
 
           if(vType == ReconstructionData::PRIMITIVE_CHARACTERISTIC) {
@@ -413,12 +463,35 @@ RETRY:
                  vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) { 
 
           for(int dof=0; dof<nDOF; dof++) {
-            dql[dof] = u[k][j][i*nDOF+dof]     - u[k][j][(i-1)*nDOF+dof];
-            dqr[dof] = u[k][j][(i+1)*nDOF+dof] - u[k][j][i*nDOF+dof];
-            dqb[dof] = u[k][j][i*nDOF+dof]     - u[k][j-1][i*nDOF+dof];
-            dqt[dof] = u[k][j+1][i*nDOF+dof]   - u[k][j][i*nDOF+dof];
-            dqk[dof] = u[k][j][i*nDOF+dof]     - u[k-1][j][i*nDOF+dof];
-            dqf[dof] = u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof];
+            if(id && ((int)id[k][j][i-1] == INACTIVE_MATERIAL_ID))
+              dql[dof] = 0.0;
+            else
+              dql[dof] = u[k][j][i*nDOF+dof]     - u[k][j][(i-1)*nDOF+dof];
+
+            if(id && ((int)id[k][j][i+1] == INACTIVE_MATERIAL_ID))
+              dqr[dof] = 0.0;
+            else
+              dqr[dof] = u[k][j][(i+1)*nDOF+dof] - u[k][j][i*nDOF+dof];
+
+            if(id && ((int)id[k][j-1][i] == INACTIVE_MATERIAL_ID))
+              dqb[dof] = 0.0;
+            else
+              dqb[dof] = u[k][j][i*nDOF+dof]     - u[k][j-1][i*nDOF+dof];
+
+            if(id && ((int)id[k][j+1][i] == INACTIVE_MATERIAL_ID))
+              dqt[dof] = 0.0;
+            else
+              dqt[dof] = u[k][j+1][i*nDOF+dof]   - u[k][j][i*nDOF+dof];
+
+            if(id && ((int)id[k-1][j][i] == INACTIVE_MATERIAL_ID))
+              dqk[dof] = 0.0;
+            else
+              dqk[dof] = u[k][j][i*nDOF+dof]     - u[k-1][j][i*nDOF+dof];
+
+            if(id && ((int)id[k+1][j][i] == INACTIVE_MATERIAL_ID))
+              dqf[dof] = 0.0;
+            else
+              dqf[dof] = u[k+1][j][i*nDOF+dof]   - u[k][j][i*nDOF+dof];
           }
 
           if(vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
@@ -493,8 +566,7 @@ RETRY:
           copyarray(dw, sigmay, 5);
           fluxFcn->PrimitiveCharacteristicToPrimitive(2, &v[k][j][i*nDOF], sigmaz, myid, dw);
           copyarray(dw, sigmaz, 5);
-        }
-        else if (vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
+        } else if (vType == ReconstructionData::CONSERVATIVE_CHARACTERISTIC) {
           int myid = (int)id[k][j][i];
           double dw[5];
           fluxFcn->ConservativeCharacteristicToConservative(0, &v[k][j][i*nDOF], sigmax, myid, dw);
@@ -506,16 +578,30 @@ RETRY:
         }
 
         //------------------------------------------------------------------------------------
-        // Step 2.4. (Optional) Switch back to constant reconstruction near material interface
+        // Step 2.4. (Optional) Switch back to constant reconstruction near material interface (not FS interface)
         //------------------------------------------------------------------------------------
-        if(ID && iod_rec.slopeNearInterface == ReconstructionData::ZERO) {
-          if(id[k][j][i] != id[k][j][i-1] || id[k][j][i] != id[k][j][i+1])
-            setValue(sigmax, 0.0, nDOF);
-          if(id[k][j][i] != id[k][j-1][i] || id[k][j][i] != id[k][j+1][i])
-            setValue(sigmay, 0.0, nDOF);
-          if(id[k][j][i] != id[k-1][j][i] || id[k][j][i] != id[k+1][j][i])
-            setValue(sigmaz, 0.0, nDOF);
+        if(iod_rec.slopeNearInterface == ReconstructionData::ZERO) {
+          if(ID) {
+            if(id[k][j][i] != id[k][j][i-1] || id[k][j][i] != id[k][j][i+1])
+              setValue(sigmax, 0.0, nDOF);
+            if(id[k][j][i] != id[k][j-1][i] || id[k][j][i] != id[k][j+1][i])
+              setValue(sigmay, 0.0, nDOF);
+            if(id[k][j][i] != id[k-1][j][i] || id[k][j][i] != id[k+1][j][i])
+              setValue(sigmaz, 0.0, nDOF);
+          }
+
+          if(xf.size()>0) {
+            for(int s=0; s<xf.size(); s++) {
+              if(xf[s][k][j][i][0]>=0 || (i+1<NX && xf[s][k][j][i+1][0]>=0))
+                setValue(sigmax, 0.0, nDOF);
+              if(xf[s][k][j][i][1]>=0 || (j+1<NY && xf[s][k][j+1][i][1]>=0))
+                setValue(sigmay, 0.0, nDOF);
+              if(xf[s][k][j][i][2]>=0 || (k+1<NZ && xf[s][k+1][j][i][2]>=0))
+                setValue(sigmaz, 0.0, nDOF);
+            }
+          }
         }
+
 
         //------------------------------------------------------------
         // Step 2.5. Calculate interface values
@@ -684,7 +770,7 @@ RETRY:
         break;
 
       case MeshData::SYMMETRY :
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
         //constant or linear reconstruction, matching the image
 
         if     (i<0)   copyarray_flip(&vl[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF, 1);
@@ -693,6 +779,16 @@ RETRY:
         else if(j>=NY) copyarray_flip(&vt[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF, 2);
         else if(k<0)   copyarray_flip(&vk[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF, 3);
         else if(k>=NZ) copyarray_flip(&vf[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF, 3);
+
+        break;
+
+      case MeshData::STICKWALL :
+        if     (i<0)   copyarray_flip(&vl[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF, 1, 3);
+        else if(i>=NX) copyarray_flip(&vr[kk][jj][ii*nDOF], &vl[k][j][i*nDOF], nDOF, 1, 3);
+        else if(j<0)   copyarray_flip(&vb[kk][jj][ii*nDOF], &vt[k][j][i*nDOF], nDOF, 1, 3);
+        else if(j>=NY) copyarray_flip(&vt[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF, 1, 3);
+        else if(k<0)   copyarray_flip(&vk[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF, 1, 3);
+        else if(k>=NZ) copyarray_flip(&vf[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF, 1, 3);
 
         break;
 
@@ -721,6 +817,11 @@ RETRY:
   if(ID) ID->RestoreDataPointerToLocalVector(); //!< no changes to vector
 
   if(Selected) Selected->RestoreDataPointerToLocalVector(); //!< no changes to vector
+
+  if(xf.size()>0) {
+    for(auto it = EBDS->begin(); it != EBDS->end(); it++) 
+      (*it)->XForward_ptr->RestoreDataPointerToLocalVector();
+  }
 
   U.RestoreDataPointerToLocalVector(); //!< internal variable
 
@@ -893,7 +994,8 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
         break;
 
       case MeshData::SYMMETRY :
-      case MeshData::WALL :
+      case MeshData::SLIPWALL :
+      case MeshData::STICKWALL : //TODO: Correct??
         //constant or linear reconstruction, matching the image
 
         //relying on nDOF = 1!!

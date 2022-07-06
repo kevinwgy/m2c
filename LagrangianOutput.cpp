@@ -21,8 +21,6 @@ LagrangianOutput::LagrangianOutput(MPI_Comm &comm_, LagrangianMeshOutputData &io
 
 LagrangianOutput::~LagrangianOutput()
 {
-  if(disp_file) delete disp_file;
-  if(sol_file) delete sol_file;
 }
 
 //------------------------------------------------------------------------------
@@ -162,7 +160,7 @@ END_OF_OUTPUT:
 
   MPI_Barrier(comm);
 
-  print("- Wrote solution at %e.\n", t);
+  print("- Wrote solution on a Lagrangian mesh at %e.\n", t);
 
   last_snapshot_time = t;
   iFrame++;

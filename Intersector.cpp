@@ -1,8 +1,10 @@
 #include<Intersector.h>
 #include<GeoTools.h>
 #include<Intersections.h>
+#include<EmbeddedBoundaryDataSet.h>
 using std::pair;
 using std::vector;
+using std::unique_ptr;
 
 extern int verbose;
 extern double domain_diagonal;
@@ -11,31 +13,41 @@ extern double domain_diagonal;
 Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
                          TriangulatedSurface &surface_, SpaceVariable3D &coordinates_, 
                          vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
-                         vector<double> &x_, vector<double> &y_, vector<double> &z_,
-                         vector<double> &dx_, vector<double> &dy_, vector<double> &dz_)
-           : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree(NULL),
+                         GlobalMeshInfo &global_mesh_)
+           : comm(comm_), iod_surface(iod_surface_), surface(surface_), tree_1(NULL), tree_n(NULL),
              coordinates(coordinates_), 
              ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
-             x_glob(x_), y_glob(y_), z_glob(z_), dx_glob(dx_), dy_glob(dy_), dz_glob(dz_),
-             BBmin(comm_, &(dms_.ghosted1_3dof)),
-             BBmax(comm_, &(dms_.ghosted1_3dof)),
+             global_mesh(global_mesh_),
+             BBmin_1(comm_, &(dms_.ghosted1_3dof)),
+             BBmax_1(comm_, &(dms_.ghosted1_3dof)),
+             BBmin_n(comm_, &(dms_.ghosted1_3dof)),
+             BBmax_n(comm_, &(dms_.ghosted1_3dof)),
              TMP(comm_, &(dms_.ghosted1_1dof)),
              TMP2(comm_, &(dms_.ghosted1_1dof)),
-             CandidatesIndex(comm_, &(dms_.ghosted1_1dof)),
+             CandidatesIndex_1(comm_, &(dms_.ghosted1_1dof)),
+             CandidatesIndex_n(comm_, &(dms_.ghosted1_1dof)),
              ClosestPointIndex(comm_, &(dms_.ghosted1_1dof)),
              XForward(comm_, &(dms_.ghosted1_3dof)),
              XBackward(comm_, &(dms_.ghosted1_3dof)),
              Phi(comm_, &(dms_.ghosted1_1dof)),
-             Sign(comm_, &(dms_.ghosted1_1dof)),
+             Phi_nLayer(0),
+             Color(comm_, &(dms_.ghosted1_1dof)), hasInlet(false), hasOutlet(false), nRegions(0),
              floodfiller(comm_, dms_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
 
-  CandidatesIndex.SetConstantValue(-1, true);
+  CandidatesIndex_1.SetConstantValue(-1, true);
+  CandidatesIndex_n.SetConstantValue(-1, true);
   ClosestPointIndex.SetConstantValue(-1, true);
   XForward.SetConstantValue(-1, true);
   XBackward.SetConstantValue(-1, true);
+  Color.SetConstantValue(-1, true);
 
-  half_thickness = 0.5*iod_surface.tracker.surface_thickness;
+  half_thickness = 0.5*iod_surface.surface_thickness;
+  if(half_thickness==0) {
+    print_error("*** Error: Detected an embedded surface with 0 thickness. Even if the physical thickness is 0, \n"
+                "           a small numerical tolerance is needed to avoid round-off issues.\n");
+    exit_mpi();
+  }
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
@@ -45,8 +57,10 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   // Set the capacity of internal vectors, so we don't frequently reallocate memory
   int capacity = (imax-i0)*(jmax-j0)*(kmax-k0)/4; //should be big enough
   intersections.reserve(capacity);
-  candidates.reserve(capacity*2);
-  scope.reserve(surface.elems.size());
+  candidates_1.reserve(capacity*2);
+  scope_1.reserve(surface.elems.size());
+  candidates_n.reserve(capacity*2);
+  scope_n.reserve(surface.elems.size());
 
   //sanity checks on the triangulated surface
   if(surface.degenerate) {
@@ -60,8 +74,9 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
   closed_surface = surface.CheckSurfaceOrientationAndClosedness();
 
   //build nodal bounding boxes
-  bblayer = 1;
-  BuildNodalAndSubdomainBoundingBoxes(bblayer);
+  BuildNodalAndSubdomainBoundingBoxes(1, BBmin_1, BBmax_1, subD_bbmin_1, subD_bbmax_1);
+
+  nLayer = -1; //this will be the number of layers in BBmin_n, BBmax_n, etc.
 
 }
 
@@ -69,8 +84,10 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
 
 Intersector::~Intersector()
 {
-  if(tree)
-    delete tree;
+  if(tree_1)
+    delete tree_1;
+  if(tree_n)
+    delete tree_n;
 }
 
 //-------------------------------------------------------------------------
@@ -80,33 +97,86 @@ Intersector::Destroy()
 {
   floodfiller.Destroy();
 
-  BBmin.Destroy();
-  BBmax.Destroy();
+  BBmin_1.Destroy();
+  BBmax_1.Destroy();
+  BBmin_n.Destroy();
+  BBmax_n.Destroy();
   TMP.Destroy();
   TMP2.Destroy();
-  CandidatesIndex.Destroy();
+  CandidatesIndex_1.Destroy();
+  CandidatesIndex_n.Destroy();
   ClosestPointIndex.Destroy();
   XForward.Destroy();
   XBackward.Destroy();
   Phi.Destroy();
-  Sign.Destroy();
+  Color.Destroy();
+}
+
+//-------------------------------------------------------------------------
+
+unique_ptr<EmbeddedBoundaryDataSet>
+Intersector::GetPointerToResults()
+{
+  unique_ptr<EmbeddedBoundaryDataSet> ebds(new EmbeddedBoundaryDataSet());
+
+  ebds->surface_ptr             = &surface;
+  ebds->half_thickness          = half_thickness;
+  ebds->XForward_ptr            = &XForward;
+  ebds->XBackward_ptr           = &XBackward;
+  ebds->Phi_ptr                 = &Phi;
+  ebds->Phi_nLayer              = Phi_nLayer;
+  ebds->Color_ptr               = &Color;
+  ebds->ColorReachesBoundary_ptr= &ColorReachesBoundary;
+  ebds->hasInlet                = hasInlet;
+  ebds->hasOutlet               = hasOutlet;
+  ebds->nRegions                = nRegions;
+  ebds->ClosestPointIndex_ptr   = &ClosestPointIndex;
+  ebds->closest_points_ptr      = &closest_points;
+  ebds->intersections_ptr       = &intersections;
+  ebds->occluded_ptr            = &occluded;
+  ebds->firstLayer_ptr          = &firstLayer;
+  ebds->imposed_occluded_ptr    = &imposed_occluded;
+  ebds->swept_ptr               = &swept;
+
+  return ebds;
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, int phi_layers)
+Intersector::GetElementsInScope1(std::vector<int> &elems_in_scope)
+{
+  elems_in_scope.resize(scope_1.size());
+  for(int i=0; i<scope_1.size(); i++)
+    elems_in_scope[i] = scope_1[i].trId();
+}
+
+//-------------------------------------------------------------------------
+
+void
+Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers)
 {
   assert(phi_layers>=1);
 
-  if(bblayer != 1)
-    BuildNodalAndSubdomainBoundingBoxes(1); //1 layer
+  // This (smaller) one is for edge-surface intersections
+  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1);
 
-  BuildSubdomainScopeAndKDTree();
-  FindNodalCandidates();
-  FindIntersections(true);
-  FloodFillColors(hasInlet, hasOutlet, hasOcc, nRegions);
-  CalculateUnsignedDistanceNearSurface(phi_layers, phi_layers==1);
+  FindIntersections(); //using scope_1 and tree_1
+
+  bool hasOcc = FloodFillColors();
+
+  // Calculate unsigned distance
+  if(nLayer != phi_layers) {
+    BuildNodalAndSubdomainBoundingBoxes(phi_layers, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
+    nLayer = phi_layers;
+  }
+  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
+  CalculateUnsignedDistanceNearSurface(phi_layers);
+
+  hasInlet_  = hasInlet;
+  hasOutlet_ = hasOutlet;
+  hasOcc_    = hasOcc;
+  nRegions_  = nRegions;
 
 /*
   Debug
@@ -118,8 +188,8 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
   XBackward.RestoreDataPointerAndInsert();
   XBackward.StoreMeshCoordinates(coordinates);
   XBackward.WriteToVTRFile("XBackward.vtr", "xb");
-  Sign.StoreMeshCoordinates(coordinates);
-  Sign.WriteToVTRFile("Sign.vtr", "color");
+  Color.StoreMeshCoordinates(coordinates);
+  Color.WriteToVTRFile("Color.vtr", "color");
   Phi.StoreMeshCoordinates(coordinates);
   Phi.WriteToVTRFile("Phi.vtr", "phi");
   fprintf(stderr,"Got here!\n");
@@ -131,7 +201,29 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOc
 //-------------------------------------------------------------------------
 
 void
-Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
+Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
+{
+  assert(phi_layers>=1);
+
+  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1);
+  FindIntersections();
+  FindSweptNodes(Xprev);
+  RefillAfterSurfaceUpdate();
+
+  if(nLayer != phi_layers) {
+    BuildNodalAndSubdomainBoundingBoxes(phi_layers, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
+    nLayer = phi_layers;
+  }
+  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
+  CalculateUnsignedDistanceNearSurface(phi_layers);
+
+}
+
+//-------------------------------------------------------------------------
+
+void
+Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin, SpaceVariable3D &BBmax,
+                                                 Vec3D &subD_bbmin, Vec3D &subD_bbmax)
 {
   double tol = 0.1;  //i.e. tolerance = 10% of element size (plus 50% of surface thickness)
   double thicker = (1.0+tol)*half_thickness;
@@ -139,22 +231,29 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
   Vec3D*** bbmin  = (Vec3D***) BBmin.GetDataPointer();
   Vec3D*** bbmax  = (Vec3D***) BBmax.GetDataPointer();
 
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+  vector<double> &dx_glob(global_mesh.dx_glob);
+  vector<double> &dy_glob(global_mesh.dy_glob);
+  vector<double> &dz_glob(global_mesh.dz_glob);
+
   double delta;
   for(int k=kk0_in; k<kkmax_in; k++)
     for(int j=jj0_in; j<jjmax_in; j++)
       for(int i=ii0_in; i<iimax; i++) {
 
         delta = tol*dx_glob[i] + thicker;
-        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nLayer)] - tol;
-        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nLayer)] + tol;
+        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - tol;
+        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nL)] + tol;
 
         delta = tol*dy_glob[j] + thicker;
-        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nLayer)] - tol;
-        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nLayer)] + tol;
+        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nL)] - tol;
+        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nL)] + tol;
 
         delta = tol*dz_glob[k] + thicker;
-        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nLayer)] - tol;
-        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nLayer)] + tol;
+        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nL)] - tol;
+        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nL)] + tol;
       }
 
   //subD_bb includes the ghost boundary
@@ -166,13 +265,13 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nLayer)
   BBmin.RestoreDataPointerToLocalVector();
   BBmax.RestoreDataPointerToLocalVector();
 
-  bblayer = nLayer;
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::BuildSubdomainScopeAndKDTree()
+Intersector::BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &subD_bbmax, 
+                                          vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree)//updating the tree itself
 {
   scope.clear();
 
@@ -194,19 +293,21 @@ Intersector::BuildSubdomainScopeAndKDTree()
 //  fprintf(stderr,"scope size: %d.\n", (int)scope.size());
 
   // build the tree
-  if(tree)
-    delete tree;
+  if(*tree)
+    delete *tree;
 
   if(scope.size()!=0)
-    tree = new KDTree<MyTriangle,3>(scope.size(), scope.data());
+    *tree = new KDTree<MyTriangle,3>(scope.size(), scope.data());
   else
-    tree = NULL;
+    *tree = NULL;
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::FindNodalCandidates()
+Intersector::FindNodalCandidates(SpaceVariable3D &BBmin, SpaceVariable3D &BBmax, KDTree<MyTriangle, 3> *tree,
+                                 SpaceVariable3D &CandidatesIndex, 
+                                 vector<pair<Int3, vector<MyTriangle> > > &candidates)
 {
 
   candidates.clear();
@@ -250,20 +351,26 @@ Intersector::FindNodalCandidates()
 //-------------------------------------------------------------------------
 
 void
-Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and first layer nodes
+Intersector::FindIntersections() //also finds occluded and first layer nodes
 {
+
+  // Find nodal candidates, layer = 1
+  FindNodalCandidates(BBmin_1, BBmax_1, tree_1, CandidatesIndex_1, candidates_1);
+
 
   Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
   Vec3D*** xf      = (Vec3D***) XForward.GetDataPointer();
   Vec3D*** xb      = (Vec3D***) XBackward.GetDataPointer();
-  double*** candid = with_nodal_cands ? CandidatesIndex.GetDataPointer() : NULL;
-  double*** sign   = Sign.GetDataPointer();
+  double*** candid = CandidatesIndex_1.GetDataPointer();
+  double*** color  = Color.GetDataPointer();
   
   double*** occid  = TMP.GetDataPointer(); //occluding triangle id
   double*** layer  = TMP2.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
 
   //Clear previous values
   intersections.clear();
+
+  previously_occluded_but_not_now.clear();
 
   //Preparation
   Vec3D tol(half_thickness*1.5, half_thickness*1.5, half_thickness*1.5); //a tolerance
@@ -281,6 +388,14 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
   IntersectionPoint xp0, xp1;
 
+  // For completeness (to avoid confusion), we set external ghost cells to -1
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+      Int3& ijk(it->ijk);
+      xf[ijk[2]][ijk[1]][ijk[0]] = -1; //setting all three components to -1
+      xb[ijk[2]][ijk[1]][ijk[0]] = -1;
+  }
+ 
+
   // ----------------------------------------------------------------------------
   // Find occluded nodes and intersections. Build occluded and firstLayer 
   // ----------------------------------------------------------------------------
@@ -290,18 +405,15 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
     for(int j=jj0_in; j<jjmax_in; j++)
       for(int i=ii0_in; i<iimax_in; i++) {
   
-        // start with assuming it is outside
-        sign[k][j][i] = 1;
-
         // start with a meaningless triangle id
         occid[k][j][i] = -1;
 
         layer[k][j][i] = -1;
 
-        if(!tree) //this subdomain is entirely away from surface, just set sign, occid, and layer to default values
+        if(!tree_1) //this subdomain is entirely away from surface, just set color, occid, and layer to default values
           continue; 
 
-        if(candid && k<kmax && j<jmax && i<imax && //candid has a valid value @ i,j,k
+        if(k<kmax && j<jmax && i<imax && //candid has a valid value @ i,j,k
            candid[k][j][i] < 0)  //no nodal candidates, intersection impossible, occlusion also impossible
           continue;
  
@@ -312,15 +424,15 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         found_left = found_bottom = found_back = 0;
 
         if(i-1>=ii0_in) { //the edge [k][j][i-1] -> [k][j][i] is inside the physical domain
-          found_left = FindCandidatesInBox(tree, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
+          found_left = FindCandidatesInBox(tree_1, coords[k][j][i-1] - tol, coords[k][j][i] + tol, tmp_left, max_left);
         }
 
         if(j-1>=jj0_in) { //the edge [k][j-1][i] -> [k][j][i] is inside the physical domain
-          found_bottom = FindCandidatesInBox(tree, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
+          found_bottom = FindCandidatesInBox(tree_1, coords[k][j-1][i] - tol, coords[k][j][i] + tol, tmp_bottom, max_bottom);
         }
 
         if(k-1>=kk0_in) { //the edge [k-1][j][i] -> [k][j][i] is inside the physical domain
-          found_back = FindCandidatesInBox(tree, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
+          found_back = FindCandidatesInBox(tree_1, coords[k-1][j][i] - tol, coords[k][j][i] + tol, tmp_back, max_back);
         }
 
         //--------------------------------------------
@@ -330,9 +442,15 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
         if ((found_left>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_left.data(),   found_left,   half_thickness, tid)) ||
             (found_bottom>0 && IsPointOccludedByTriangles(coords[k][j][i], tmp_bottom.data(), found_bottom, half_thickness, tid)) ||
             (found_back>0   && IsPointOccludedByTriangles(coords[k][j][i], tmp_back.data(),   found_back,   half_thickness, tid))) {
-          sign[k][j][i] = 0;
+          color[k][j][i] = 0;
           occid[k][j][i] = tid;
           layer[k][j][i] = 0;          
+        }
+        else {
+          if(color[k][j][i]==0) {// previously occluded!
+            color[k][j][i] = -1; // to be corrected in "Refill"
+            previously_occluded_but_not_now.insert(Int3(i,j,k));
+          }
         }
 
         //--------------------------------------------
@@ -421,9 +539,9 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
       }
 
-  // Exchange Sign and TMP so internal ghost nodes are accounted for
-  if(candid) CandidatesIndex.RestoreDataPointerToLocalVector();
-  Sign.RestoreDataPointerAndInsert();
+  // Exchange Color and TMP so internal ghost nodes are accounted for
+  CandidatesIndex_1.RestoreDataPointerToLocalVector();
+  Color.RestoreDataPointerAndInsert();
   TMP.RestoreDataPointerAndInsert();
   TMP2.RestoreDataPointerAndInsert();
 
@@ -628,6 +746,8 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
 
       }
 
+
+
   TMP.RestoreDataPointerToLocalVector();
 
   XForward.RestoreDataPointerToLocalVector(); //Cannot exchange data, because "intersections" does not communicate
@@ -667,8 +787,8 @@ Intersector::FindIntersections(bool with_nodal_cands) //also finds occluded and 
   TMP2.WriteToVTRFile("TMP2.vtr", "layer");
   TMP.StoreMeshCoordinates(coordinates);
   TMP.WriteToVTRFile("TMP.vtr", "occid");
-  Sign.StoreMeshCoordinates(coordinates);
-  Sign.WriteToVTRFile("Sign.vtr", "sign");
+  Color.StoreMeshCoordinates(coordinates);
+  Color.WriteToVTRFile("Color.vtr", "color");
 */
 }
 
@@ -713,19 +833,19 @@ Intersector::IsPointOccludedByTriangles(Vec3D &x0, MyTriangle* tri, int nTri, do
 
 //-------------------------------------------------------------------------
 
-int
-Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions)
+bool
+Intersector::FloodFillColors()
 {
   // ----------------------------------------------------------------
   // Call floodfiller to do the work.
   // ----------------------------------------------------------------
-  int nColors = floodfiller.FillBasedOnEdgeObstructions(XForward, -1/*xf==-1 means no intersection*/, occluded, Sign);
+  int nColors = floodfiller.FillBasedOnEdgeObstructions(XForward, -1/*xf==-1 means no intersection*/, occluded, Color);
 
   // ----------------------------------------------------------------
   // Now we need to convert the color map to what we want: 0~occluded, 1, 2,...: regions connected to Dirichlet
   // boundaries (inlet/outlet/farfield). 1=inlet, 2=outlet. -1,-2,...: inside enclosures
   // ----------------------------------------------------------------
-  double*** sign   = Sign.GetDataPointer();
+  double*** color = Color.GetDataPointer();
 
   // First, we need to find the current colors for inlet, outlet
   std::set<int> inlet_color; 
@@ -737,10 +857,10 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
       continue;
     if(it->bcType == MeshData::INLET) {
       Int3& ijk(it->image_ijk);
-      inlet_color.insert(sign[ijk[2]][ijk[1]][ijk[0]]);
+      inlet_color.insert(color[ijk[2]][ijk[1]][ijk[0]]);
     } else if(it->bcType == MeshData::OUTLET) {
       Int3& ijk(it->image_ijk);
-      outlet_color.insert(sign[ijk[2]][ijk[1]][ijk[0]]);
+      outlet_color.insert(color[ijk[2]][ijk[1]][ijk[0]]);
     }
   }
 
@@ -751,7 +871,7 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
 
   vector<int> in_colors;
   if(max_inlet_color!=-1) {
-    in_colors.resize(max_inlet_color+1, -1);
+    in_colors.assign(max_inlet_color+1, -1);
     for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
       in_colors[*it] = 1;
     MPI_Allreduce(MPI_IN_PLACE, in_colors.data(), in_colors.size(), MPI_INT, MPI_MAX, comm);
@@ -770,7 +890,7 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
 
   vector<int> out_colors;
   if(max_outlet_color!=-1) {
-    out_colors.resize(max_outlet_color+1, -1);
+    out_colors.assign(max_outlet_color+1, -1);
     for(auto it = outlet_color.begin(); it != outlet_color.end(); it++)
       out_colors[*it] = 1;
     MPI_Allreduce(MPI_IN_PLACE, out_colors.data(), out_colors.size(), MPI_INT, MPI_MAX, comm);
@@ -806,8 +926,8 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
-        if(sign[k][j][i] != 0)
-          sign[k][j][i] = old2new[sign[k][j][i]];
+        if(color[k][j][i] != 0)
+          color[k][j][i] = old2new[color[k][j][i]];
         else
           total_occluded++;
       }
@@ -815,8 +935,7 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
   // statistics
   MPI_Allreduce(MPI_IN_PLACE, &total_occluded, 1, MPI_INT, MPI_SUM, comm);
 
-  if(total_occluded>0) 
-    hasOcc = true; //i.e. one zero color (for occluded)
+  bool hasOcc = total_occluded>0; //i.e. one zero color (for occluded)
 
   hasInlet = hasOutlet = false;
   nRegions = 0;
@@ -828,33 +947,48 @@ Intersector::FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int 
     else if(it->second<0)
       nRegions++;
 
-  Sign.RestoreDataPointerAndInsert();
 
-  return int(hasInlet) + int(hasOutlet) + int(hasOcc) + nRegions;
+  // fill ColorReachesBoundary
+  ColorReachesBoundary.assign(nRegions, 0);
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+    if(it->type_projection != GhostPoint::FACE)
+      continue;
+    Int3& ijk(it->image_ijk);
+    int mycolor = color[ijk[2]][ijk[1]][ijk[0]];
+    if(mycolor<0) 
+      ColorReachesBoundary[-mycolor] = 1;
+  }
+  MPI_Allreduce(MPI_IN_PLACE, ColorReachesBoundary.data(), ColorReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
+ 
+
+
+  // Finalization
+
+  Color.RestoreDataPointerAndInsert();
+
+  return hasOcc;
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
+Intersector::RefillAfterSurfaceUpdate()
 {
   // "FindSweptNodes" should be called before calling this function. So, in most cases, "nodal_cands_calculated" should be true
   
-  // Assuming occluded nodes already have the correct sign. We do not deal with them here.
+  // Assuming occluded nodes already have the correct color. We do not deal with them here.
   
-  if(!nodal_cands_calculated) {
-    BuildNodalAndSubdomainBoundingBoxes(1);
-    BuildSubdomainScopeAndKDTree();
-    FindNodalCandidates();
-  }
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
 
-  double*** candid = CandidatesIndex.GetDataPointer();
+  double*** candid = CandidatesIndex_1.GetDataPointer();
   
-  //add swepted nodes to nodes2fill (including internal ghosts)
+  //add swept nodes to nodes2fill (including internal ghosts)
   std::set<Int3> nodes2fill = swept;
   std::set<Int3> nodes2fill2;
 
-  // go over swept nodes, correct their signs
+  // go over swept nodes, correct their colors
   int i0,j0,k0;
   vector<Vec3D>&  Xs(surface.X);
   vector<Int3>&   Es(surface.elems);
@@ -862,7 +996,7 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
   int BAD_SIGN = -999999; //used temporarily.
 
   int max_it = 100;
-  double*** sign = NULL;
+  double*** color = NULL;
   int total_remaining_nodes;
   for(int iter = 0; iter < max_it; iter++) {
 
@@ -871,8 +1005,16 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
     if(total_remaining_nodes == 0) //Yeah
       break;
   
-    if(!sign) //first iteration
-      sign = Sign.GetDataPointer();
+/*
+    if(total_remaining_nodes>0) {
+      fprintf(stderr,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
+      Color.StoreMeshCoordinates(coordinates);
+      Color.WriteToVTRFile("Color.vtr", "color");
+    }
+*/
+
+    if(!color) //first iteration
+      color = Color.GetDataPointer();
 
     nodes2fill2 = nodes2fill;
 
@@ -884,11 +1026,16 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
       if(!coordinates.IsHere(i0,j0,k0,false))
         continue; //this is an internal ghost. we let its owner fix it.
 
-      sign[k0][j0][i0] = BAD_SIGN;
+      if(color[k0][j0][i0] == 0) { //occluded
+        nodes2fill2.erase(nodes2fill2.find(*it)); 
+        continue;
+      }
+
+      color[k0][j0][i0] = BAD_SIGN;
 
       // if this node is swept, candidates must exist. Otherwise, the surface moved too much!
       assert(candid[k0][j0][i0]>=0);
-      vector<MyTriangle> &cands(candidates[candid[k0][j0][i0]].second);
+      vector<MyTriangle> &cands(candidates_1[candid[k0][j0][i0]].second);
       assert(cands.size()>0);
 
       //go over first layer neighbors, find a nonblocked reliable neighbor
@@ -896,30 +1043,32 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
         for(int j=j0-1; j<=j0+1; j++)
           for(int i=i0-1; i<=i0+1; i++) {
 
-            if(!coordinates.OutsidePhysicalDomain(i,j,k) || (i==i0 && j==j0 && k==k0))
+            if(coordinates.OutsidePhysicalDomain(i,j,k) || (i==i0 && j==j0 && k==k0))
               continue; //this neighbor is out of physical domain, or just the same node
 
             if(nodes2fill2.find(Int3(i,j,k)) != nodes2fill2.end()) //uses "nodes2fill2", the latest updated list
               continue; //this neighbor is in trouble as well...
 
-            if(sign[k][j][i] == 0) //this neighbor is occluded (naturally or "forced"). Either way, it cannot be used.
+            if(color[k][j][i] == 0) //this neighbor is occluded (naturally or "forced"). Either way, it cannot be used.
               continue;
 
             bool blocked = false;
             for(auto it2 = cands.begin(); it2 != cands.end(); it2++) {
               int id = it2->trId();
               Int3 &nodes(Es[id]);
-              blocked = GeoTools::LineSegmentIntersectsTriangle(Vec3D(x_glob[i],y_glob[j],z_glob[k]),//inside physical domain (safe)
+              blocked = GeoTools::LineSegmentIntersectsTriangle(Vec3D(x_glob[i],y_glob[j],z_glob[k]),
                                                                 Vec3D(x_glob[i0],y_glob[j0],z_glob[k0]), 
                                                                 Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]]);
+
               if(blocked)
                 break;
             }
+
             if(blocked)
               continue; //this neighbor is blocked from me by the surface
 
             // If the above checks are all passed, this neighbor is in the same region as me.
-            sign[k0][j0][i0] = sign[k][j][i];
+            color[k0][j0][i0] = color[k][j][i];
             nodes2fill2.erase(nodes2fill2.find(*it)); //erase from nodes2fill2, NOT from nodes2fill (would mess up pointer!)
             goto DONE_WITH_THIS_NODE; 
          }
@@ -929,10 +1078,10 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
     }
     nodes2fill = nodes2fill2;
 
-    Sign.RestoreDataPointerAndInsert();
+    Color.RestoreDataPointerAndInsert();
 
     // Get new data
-    sign = Sign.GetDataPointer();
+    color = Color.GetDataPointer();
 
     // remove filled internal ghosts (filled by their owners) from "nodes2fill"
     for(auto it = nodes2fill.begin(); it != nodes2fill.end(); it++) {
@@ -940,7 +1089,7 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
       j0 = (*it)[1];
       k0 = (*it)[2]; 
       if(!coordinates.IsHere(i0,j0,k0,false)) { //this is an internal ghost
-        if(sign[k0][j0][i0] != BAD_SIGN) //must have been fixed by its owner
+        if(color[k0][j0][i0] != BAD_SIGN) //must have been fixed by its owner
           nodes2fill2.erase(nodes2fill2.find(*it)); 
       }
     }
@@ -956,31 +1105,45 @@ Intersector::RefillAfterSurfaceUpdate(bool nodal_cands_calculated)
                    total_remaining_nodes, max_it);
     imposed_occluded = nodes2fill;
     for(auto it = imposed_occluded.begin(); it != imposed_occluded.end(); it++) 
-      sign[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
-      //sign must be valid (i.e. not NULL) if total_remaining_nodes>0
+      color[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
+      //color must be valid (i.e. not NULL) if total_remaining_nodes>0
   }
 
-  if(sign)
-    Sign.RestoreDataPointerToLocalVector();
 
-  CandidatesIndex.RestoreDataPointerToLocalVector();
+  // Update "ColorReachesBoundary"
+  if(color) {
+    for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+      if(it->type_projection != GhostPoint::FACE)
+        continue;
+      Int3& ijk(it->image_ijk);
+      int mycolor = color[ijk[2]][ijk[1]][ijk[0]];
+      if(mycolor<0) 
+        ColorReachesBoundary[-mycolor] = 1;
+    }
+    MPI_Allreduce(MPI_IN_PLACE, ColorReachesBoundary.data(), ColorReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
+  }
+
+
+  if(color)
+    Color.RestoreDataPointerToLocalVector();
+
+  CandidatesIndex_1.RestoreDataPointerToLocalVector();
 
 }
 
 //-------------------------------------------------------------------------
  
 void
-Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
+Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
 {
-  if(!nodal_cands_calculated) {
-    BuildNodalAndSubdomainBoundingBoxes(1);
-    BuildSubdomainScopeAndKDTree();
-    FindNodalCandidates();
-  }
   
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+
   swept.clear();
 
-  double*** candid = CandidatesIndex.GetDataPointer();
+  double*** candid = CandidatesIndex_1.GetDataPointer();
 
   vector<Vec3D>&  Xs(surface.X);
   vector<Int3>&   Es(surface.elems);
@@ -999,7 +1162,7 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
     k = (*it)[2];
 
     assert(candid[k][j][i]>=0);
-    vector<MyTriangle> &cands(candidates[candid[k][j][i]].second);
+    vector<MyTriangle> &cands(candidates_1[candid[k][j][i]].second);
     assert(cands.size()>0);
 
     for(auto it2 = cands.begin(); it2 != cands.end(); it2++) {
@@ -1008,27 +1171,43 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated)
       Vec3D coords(x_glob[(*it)[0]], y_glob[(*it)[1]], z_glob[(*it)[2]]); //inside physical domain (safe)
       if(GeoTools::IsPointSweptByTriangle(coords, X0[nodes[0]], X0[nodes[1]], X0[nodes[2]],
                                           Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], &collision_time, half_thickness, 
-                                          NULL, NULL, &(As[id]), &(Ns[id])))
+                                          NULL, NULL, &(As[id]), &(Ns[id]))) {
         swept.insert(*it);
+        //fprintf(stderr,"Found swept node: [%d][%d][%d] [%e %e %e].\n", (*it)[2], (*it)[1], (*it)[0],
+        //        coords[0], coords[1], coords[2]);
+      }
     }
   }
       
-  CandidatesIndex.RestoreDataPointerToLocalVector();
+  // Verification
+  for(auto&& ijk : previously_occluded_but_not_now) {
+    if(swept.find(ijk) == swept.end()) {
+      fprintf(stderr,"\033[0;31m*** Error: Conflict between 'swept' and 'occluded': %d %d %d. A software bug.\033[0m\n",
+              ijk[0], ijk[1], ijk[2]);
+      exit(-1);
+    } 
+  }
+  
+  CandidatesIndex_1.RestoreDataPointerToLocalVector();
 }
 
 //-------------------------------------------------------------------------
 
 void
-Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated)
+Intersector::CalculateUnsignedDistanceNearSurface(int nL)
 {
 
-  if(!nodal_cands_calculated) {
-    BuildNodalAndSubdomainBoundingBoxes(nLayer);
-    BuildSubdomainScopeAndKDTree();
-    FindNodalCandidates();
-  }
+  assert(nLayer = nL);
 
-  double*** candid = CandidatesIndex.GetDataPointer();
+  FindNodalCandidates(BBmin_n, BBmax_n, tree_n, CandidatesIndex_n, candidates_n);
+
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+
+  Phi_nLayer = nLayer;
+
+  double*** candid = CandidatesIndex_n.GetDataPointer();
   double*** phi    = Phi.GetDataPointer();
   double*** cpi    = ClosestPointIndex.GetDataPointer();
   
@@ -1065,7 +1244,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
       k = (*it)[2];
 
       assert(candid[k][j][i]>=0);
-      vector<MyTriangle> &cands(candidates[candid[k][j][i]].second);
+      vector<MyTriangle> &cands(candidates_n[candid[k][j][i]].second);
       assert(cands.size()>0);
 
       double dist = DBL_MAX, new_dist;
@@ -1114,10 +1293,176 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_c
   }
 
 
-  CandidatesIndex.RestoreDataPointerToLocalVector();
+  CandidatesIndex_n.RestoreDataPointerToLocalVector();
   ClosestPointIndex.RestoreDataPointerToLocalVector(); //cannot communicate, because "closest_points" do not.
   Phi.RestoreDataPointerAndInsert(); 
 
+}
+
+//-------------------------------------------------------------------------
+
+void
+Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
+{
+
+  // Step 0. Check if the domain (not just this subdomain) has the input color
+  if((this_color==1 && !hasInlet) || (this_color==2 && !hasOutlet) || this_color>2 || this_color==0 ||
+     this_color<-nRegions) {
+    print_error("*** Error: (FindColorBoundary) Unable to find the boundary of an invalid color %d.\n",
+                this_color);
+    exit_mpi();
+  }
+
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+  vector<double> &dx_glob(global_mesh.dx_glob);
+  vector<double> &dy_glob(global_mesh.dy_glob);
+  vector<double> &dz_glob(global_mesh.dz_glob);
+
+
+  // Step 1. Preparation
+  vector<Vec3D>&  Xs(surface.X);
+  vector<Int3>&   Es(surface.elems);
+  vector<Vec3D>&  Ns(surface.elemNorm);
+
+  vector<int> positive_side(Es.size(), 0); //0 means NOT facing "this_color"
+  vector<int> negative_side(Es.size(), 0);
+
+
+  //Step 2. Build a small (layer=0) local scope. No need to create tree.
+  //        Also build a global scope and tree that contain all the triangles
+  Vec3D subDmin(0.0), subDmax(0.0);
+  subDmin[0] = x_glob[i0] - 0.5*dx_glob[i0] - 2.0*half_thickness;
+  subDmin[1] = y_glob[j0] - 0.5*dy_glob[j0] - 2.0*half_thickness;
+  subDmin[2] = z_glob[k0] - 0.5*dz_glob[k0] - 2.0*half_thickness;
+  subDmax[0] = x_glob[imax-1] + 0.5*dx_glob[imax-1] + 2.0*half_thickness;
+  subDmax[1] = y_glob[jmax-1] + 0.5*dy_glob[jmax-1] + 2.0*half_thickness;
+  subDmax[2] = z_glob[kmax-1] + 0.5*dz_glob[kmax-1] + 2.0*half_thickness;
+
+  vector<int> local_scope;
+  vector<MyTriangle> global_scope;
+  global_scope.reserve(Es.size());
+
+  for(int e=0; e<Es.size(); e++) {
+    MyTriangle tri(e, Xs[Es[e][0]], Xs[Es[e][1]], Xs[Es[e][2]]);
+    global_scope.push_back(tri);
+
+    bool inside = true;
+    for(int i=0; i<3; i++) {
+      if(tri.val(i) > subDmax[i] || tri.val(i) + tri.width(i) < subDmin[i]) {
+        inside = false;
+        break;
+      }
+    }
+    if(inside)
+      local_scope.push_back(e);
+  }
+
+  KDTree<MyTriangle,3> global_tree(global_scope.size(), global_scope.data());
+ 
+
+  // Step 3. Check both sides 
+  Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
+  double*** color  = Color.GetDataPointer();
+
+  int bandwidth = 2;
+  int nMaxCand = 1000;
+  vector<MyTriangle> tmp(nMaxCand);
+
+  for(int side=0; side<2; side++) {
+
+    double disp = 1.5*half_thickness;
+    if(side==1) disp *= -1;
+
+    // loop through triangles within the "local scope"
+    for(int i=0; i<local_scope.size(); i++) {
+
+      // find point "p" with lofting
+      int triangle_id = local_scope[i];
+      Int3 &nod(Es[triangle_id]);
+      Vec3D p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0 + disp*Ns[triangle_id];
+
+      // locate the node that is closest to p
+      Int3 ijk = global_mesh.FindClosestNodeToPoint(p, false);
+
+      // find candidates (nodes with "this_color" for this point)
+      vector<Int3> mycands;
+      Int3 ijk1;
+      for(int dk=-bandwidth; dk<=bandwidth; dk++) {
+        ijk1[2] = ijk[2] + dk;
+        for(int dj=-bandwidth; dj<=bandwidth; dj++) {
+          ijk1[1] = ijk[1] + dj;
+          for(int di=-bandwidth; di<=bandwidth; di++) {
+            ijk1[0] = ijk[0] + di; 
+            if(coordinates.IsHereOrInternalGhost(ijk1[0], ijk1[1], ijk1[2]) &&
+               color[ijk1[2]][ijk1[1]][ijk1[0]] == this_color)
+              mycands.push_back(ijk1);
+          }
+        }
+      }
+      std::sort(mycands.begin(), mycands.end(), 
+                [&](Int3 a, Int3 b) {
+                   return (coords[a[2]][a[1]][a[0]] - p).norm() < (coords[b[2]][b[1]][b[0]] - p).norm();} );
+
+      // find intersections using the global tree (i.e. all the triangles)
+      for(auto it = mycands.begin(); it != mycands.end(); it++) {
+       
+        Vec3D &q(coords[(*it)[2]][(*it)[1]][(*it)[0]]);
+
+        Vec3D bmin(0.0), bmax(0.0);
+        for(int s=0; s<3; s++) {
+          bmin[s] = std::min(q[s], p[s]) - half_thickness;
+          bmax[s] = std::max(q[s], p[s]) + half_thickness;
+        } 
+        int nFound = FindCandidatesInBox(&global_tree, bmin, bmax, tmp, nMaxCand);
+        bool intersect = false; //if nFound = 0 (unlikely), this should be "false"
+        for(int tri=0; tri<nFound; tri++) {
+          int id = tmp[tri].trId();
+          Int3& nodes(Es[id]);
+          if(GeoTools::LineSegmentIntersectsTriangle(p, q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]])) {
+            intersect = true;
+            break;  //intersecting one triangle means intersecting the whole surface 
+          } 
+        }  
+        if(!intersect) { //if one <p,q> does not intersect the interface, it means they are on the same "side"
+          if(side==0) 
+            positive_side[triangle_id] = 1;
+          else
+            negative_side[triangle_id] = 1;
+
+          break;
+        }
+      }
+
+    }
+
+    // assemble data
+    if(side==0)
+      MPI_Allreduce(MPI_IN_PLACE, positive_side.data(), positive_side.size(), MPI_INT, MPI_MAX, comm);
+    else
+      MPI_Allreduce(MPI_IN_PLACE, negative_side.data(), negative_side.size(), MPI_INT, MPI_MAX, comm);
+
+  }
+
+  
+  // Step 4. Finalize output
+  status.assign(Es.size(), 0);
+  for(int i=0; i<Es.size(); i++) {
+    if(positive_side[i]>0) {
+      if(negative_side[i]>0)
+        status[i] = 3;
+      else
+        status[i] = 1;
+    } else if(negative_side[i]>0)
+      status[i] = 2;
+  }
+  
+
+  // Clean-up
+  coordinates.RestoreDataPointerToLocalVector();
+  Color.RestoreDataPointerToLocalVector();
+ 
 }
 
 //-------------------------------------------------------------------------
@@ -1160,6 +1505,57 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 
   return X.size();
 }
+
+//-------------------------------------------------------------------------
+
+bool
+Intersector::Intersects(Vec3D &X0, Vec3D &X1)
+{
+
+  if(!tree_n) //this subdomain is not even close to the embedded surface.
+    return false;
+
+  assert(nLayer>=1);
+
+  // Step 1: Find candidates using the KDTree
+  Vec3D bmin(std::min(X0[0],X1[0]), std::min(X0[1],X1[1]), std::min(X0[2],X1[2]));
+  Vec3D bmax(std::max(X0[0],X1[0]), std::max(X0[1],X1[1]), std::max(X0[2],X1[2]));
+  bmin -= half_thickness;
+  bmax += half_thickness;
+
+  int maxCand = 1000;
+  vector<MyTriangle> cands(maxCand);
+  int found = tree_n->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+  if(found>maxCand) {
+    maxCand = found;
+    cands.resize(maxCand);
+    found = tree_n->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+  }
+
+  if(!found)
+    return false;
+
+  // Step 2: Check if X0 or X1 is occluded (-->intersection)
+  int tid; //not used
+  if(IsPointOccludedByTriangles(X0, cands.data(), found, half_thickness, tid))
+    return true;
+  if(IsPointOccludedByTriangles(X1, cands.data(), found, half_thickness, tid))
+    return true;
+
+  // Step 3: Check for intersection
+  vector<Vec3D>& Xs(surface.X);
+  vector<Int3>&  Es(surface.elems);
+  for(int i=0; i<found; i++) {
+    Int3 &nodes(Es[cands[i].trId()]);
+    if(GeoTools::LineSegmentIntersectsTriangle(X0, X1, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]]))
+      return true;
+  }
+
+  return false;
+}
+
+//-------------------------------------------------------------------------
+
 
 //-------------------------------------------------------------------------
 

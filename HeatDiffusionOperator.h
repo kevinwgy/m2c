@@ -7,6 +7,9 @@
 #include <VarFcnBase.h>
 #include <Interpolator.h>
 #include <HeatDiffuFcn.h>
+#include <memory>
+
+class EmbeddedBoundaryDataSet;
 
 /***************************************************
  * class HeatDiffusionOperator calculates the diffusive 
@@ -61,7 +64,9 @@ public:
   void Destroy();
 
   //! calculate diffusion fluxes (on the left-hand-side of the N-S equations; add them to R) 
-  void AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R);
+  void AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                          SpaceVariable3D &R);
 
   //! Add symmetry Term induced by heat diffusion if needed
   void AddSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R);

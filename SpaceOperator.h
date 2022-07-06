@@ -1,6 +1,7 @@
 #ifndef _SPACEOPERATOR_H_
 #define _SPACEOPERATOR_H_
 #include <ExactRiemannSolverBase.h>
+#include <GlobalMeshInfo.h>
 #include <SymmetryOperator.h>
 #include <ViscosityOperator.h>
 #include <HeatDiffusionOperator.h>
@@ -8,6 +9,10 @@
 #include <FluxFcnBase.h>
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
+
+class EmbeddedBoundaryDataSet;
+class TriangulatedSurface;
+class IntersectionPoint;
 
 /*******************************************
  * class SpaceOperator drives computations
@@ -36,6 +41,8 @@ class SpaceOperator
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
   int NX, NY, NZ; //!< global size
+
+  GlobalMeshInfo &global_mesh;
 
   //! Class for spatial reconstruction
   Reconstructor rec;
@@ -66,8 +73,7 @@ public:
   SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                 vector<VarFcnBase*> &varFcn_, FluxFcnBase &fluxFcn_,
                 ExactRiemannSolverBase &riemann_,
-                vector<double> &x, vector<double> &y, vector<double> &z,
-                vector<double> &dx, vector<double> &dy, vector<double> &dz,
+                GlobalMeshInfo &global_mesh_,
                 bool screenout = true); 
   ~SpaceOperator();
 
@@ -87,7 +93,8 @@ public:
 
   void SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
-  void SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID);
+  std::multimap<int,std::pair<int,int> > SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, 
+                             std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
     
   void ApplyBoundaryConditions(SpaceVariable3D &V);
 
@@ -103,7 +110,8 @@ public:
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,
-                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL, bool run_heat = true);
+                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr, bool run_heat = true);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}
@@ -122,6 +130,14 @@ private:
 
   void CreateGhostNodeLists(bool screenout);
 
+  void ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** v, double*** id);
+
+  std::pair<int, std::pair<int,int> >
+  ApplyPointBasedInitialCondition(PointData& point, 
+                                  vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
+                                  vector<double***> &color,
+                                  Vec5D*** v, double*** id);
+                                       
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
 
   void CheckReconstructedStates(SpaceVariable3D &V,
@@ -131,7 +147,16 @@ private:
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL,
-                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL);
+                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                              vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
+
+  Vec3D GetNormalForOneSidedRiemann(int d,/*0,1,2*/
+                                    int forward_or_backward,/*1~wall is in the +x/y/z dir of material, -1~-x/y/z*/
+                                    Vec3D& nwall);
+
+  Vec3D GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
+                                      int myid, int neighborid, vector<int> *ls_mat_id,
+                                      vector<double***> *phi);
 
   Vec3D CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
                                         int myid, int neighborid, vector<int> *ls_mat_id,
@@ -141,8 +166,16 @@ private:
   Vec3D CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
                                          Vec3D*** dxyz, double*** phi);
 
+  bool TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi, 
+                                  vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                  SpaceVariable3D &Tag0);
 
-  void TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &Tag0, double depth);
+  // Find intersections (forward and backward) between an edge and embedded surface(s)
+  bool FindEdgeSurfaceIntersections(int dir/*0~x,1~y,2~z*/, int i, int j, int k,
+                                    vector<TriangulatedSurface*>& surfaces,
+                                    vector<vector<IntersectionPoint>*>& intersections,
+                                    vector<Vec3D***>& xf, vector<Vec3D***>& xb,
+                                    Vec3D& vwallf, Vec3D& vwallb, Vec3D& nwallf, Vec3D& nwallb);
 
   // Utility
   inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {

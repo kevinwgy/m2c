@@ -5,6 +5,9 @@
 #include<KDTree.h>
 #include<TriangulatedSurface.h>
 #include<FloodFill.h>
+#include<EmbeddedBoundaryDataSet.h>
+#include<GlobalMeshInfo.h>
+#include<memory> //unique_ptr
 
 /****************************************************************
  * Class Intersector is responsible for tracking a triangulated
@@ -13,44 +16,18 @@
  * Wang et al., IJNMF, 2012. The intersector is able to find
  * (1) nodes covered by the interface (occluded nodes),
  * (2) all the edge-interface intersections,
- * (3) shortest distance from each node to the intersector (w/
- *     the help of level set reinitializer)
+ * (3) shortest distance from each node to the interface (usually
+ *     only a few layers of nodes near the surface)
  * (4) closest point on the interface to each node (If solution is not
  *     unique, only one solution is found)
  * (5) nodes swept by the (dynamic) surface in one time step
- * (6) (if the interface is a closed surface) the inside/outside
- *     status of each node with respect to the surface.
+ * (6) the "color" of each node (i.e. connectivity info)
+ * (7) the elements in the embedded surface that form the boundary
+ *     of a "color", and their inward-facing side.
  * Note: The above results are stored within this class.
  ***************************************************************/
 
 class Intersector {
-
-  //! A nested class that stores information about an intersection point between an edge and a triangle
-  struct IntersectionPoint {
-    Int3 n0; //!< the first (i.e., left, bottom, or back) node
-    int dir; //!< the direction of the edge (0~x, 1~y, 2~z)
-    double dist; //!< dist from n0 to the intersection point along dir
-    int tid; //!< id of the triangle that it intersects
-    double xi[3]; //!< barycentric coords of the intersection point within the triangle it intersects
-
-    /** NOTE: In most cases, the point obtained using tid and xi is IDENTICAL to the point
-     *        obtained using n0, dir, and dist. 
-     *        However, the two points may not be the same when the intersection is IMPOSED to an edge because
-     *        (1) one (or two) of the vertices of the edge is occluded and 
-     *        (2) an intersection cannot be identified normally (i.e. w/o imposing thickness).
-     *        In this case, the second point (obtained using n0, dir, and dist) would be the occluded vertex,
-     *        and the first point is the closest point on the triangle to the occluded vertex.
-     *        If both vertices of the edge are occluded. The two vertices are considered as two intersection
-     *        points. */
-
-    IntersectionPoint() : n0(-1,-1,-1), dir(-1), dist(-1), tid(-1) {xi[0] = xi[1] = xi[2] = -1;}
-
-    IntersectionPoint(int i, int j, int k, int dir_, double dist_, int tid_, double* xi_)
-      : n0(Int3(i,j,k)), dir(dir_), dist(dist_), tid(tid_) {xi[0] = xi_[0]; xi[1] = xi_[1]; xi[2] = xi_[2];}
-
-    IntersectionPoint &operator=(const IntersectionPoint& p2) {
-      n0 = p2.n0;  dir = p2.dir;  dist = p2.dist;  tid = p2.tid;  for(int i=0; i<3; i++) xi[i] = p2.xi[i]; return *this;}
-  };
 
 
   //! Utility class to find and store bounding boxes for triangles
@@ -75,20 +52,6 @@ class Intersector {
   };
 
 
-  //! Utility class to store the closest point on the surface to a node (an arbitrary point)
-  struct ClosestPoint {
-    int tid;
-    double dist; //!< dist to the node in question
-    double xi[3]; //!< closest point is at xi[0]*node[0] + xi[1]*node[1] + xi[2]*node[2]
-
-    ClosestPoint(int tid_, double dist_, double xi_[3]) : tid(tid_), dist(dist_) {
-      for(int i=0; i<3; i++) xi[i] = xi_[i];}
-
-    ClosestPoint &operator=(const ClosestPoint& p2) {
-      tid = p2.tid;  dist = p2.dist;
-      for(int i=0; i<3; i++) {xi[i] = p2.xi[i];} return *this;}
-  };
-
   MPI_Comm& comm;
 
   EmbeddedSurfaceData &iod_surface;
@@ -101,9 +64,6 @@ class Intersector {
   bool closed_surface; //!< whether the surface is closed AND normals are consistent
   double half_thickness; //!< half thickness of the surface
 
-  std::vector<MyTriangle> scope; //!< triangles relevant to the current subdomain (no tol for the BB of triangles)
-  KDTree<MyTriangle, 3> *tree; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
-
   //! Mesh info
   SpaceVariable3D& coordinates;
 
@@ -115,15 +75,27 @@ class Intersector {
   int ii0_in, jj0_in, kk0_in, iimax_in, jjmax_in, kkmax_in; //!< corners of the ghosted subdomain, excluding external ghosts
   int NX, NY, NZ; //!< global size (number of cells in the real domain)
 
-  std::vector<double> &x_glob, &y_glob, &z_glob; //!< x,y,z coords of the entire domain
-  std::vector<double> &dx_glob, &dy_glob, &dz_glob; //!< dx, dy, dz of the entire domain
+  GlobalMeshInfo &global_mesh;
 
-  SpaceVariable3D BBmin, BBmax; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
+
+  //! Infrastructure #1. One layer of neighbors
+  SpaceVariable3D BBmin_1, BBmax_1; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
                                      in the physical domain. For each node, the BB contains the \n
                                      node itself and all the edges (n layers, n TBD) that connect the node \n
                                      with other nodes IN THE PHYSICAL DOMAIN.*/
-  Vec3D subD_bbmin, subD_bbmax; //!< bounding box of the subdomain (n layers, n TBD)
-  int bblayer; //!< number of layers of neighbors included in the b.b.
+  Vec3D subD_bbmin_1, subD_bbmax_1; //!< bounding box of the subdomain (n layers, n TBD)
+
+  std::vector<MyTriangle> scope_1; //!< triangles relevant to the current subdomain (no tol for the BB of triangles)
+  KDTree<MyTriangle, 3> *tree_1; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
+
+
+  //! Infrastructure #1. N(>1) layer of neighbors
+  SpaceVariable3D BBmin_n, BBmax_n; 
+  Vec3D subD_bbmin_n, subD_bbmax_n;
+  std::vector<MyTriangle> scope_n;
+  KDTree<MyTriangle, 3> *tree_n;
+  int nLayer; //!< number of layers of neighbors included in the b.b. In most cases, should = Phi_nLayer
+
 
   SpaceVariable3D TMP, TMP2; //!< For temporary use.
 
@@ -131,8 +103,13 @@ class Intersector {
    * Results
    ************************/
   //! "CandidatesIndex" and "candidates" account for internal ghost nodes, but not ghost nodes outside physical domain.
-  SpaceVariable3D CandidatesIndex; //!< index in the vector "candidates" (-1 means no candidates)
-  std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates;
+  SpaceVariable3D CandidatesIndex_1; //!< index in the vector "candidates" (-1 means no candidates)
+  std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates_1;
+
+  SpaceVariable3D CandidatesIndex_n;
+  std::vector<std::pair<Int3, std::vector<MyTriangle> > > candidates_n;
+
+
 
   //! XForward/XBackward stores edge-surface intersections where both vertices of the edge are inside subdomain or inn. ghost
   SpaceVariable3D XForward; /**< Edge-surface intersections. X[k][j][i][0]: left-edge, [1]: bottom-edge, [2]: back-edge \n
@@ -143,9 +120,15 @@ class Intersector {
                                   two vertices. XForward stores the one that is closest to the left/bottom/back vertex. \n
                                   XBackward stores the one that is closest to the right/top/front vertex. */
 
-  //! Phi and Sign communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
+  //! Phi and Color communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
-  SpaceVariable3D Sign; //!< GENERALIZED sign: -N (inside enclosure #N), 0 (occluded), or N (inlet, outlet). N = 1,2,...
+  int Phi_nLayer; //!< number of layers of nodes where Phi is calculated.
+  SpaceVariable3D Color; //!< GENERALIZED color: -N (inside enclosure #N), 0 (occluded), or N (inlet=1, outlet=2).
+  std::vector<int> ColorReachesBoundary; /**< stores whether each negative colored regions (i.e. enclosrures)  touches \n
+                                             the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
+                                             the size of this vector is "nRegions" calculated in FloodFillColors.*/
+  bool hasInlet, hasOutlet;
+  int nRegions;
                       
   //! Closest point on triangle (for near-field nodes inside subdomain, including internal ghosts nodes)
   SpaceVariable3D ClosestPointIndex; //!< index in the vector closest_points. (-1 means not available)
@@ -159,8 +142,8 @@ class Intersector {
   //! "occluded" and "firstLayer" account for the internal ghost nodes.
   std::set<Int3> occluded;
   std::set<Int3> firstLayer; //!< nodes that belong to intersecting edges (naturally, including occluded nodes)
-  std::set<Int3> imposed_occluded; /**< tracks nodes whose sign cannot be resolved; these nodes are FORCED to have\n
-                                        the sign of occluded(0), but intersections from these nodes to neighbors\n
+  std::set<Int3> imposed_occluded; /**< tracks nodes whose color cannot be resolved; these nodes are FORCED to have\n
+                                        the color of occluded(0), but intersections from these nodes to neighbors\n
                                         may not exist! Includes internal ghost nodes.*/
                                         
 
@@ -168,52 +151,88 @@ class Intersector {
   //! Does not include nodes that are occluded at present. Includes internal ghost nodes.
   std::set<Int3> swept;
 
+  //! an internally used vector
+  std::set<Int3> previously_occluded_but_not_now;
+
 public:
 
   Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
               TriangulatedSurface &surface_,
               SpaceVariable3D &coordinates_, 
               std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
-              std::vector<double> &x_, std::vector<double> &y_, std::vector<double> &z_,
-              std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
+              GlobalMeshInfo &global_mesh_);
 
   ~Intersector();
 
   void Destroy();
 
-  //! Interface tracking functions
-  void TrackSurfaceFullCourse(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions, int phi_layers);
+  //! Get surface half thickness
+  inline double GetSurfaceHalfThickness() {return half_thickness;}
 
- 
+  //! Check if a line segment intersects with any triangles inside scope
+  bool Intersects(Vec3D &X0, Vec3D &X1);
+
+  //! Interface tracking functions
+  void TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers);
+
+  void RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
+
 
 /** Below is like the a la carte menu. Try to use the pre-defined "combos" above as much as you can. 
  *  The functions below are not all independent with each other!*/
 public:
 
-  void BuildNodalAndSubdomainBoundingBoxes(int nLayer=1); //!< build BBmin, BBmax, subD_bbmin, subD_bbmax
+  void BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin, SpaceVariable3D &BBmax,
+                                           Vec3D &subD_bbmin, Vec3D &subD_bbmax); //!< build bounding boxes
 
-  void BuildSubdomainScopeAndKDTree(); //!< build "scope" and "tree". Requires subdomain bounding box
+  void BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &subD_bbmax,
+                                    std::vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree); //!< Requires bounding box
 
-  //! Many functions below assume that "BuildNodalBoundingBoxes" and "BuildSubdomainScopeAndKDTree" have been called.
+  //! Many functions below assume that bounding boxes, scope, and tree have already been constructed.
 
-  void FindNodalCandidates(); //!< find nearby triangles for each node based on bounding boxes and KDTree
+  //! find nearby triangles for each node based on bounding boxes and KDTree
+  void FindNodalCandidates(SpaceVariable3D &BBmin, SpaceVariable3D &BBmax, KDTree<MyTriangle, 3> *tree,
+                           SpaceVariable3D &CandidatesIndex,
+                           std::vector<std::pair<Int3, std::vector<MyTriangle> > > &candidates); 
 
-  void FindIntersections(bool with_nodal_cands = false); //!< find occluded nodes, intersections, and first layer nodes
+  void FindIntersections(); //!< find occluded nodes, intersections, and first layer nodes
 
-  int FloodFillColors(bool &hasInlet, bool &hasOutlet, bool &hasOcc, int &nRegions); /**< determine the generalized sign function ("Sign"). 
-                                                                                          Returns the number of "colors" (sum of the four).\n*/
+  bool FloodFillColors(); /**< determine the generalized color function ("Color").\n 
+                               Returns whether some nodes are occluded.\n"*/
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
-  void FindSweptNodes(std::vector<Vec3D> &X0, bool nodal_cands_calculated = false); //!< candidates only need to account for 1 layer
+  void FindSweptNodes(std::vector<Vec3D> &X0); //!< candidates only need to account for 1 layer
 
   /** When the structure has moved SLIGHTLY, this "refill" function should be called, not the one above. This function only recomputes
-   *  the "Sign" of swept nodes. It is faster, and also maintains the same "signs". Calling the original "FloodFill" function may 
-   *  lead to sign(tag) change for the same enclosure.
+   *  the "Color" of swept nodes. It is faster, and also maintains the same "colors". Calling the original "FloodFill" function may 
+   *  lead to color(tag) change for the same enclosure.
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
-  void RefillAfterSurfaceUpdate(bool nodal_cands_calculated = false);
+  void RefillAfterSurfaceUpdate();
 
-  void CalculateUnsignedDistanceNearSurface(int nLayer, bool nodal_cands_calculated = false); //!< Calculate "Phi" for small "nLayers"
+  void CalculateUnsignedDistanceNearSurface(int nL); //!< Calculate "Phi" for small "nL"
+
+  //! Find the elements of the embedded surface that constitute the boundary of a "color". For each element in\n
+  //! in this set, determine which side(s) of it faces the interior of this color. "status" has the size of\n
+  //! surface.elems. For each element, status = 0 means this element does not belong to the boundary of "color",\n
+  //! 1 means the positive side (i.e. along "elemNorm") faces the interior, 2 means the negative side faces the\n
+  //! interior; 3 means both sides face the interior.
+  //! Note: This function assumes intersections and colors "i.e. Color" have been calculated
+  void FindColorBoundary(int color, std::vector<int> &status);
+
+  //! Get pointers to all the results
+  std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();
+
+  //! Get "scope_1" (copied to elems_in_scope)
+  void GetElementsInScope1(std::vector<int> &elems_in_scope);
+
+  //! Get colors
+  void GetColors(bool *hasInlet_ = NULL, bool *hasOutlet_ = NULL, int *nRegions_ = NULL) {
+    if(hasInlet_)   *hasInlet_ = hasInlet;
+    if(hasOutlet_) *hasOutlet_ = hasOutlet; 
+    if(nRegions_)   *nRegions_ = nRegions;
+  }
 
 private: 
+
   //! Utility functions
   //
   //! Use a tree to find candidates. maxCand may change, tmp may be reallocated (if size is insufficient)
@@ -227,6 +246,7 @@ private:
   int FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir/*0~x,1~y,2~z*/, 
                                          double len, MyTriangle* tri, int nTri, 
                                          IntersectionPoint &xf, IntersectionPoint &xb); //!< 2 points, maybe the same
+
 
 };
 

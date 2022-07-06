@@ -79,6 +79,8 @@ public:
 
   inline double GetReferenceTemperature() const {return T0;}
 
+  inline double GetReferenceInternalEnergyPerUnitMass() const {return e0;}
+
   inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const;
 
   inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const;

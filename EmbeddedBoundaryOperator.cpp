@@ -3,37 +3,41 @@
 #include<list>
 #include<utility>
 #include<Utils.h>
+#include<Vector5D.h>
+#include<GeoTools.h>
+#include<trilinear_interpolation.h>
+#include<gauss_quadratures.h>
+#include<memory.h> //unique_ptr
+#include<dlfcn.h> //dlopen, dlclose
 
 using std::string;
 using std::map;
 using std::vector;
+using std::unique_ptr;
+
+extern int INACTIVE_MATERIAL_ID;
+extern int verbose;
 
 //------------------------------------------------------------------------------------------------
 
 EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver) 
                         : comm(comm_), iod(iod_), hasSurfFromOtherSolver(surface_from_other_solver),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
-                          ghost_nodes_outer_ptr(NULL), x_glob_ptr(NULL), y_glob_ptr(NULL), z_glob_ptr(NULL),
-                          dx_glob_ptr(NULL), dy_glob_ptr(NULL), dz_glob_ptr(NULL)
+                          ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL)
 {
   // count surfaces from files
   int counter = iod.ebm.embed_surfaces.surfaces.dataMap.size();
 
   // get the correct size of surfaces and F
-  if(surface_from_other_solver) {
-    surfaces.resize(counter+1);
-    F.resize(counter+1);
-  } else {
-    surfaces.resize(counter);
-    F.resize(counter);
-  }
+  surfaces.resize(counter);
+  F.resize(counter);
 
-  surfaces.resize(surfaces.size());
+  surfaces_prev.resize(surfaces.size());
   F_prev.resize(F.size());
  
   // set default boundary type to "None"
-  surface_type.resize(surfaces.size(), EmbeddedSurfaceData::None);
-  iod_embedded_surfaces.resize(surfaces.size(), NULL);
+  surface_type.assign(surfaces.size(), EmbeddedSurfaceData::None);
+  iod_embedded_surfaces.assign(surfaces.size(), NULL);
 
   // read surfaces from files
   for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
@@ -49,19 +53,20 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 
     if(index==0) {
       if(surface_from_other_solver) {
-        if(it->second->surface_provided_by_other_solver != EmbeddedSurfaceData::YES) {
-          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", index); 
+        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::YES) {
+          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", 
+                      index); 
           exit_mpi();
         } 
         continue; //no file to read
       } else {
-        if(it->second->surface_provided_by_other_solver != EmbeddedSurfaceData::NO) {
+        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
           print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by user?", index); 
           exit_mpi();
         }
       }
     } else {
-      if(it->second->surface_provided_by_other_solver != EmbeddedSurfaceData::NO) {
+      if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
         print_error("*** Error: Currently, only one embedded surface (with id 0) can be provided by another solver.");
         exit_mpi();
       }
@@ -72,6 +77,9 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
     ReadMeshFile(it->second->filename, surface_type[index], surfaces[index].X, surfaces[index].elems);
 
     surfaces[index].X0 = surfaces[index].X;
+
+    // initialize the velocity vector (to 0)
+    surfaces[index].Udot.assign(surfaces[index].X.size(), 0.0);
 
     surfaces[index].BuildConnectivities();
     surfaces[index].CalculateNormalsAndAreas();
@@ -85,14 +93,35 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
         surfaces.size(), surfaces.size() - counter); 
 
   // set NULL to intersector pointers
-  intersector.resize(surfaces.size(), NULL);
+  intersector.assign(surfaces.size(), NULL);
 
+  // setup output
+  for(int i=0; i<surfaces.size(); i++)
+    lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
+
+  // setup dynamics_calculator
+  SetupUserDefinedDynamicsCalculator();
 }
 
 //------------------------------------------------------------------------------------------------
 
 EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
-{ }
+{
+
+  for(int i=0; i<intersector.size(); i++)
+    if(intersector[i])
+      delete intersector[i];
+
+  for(auto it = dynamics_calculator.begin(); it != dynamics_calculator.end(); it++) {
+    if(std::get<0>(*it)) {
+      assert(std::get<2>(*it)); //this is the destruction function
+      (std::get<2>(*it))(std::get<0>(*it)); //use the destruction function to destroy the calculator
+      assert(std::get<1>(*it));
+      dlclose(std::get<1>(*it));
+    }
+  }
+
+}
 
 //------------------------------------------------------------------------------------------------
 
@@ -109,19 +138,13 @@ EmbeddedBoundaryOperator::Destroy()
 void
 EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable3D &coordinates_,
                               vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_,
-                              vector<double> &x_, vector<double> &y_, vector<double> &z_,
-                              vector<double> &dx_, vector<double> &dy_, vector<double> &dz_)
+                              GlobalMeshInfo &global_mesh_)
 {
   dms_ptr               = &dms_;
   coordinates_ptr       = &coordinates_;
   ghost_nodes_inner_ptr = &ghost_nodes_inner_; 
   ghost_nodes_outer_ptr = &ghost_nodes_outer_; 
-  x_glob_ptr            = &x_;
-  y_glob_ptr            = &y_;
-  z_glob_ptr            = &z_;
-  dx_glob_ptr           = &dx_;
-  dy_glob_ptr           = &dy_;
-  dz_glob_ptr           = &dz_;
+  global_mesh_ptr       = &global_mesh_;
 }
 
 //------------------------------------------------------------------------------------------------
@@ -132,9 +155,156 @@ EmbeddedBoundaryOperator::SetupIntersectors()
   for(int i=0; i<intersector.size(); i++) {
     intersector[i] = new Intersector(comm, *dms_ptr, *iod_embedded_surfaces[i], surfaces[i],
                                      *coordinates_ptr, *ghost_nodes_inner_ptr, *ghost_nodes_outer_ptr,
-                                     *x_glob_ptr, *y_glob_ptr, *z_glob_ptr,
-                                     *dx_glob_ptr, *dy_glob_ptr, *dz_glob_ptr);
+                                     *global_mesh_ptr);
   }
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> > &id2closure)
+{
+
+  // Part 1: Find inactive colors. Warning: When multiple surfaces have inactive regions that are close
+  //         to each other or overlapping, the information collected here is invalid.
+  inactive_colors.clear();
+  for(int i=0; i<surfaces.size(); i++) {
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
+    int nRegions = EBDS->nRegions; //this is the number of *closures*. Colors -1, -2, ...
+    for(int color = -1; color>=-nRegions; color--) {
+      bool found = false;
+      for(auto it = id2closure.begin(); it != id2closure.end(); it++) {
+        if(it->second.first == i && it->second.second == color) {
+          found = true;
+          break;
+        }
+      }
+      if(!found)
+        inactive_colors.insert(std::make_pair(i, color));
+    } 
+  }
+
+
+  // Part 2: Find inactive_elem_status. Needed for force computation
+  inactive_elem_status.resize(surfaces.size());
+  for(int surf=0; surf<surfaces.size(); surf++)
+    inactive_elem_status[surf].assign(surfaces[surf].elems.size(), 0);
+
+  vector<bool> touched(surfaces.size(), false);
+  for(auto it = inactive_colors.begin(); it != inactive_colors.end(); it++) {
+    int surf = it->first;
+    int this_color = it->second;
+    assert(intersector[surf]);
+    vector<int> &status(inactive_elem_status[surf]);
+    if(touched[surf]) { //be careful! Create a new vector for FindColorBoundary, then merge w/ existing one
+      vector<int> tmp;
+      intersector[surf]->FindColorBoundary(this_color, tmp);
+      assert(tmp.size() == status.size());
+      for(int i=0; i<tmp.size(); i++) {
+        if(tmp[i]==1) {
+          if(status[i]==0)
+            status[i] = 1;
+          else if(status[i]==2)
+            status[i] = 3;
+        }
+        else if(tmp[i]==2) {
+          if(status[i]==0)
+            status[i] = 2;
+          else if(status[i]==1)
+            status[i] = 3;
+        }
+        else if(tmp[i]==3)
+          status[i] = 3;
+      }
+    }
+    else {
+      intersector[surf]->FindColorBoundary(this_color, status);
+      touched[surf] = true;
+    }
+  }
+
+
+  // output the wetted sides (i.e. active_elem_status)
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+  for(int surf=0; surf<surfaces.size(); surf++) {
+
+    if(mpi_rank != 0)
+      continue;
+
+    if(strcmp(iod_embedded_surfaces[surf]->wetting_output_filename,"")) {
+
+      std::fstream out(iod_embedded_surfaces[surf]->wetting_output_filename, std::fstream::out);
+      if(!out.is_open()) {
+        fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", 
+                iod_embedded_surfaces[surf]->wetting_output_filename);
+        exit(-1);
+      }
+
+
+      vector<Vec3D>&  Xs(surfaces[surf].X);
+      vector<Int3>&   Es(surfaces[surf].elems);
+      vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
+
+      // find the median element "size" --> length of markers
+      vector<double> tmp = surfaces[surf].elemArea; //make a copy
+      auto mid = tmp.begin() + tmp.size()/2;
+      std::nth_element(tmp.begin(), mid, tmp.end()); //partial sort to find median
+      double midarea = tmp[tmp.size()/2];
+      assert(midarea>=0);
+      double amplification_factor = 2.0;
+      double marker_length = amplification_factor*sqrt(midarea*2.0);
+
+      vector<int> &status(inactive_elem_status[surf]);
+
+      // Write nodes
+      out << "Nodes WettedSurfacePoints" << std::endl;
+      Vec3D p,q;
+      for(int i=0; i<Es.size(); i++) {
+        Int3 &nod(Es[i]);
+        switch (status[i]) {
+          case 0 : //both sides are wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0 - marker_length*Ns[i];
+            q = p + 2.0*marker_length*Ns[i];
+            break;
+          case 1 : //negative side is wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
+            q = p - marker_length*Ns[i];
+            break;
+          case 2 : //positive side is wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
+            q = p + marker_length*Ns[i];
+            break;
+          case 3 : //neither side is wetted
+            p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0;
+            q = p;
+            break;
+        }
+        out << std::setw(10) << 2*i+1
+            << std::setw(14) << std::scientific << p[0]
+            << std::setw(14) << std::scientific << p[1]
+            << std::setw(14) << std::scientific << p[2] << "\n";
+        out << std::setw(10) << 2*i+2
+            << std::setw(14) << std::scientific << q[0]
+            << std::setw(14) << std::scientific << q[1]
+            << std::setw(14) << std::scientific << q[2] << "\n";
+      }
+
+      // Write line segments / "markers"
+      out << "Elements Markers using WettedSurfacePoints" << std::endl;
+      for(int i=0; i<Es.size(); i++) {
+        out << std::setw(10) << i+1 << "  1  "  //"1" for line segment 
+            << std::setw(10) << 2*i+1
+            << std::setw(10) << 2*i+2 << std::endl;
+      }
+
+      out.flush();
+      out.close();
+    }
+  }
+
+  MPI_Barrier(comm);
+
 }
 
 //------------------------------------------------------------------------------------------------
@@ -438,13 +608,22 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
 
   // loop through all the surfaces
   for(int i = 0; i < F.size(); i++) {
+
+    if(F_prev[i].size()>0) //not the first time
+      assert(F[i].size() == F_prev[i].size());
+    else
+      F_prev[i].assign(F[i].size(),Vec3D(0.0));
+
     // copy force
-    assert(F[i].size() == F_prev[i].size());
     for(int j=0; j<F[i].size(); j++)
       F_prev[i][j] = F[i][j];
 
+    if(surfaces_prev[i].X.size()>0) //not the first time
+      assert(surfaces[i].X.size() == surfaces_prev[i].X.size());
+    else
+      surfaces_prev[i].X.assign(surfaces[i].X.size(),Vec3D(0.0));
+      
     // copy nodal coords
-    assert(surfaces[i].X.size() == surfaces_prev[i].X.size());
     for(int j=0; j<surfaces[i].X.size(); j++)
       surfaces_prev[i].X[j] = surfaces[i].X[j];
   }
@@ -455,7 +634,138 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
 void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
-  print_warning("Warning: EmbeddedBoundaryOperator::ComputeForces has not been implemented.\n");
+
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+
+  Vec5D***  v  = (Vec5D***) V.GetDataPointer();
+  double*** id = ID.GetDataPointer();
+  
+  // loop through all the embedded surfaces
+  for(int surf=0; surf<surfaces.size(); surf++) {
+
+    // Clear force vector
+    vector<Vec3D>&  Fs(F[surf]); //Nodal loads (TO BE COMPUTED)
+    Fs.assign(surfaces[surf].X.size(), 0.0);
+
+    // Get quadrature info
+    int np = 0; //number of Gauss points
+    switch (iod_embedded_surfaces[surf]->quadrature) {
+      case EmbeddedSurfaceData::NONE :
+        np = 0; //force is always 0 --> one-way coupling
+        break;
+      case EmbeddedSurfaceData::ONE_POINT :
+        np = 1;
+        break;
+      case EmbeddedSurfaceData::THREE_POINT :
+        np = 3;
+        break;
+      case EmbeddedSurfaceData::FOUR_POINT :
+        np = 4;
+        break;
+      case EmbeddedSurfaceData::SIX_POINT :
+        np = 6;
+        break;
+      default :
+        print_error("*** Error: Detected unknown Gauss quadrature rule (%d).\n", 
+                    (int)iod_embedded_surfaces[surf]->quadrature);
+        exit_mpi();
+    }
+
+    // ------------------------------------
+    if(np==0) //one-way coupling
+      continue;
+    // ------------------------------------
+
+    // Collect info about the surface and intersection results
+    vector<Vec3D>&  Xs(surfaces[surf].X);
+    vector<Int3>&   Es(surfaces[surf].elems);
+    vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
+    vector<double>& As(surfaces[surf].elemArea);
+    vector<int>&    status(inactive_elem_status[surf]);
+
+    vector<double> gweight(np, 0.0);
+    vector<Vec3D>  gbary(np, 0.0); //barycentric coords of Gauss points (symmetric) 
+    MathTools::GaussQuadraturesTriangle::GetParameters(np, gweight.data(), gbary.data());
+ 
+    
+    vector<int> scope;
+    intersector[surf]->GetElementsInScope1(scope);
+
+    //Note that different subdomain scopes overlap. We need to avoid repetition!
+    for(auto it = scope.begin(); it != scope.end(); it++) {
+
+      int tid = *it; //triangle id
+      Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
+
+      vector<Vec3D> tg(np, 0.0); //traction at each Gauss point, (-pI + tau)n --> a Vec3D
+
+      assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
+
+      for(int side=0; side<2; side++) { //loop through the two sides
+
+        Vec3D normal = Ns[tid];
+        if(side==1)
+          normal *= -1.0;
+
+        for(int p=0; p<np; p++) { //loop through Gauss points
+
+          Vec3D xg = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
+
+          // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
+          double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
+          xg += loft*normal;
+          
+          // Check if this Gauss point is in this subdomain.
+          Int3 ijk;
+          bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
+          if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
+            continue;
+
+//          fprintf(stderr,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
+          // Calculate traction at Gauss point on this "side"
+          if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
+            tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
+          else 
+            tg[p] += CalculateTractionAtPoint(xg, side, As[tid], normal, n, Xs, v, id); 
+
+        }
+
+      }
+
+//      fprintf(stderr,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
+//              tg[0].norm());
+
+      // Now, tg carries traction from both sides of the triangle
+
+      // Integrate (See KW's notes for the formula)
+      for(int p=0; p<np; p++) {
+        tg[p] *= As[tid];
+        // each node of the triangle gets some load from this Gauss point
+        for(int node=0; node<3; node++)
+          Fs[n[node]] += gweight[p]*gbary[p][node]*tg[p];
+      }
+    }
+
+    // Processor 0 assembles the loads on the entire surface
+    if(mpi_rank==0)
+      MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+    else
+      MPI_Reduce((double*)Fs.data(), NULL, 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+
+/*
+    Vec3D sum(0.0);
+    for(int i=0; i<Fs.size(); i++) {
+      sum+= Fs[i];
+      print("Tri %d: %e %e %e (%e)\n", i, Fs[i][0], Fs[i][1], Fs[i][2], Fs[i].norm());
+    }
+    print("sum = %e %e %e.\n", sum[0], sum[1], sum[2]);
+*/
+  }
+  
+  V.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+
 }
 
 //------------------------------------------------------------------------------------------------
@@ -463,6 +773,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 void
 EmbeddedBoundaryOperator::TrackSurfaces()
 {
+  for(auto&& surf : surfaces)
+    surf.CalculateNormalsAndAreas();
+
   vector<bool> hasInlet(intersector.size(), false);
   vector<bool> hasOutlet(intersector.size(), false);
   vector<bool> hasOccluded(intersector.size(), false);
@@ -482,15 +795,291 @@ EmbeddedBoundaryOperator::TrackSurfaces()
 //------------------------------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryOperator::TrackUpdatedSurfaceFromOtherSolver()
+EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 {
-  print_warning("Warning: EmbeddedBoundaryOperator::TrackUpdatedSurfaceFromOtherSolver has not been implemented.\n");
+  int phi_layers = 3;
+  for(int i=0; i<intersector.size(); i++) {
+    if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
+       strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+      continue; //this surface is fixed...
+
+    surfaces[i].CalculateNormalsAndAreas();
+
+    intersector[i]->RecomputeFullCourse(surfaces_prev[i].X, phi_layers);
+  }
 }
 
 //------------------------------------------------------------------------------------------------
 
+void
+EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
+{
+  for(int surf=0; surf<surfaces.size(); surf++) {
+    if(strcmp(iod_embedded_surfaces[surf]->dynamics_calculator, "") == 0)
+      continue; //not specified for this surface
+    UserDefinedDynamics *calculator(std::get<0>(dynamics_calculator[surf]));
+    assert(calculator);
+
+    vector<Vec3D> &Xs(surfaces[surf].X);
+    vector<Vec3D> &X0(surfaces[surf].X0);
+    vector<Vec3D> disp(Xs.size(), 0.0);
+    calculator->GetUserDefinedDynamics(t, disp.size(), (double*)X0.data(), (double*)Xs.data(),
+                                       (double*)disp.data(), (double*)surfaces[surf].Udot.data());
+    for(int i=0; i<Xs.size(); i++) {
+      for(int j=0; j<3; j++)
+        Xs[i][j] = X0[i][j] + disp[i][j];
+    }
+  }
+}
+
+//------------------------------------------------------------------------------------------------
+
+unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > >
+EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData()
+{
+  unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > p(new vector<unique_ptr<EmbeddedBoundaryDataSet> >());
+
+  for(int i=0; i<intersector.size(); i++) {
+    assert(intersector[i]); //should not call this function if surfaces are not "tracked"
+    p->push_back(intersector[i]->GetPointerToResults());
+  }
+
+  return p;
+}
+
+//------------------------------------------------------------------------------------------------
+
+unique_ptr<EmbeddedBoundaryDataSet>
+EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData(int i)
+{
+  assert(i>=0 && i<intersector.size());
+  assert(intersector[i]);
+  return intersector[i]->GetPointerToResults();
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
+{
+  dynamics_calculator.assign(surfaces.size(), std::make_tuple(nullptr,nullptr,nullptr));
+  for(int i=0; i<surfaces.size(); i++) {
+    if(strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+      continue; //not specified for this surface
+    if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::YES) {
+      print_error("*** Error: Unable to apply user-defined dynamics for Surface %d, which is owned by "
+                  "another solver.\n", i);
+      exit_mpi();
+    }
+
+    // setup the calculator: dynamically load the object
+    std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> &me(dynamics_calculator[i]);
+    std::get<1>(me) = dlopen(iod_embedded_surfaces[i]->dynamics_calculator, RTLD_NOW);
+    if(!std::get<1>(me)) {
+      print_error("*** Error: Unable to load object %s.\n", iod_embedded_surfaces[i]->dynamics_calculator);
+      exit_mpi();
+    }
+    dlerror();
+    CreateUDD* create = (CreateUDD*) dlsym(std::get<1>(me), "Create");
+    const char* dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Create in %s.\n",
+                  iod_embedded_surfaces[i]->dynamics_calculator);
+      exit_mpi();
+    }
+    std::get<2>(me) = (DestroyUDD*) dlsym(std::get<1>(me), "Destroy");
+    dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Destroy in %s.\n",
+                  iod_embedded_surfaces[i]->dynamics_calculator);
+      exit_mpi();
+    }
+     
+    //This is the actual calculator
+    std::get<0>(me) = create();
+
+    print("- Loaded user-defined dynamics calculator for surface %d from %s.\n",
+          i, iod_embedded_surfaces[i]->dynamics_calculator);
+  }
+
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::OutputSurfaces()
+{
+  for(int i=0; i<lagout.size(); i++)
+    lagout[i].OutputTriangulatedMesh(surfaces[i].X0, surfaces[i].elems);
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::OutputResults(double time, double dt, int time_step, bool force_write)
+{
+  for(int i=0; i<lagout.size(); i++)
+    lagout[i].OutputResults(time, dt, time_step, surfaces[i].X0, surfaces[i].X, F[i], force_write);
+}
+
+//------------------------------------------------------------------------------------------------
+
+double
+EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
+{
+  if(factor==0)
+    return 0.0;
+
+  assert(factor>0);
+
+  Int3 ijk;
+  bool foundit = global_mesh_ptr->FindCellCoveringPoint(p, ijk, true);
+  if(!foundit)
+    return 0.0; //no lofting applied to triangles outside. They will not (and should not) get a force.
+
+  double size = std::min(global_mesh_ptr->dx_glob[ijk[0]],
+                         std::min(global_mesh_ptr->dy_glob[ijk[1]], global_mesh_ptr->dz_glob[ijk[2]]));
+
+  return factor*size;
+}
+
+//------------------------------------------------------------------------------------------------
+
+Vec3D
+EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double area,
+                                                   Vec3D &normal, Int3 &tnodes, vector<Vec3D> &Xs, 
+                                                   Vec5D*** v, double*** id)
+{
+  //int mpi_rank;
+  //MPI_Comm_rank(comm, &mpi_rank);
 
 
+  Int3 ijk0(INT_MAX);
+  Vec3D xi;
+  global_mesh_ptr->FindElementCoveringPoint(p, ijk0, &xi, true);
+
+  int i,j,k;
+
+  // find which nodes in the element are on the correct side given by "normal"
+  // first, we move the Gauss point (p) along the normal direction outside "wall_thickness"
+  double loft = 0.0;
+  for(auto&& xter : intersector)
+    loft = std::max(loft, xter->GetSurfaceHalfThickness());
+  loft *= 2.0; //moving out of half_thickness
+
+  int iter, max_iter = 10;
+  bool sameside[2][2][2];
+  bool found_sameside;
+  for(iter=0; iter<max_iter; iter++) {//gradually increase "loft", if necessary
+
+    Vec3D ref_point = p + loft*normal;
+
+    found_sameside = false;
+    for(int dk=0; dk<=1; dk++)
+      for(int dj=0; dj<=1; dj++)
+        for(int di=0; di<=1; di++) {
+          i = ijk0[0] + di;
+          j = ijk0[1] + dj;
+          k = ijk0[2] + dk;
+
+          assert(coordinates_ptr->IsHere(i,j,k,true)); //Not in the ghosted subdomain? Something is wrong
+
+          if(coordinates_ptr->OutsidePhysicalDomain(i,j,k)) { //state variable unavailable here.
+            sameside[dk][dj][di] = false;
+            continue;
+          } //NOTE: Must not check (external) ghost nodes, even if the state variable is correct (w/ b.c.).
+            //      This is because the surface may not extend into the ghost layer. Hence, the intersection
+            //      function may not work as expected!
+
+          if(id[k][j][i] == INACTIVE_MATERIAL_ID) {
+            sameside[dk][dj][di] = false;
+            continue;
+          }
+
+
+          Vec3D x(global_mesh_ptr->GetX(i), global_mesh_ptr->GetY(j), global_mesh_ptr->GetZ(k));
+          sameside[dk][dj][di] = true; //start w/ true
+          for(auto&& xter : intersector) {
+            if(xter->Intersects(x, ref_point)) {
+              sameside[dk][dj][di] = false;
+              break;
+            }
+          }
+
+          if(sameside[dk][dj][di])
+            found_sameside = true; //at least found one on the "same side"
+        }
+
+    if(found_sameside)
+      break;
+    else
+      loft *= 2.0; //increase lofting distance
+  }
+
+  if(iter>=5 && verbose>=1) {
+    if(found_sameside)
+      fprintf(stderr,"\033[0;35mWarning: Applied a lofting height of %e (iter=%d) to find valid nodes for interpolating \n"
+                               "         pressure at Gauss point (%e, %e, %e).\033[0m\n",
+              loft, iter, p[0], p[1], p[2]);
+    //if found_sameside == false, will trigger another warning message below.
+  }
+
+  // interpolate pressure at the point
+  // We populate opposite side and inactive nodes by average of same side / active nodes.
+  // TODO: This can be done more carefully.
+  double pressure[2][2][2];
+  double total_pressure = 0.0;
+  int n_pressure = 0;
+  for(int dk=0; dk<=1; dk++)
+    for(int dj=0; dj<=1; dj++)
+      for(int di=0; di<=1; di++) {
+
+        if(!sameside[dk][dj][di])
+          continue;
+
+        i = ijk0[0] + di;
+        j = ijk0[1] + dj;
+        k = ijk0[2] + dk;
+
+        //fprintf(stderr,"[%d] side = %d: (%d,%d,%d), p = %e.\n", mpi_rank, side, i,j,k, v[k][j][i][4]);
+        pressure[dk][dj][di] = v[k][j][i][4]; //get pressure
+        total_pressure += pressure[dk][dj][di];
+        n_pressure++;
+      }
+
+  double avg_pressure;
+  if(n_pressure==0) {
+    fprintf(stderr,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
+                   "Gauss point (%e, %e, %e). Try adjusting surface thickness.\033[0m\n",
+                   p[0], p[1], p[2]);
+    avg_pressure = 0.0;
+  } else
+    avg_pressure = total_pressure/n_pressure;
+
+  for(int dk=0; dk<=1; dk++)
+    for(int dj=0; dj<=1; dj++)
+      for(int di=0; di<=1; di++) {
+
+        if(sameside[dk][dj][di])
+          continue;
+
+        i = ijk0[0] + di;
+        j = ijk0[1] + dj;
+        k = ijk0[2] + dk;
+
+        pressure[dk][dj][di] = avg_pressure;
+      }
+  
+  //Now, perform trilinear interpolation to get p at the point
+  double my_pressure = MathTools::trilinear_interpolation(pressure[0][0][0], pressure[0][0][1],
+                                      pressure[0][1][0], pressure[0][1][1], pressure[1][0][0], 
+                                      pressure[1][0][1], pressure[1][1][0], pressure[1][1][1], (double*)xi);
+
+  //TODO: Add viscous force later!
+
+  return -1.0*my_pressure*normal;  
+
+}
 
 //------------------------------------------------------------------------------------------------
 

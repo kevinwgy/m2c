@@ -3,6 +3,7 @@
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
 #include <GradientCalculatorFD3.h>
+#include <EmbeddedBoundaryDataSet.h>
 
 #ifdef LEVELSET_TEST
   #include <Vector2D.h>
@@ -11,6 +12,7 @@
 using std::min;
 using std::max;
 using std::pair;
+using std::unique_ptr;
 
 extern double domain_diagonal;
 //-----------------------------------------------------
@@ -278,7 +280,9 @@ void LevelSetOperator::CreateGhostNodeLists()
 
 //-----------------------------------------------------
 
-void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
+void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, 
+                                           unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                           vector<pair<int,int> > *surf_and_color)
 {
   //get info
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
@@ -586,6 +590,79 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
 #endif
 
 
+  int ebds_counter = 0;
+  if(EBDS && surf_and_color) {
+    if(!reinit) {
+      print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary. In this case, \n"
+                  "           level set reinitialization must be turned on.\n", materialid);
+      exit_mpi();
+    }    
+
+    if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::FIXED)
+      print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary. In this case,\n"
+                    "         it may be better to 'fix' the first layer nodes when reinitializing the level set.\n",
+                    materialid);
+
+
+    for(auto&& mypair : *surf_and_color) {
+
+      int surf = mypair.first;
+      int mycolor = mypair.second;
+
+      int nLayer = (*EBDS)[surf]->Phi_nLayer;
+      if(nLayer<2) 
+        print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary.\n"
+                      "         The intersector should compute unsigned distance ('phi') for at least two layers\n"
+                      "         of nodes. Currently, this value is set to %d.\n", (*EBDS)[surf]->Phi_nLayer); 
+
+      double*** color = (*EBDS)[surf]->Color_ptr->GetDataPointer();
+      double*** psi   = (*EBDS)[surf]->Phi_ptr->GetDataPointer();
+     
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+    
+            //Check if this node is within nLayer of the interface
+            bool near = false;
+            for(int k1 = k-nLayer; k1 <= k+nLayer; k1++)
+              for(int j1 = j-nLayer; j1 <= j+nLayer; j1++)
+                for(int i1 = i-nLayer; i1 <= i+nLayer; i1++) {
+                  if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
+                    continue;
+                  if(color[k1][j1][i1] == mycolor) {
+                    near = true;
+                    goto DONE;  
+                  }
+                }
+DONE:
+
+            if(!near) 
+              continue; //nothing to do
+
+            ebds_counter++;
+
+            // determine phi at [k][j][i]
+            if(color[k][j][i] == mycolor) {//"inside"
+              if(phi[k][j][i]>=0) 
+                phi[k][j][i] = -psi[k][j][i];
+              else
+                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+            } else if(color[k][j][i] == 0) {//occluded
+              phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
+            } else { //"outside"
+              if(phi[k][j][i]>=0)
+                phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
+              else //this is really bad... the user should avoid this...
+                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+            }
+          }
+
+
+      (*EBDS)[surf]->Color_ptr->RestoreDataPointerToLocalVector();
+      (*EBDS)[surf]->Phi_ptr->RestoreDataPointerToLocalVector();
+    }
+  }
+
   coordinates.RestoreDataPointerToLocalVector();
   Phi.RestoreDataPointerAndInsert();
 
@@ -595,6 +672,14 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi)
     assert(reinit);
     reinit->ConstructNarrowBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
   }
+
+  MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
+  if(ebds_counter>0) {
+    print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
+          materialid, ebds_counter);
+    Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
+  }
+
 }
 
 //-----------------------------------------------------
@@ -1001,7 +1086,7 @@ void LevelSetOperator::ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Ph
   rec->ReconstructIn1D(2/*z-dir*/, scalar, wk, wf, &dwdz, &Active);
 
   // Reconstruction: Phi
-  rec->Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, &Active);
+  rec->Reconstruct(Phi, Phil, Phir, Phib, Phit, Phik, Phif, NULL/*ID*/, nullptr/*EBDS*/, &Active);
 
   V.RestoreDataPointerToLocalVector(); //no changes made
 }
@@ -1204,7 +1289,7 @@ double LevelSetOperator::ComputeLocalAdvectionFlux(double phim, double phip, dou
       break;
 
     case LevelSetSchemeData::ROE :
-      lam = abs(0.5*(um+up));
+      lam = fabs(0.5*(um+up));
       tol   = max(fabs(um), fabs(up))*iod_ls.delta;
       if(lam<tol) lam = (lam*lam + tol*tol)/(2*tol);
       flux = 0.5*(phim*um + phip*up) - 0.5*lam*(phip-phim);

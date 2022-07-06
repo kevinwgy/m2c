@@ -1,11 +1,8 @@
 #ifndef _OUTPUT_H_
 #define _OUTPUT_H_
-#include <IoData.h>
-#include <VarFcnBase.h>
-#include <SpaceVariable.h>
 #include <ProbeOutput.h>
 #include <MaterialVolumeOutput.h>
-#include <IonizationOperator.h>
+#include <TerminalVisualization.h>
 #include <stdio.h>
 
 /** Class Output is responsible  for writing solutions to files. It uses PETSc functionalities
@@ -17,6 +14,9 @@ class Output
   MPI_Comm& comm;
   IoData& iod;
   vector<VarFcnBase*> &vf;
+
+  //! Global mesh
+  GlobalMeshInfo &global_mesh;
 
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
@@ -36,8 +36,12 @@ class Output
 
   MaterialVolumeOutput matvol_output;
 
+  TerminalVisualization terminal;
+
 public:
-  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
+
+  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
+         vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
          IonizationOperator* ion_ = NULL);
   ~Output();
 
@@ -45,15 +49,20 @@ public:
 
   void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
                        SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
-                       SpaceVariable3D *L/*laser radiance*/, bool force_write);
-
-  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                             vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L); //!< write solution to file
+                       SpaceVariable3D *L/*laser radiance*/, 
+                       SpaceVariable3D *Xi/*ref map for hyperelasticity*/,
+                       bool force_write);
 
   void FinalizeOutput();
 
 private:
   void OutputMeshInformation(SpaceVariable3D& coordinates);
+
+  void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
+                             vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
+                             SpaceVariable3D *Xi); //!< write solution to file
+
+  void OutputMeshPartition();
 
 };
 

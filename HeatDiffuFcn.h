@@ -14,7 +14,6 @@ class HeatDiffuFcnBase{
 
 protected:
 
-   VarFcnBase &vf;
 
 public:
 
@@ -22,7 +21,7 @@ public:
 
    double conduct;
 
-   HeatDiffuFcnBase(VarFcnBase &vf_) : vf(vf_), type(NONE), conduct(0.0) {}
+   HeatDiffuFcnBase() : type(NONE), conduct(0.0) {}
    virtual ~HeatDiffuFcnBase() {}   
 
 };
@@ -34,7 +33,7 @@ class HeatDiffuFcnConstant : public HeatDiffuFcnBase{
 
 public:
   
-  HeatDiffuFcnConstant(HeatDiffusionModelData &heatdiff, VarFcnBase &vf_) : HeatDiffuFcnBase(vf_) {
+  HeatDiffuFcnConstant(HeatDiffusionModelData &heatdiff) : HeatDiffuFcnBase() {
     assert(heatdiff.type == HeatDiffusionModelData::CONSTANT);
     type = CONSTANT;
     conduct = heatdiff.diffusivity;

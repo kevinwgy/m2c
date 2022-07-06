@@ -1,5 +1,6 @@
 #include<LaserAbsorptionSolver.h>
 #include<GeoTools.h>
+#include<GlobalMeshInfo.h>
 #include<algorithm> //std::sort
 #include<numeric> //std::iota
 #include<map>
@@ -59,7 +60,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
   for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
     if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
-      fprintf(stderr,"ERROR: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
+      fprintf(stderr,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
       exit_mpi();
     }
     std::get<0>(absorption[it->first]) = it->second->slope;
@@ -128,7 +129,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
   for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
     if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
-      fprintf(stderr,"ERROR: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
+      fprintf(stderr,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
       exit(-1);
     }
     std::get<0>(absorption[it->first]) = it->second->slope;
@@ -280,7 +281,8 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   // -------------------------------------------------------------
   if(active_core) {
     dms = new DataManagers3D(comm, xsub.size(), ysub.size(), zsub.size());
-    spo = new SpaceOperator(comm, *dms, iod, varFcn, fluxFcn_, riemann_, xsub, ysub, zsub, dxsub, dysub, dzsub);
+    GlobalMeshInfo global_mesh(xsub,ysub,zsub,dxsub,dysub,dzsub);
+    spo = new SpaceOperator(comm, *dms, iod, varFcn, fluxFcn_, riemann_, global_mesh);
     spo->ResetGhostLayer(xminus, xplus, yminus, yplus, zminus, zplus, dxminus, dxplus, dyminus, dyplus, dzminus, dzplus);
     coordinates       = &(spo->GetMeshCoordinates());
     delta_xyz         = &(spo->GetMeshDeltaXYZ());
@@ -1451,7 +1453,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   //----------------------------------------------------------------
   // Step 5: Figure out formula for ghost node update
   //----------------------------------------------------------------
-  ebm.ghostNodes1.resize(ordered.size()-far_nodes.size()-prob_nodes.size()+prob_nodes_owned_by_myself.size(), 
+  ebm.ghostNodes1.assign(ordered.size()-far_nodes.size()-prob_nodes.size()+prob_nodes_owned_by_myself.size(), 
                          std::make_pair(Int3(0), EmbeddedBoundaryFormula(eps)));
   int counter = 0;
   for(int o = 0; o < ordered.size(); o++) {
@@ -1482,10 +1484,10 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
 
   // Allocate space for storing laser radiance at ghost nodes
-  ebm.l1.resize(ebm.ghostNodes1.size(), 0.0);
+  ebm.l1.assign(ebm.ghostNodes1.size(), 0.0);
   ebm.l2.resize(ebm.ghostNodes2.size());
   for(int n1=0; n1<ebm.ghostNodes2.size(); n1++)
-    ebm.l2[n1].resize(ebm.ghostNodes2[n1].size(), 0.0);
+    ebm.l2[n1].assign(ebm.ghostNodes2[n1].size(), 0.0);
  
 }
 

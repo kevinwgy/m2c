@@ -2,8 +2,13 @@
 #define _EMBEDDED_BOUNDARY_OPERATOR_H_
 
 #include<Intersector.h>
+#include<UserDefinedDynamics.h>
+#include<LagrangianOutput.h>
 #include<cassert>
 #include<map>
+#include<tuple>
+
+struct Vec5D;
 
 /******************************************************************
  * Class EmbeddedBoundaryOperator stores data related to one or
@@ -27,17 +32,27 @@ class EmbeddedBoundaryOperator {
   vector<vector<Vec3D> > F; //!< forces
   vector<vector<Vec3D> > F_prev; //!< forces at the previous time step
   vector<EmbeddedSurfaceData::Type> surface_type;
-
-  vector<Intersector*> intersector; //one intersector for each embedded surface (initialized to NULL)
+  vector<Intersector*> intersector; //!< one intersector for each embedded surface (initialized to NULL)
  
+  vector<LagrangianOutput> lagout; //!< output displacement and *nodal load* on embedded surfaces
+
+  //! inactive closures: pair of <surface number, color>, not including color = 0 (occluded)
+  std::set<std::pair<int,int> > inactive_colors;
+
+  //! for each surface (i), inactive_elem_status[i][j] (j: 0 -- surfaces[i].elems.size()) shows weather one or both
+  //! sides of triangle element j is part of the inward-facing side of any inactive region. 
+  //! Needed for force computation
+  std::vector<std::vector<int> > inactive_elem_status;
+
+  vector<std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> > dynamics_calculator; //!< the 1st one is the calculator
+
   //! Mesh info (Not used when the class is used for special purposes, e.g., DynamicLoadCalculator)
   //! These information are generally needed when the surface needs to be "tracked" within the M2C mesh
   DataManagers3D* dms_ptr;
   SpaceVariable3D* coordinates_ptr;
   std::vector<GhostPoint>* ghost_nodes_inner_ptr;
   std::vector<GhostPoint>* ghost_nodes_outer_ptr;
-  std::vector<double> *x_glob_ptr, *y_glob_ptr, *z_glob_ptr;
-  std::vector<double> *dx_glob_ptr, *dy_glob_ptr, *dz_glob_ptr;
+  GlobalMeshInfo *global_mesh_ptr;
 
 public:
    
@@ -54,26 +69,48 @@ public:
   TriangulatedSurface         *GetPointerToSurface(int i) {assert(i>=0 && i<surfaces.size()); return &surfaces[i];}
   vector<vector<Vec3D> >      *GetPointerToForces() {return &F;}
   vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<F.size()); return &F[i];}
+  vector<Intersector*>        *GetPointerToIntersectors() {return &intersector;}
+  Intersector                 *GetPointerToIntersector(int i) {assert(i>=0 && i<intersector.size()); return intersector[i];}
 
+  std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > GetPointerToEmbeddedBoundaryData();
+  std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToEmbeddedBoundaryData(int i); 
 
 
   void SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable3D &coordinates_, 
                           std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
-                          std::vector<double> &x_, std::vector<double> &y_, std::vector<double> &z_,
-                          std::vector<double> &dx_, std::vector<double> &dy_, std::vector<double> &dz_);
+                          GlobalMeshInfo &global_mesh_);
   void SetupIntersectors();
+
+  //build inactive_colors, and inactive_elem_status
+  void FindSolidBodies(std::multimap<int, std::pair<int,int> > &id2closure); 
 
   void ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID);
 
   void TrackSurfaces();
-  void TrackUpdatedSurfaceFromOtherSolver();
+  void TrackUpdatedSurfaces();
+
+  void ApplyUserDefinedSurfaceDynamics(double t, double dt);
+
+  void UpdateSurfacesPrevAndFPrev(bool partial_copy=true); //!< copy surfaces.nodes/elements to surfaces_prev; also copy F to F_prev
+
+  //! Output embedded surfaces to files (meshes)
+  void OutputSurfaces();
+
+  //! Output displacements and nodal forces on embedded surfaces
+  void OutputResults(double time, double dt, int time_step, bool force_write=false);
 
 private:
 
   void ReadMeshFile(const char *filename, EmbeddedSurfaceData::Type& surface_type,
                     vector<Vec3D> &Xs, vector<Int3> &Es);
 
-  void UpdateSurfacesPrevAndFPrev(bool partial_copy=true); //!< copy surfaces.nodes/elements to surfaces_prev; also copy F to F_prev
+  void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
+
+  double CalculateLoftingHeight(Vec3D &p, double factor);
+
+  Vec3D CalculateTractionAtPoint(Vec3D &p, int side/*0 or 1*/, double area, Vec3D &normal/*towards the "side"*/, 
+                                 Int3 &tnodes, vector<Vec3D> &Xs, Vec5D*** v, double*** id);
+
 };
 
 

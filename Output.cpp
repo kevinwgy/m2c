@@ -5,15 +5,17 @@
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, vector<VarFcnBase*> &vf_, 
+Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
+               vector<VarFcnBase*> &vf_, 
                SpaceVariable3D &cell_volume, IonizationOperator* ion_) : 
     comm(comm_), 
-    iod(iod_), vf(vf_),
+    iod(iod_), global_mesh(global_mesh_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
     probe_output(comm_, iod_.output, vf_, ion_),
     matvol_output(comm_, iod_, cell_volume),
-    ion(ion_)
+    ion(ion_),
+    terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
 {
   iFrame = 0;
 
@@ -81,18 +83,22 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 
   if(iod.output.mesh_filename[0] != 0)
     OutputMeshInformation(coordinates);
+
+  if(iod.output.mesh_partition[0] != 0)
+    OutputMeshPartition();
 }
 
 //--------------------------------------------------------------------------
 
 void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
                              SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
-                             SpaceVariable3D *L, bool force_write)
+                             SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
 {
+
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
-    WriteSolutionSnapshot(time, time_step, V, ID, Phi, L);
+    WriteSolutionSnapshot(time, time_step, V, ID, Phi, L, Xi);
 
   //write solutions at probes
   probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, force_write);
@@ -103,12 +109,16 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
 
   //write material volumes
   matvol_output.WriteSolution(time, dt, time_step, ID, force_write);
+
+  //write terminal visualization 
+  terminal.PrintSolutionSnapshot(time, dt, time_step, V, ID, Phi, L, force_write);
+
 }
 //--------------------------------------------------------------------------
 
 void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
                                    SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
-                                   SpaceVariable3D *L)
+                                   SpaceVariable3D *L, SpaceVariable3D *Xi)
 {
   //! Post-processing
   if(iod.output.ionization_output_requested())
@@ -231,6 +241,18 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     VecView(scalar.GetRefToGlobalVec(), viewer);
   }
 
+  if(iod.output.delta_internal_energy==OutputData::ON) {
+    double*** s  = (double***) scalar.GetDataPointer();
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++)
+          s[k][j][i] = vf[(int)id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4])
+                     - vf[(int)id[k][j][i]]->GetReferenceInternalEnergyPerUnitMass();
+    scalar.RestoreDataPointerAndInsert();
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "delta_internal_energy");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
+  }
+
   if(iod.output.materialid==OutputData::ON) {
     
 // TODO(KW): not sure why this does not work...
@@ -295,7 +317,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
 
   if(iod.output.laser_radiance==OutputData::ON) {
     if(L == NULL) {
-      print_error("*** Error: Requested output of laser radiance, but the laser source is not specified.\n");
+      print_error("*** Error: Cannot output laser radiance. Solver is not activated.\n");
       exit_mpi();
     }
     PetscObjectSetName((PetscObject)(L->GetRefToGlobalVec()), "laser_radiance");
@@ -326,6 +348,16 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
     VecView(Ne.GetRefToGlobalVec(), viewer);
   }
+
+  if(iod.output.reference_map==OutputData::ON) {
+    if(Xi == NULL) {
+      print_error("*** Error: Cannot output reference map. Solver is not activated.\n");
+      exit_mpi();
+    }
+    PetscObjectSetName((PetscObject)(Xi->GetRefToGlobalVec()), "reference_map");
+    VecView(Xi->GetRefToGlobalVec(), viewer);
+  }
+
 
   MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
 
@@ -427,6 +459,36 @@ void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
 
   coordinates.RestoreDataPointerToLocalVector();
   fclose(file);
+}
+
+//--------------------------------------------------------------------------
+
+void Output::OutputMeshPartition()
+{
+  if(iod.output.mesh_partition[0] == 0)
+    return; //nothing to do
+
+  char fname[256];
+  sprintf(fname, "%s%s.vtr", iod.output.prefix, iod.output.mesh_partition);
+
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+
+  int i0, j0, k0, imax, jmax, kmax;
+  scalar.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
+  double*** s  = (double***) scalar.GetDataPointer();
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        s[k][j][i] = mpi_rank;
+  scalar.RestoreDataPointerAndInsert();
+
+  scalar.WriteToVTRFile(fname, "partition");
+  
+  MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
+
+  scalar.SetConstantValue(0.0); //clean up the internal variable (not necessary)
 }
 
 //--------------------------------------------------------------------------

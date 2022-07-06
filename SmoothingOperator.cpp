@@ -220,7 +220,7 @@ void SmoothingOperator::EnforceLocalConservation(SpaceVariable3D &U0, SpaceVaria
   double uold[Udim], unew[Udim];
 
   
-  for(int iter=0;  iter<1;  iter++) {
+  for(int iter=0;  iter<5;  iter++) {
 
     double maxdiff = 0.0;
 
@@ -268,7 +268,7 @@ void SmoothingOperator::EnforceLocalConservation(SpaceVariable3D &U0, SpaceVaria
         }
 
     MPI_Allreduce(MPI_IN_PLACE, &maxdiff, 1, MPI_DOUBLE, MPI_MAX, comm);
-    print("Iteration %d: maxdiff = %e.\n", iter, maxdiff);
+    print("  o Enforcing conversation (It. %d): maxdiff = %e.\n", iter, maxdiff);
     if(maxdiff<iod_smooth.conservation_tol)
       break;
   }
