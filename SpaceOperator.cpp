@@ -1490,6 +1490,68 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 {
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
 
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+
+    if(it->bcType == (int)MeshData::INLET) {
+      v[k][j][i][0] = iod.bc.inlet.density;
+      v[k][j][i][1] = iod.bc.inlet.velocity_x;
+      v[k][j][i][2] = iod.bc.inlet.velocity_y;
+      v[k][j][i][3] = iod.bc.inlet.velocity_z;
+      v[k][j][i][4] = iod.bc.inlet.pressure;
+    }
+    else if(it->bcType == (int)MeshData::OUTLET) {
+      v[k][j][i][0] = iod.bc.outlet.density;
+      v[k][j][i][1] = iod.bc.outlet.velocity_x;
+      v[k][j][i][2] = iod.bc.outlet.velocity_y;
+      v[k][j][i][3] = iod.bc.outlet.velocity_z;
+      v[k][j][i][4] = iod.bc.outlet.pressure;
+    }
+    else if(it->bcType == MeshData::SLIPWALL ||
+            it->bcType == MeshData::SYMMETRY) {
+
+      int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+      for(int p=0; p<5; p++)
+        v[k][j][i][p] = v[im_k][im_j][im_i][p];
+
+      switch (it->side) {
+        case GhostPoint::LEFT :
+        case GhostPoint::RIGHT :
+          v[k][j][i][1] *= -1.0;
+          break;
+        case GhostPoint::BOTTOM :
+        case GhostPoint::TOP :
+          v[k][j][i][2] *= -1.0;
+          break;
+        case GhostPoint::BACK :
+        case GhostPoint::FRONT :
+          v[k][j][i][3] *= -1.0;
+          break;
+        default :
+          fprintf(stderr,"*** Error: Unknown 'side' tag for GhostPoint (%d).\n", (int)it->side); 
+          exit(-1);
+      }
+    } 
+    else if(it->bcType == MeshData::STICKWALL) {
+      int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+      v[k][j][i][0] =      v[im_k][im_j][im_i][0];
+      v[k][j][i][1] = -1.0*v[im_k][im_j][im_i][1];
+      v[k][j][i][2] = -1.0*v[im_k][im_j][im_i][2];
+      v[k][j][i][3] = -1.0*v[im_k][im_j][im_i][3];
+      v[k][j][i][4] =      v[im_k][im_j][im_i][4];
+    } else {
+      fprintf(stderr,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
+      exit(-1);
+    }
+
+  }
+
+/*
   //! Left boundary
   if(ii0==-1) { 
     switch (iod.mesh.bc_x0) {
@@ -1789,6 +1851,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
         exit_mpi();
     }
   }
+*/
 
   ApplyBoundaryConditionsGeometricEntities(v);
 
@@ -1853,8 +1916,11 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
          }
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int j=jj0; j<jjmax; j++) {
+
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii0,j,k))
+              continue; //skip corner nodes
 
             for(int p=0; p<mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][j][ii0][1], coords[k][j][ii0][2],
@@ -1905,8 +1971,11 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int j=jj0; j<jjmax; j++) {
+
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(iimax-1,j,k))
+              continue; //skip corner nodes
 
             for(int p=0; p<mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][j][iimax-1][1], coords[k][j][iimax-1][2],
@@ -1957,8 +2026,11 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
         }
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,jj0,k))
+              continue; //skip corner nodes
 
             for(int p=0; p<mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][jj0][i][2], coords[k][jj0][i][0],
@@ -2009,8 +2081,11 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,jjmax-1,k))
+              continue; //skip corner nodes
 
             for(int p=0; p<mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][jjmax-1][i][2], coords[k][jjmax-1][i][0],
@@ -2062,8 +2137,11 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
+        for(int j=jj0; j<jjmax; j++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,kk0))
+              continue; //skip corner nodes
 
             for(int p=0; p<mydisks.size(); p++) {
               if(IsPointInDisk(coords[kk0][j][i][0], coords[kk0][j][i][1],
@@ -2115,8 +2193,11 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
+        for(int j=jj0; j<jjmax; j++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,kkmax-1))
+              continue; //skip corner nodes
 
             for(int p=0; p<mydisks.size(); p++) {
               if(IsPointInDisk(coords[kkmax-1][j][i][0], coords[kkmax-1][j][i][1],

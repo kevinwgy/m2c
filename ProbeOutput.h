@@ -34,6 +34,8 @@ class ProbeOutput {
 
   //! For each probe node, ijk are the lower nodal indices of the element that contains the node
   std::vector<Int3> ijk;
+  std::vector<std::pair<int, std::array<bool,8> > > ijk_valid; //!< invalid if it is a corner/edge ghost node
+
   //! For each probe node, trilinear_coords contains the local x,y,z coordinates w/i the element
   std::vector<Vec3D> trilinear_coords;
 
@@ -58,13 +60,17 @@ public:
 
 private:
 
-  double InterpolateSolutionAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, int dim, int p);
+  double InterpolateSolutionAtProbe(Int3& ijk, std::pair<int, std::array<bool,8> >& ijk_valid,
+                                    Vec3D &trilinear_coords, double ***v, int dim, int p);
 
-  double CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
+  double CalculateTemperatureAtProbe(Int3& ijk, std::pair<int, std::array<bool,8> >& ijk_valid,
+                                     Vec3D &trilinear_coords, double ***v, double ***id);
 
-  double CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
+  double CalculateDeltaTemperatureAtProbe(Int3& ijk, std::pair<int, std::array<bool,8> >& ijk_valid,
+                                          Vec3D &trilinear_coords, double ***v, double ***id);
 
-  Vec3D CalculateIonizationAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id);
+  Vec3D CalculateIonizationAtProbe(Int3& ijk, std::pair<int, std::array<bool,8> >& ijk_valid,
+                                   Vec3D &trilinear_coords, double ***v, double ***id);
 
 };
 

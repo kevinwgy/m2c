@@ -1,5 +1,7 @@
 #include <ProbeOutput.h>
 #include <trilinear_interpolation.h>
+using std::pair;
+using std::array;
 
 //-------------------------------------------------------------------------
 
@@ -211,6 +213,8 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
     return;
 
   ijk.resize(numNodes);
+  ijk_valid.resize(numNodes);
+
   trilinear_coords.resize(numNodes);
 
   int found[numNodes];
@@ -240,6 +244,8 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
        p[2] < xyz0[2] || p[2] >= xyzmax[2]) {//not in this subdomain
       found[iNode] = 0;
       ijk[iNode] = INT_MIN; //default: not in the current subdomain
+      ijk_valid[iNode].first = 0;
+      ijk_valid[iNode].second.fill(false);
     }
     else {//in this subdomain
       found[iNode] = 1; 
@@ -264,17 +270,50 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
                                        (coords[k+1][j0][i0][2] - coords[k][j0][i0][2]);
           break;
         }
+
+
+      int i(ijk[iNode][0]),j(ijk[iNode][1]),k(ijk[iNode][2]);
+
+      ijk_valid[iNode].second.fill(true);
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k)) //c000
+        ijk_valid[iNode].second[0] = false;
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i+1,j,k)) //c100
+        ijk_valid[iNode].second[1] = false;
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j+1,k)) //c010
+        ijk_valid[iNode].second[2] = false;
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i+1,j+1,k)) //c110
+        ijk_valid[iNode].second[3] = false;
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k+1)) //c001
+        ijk_valid[iNode].second[4] = false;
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i+1,j,k+1)) //c101
+        ijk_valid[iNode].second[5] = false;
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j+1,k+1)) //c011
+        ijk_valid[iNode].second[6] = false;
+      if(coordinates.OutsidePhysicalDomainAndUnpopulated(i+1,j+1,k+1)) //c111
+        ijk_valid[iNode].second[7] = false;
+
+      ijk_valid[iNode].first = 0;
+      for(auto&& val : ijk_valid[iNode].second)
+        if(val)
+          ijk_valid[iNode].first++;
+
+      if(ijk_valid[iNode].first==0) {
+        fprintf(stderr,"\033[0;31m*** Error: Location of probe node %d is too close to the edges "
+                       "of the domain boundary.\033[0m\n", iNode);
+        exit(-1);
+      }
+
     }
         
   } 
-/*
+
   for(int iNode = 0; iNode<numNodes; iNode++) {
     if(found[iNode]) {
       fprintf(stdout, "Probe %d: (%d, %d, %d): %e %e %e.\n", iNode, ijk[iNode][0], ijk[iNode][1], ijk[iNode][2],
              trilinear_coords[iNode][0], trilinear_coords[iNode][1], trilinear_coords[iNode][2]);
     }
   }
-*/
+
   MPI_Allreduce(MPI_IN_PLACE, found, numNodes, MPI_INT, MPI_SUM, comm);
   for(int iNode = 0; iNode<numNodes; iNode++) {
     if(found[iNode] != 1) {
@@ -345,26 +384,26 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
 
   //write data to file
   for(int iNode=0; iNode<numNodes; iNode++) {
-    double rho = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 0);
-    double vx  = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 1);
-    double vy  = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 2);
-    double vz  = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 3);
-    double p   = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 4);
-    double T   = CalculateTemperatureAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
-    double myid= InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], id, 1, 0);
+    double rho = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 0);
+    double vx  = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 1);
+    double vy  = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 2);
+    double vz  = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 3);
+    double p   = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 4);
+    double T   = CalculateTemperatureAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, id);
+    double myid= InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], id, 1, 0);
     print(file, "%16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e  %16.8e", 
                 iNode*h, rho, vx, vy, vz, p, T, myid);
     if(l) {
-      double laser_rad = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], l, 1, 0);
+      double laser_rad = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], l, 1, 0);
       print(file, "%16.8e  ", laser_rad);
     }
     for(int i=0; i<Phi.size(); i++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi[i], 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi[i], 1, 0);
       print(file, "%16.8e  ", sol);
     }
 
     if(ion) {
-      Vec3D ion_res = CalculateIonizationAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      Vec3D ion_res = CalculateIonizationAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, id);
       print(file, "%16.8e  %16.8e  ", ion_res[0], ion_res[1]);
     }
 
@@ -402,7 +441,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
   if(file[Probes::DENSITY]) {
     print(file[Probes::DENSITY], "%10d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 0);
       print(file[Probes::DENSITY], "%16.8e    ", sol);
     }
     print(file[Probes::DENSITY],"\n");
@@ -412,7 +451,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
   if(file[Probes::VELOCITY_X]) {
     print(file[Probes::VELOCITY_X], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 1);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 1);
       print(file[Probes::VELOCITY_X], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_X],"\n");
@@ -422,7 +461,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
   if(file[Probes::VELOCITY_Y]) {
     print(file[Probes::VELOCITY_Y], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 2);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 2);
       print(file[Probes::VELOCITY_Y], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Y],"\n");
@@ -432,7 +471,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
   if(file[Probes::VELOCITY_Z]) {
     print(file[Probes::VELOCITY_Z], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 3);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 3);
       print(file[Probes::VELOCITY_Z], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Z],"\n");
@@ -442,7 +481,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
   if(file[Probes::PRESSURE]) {
     print(file[Probes::PRESSURE], "%8d    %16.8e    ", time_step, time);
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], v, 5, 4);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, 5, 4);
       print(file[Probes::PRESSURE], "%16.8e    ", sol);
     }
     print(file[Probes::PRESSURE],"\n");
@@ -453,7 +492,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::TEMPERATURE], "%8d    %16.8e    ", time_step, time);
     double*** id  = (double***)ID.GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = CalculateTemperatureAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      double sol = CalculateTemperatureAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, id);
       print(file[Probes::TEMPERATURE], "%16.8e    ", sol);
     }
     print(file[Probes::TEMPERATURE],"\n");
@@ -465,7 +504,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::DELTA_TEMPERATURE], "%8d    %16.8e    ", time_step, time);
     double*** id  = (double***)ID.GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = CalculateDeltaTemperatureAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      double sol = CalculateDeltaTemperatureAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, id);
       print(file[Probes::DELTA_TEMPERATURE], "%16.8e    ", sol);
     }
     print(file[Probes::DELTA_TEMPERATURE],"\n");
@@ -477,7 +516,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::MATERIALID], "%8d    %16.8e    ", time_step, time);
     double*** id  = (double***)ID.GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], id, 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], id, 1, 0);
       print(file[Probes::MATERIALID], "%16.8e    ", sol);
     }
     print(file[Probes::MATERIALID],"\n");
@@ -493,7 +532,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     }
     double*** l  = (double***)L->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], l, 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], l, 1, 0);
       print(file[Probes::LASERRADIANCE], "%16.8e    ", sol);
     }
     print(file[Probes::LASERRADIANCE],"\n");
@@ -505,7 +544,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::LEVELSET0], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[0]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi, 1, 0);
       print(file[Probes::LEVELSET0], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET0],"\n");
@@ -517,7 +556,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::LEVELSET1], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[1]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi, 1, 0);
       print(file[Probes::LEVELSET1], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET1],"\n");
@@ -529,7 +568,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::LEVELSET2], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[2]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi, 1, 0);
       print(file[Probes::LEVELSET2], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET2],"\n");
@@ -541,7 +580,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::LEVELSET3], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[3]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi, 1, 0);
       print(file[Probes::LEVELSET3], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET3],"\n");
@@ -553,7 +592,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::LEVELSET4], "%8d    %16.8e    ", time_step, time);
     double*** phi = (double***)Phi[4]->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      double sol = InterpolateSolutionAtProbe(ijk[iNode], trilinear_coords[iNode], phi, 1, 0);
+      double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi, 1, 0);
       print(file[Probes::LEVELSET4], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET4],"\n");
@@ -565,7 +604,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     print(file[Probes::IONIZATION], "%8d    %16.8e    ", time_step, time);
     double*** id  = (double***)ID.GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
-      Vec3D sol = CalculateIonizationAtProbe(ijk[iNode], trilinear_coords[iNode], v, id);
+      Vec3D sol = CalculateIonizationAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], v, id);
       print(file[Probes::IONIZATION], "%16.8e    %16.8e    ", sol[0], sol[1]);
     }
     print(file[Probes::IONIZATION],"\n");
@@ -583,97 +622,34 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
 //-------------------------------------------------------------------------
 
 double
-ProbeOutput::InterpolateSolutionAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, int dim, int p)
+ProbeOutput::InterpolateSolutionAtProbe(Int3& ijk, pair<int, array<bool,8> >& ijk_valid,
+                                        Vec3D &trilinear_coords, double ***v, int dim, int p)
 {
   double sol = 0.0;
 
   int i = ijk[0], j = ijk[1], k = ijk[2];
 
   if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
-    double c000 = v[k][j][i*dim+p];
-    double c100 = v[k][j][(i+1)*dim+p];
-    double c010 = v[k][j+1][i*dim+p];
-    double c110 = v[k][j+1][(i+1)*dim+p];
-    double c001 = v[k+1][j][i*dim+p];
-    double c101 = v[k+1][j][(i+1)*dim+p];
-    double c011 = v[k+1][j+1][i*dim+p];
-    double c111 = v[k+1][j+1][(i+1)*dim+p];
-    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
-  }
+    double c000 = ijk_valid.second[0] ? v[k][j][i*dim+p]         : 0.0;
+    double c100 = ijk_valid.second[1] ? v[k][j][(i+1)*dim+p]     : 0.0;
+    double c010 = ijk_valid.second[2] ? v[k][j+1][i*dim+p]       : 0.0;
+    double c110 = ijk_valid.second[3] ? v[k][j+1][(i+1)*dim+p]   : 0.0;
+    double c001 = ijk_valid.second[4] ? v[k+1][j][i*dim+p]       : 0.0;
+    double c101 = ijk_valid.second[5] ? v[k+1][j][(i+1)*dim+p]   : 0.0;
+    double c011 = ijk_valid.second[6] ? v[k+1][j+1][i*dim+p]     : 0.0;
+    double c111 = ijk_valid.second[7] ? v[k+1][j+1][(i+1)*dim+p] : 0.0;
 
-  MPI_Allreduce(MPI_IN_PLACE, &sol, 1, MPI_DOUBLE, MPI_SUM, comm);
-  return sol;
-}
-
-//-------------------------------------------------------------------------
-
-double
-ProbeOutput::CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id)
-{
-  double sol = 0.0;
-
-  int i = ijk[0], j = ijk[1], k = ijk[2];
-  int dim = 5;
-  double rho,p,e;
-  int myid;
-
-  if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
-
-    // c000
-    myid = id[k][j][i]; 
-    rho  =  v[k][j][i*dim];
-    p    =  v[k][j][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c000 = vf[myid]->GetTemperature(rho,e);
-
-    // c100
-    myid = id[k][j][i+1];
-    rho  =  v[k][j][(i+1)*dim];
-    p    =  v[k][j][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c100 = vf[myid]->GetTemperature(rho,e);
-
-    // c010
-    myid = id[k][j+1][i];
-    rho  =  v[k][j+1][i*dim];
-    p    =  v[k][j+1][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c010 = vf[myid]->GetTemperature(rho,e);
-
-    // c110
-    myid = id[k][j+1][i+1];
-    rho  =  v[k][j+1][(i+1)*dim];
-    p    =  v[k][j+1][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c110 = vf[myid]->GetTemperature(rho,e);
-
-    // c001
-    myid = id[k+1][j][i];
-    rho  =  v[k+1][j][i*dim];
-    p    =  v[k+1][j][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c001 = vf[myid]->GetTemperature(rho,e);
-
-    // c101
-    myid = id[k+1][j][i+1];
-    rho  =  v[k+1][j][(i+1)*dim];
-    p    =  v[k+1][j][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c101 = vf[myid]->GetTemperature(rho,e);
-
-    // c011
-    myid = id[k+1][j+1][i];
-    rho  =  v[k+1][j+1][i*dim];
-    p    =  v[k+1][j+1][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c011 = vf[myid]->GetTemperature(rho,e);
-
-    // c111
-    myid = id[k+1][j+1][i+1];
-    rho  =  v[k+1][j+1][(i+1)*dim];
-    p    =  v[k+1][j+1][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c111 = vf[myid]->GetTemperature(rho,e);
+    if(ijk_valid.first<8) {//fill invalid slots with average value
+      double c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid.first;
+      if(!ijk_valid.second[0])  c000 = c_avg;
+      if(!ijk_valid.second[1])  c100 = c_avg;
+      if(!ijk_valid.second[2])  c010 = c_avg;
+      if(!ijk_valid.second[3])  c110 = c_avg;
+      if(!ijk_valid.second[4])  c001 = c_avg;
+      if(!ijk_valid.second[5])  c101 = c_avg;
+      if(!ijk_valid.second[6])  c011 = c_avg;
+      if(!ijk_valid.second[7])  c111 = c_avg;
+    }
 
     sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
   }
@@ -685,7 +661,8 @@ ProbeOutput::CalculateTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, dou
 //-------------------------------------------------------------------------
 
 double
-ProbeOutput::CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id)
+ProbeOutput::CalculateTemperatureAtProbe(Int3& ijk, pair<int, array<bool,8> >& ijk_valid,
+                                         Vec3D &trilinear_coords, double ***v, double ***id)
 {
   double sol = 0.0;
 
@@ -697,60 +674,211 @@ ProbeOutput::CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords
   if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
 
     // c000
-    myid = id[k][j][i]; 
-    rho  =  v[k][j][i*dim];
-    p    =  v[k][j][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c000 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c000 = 0.0;
+    if(ijk_valid.second[0]) {
+      myid = id[k][j][i]; 
+      rho  =  v[k][j][i*dim];
+      p    =  v[k][j][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c000 = vf[myid]->GetTemperature(rho,e);
+    }
 
     // c100
-    myid = id[k][j][i+1];
-    rho  =  v[k][j][(i+1)*dim];
-    p    =  v[k][j][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c100 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c100 = 0.0;
+    if(ijk_valid.second[1]) {
+      myid = id[k][j][i+1];
+      rho  =  v[k][j][(i+1)*dim];
+      p    =  v[k][j][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c100 = vf[myid]->GetTemperature(rho,e);
+    }
 
     // c010
-    myid = id[k][j+1][i];
-    rho  =  v[k][j+1][i*dim];
-    p    =  v[k][j+1][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c010 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c010 = 0.0;
+    if(ijk_valid.second[2]) {
+      myid = id[k][j+1][i];
+      rho  =  v[k][j+1][i*dim];
+      p    =  v[k][j+1][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c010 = vf[myid]->GetTemperature(rho,e);
+    }
 
     // c110
-    myid = id[k][j+1][i+1];
-    rho  =  v[k][j+1][(i+1)*dim];
-    p    =  v[k][j+1][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c110 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c110 = 0.0;
+    if(ijk_valid.second[3]) {
+      myid = id[k][j+1][i+1];
+      rho  =  v[k][j+1][(i+1)*dim];
+      p    =  v[k][j+1][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c110 = vf[myid]->GetTemperature(rho,e);
+    }
 
     // c001
-    myid = id[k+1][j][i];
-    rho  =  v[k+1][j][i*dim];
-    p    =  v[k+1][j][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c001 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c001 = 0.0;
+    if(ijk_valid.second[4]) {
+      myid = id[k+1][j][i];
+      rho  =  v[k+1][j][i*dim];
+      p    =  v[k+1][j][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c001 = vf[myid]->GetTemperature(rho,e);
+    }
 
     // c101
-    myid = id[k+1][j][i+1];
-    rho  =  v[k+1][j][(i+1)*dim];
-    p    =  v[k+1][j][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c101 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c101 = 0.0;
+    if(ijk_valid.second[5]) {
+      myid = id[k+1][j][i+1];
+      rho  =  v[k+1][j][(i+1)*dim];
+      p    =  v[k+1][j][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c101 = vf[myid]->GetTemperature(rho,e);
+    }
 
     // c011
-    myid = id[k+1][j+1][i];
-    rho  =  v[k+1][j+1][i*dim];
-    p    =  v[k+1][j+1][i*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c011 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c011 = 0.0;
+    if(ijk_valid.second[6]) {
+      myid = id[k+1][j+1][i];
+      rho  =  v[k+1][j+1][i*dim];
+      p    =  v[k+1][j+1][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c011 = vf[myid]->GetTemperature(rho,e);
+    }
 
     // c111
-    myid = id[k+1][j+1][i+1];
-    rho  =  v[k+1][j+1][(i+1)*dim];
-    p    =  v[k+1][j+1][(i+1)*dim+4];
-    e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-    double c111 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    double c111 = 0.0;
+    if(ijk_valid.second[7]) {
+      myid = id[k+1][j+1][i+1];
+      rho  =  v[k+1][j+1][(i+1)*dim];
+      p    =  v[k+1][j+1][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c111 = vf[myid]->GetTemperature(rho,e);
+    }
+
+    if(ijk_valid.first<8) {//fill invalid slots with average value
+      double c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid.first;
+      if(!ijk_valid.second[0])  c000 = c_avg;
+      if(!ijk_valid.second[1])  c100 = c_avg;
+      if(!ijk_valid.second[2])  c010 = c_avg;
+      if(!ijk_valid.second[3])  c110 = c_avg;
+      if(!ijk_valid.second[4])  c001 = c_avg;
+      if(!ijk_valid.second[5])  c101 = c_avg;
+      if(!ijk_valid.second[6])  c011 = c_avg;
+      if(!ijk_valid.second[7])  c111 = c_avg;
+    }
+
+    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &sol, 1, MPI_DOUBLE, MPI_SUM, comm);
+  return sol;
+}
+
+//-------------------------------------------------------------------------
+
+double
+ProbeOutput::CalculateDeltaTemperatureAtProbe(Int3& ijk, pair<int, array<bool,8> >& ijk_valid, 
+                                              Vec3D &trilinear_coords, double ***v, double ***id)
+{
+  double sol = 0.0;
+
+  int i = ijk[0], j = ijk[1], k = ijk[2];
+  int dim = 5;
+  double rho,p,e;
+  int myid;
+
+  if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
+
+    // c000
+    double c000 = 0.0;
+    if(ijk_valid.second[0]) {
+      myid = id[k][j][i]; 
+      rho  =  v[k][j][i*dim];
+      p    =  v[k][j][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c000 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+    // c100
+    double c100 = 0.0;
+    if(ijk_valid.second[1]) {
+      myid = id[k][j][i+1];
+      rho  =  v[k][j][(i+1)*dim];
+      p    =  v[k][j][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c100 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+    // c010
+    double c010 = 0.0;
+    if(ijk_valid.second[2]) { 
+      myid = id[k][j+1][i];
+      rho  =  v[k][j+1][i*dim];
+      p    =  v[k][j+1][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c010 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+    // c110
+    double c110 = 0.0;
+    if(ijk_valid.second[3]) {
+      myid = id[k][j+1][i+1];
+      rho  =  v[k][j+1][(i+1)*dim];
+      p    =  v[k][j+1][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c110 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+    // c001
+    double c001 = 0.0;
+    if(ijk_valid.second[4]) {
+      myid = id[k+1][j][i];
+      rho  =  v[k+1][j][i*dim];
+      p    =  v[k+1][j][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c001 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+    // c101
+    double c101 = 0.0;
+    if(ijk_valid.second[5]) {
+      myid = id[k+1][j][i+1];
+      rho  =  v[k+1][j][(i+1)*dim];
+      p    =  v[k+1][j][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c101 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+    // c011
+    double c011 = 0.0;
+    if(ijk_valid.second[6]) {
+      myid = id[k+1][j+1][i];
+      rho  =  v[k+1][j+1][i*dim];
+      p    =  v[k+1][j+1][i*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c011 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+    // c111
+    double c111 = 0.0;
+    if(ijk_valid.second[7]) {
+      myid = id[k+1][j+1][i+1];
+      rho  =  v[k+1][j+1][(i+1)*dim];
+      p    =  v[k+1][j+1][(i+1)*dim+4];
+      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+      c111 = vf[myid]->GetTemperature(rho,e) - vf[myid]->GetReferenceTemperature();
+    }
+
+
+    if(ijk_valid.first<8) {//fill invalid slots with average value
+      double c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid.first;
+      if(!ijk_valid.second[0])  c000 = c_avg;
+      if(!ijk_valid.second[1])  c100 = c_avg;
+      if(!ijk_valid.second[2])  c010 = c_avg;
+      if(!ijk_valid.second[3])  c110 = c_avg;
+      if(!ijk_valid.second[4])  c001 = c_avg;
+      if(!ijk_valid.second[5])  c101 = c_avg;
+      if(!ijk_valid.second[6])  c011 = c_avg;
+      if(!ijk_valid.second[7])  c111 = c_avg;
+    }
 
     sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
   }
@@ -762,7 +890,8 @@ ProbeOutput::CalculateDeltaTemperatureAtProbe(Int3& ijk, Vec3D &trilinear_coords
 //-------------------------------------------------------------------------
 
 Vec3D
-ProbeOutput::CalculateIonizationAtProbe(Int3& ijk, Vec3D &trilinear_coords, double ***v, double ***id)
+ProbeOutput::CalculateIonizationAtProbe(Int3& ijk, pair<int, array<bool,8> >& ijk_valid,
+                                        Vec3D &trilinear_coords, double ***v, double ***id)
 {
   Vec3D sol(0.0);
 
@@ -774,52 +903,89 @@ ProbeOutput::CalculateIonizationAtProbe(Int3& ijk, Vec3D &trilinear_coords, doub
   if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
 
     // c000
-    myid = id[k][j][i]; 
-    rho  =  v[k][j][i*dim];
-    p    =  v[k][j][i*dim+4];
-    Vec3D c000 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c000 = 0.0;
+    if(ijk_valid.second[0]) {
+      myid = id[k][j][i]; 
+      rho  =  v[k][j][i*dim];
+      p    =  v[k][j][i*dim+4];
+      c000 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
 
     // c100
-    myid = id[k][j][i+1];
-    rho  =  v[k][j][(i+1)*dim];
-    p    =  v[k][j][(i+1)*dim+4];
-    Vec3D c100 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c100 = 0.0;
+    if(ijk_valid.second[1]) {
+      myid = id[k][j][i+1];
+      rho  =  v[k][j][(i+1)*dim];
+      p    =  v[k][j][(i+1)*dim+4];
+      c100 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
 
     // c010
-    myid = id[k][j+1][i];
-    rho  =  v[k][j+1][i*dim];
-    p    =  v[k][j+1][i*dim+4];
-    Vec3D c010 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c010 = 0.0;
+    if(ijk_valid.second[2]) {
+      myid = id[k][j+1][i];
+      rho  =  v[k][j+1][i*dim];
+      p    =  v[k][j+1][i*dim+4];
+      c010 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
 
     // c110
-    myid = id[k][j+1][i+1];
-    rho  =  v[k][j+1][(i+1)*dim];
-    p    =  v[k][j+1][(i+1)*dim+4];
-    Vec3D c110 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c110 = 0.0;
+    if(ijk_valid.second[3]) {
+      myid = id[k][j+1][i+1];
+      rho  =  v[k][j+1][(i+1)*dim];
+      p    =  v[k][j+1][(i+1)*dim+4];
+      c110 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
 
     // c001
-    myid = id[k+1][j][i];
-    rho  =  v[k+1][j][i*dim];
-    p    =  v[k+1][j][i*dim+4];
-    Vec3D c001 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c001 = 0.0;
+    if(ijk_valid.second[4]) {
+      myid = id[k+1][j][i];
+      rho  =  v[k+1][j][i*dim];
+      p    =  v[k+1][j][i*dim+4];
+      c001 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
 
     // c101
-    myid = id[k+1][j][i+1];
-    rho  =  v[k+1][j][(i+1)*dim];
-    p    =  v[k+1][j][(i+1)*dim+4];
-    Vec3D c101 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c101 = 0.0;
+    if(ijk_valid.second[5]) {
+      myid = id[k+1][j][i+1];
+      rho  =  v[k+1][j][(i+1)*dim];
+      p    =  v[k+1][j][(i+1)*dim+4];
+      c101 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
 
     // c011
-    myid = id[k+1][j+1][i];
-    rho  =  v[k+1][j+1][i*dim];
-    p    =  v[k+1][j+1][i*dim+4];
-    Vec3D c011 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c011 = 0.0;
+    if(ijk_valid.second[6]) {
+      myid = id[k+1][j+1][i];
+      rho  =  v[k+1][j+1][i*dim];
+      p    =  v[k+1][j+1][i*dim+4];
+      c011 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
 
     // c111
-    myid = id[k+1][j+1][i+1];
-    rho  =  v[k+1][j+1][(i+1)*dim];
-    p    =  v[k+1][j+1][(i+1)*dim+4];
-    Vec3D c111 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    Vec3D c111 = 0.0;
+    if(ijk_valid.second[7]) {
+      myid = id[k+1][j+1][i+1];
+      rho  =  v[k+1][j+1][(i+1)*dim];
+      p    =  v[k+1][j+1][(i+1)*dim+4];
+      c111 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
+    }
+
+
+    if(ijk_valid.first<8) {//fill invalid slots with average value
+      Vec3D c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid.first;
+      if(!ijk_valid.second[0])  c000 = c_avg;
+      if(!ijk_valid.second[1])  c100 = c_avg;
+      if(!ijk_valid.second[2])  c010 = c_avg;
+      if(!ijk_valid.second[3])  c110 = c_avg;
+      if(!ijk_valid.second[4])  c001 = c_avg;
+      if(!ijk_valid.second[5])  c101 = c_avg;
+      if(!ijk_valid.second[6])  c011 = c_avg;
+      if(!ijk_valid.second[7])  c111 = c_avg;
+    }
 
     sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
   }
