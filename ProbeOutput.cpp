@@ -307,12 +307,14 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
         
   } 
 
+/*
   for(int iNode = 0; iNode<numNodes; iNode++) {
     if(found[iNode]) {
       fprintf(stdout, "Probe %d: (%d, %d, %d): %e %e %e.\n", iNode, ijk[iNode][0], ijk[iNode][1], ijk[iNode][2],
              trilinear_coords[iNode][0], trilinear_coords[iNode][1], trilinear_coords[iNode][2]);
     }
   }
+*/
 
   MPI_Allreduce(MPI_IN_PLACE, found, numNodes, MPI_INT, MPI_SUM, comm);
   for(int iNode = 0; iNode<numNodes; iNode++) {
