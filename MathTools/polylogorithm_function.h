@@ -9,7 +9,33 @@ namespace MathTools {
  ***************************************************************************/
 double polylogarithm_function(int s, double z, int kmax, double rel_tol = 0.0)
 {
+  // closed form expressions for s = 1, 0, -1, -2, -3, -4
+  if(s==1) {
+    assert(z<1.0);
+    return -log(1.0-z);
+  }
+  else if(s==0) {
+    assert(z!=1.0);
+    return z/(1.0-z); 
+  } 
+  else if(s==-1) {
+    assert(z!=1.0);
+    return z/((1.0-z)*(1.0-z));
+  }
+  else if(s==-2) {
+    assert(z!=1.0);
+    return z*(1.0+z)/pow(1.0-z,3);
+  }
+  else if(s==-3) {
+    assert(z!=1.0);
+    return z*(1.0+4.0*z+z*z)/pow(1.0-z,4);
+  }
+  else if(s==-4) {
+    assert(z!=1.0);
+    return z*(1.0+z)*(1.0+10.0*z+z*z)/pow(1.0-z,5);
+  }
 
+  // Now, implementing the general summation formula
   assert(kmax>=1);
 
   double numerator = z;

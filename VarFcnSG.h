@@ -110,7 +110,7 @@ inline
 VarFcnSG::VarFcnSG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::STIFFENED_GAS){
-    fprintf(stderr, "*** Error: MaterialModelData is not of type GAS\n");
+    fprintf(stderr, "*** Error: MaterialModelData is not of type STIFFENED_GAS.\n");
     exit(-1);
   }
 
