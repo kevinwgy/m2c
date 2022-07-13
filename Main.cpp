@@ -6,6 +6,7 @@
 #include <VarFcnSG.h>
 #include <VarFcnMG.h>
 #include <VarFcnJWL.h>
+#include <VarFcnANEOSEx1.h>
 #include <VarFcnDummy.h>
 #include <FluxFcnGenRoe.h>
 #include <FluxFcnLLF.h>
@@ -103,6 +104,8 @@ int main(int argc, char* argv[])
       vf[matid] = new VarFcnMG(*it->second);
     else if(it->second->eos == MaterialModelData::JWL)
       vf[matid] = new VarFcnJWL(*it->second);
+    else if(it->second->eos == MaterialModelData::ANEOS_BIRCH_MURNAGHAN_DEBYE)
+      vf[matid] = new VarFcnANEOSEx1(*it->second);
     else {
       print_error("*** Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
       exit_mpi();

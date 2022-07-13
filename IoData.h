@@ -270,6 +270,29 @@ struct JonesWilkinsLeeModelData {
 
 //------------------------------------------------------------------------------
 
+struct ANEOSBirchMurnaghanDebyeModelData {
+
+  double zeroKelvinDensity; //!< reference density at 0 K (NOT ambient state)
+  double b0; //!< bulk modulus (ambient)
+  double b0prime; //!< derivative of b0 w.r.t. pressure
+  double delta_e; //!< internal energy shift (often set to 0)
+  double molar_mass; //!< molar mass
+  double T0; //!< reference temperature (ambient state)
+  double e0; //!< reference internal energy (ambient state)
+  double Gamma0; //!< reference Gruneisen parameter (ambient state)
+  double rho0; //!< reference densiy (ambient state)
+
+  enum DebyeFunctionEvaluation {ON_THE_FLY = 0, CUBIC_SPLINE_INTERPOLATION = 1} debye_evaluation;
+
+  ANEOSBirchMurnaghanDebyeModelData();
+  ~ANEOSBirchMurnaghanDebyeModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);  
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ViscosityModelData {
 
   enum Type {NONE = 0, CONSTANT = 1, SUTHERLAND = 2, ARTIFICIAL_RODIONOV = 3} type;
@@ -327,7 +350,7 @@ struct HyperelasticityModelData {
 struct MaterialModelData {
 
   int id;
-  enum EOS {STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2} eos;
+  enum EOS {STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2, ANEOS_BIRCH_MURNAGHAN_DEBYE = 3} eos;
   double rhomin;
   double pmin;
   double rhomax;
@@ -335,9 +358,10 @@ struct MaterialModelData {
 
   double failsafe_density; //for updating phase change -- last resort
 
-  StiffenedGasModelData    sgModel;
-  MieGruneisenModelData    mgModel;
-  JonesWilkinsLeeModelData jwlModel;
+  StiffenedGasModelData             sgModel;
+  MieGruneisenModelData             mgModel;
+  JonesWilkinsLeeModelData          jwlModel;
+  ANEOSBirchMurnaghanDebyeModelData abmdModel;
 
   ViscosityModelData viscosity;
 

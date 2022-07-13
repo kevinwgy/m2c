@@ -583,6 +583,56 @@ void JonesWilkinsLeeModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+ANEOSBirchMurnaghanDebyeModelData::ANEOSBirchMurnaghanDebyeModelData() 
+{
+  //Default values are for Copper (J.J. Sanchez, CMAME 2021)
+  zeroKelvinDensity = 0.00909; //g/mm3
+  b0 = 138.6e9; //Pa
+  b0prime = 5.24; //non-D
+  delta_e = 0.0;
+  molar_mass = 63.546; //g/mol
+  T0 = 343.0; //Kelvin
+  e0 = 0.0;
+  Gamma0 = 1.975; //non-D
+  rho0 = 0.00896; //g/mm3
+
+  debye_evaluation = CUBIC_SPLINE_INTERPOLATION;
+}
+
+//------------------------------------------------------------------------------
+
+void ANEOSBirchMurnaghanDebyeModelData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 10, father);
+
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "DensityAtZeroKelvin", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::zeroKelvinDensity);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "ReferenceBulkModulus", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::b0);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "ReferenceBulkModulusDerivative", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::b0prime);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "EnergyShift", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::delta_e);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "MolarMass", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::molar_mass);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "ReferenceTemperature", this,
+                       &ANEOSBirchMurnaghanDebyeModelData::T0);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "ReferenceSpecificInternalEnergy", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::e0);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "ReferenceGamma", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::Gamma0);
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "ReferenceDensity", this, 
+                       &ANEOSBirchMurnaghanDebyeModelData::rho0);
+
+  new ClassToken<ANEOSBirchMurnaghanDebyeModelData> (ca, "DebyeFunctionEvaluation", this,
+        reinterpret_cast<int ANEOSBirchMurnaghanDebyeModelData::*>
+            (&ANEOSBirchMurnaghanDebyeModelData::debye_evaluation), 
+        2, "OnTheFly", 0, "CubicSplineInterpolation", 1);
+}
+
+//------------------------------------------------------------------------------
+
 HyperelasticityModelData::HyperelasticityModelData()
 {
   type = NONE;
@@ -620,13 +670,14 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
-                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
+                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 4,
                                  "StiffenedGas", MaterialModelData::STIFFENED_GAS, 
                                  "MieGruneisen", MaterialModelData::MIE_GRUNEISEN,
-                                 "JonesWilkinsLee", MaterialModelData::JWL);
+                                 "JonesWilkinsLee", MaterialModelData::JWL,
+                                 "ANEOSBirchMurnaghanDebye", MaterialModelData::ANEOS_BIRCH_MURNAGHAN_DEBYE);
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
   new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
   new ClassDouble<MaterialModelData>(ca, "DensityUpperLimit", this, &MaterialModelData::rhomax);
@@ -637,6 +688,7 @@ Assigner *MaterialModelData::getAssigner()
   sgModel.setup("StiffenedGasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
   jwlModel.setup("JonesWilkinsLeeModel", ca);
+  abmdModel.setup("ANEOSBirchMurnaghanDebyeModel", ca);
 
   viscosity.setup("ViscosityModel", ca);
   
