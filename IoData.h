@@ -282,6 +282,8 @@ struct ANEOSBirchMurnaghanDebyeModelData {
   double Gamma0; //!< reference Gruneisen parameter (ambient state)
   double rho0; //!< reference densiy (ambient state)
 
+  double boltzmann_constant; //!< boltzmann constant
+
   enum DebyeFunctionEvaluation {ON_THE_FLY = 0, CUBIC_SPLINE_INTERPOLATION = 1} debye_evaluation;
 
   ANEOSBirchMurnaghanDebyeModelData();

@@ -56,13 +56,13 @@ public:
   ~VarFcnSG() {}
 
   //! ----- EOS-Specific Functions -----
-  inline double GetPressure(double rho, double e) const {return gam1*rho*e - gam*Pstiff;}
-  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {return (p+gam*Pstiff)/(gam1*rho);}
-  inline double GetDensity(double p, double e) const {return (p+gam*Pstiff)/(gam1*e);}
-  inline double GetDpdrho(double rho, double e) const{return gam1*e;}
-  inline double GetBigGamma(double rho, double e) const {return gam1;}
+  inline double GetPressure(double rho, double e) {return gam1*rho*e - gam*Pstiff;}
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) {return (p+gam*Pstiff)/(gam1*rho);}
+  inline double GetDensity(double p, double e) {return (p+gam*Pstiff)/(gam1*e);}
+  inline double GetDpdrho(double rho, double e) {return gam1*e;}
+  inline double GetBigGamma(double rho, double e) {return gam1;}
 
-  inline double GetTemperature(double rho, double e) const {
+  inline double GetTemperature(double rho, double e) {
     if(use_cv_advanced) { //Method 3
       return invcv*(e + Pstiff/rho) + pow(rho/rho0, gam1)*(T0 - invcv*(e0 + Pstiff/rho0));
     } else if(use_cp) { //Method 2
@@ -72,10 +72,10 @@ public:
       return T0 + invcv*(e-e0);
   }
 
-  inline double GetReferenceTemperature() const {return T0;}
-  inline double GetReferenceInternalEnergyPerUnitMass() const {return e0;}
+  inline double GetReferenceTemperature() {return T0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() {return e0;}
 
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {
     if(use_cv_advanced) {
       return cv*T - Pstiff/rho - pow(rho/rho0, gam1)*(cv*T0 - (e0 + Pstiff/rho0));
     } else if(use_cp) 
@@ -84,11 +84,11 @@ public:
       return e0 + cv*(T-T0);
   }
   
-  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return invgam*h+Pstiff/rho;}
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) {return invgam*h+Pstiff/rho;}
 
 
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + Pstiff < 0 (Not p + gamma*Pstiff). 
-  inline bool CheckState(double rho, double p, bool silence = false) const{
+  inline bool CheckState(double rho, double p, bool silence = false) {
     if(!std::isfinite(rho) || !std::isfinite(p)) {
       if(!silence)
         fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);

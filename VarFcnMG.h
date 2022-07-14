@@ -56,34 +56,34 @@ public:
   ~VarFcnMG() {}
 
   //! ----- EOS-Specific Functions -----
-  inline double GetPressure(double rho, double e) const {
+  inline double GetPressure(double rho, double e) {
     double eta = 1.0 - rho0/rho;
     return rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta)) + Gamma0_rho0*(e-e0);}
 
-  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) {
     double eta = 1.0 - rho0/rho;
     return (p - rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta)))/Gamma0_rho0 + e0;
   }
 
-  inline double GetDensity(double p, double e) const;
+  inline double GetDensity(double p, double e);
 
-  inline double GetDpdrho(double rho, double e) const {
+  inline double GetDpdrho(double rho, double e){
     double eta = 1.0 - rho0/rho;
     double S = 1.0 - s*eta;
     return rho0_c0_c0*(1.0 + (s - Gamma0)*eta)/(S*S*S)*rho0/(rho*rho);
   }
 
-  inline double GetBigGamma(double rho, double e) const {return Gamma0_rho0/rho;}
+  inline double GetBigGamma(double rho, double e) {return Gamma0_rho0/rho;}
 
-  inline double GetTemperature(double rho, double e) const;
+  inline double GetTemperature(double rho, double e);
 
-  inline double GetReferenceTemperature() const {return T0;}
+  inline double GetReferenceTemperature() {return T0;}
 
-  inline double GetReferenceInternalEnergyPerUnitMass() const {return e0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() {return e0;}
 
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const;
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T);
 
-  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const;
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h);
 
 };
 
@@ -123,7 +123,7 @@ VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
 //------------------------------------------------------------------------------
 
 inline
-double VarFcnMG::GetDensity(double p, double e) const {
+double VarFcnMG::GetDensity(double p, double e) {
 
   //solving a quadratic equation a*eta^2 + b*eta + c = 0 for eta ==> rho = rho0/(1-eta)
   double c = p - Gamma0_rho0*(e - e0);
@@ -164,7 +164,7 @@ double VarFcnMG::GetDensity(double p, double e) const {
 //------------------------------------------------------------------------------
 
 inline 
-double VarFcnMG::GetTemperature(double rho, double e) const {
+double VarFcnMG::GetTemperature(double rho, double e) {
 
   if(use_cp) {
     double p = GetPressure(rho, e);
@@ -176,7 +176,7 @@ double VarFcnMG::GetTemperature(double rho, double e) const {
 //------------------------------------------------------------------------------
 
 inline
-double VarFcnMG::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const
+double VarFcnMG::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) 
 {
   if(use_cp) {
     double eta = 1.0 - rho0/rho;
@@ -189,7 +189,7 @@ double VarFcnMG::GetInternalEnergyPerUnitMassFromTemperature(double rho, double 
 //------------------------------------------------------------------------------
 
 inline
-double VarFcnMG::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const
+double VarFcnMG::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) 
 {
   double eta = 1.0 - rho0/rho;
   double first_term = rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta));

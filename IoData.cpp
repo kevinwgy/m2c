@@ -596,6 +596,8 @@ ANEOSBirchMurnaghanDebyeModelData::ANEOSBirchMurnaghanDebyeModelData()
   Gamma0 = 1.975; //non-D
   rho0 = 0.00896; //g/mm3
 
+  boltzmann_constant = 1.38064852e-14; //unit: (mm^2).g/(s^2*K)  (dim: [energy]/[temperature])
+
   debye_evaluation = CUBIC_SPLINE_INTERPOLATION;
 }
 
@@ -604,7 +606,7 @@ ANEOSBirchMurnaghanDebyeModelData::ANEOSBirchMurnaghanDebyeModelData()
 void ANEOSBirchMurnaghanDebyeModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 10, father);
+  ClassAssigner *ca = new ClassAssigner(name, 11, father);
 
   new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "DensityAtZeroKelvin", this, 
                        &ANEOSBirchMurnaghanDebyeModelData::zeroKelvinDensity);
@@ -624,6 +626,9 @@ void ANEOSBirchMurnaghanDebyeModelData::setup(const char *name, ClassAssigner *f
                        &ANEOSBirchMurnaghanDebyeModelData::Gamma0);
   new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "ReferenceDensity", this, 
                        &ANEOSBirchMurnaghanDebyeModelData::rho0);
+
+  new ClassDouble<ANEOSBirchMurnaghanDebyeModelData>(ca, "BoltzmannConstant", this,
+                       &ANEOSBirchMurnaghanDebyeModelData::boltzmann_constant);
 
   new ClassToken<ANEOSBirchMurnaghanDebyeModelData> (ca, "DebyeFunctionEvaluation", this,
         reinterpret_cast<int ANEOSBirchMurnaghanDebyeModelData::*>

@@ -30,7 +30,7 @@ private:
   double delta_e; //!< energy shift constant (often set to 0)
   double R_over_w; //!< gas constant (avogadro*boltzmann) divided by molar mass
   double T0; //!< reference temperature (ambient state)
-  double e0; //!< reference internal energy (ambient state)
+  double e0; //!< reference internal energy (ambient state) --- only for output 
   double Gamma0; //!< reference Gruneisen parameter 
   double rho0; //!< reference density (ambient state)
 
@@ -55,73 +55,73 @@ public:
 
   inline double GetPressure(double rho, double e);
   double GetInternalEnergyPerUnitMass(double rho, double p);
-  double GetDensity(double p, double e) const;
-  //double GetDpdrho(double rho, double e) const;   //!< Using finite difference, defined in base class
-  //double GetBigGamma(double rho, double e) const; //!< Using finite difference, defined in base class
+  double GetDensity(double p, double e);
+  //double GetDpdrho(double rho, double e);   //!< Using finite difference, defined in base class
+  //double GetBigGamma(double rho, double e); //!< Using finite difference, defined in base class
   double GetTemperature(double rho, double e);
-  inline double GetReferenceTemperature() const {return T0;} //!< reference temperature (ambient state)
-  inline double GetReferenceInternalEnergyPerUnitMass() const {return e0;} //!< ambient state 
+  inline double GetReferenceTemperature() {return T0;} //!< reference temperature (ambient state)
+  inline double GetReferenceInternalEnergyPerUnitMass() {return e0;} //!< ambient state 
   double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T);
   double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h);
 
-private:
+public:
 
   //! calculate Debye temperature Theta(rho)
-  inline double ComputeDebyeTemperature(double rho) const {return T0*pow(rho/rho0, Gamma0);}
+  inline double ComputeDebyeTemperature(double rho) {return T0*pow(rho/rho0, Gamma0);}
 
   //! calculate Theta'(rho)
-  inline double ComputeDebyeTemperatureDerivative(double rho) const {
+  inline double ComputeDebyeTemperatureDerivative(double rho) {
     return T0*Gamma0/rho0*pow(rho/rho0, Gamma0-1.0);}
 
   //! calculate e_{cold} using the Birch-Murnaghan EOS.
-  inline double ComputeColdSpecificEnergy(double rho) const {
+  inline double ComputeColdSpecificEnergy(double rho) {
     double x = pow(rho/r0, 2.0/3.0) - 1.0;
     return 1.125*b0*x*x*(0.5*x*(b0prime-4.0) + 1.0);} //Birch-Murnaghan eq.
 
   //! calculate d(e_{cold})/d(\rho)
-  inline double ComputeColdSpecificEnergyDerivative(double rho) const {
+  inline double ComputeColdSpecificEnergyDerivative(double rho) {
     double x = pow(rho/r0, 2.0/3.0) - 1.0;
     return 1.5*(0.75*(b0prime-4.0)*x*x + x)*b0/r0*pow(rho/r0, -1.0/3.0);}
   
   //! calculate e_l
-  inline double ComputeThermalSpecificEnergy(double rho, double T) const {
+  inline double ComputeThermalSpecificEnergy(double rho, double T) {
     double Theta = ComputeDebyeTemperature(rho);   assert(T>0);
     return R_over_w*(1.125*Theta + 3.0*T*EvaluateDebyeFunction(Theta/T));}
 
   //! calculate F_l(rho,T)
-  inline double ComputeThermalSpecificHelmholtz(double rho, double T) const {
+  inline double ComputeThermalSpecificHelmholtz(double rho, double T) {
     double Theta = ComputeDebyeTemperature(rho);   assert(T>0);
     double Theta_over_T = Theta/T;
     return R_over_w*(1.125*Theta + 3.0*T*log(1.0-exp(-Theta_over_T)) - T*EvaluateDebyeFunction(Theta_over_T));}
 
   //! calculates dF_l(rho,T)/drho
-  inline double ComputeThermalSpecificHelmholtzDerivativeRho(double rho, double T) const {
+  inline double ComputeThermalSpecificHelmholtzDerivativeRho(double rho, double T) {
     double ThetaPrime = ComputeDebyeTemperatureDerivative(rho);
     double Theta_over_T = ComputeDebyeTemperature(rho)/T;
     assert(Theta_over_T>0);
     return R_over_w*ThetaPrime*(1.125 + 3.0/Theta_over_T*EvaluateDebyeFunction(Theta_over_T));}
 
   //! calculate dF_l(rho,T)/dT
-  inline double ComputeThermalSpecificHelmholtzDerivativeT(double rho, double T) const {
+  inline double ComputeThermalSpecificHelmholtzDerivativeT(double rho, double T) {
     double Theta_over_T = ComputeDebyeTemperature(rho)/T;   assert(Theta_over_T>0.0);
     return R_over_w*(3.0*log(1.0 - exp(-Theta_over_T)) - 4.0*EvaluateDebyeFunction(Theta_over_T));}
 
   //! evaluate Debye function D(x)
-  inline double EvaluateDebyeFunction(double x) const {
+  inline double EvaluateDebyeFunction(double x) {
     return (spline_Li4 && spline_Li3 && spline_Li2) ? EvaluateDebyeFunctionByInterpolation(x)
                                                     : EvaluateDebyeFunctionOnTheFly(x);}
 
   //! evaluate D'(x) (Note: Can also be done by differentiating the splines (i.e. spline.prime(x)))
-  inline double EvaluateDebyeFunctionDerivative(double x) const {
+  inline double EvaluateDebyeFunctionDerivative(double x) {
     double expmx = exp(-x);
     assert(expmx != 1.0);
     return -3.0/x*EvaluateDebyeFunction(x) + 3.0*expmx/(1.0-expmx);}
 
   //! evaluate Debye function D(x) on the fly
-  inline double EvaluateDebyeFunctionOnTheFly(double x) const;
+  inline double EvaluateDebyeFunctionOnTheFly(double x);
   
   //! evaluate Debye function D(x) by spline interpolation
-  inline double EvaluateDebyeFunctionByInterpolation(double x) const;
+  inline double EvaluateDebyeFunctionByInterpolation(double x);
 
   //! build spline interpolation for Debye function D(x)
   void InitializeInterpolationForDebyeFunction(double expmx_min, double expmx_max, int sample_size);
@@ -235,7 +235,7 @@ VarFcnANEOSEx1::VarFcnANEOSEx1(MaterialModelData &data) : VarFcnANEOSBase(data)
   b0 = data.abmdModel.b0;
   b0prime = data.abmdModel.b0prime;
   delta_e = data.abmdModel.delta_e;
-  R_over_w = avogadro_number/data.abmdModel.molar_mass;
+  R_over_w = avogadro_number*data.abmdModel.boltzmann_constant/data.abmdModel.molar_mass;
   T0 = data.abmdModel.T0; 
   e0 = data.abmdModel.e0; 
   Gamma0 = data.abmdModel.Gamma0;
@@ -297,14 +297,16 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMass(double rho, double p)
   assert(rho>0.0);
   double e_cold_prime = ComputeColdSpecificEnergyDerivative(rho);
   double dFl_drho = p/(rho*rho) - e_cold_prime;
+  //fprintf(stderr,"e_cold_prime = %e, dFl_drho = %e.\n", e_cold_prime, dFl_drho);
   ThermalHelmholtzDerivativeRhoEquation equation(rho, dFl_drho, this);
 
   // find bracketing interval
-  double T_low(100.0), T_high(2000.0);
+  double T_low(500.0), T_high(5000.0);
   double f_low  = equation(T_low);
   double f_high = equation(T_high);
   int iter = 0;
   while(f_low*f_high>0.0) {
+    //fprintf(stderr,"f(%e) = %e, f(%e) = %e.\n", T_low, f_low, T_high, f_high);
     if(++iter>10)
       break;
     T_low  /= 2.0;
@@ -313,9 +315,9 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMass(double rho, double p)
     f_high = equation(T_high);
   }
   if(iter>10) {
-    fprintf(stderr,"\033[0;31*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
+    fprintf(stderr,"\033[0;31m*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
                    " (rho = %e, p = %e).\033[0m\n", T_low, T_high, rho, p);
-
+    exit(-1);
   }
 
   boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
@@ -337,7 +339,7 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMass(double rho, double p)
 //---------------------------------------------------------------------
 //! Calculates rho from p and e
 double
-VarFcnANEOSEx1::GetDensity(double p, double e) const
+VarFcnANEOSEx1::GetDensity(double p, double e) 
 {
 
   // Check storage
@@ -469,9 +471,9 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
     f_high = equation(T_high);
   }
   if(iter>10) {
-    fprintf(stderr,"\033[0;31*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
+    fprintf(stderr,"\033[0;31m*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
                    " (rho = %e, h = %e).\033[0m\n", T_low, T_high, rho, h);
-
+    exit(-1);
   }
 
   boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
@@ -492,7 +494,7 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
 //---------------------------------------------------------------------
 //! evaluate Debye function D(x) on the fly
 inline double 
-VarFcnANEOSEx1::EvaluateDebyeFunctionOnTheFly(double x) const
+VarFcnANEOSEx1::EvaluateDebyeFunctionOnTheFly(double x) 
 {
   assert(x>0.0); 
   double expmx = exp(-x);
@@ -506,7 +508,7 @@ VarFcnANEOSEx1::EvaluateDebyeFunctionOnTheFly(double x) const
 //---------------------------------------------------------------------
 //! evaluate Debye function D(x) by spline interpolation
 inline double
-VarFcnANEOSEx1::EvaluateDebyeFunctionByInterpolation(double x) const
+VarFcnANEOSEx1::EvaluateDebyeFunctionByInterpolation(double x) 
 {
   assert(x>0.0); 
   double expmx = exp(-x);

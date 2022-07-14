@@ -31,7 +31,7 @@ public:
   // ------------------------------------------------------------------------------
 
   //! dpdrho = \frac{\partial p(\rho,e)}{\partial \rho}
-  virtual double GetDpdrho(double rho, double e) const{
+  virtual double GetDpdrho(double rho, double e) {
     assert(rho>0);
     double drho = finite_difference_step*rho;
     double pminus = GetPressure(rho - drho, e);
@@ -40,7 +40,7 @@ public:
   }
 
   //! BigGamma = 1/rho*(\frac{\partial p(\rho,e)}{\partial e})   (Gruneisen parameter)
-  virtual double GetBigGamma(double rho, double e) const{
+  virtual double GetBigGamma(double rho, double e) {
     assert(e!=0.0);
     double de = finite_difference_step*fabs(e);
     double pminus = GetPressure(rho, e + de);

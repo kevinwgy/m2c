@@ -21,19 +21,19 @@ public:
   ~VarFcnDummy() {}
 
   //! ----- EOS-Specific Functions -----
-  inline double GetPressure(double rho, double e) const {return p0;}
-  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {return e0;}
-  inline double GetDensity(double p, double e) const {return rho0;}
-  inline double GetDpdrho(double rho, double e) const{return 0.0;}
-  inline double GetBigGamma(double rho, double e) const {return 0.0;}
-  inline double GetTemperature(double rho, double e) const {return T0;}
-  inline double GetReferenceTemperature() const {return T0;}
-  inline double GetReferenceInternalEnergyPerUnitMass() const {return e0;}
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {return e0;}
-  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return e0;}
-  inline bool   CheckState(double rho, double p, bool silence = false) const {return false;}
-  inline bool   CheckState(double *V, bool silence = false) const {return false;}
-  inline bool   CheckPhaseTransition(int id/*id of the other phase*/) const {return false;}
+  inline double GetPressure(double rho, double e) {return p0;}
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) {return e0;}
+  inline double GetDensity(double p, double e) {return rho0;}
+  inline double GetDpdrho(double rho, double e) {return 0.0;}
+  inline double GetBigGamma(double rho, double e) {return 0.0;}
+  inline double GetTemperature(double rho, double e) {return T0;}
+  inline double GetReferenceTemperature() {return T0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() {return e0;}
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {return e0;}
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) {return e0;}
+  inline bool   CheckState(double rho, double p, bool silence = false) {return false;}
+  inline bool   CheckState(double *V, bool silence = false) {return false;}
+  inline bool   CheckPhaseTransition(int id/*id of the other phase*/) {return false;}
 
   //! Overwrite the calculations done in the base class
   inline void   ConservativeToPrimitive(double *U, double *V) {
