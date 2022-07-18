@@ -64,7 +64,7 @@ public:
   double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T);
   double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h);
 
-public:
+private:
 
   //! calculate Debye temperature Theta(rho)
   inline double ComputeDebyeTemperature(double rho) {return T0*pow(rho/rho0, Gamma0);}
@@ -76,12 +76,12 @@ public:
   //! calculate e_{cold} using the Birch-Murnaghan EOS.
   inline double ComputeColdSpecificEnergy(double rho) {
     double x = pow(rho/r0, 2.0/3.0) - 1.0;
-    return 1.125*b0*x*x*(0.5*x*(b0prime-4.0) + 1.0);} //Birch-Murnaghan eq.
+    return 1.125*b0/r0*x*x*(0.5*x*(b0prime-4.0) + 1.0);} //Birch-Murnaghan eq.
 
   //! calculate d(e_{cold})/d(\rho)
   inline double ComputeColdSpecificEnergyDerivative(double rho) {
     double x = pow(rho/r0, 2.0/3.0) - 1.0;
-    return 1.5*(0.75*(b0prime-4.0)*x*x + x)*b0/r0*pow(rho/r0, -1.0/3.0);}
+    return 1.5*(0.75*(b0prime-4.0)*x*x + x)*b0/(r0*r0)*pow(rho/r0, -1.0/3.0);}
   
   //! calculate e_l
   inline double ComputeThermalSpecificEnergy(double rho, double T) {
@@ -347,7 +347,7 @@ VarFcnANEOSEx1::GetDensity(double p, double e)
     if(std::get<1>(mytuple) == e && std::get<2>(mytuple) == p)
       return std::get<0>(mytuple);
 
-  //TODO: This function is non-trivial, and not really needed... (KW)
+  //TODO: This function is not really needed... (KW)
   
   fprintf(stderr,"\033[0;31m*** Error: Implementation of VarFcnANEOSEx1::GetDensity is incomplete.\n\033[0m");
   exit(-1); 
