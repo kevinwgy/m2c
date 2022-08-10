@@ -2239,7 +2239,7 @@ IonizationData::IonizationData()
   electron_charge = 1.602176634e-19;  //unit: A.s (Coulombs)
   electron_mass = 9.1093837015e-28; //unit: g
   boltzmann_constant = 1.38064852e-14; //unit: (mm^2).g/(s^2*K)  (dim: [energy]/[temperature])
-  vacuum_permittivity = 8.8541878128e-9; //unit: g/(s^2)  (dim: [force]/[length])
+  vacuum_permittivity = 8.8541878128e-24; //unit: (s^4.A^2)/(g*mm^3)  (dim: [electrical capacitance]/[length])
 }
 
 //------------------------------------------------------------------------------
