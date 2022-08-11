@@ -283,7 +283,7 @@ int main(int argc, char* argv[])
     }
   if(activate_heo) {
     heo = new HyperelasticityOperator(comm, dms, iod, spo.GetMeshCoordinates(),
-                                      spo.GetMeshDeltaXYZ(), global_mesh,
+                                      spo.GetMeshDeltaXYZ(), global_mesh, *interp, *grad,
                                       *(spo.GetPointerToInnerGhostNodes()),
                                       *(spo.GetPointerToOuterGhostNodes()));
     Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));

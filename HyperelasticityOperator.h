@@ -22,10 +22,23 @@ class HyperelasticityOperator
   //! Solver of the reference map
   ReferenceMapOperator refmap;
 
+  //! Gradient calculator
+  GradientCalculatorBase &grad;
+
+  //! Interpolator
+  InterpolatorBase &interpolator;
+
+  //! Deformation gradient (dim = 9, i.e. 3x3 matrix)
+  SpaceVariable3D DeformGrad;
+
+  //! Eigenvalues of the deformation gradient
+  SpaceVariable3D Lambda; 
+
 public:
 
   HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, SpaceVariable3D &coordinates_,
                           SpaceVariable3D &delta_xyz_, GlobalMeshInfo &global_mesh_,
+                          InterpolatorBase &interpolator_, GradientCalculatorBase &grad_,
                           std::vector<GhostPoint> &ghost_nodes_inner_,
                           std::vector<GhostPoint> &ghost_nodes_outer_);
   ~HyperelasticityOperator();
@@ -37,6 +50,8 @@ public:
   void ApplyBoundaryConditionsToReferenceMap(SpaceVariable3D &Xi);
 
   void ComputeReferenceMapResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, SpaceVariable3D &R);
+
+  void ComputeDeformationGradientAndEigenvalues;
 
 };
 
