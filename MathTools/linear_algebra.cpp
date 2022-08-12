@@ -1,5 +1,14 @@
 #include <linear_algebra.h>
 #include <Eigen/Dense>
+#include <cassert>
+
+//---------------------------------------------------------------------------------
+// Note: Some of the functions below convert between "double*" and "Eigen::Matrix3d*"
+//       or "Eigen::Vector3d*", assuming that (1) Eigen uses a fixed and continuous array
+//       to store the matrix/vector, and (2) The Eigen structures do not store anything
+//       else. This assumption is valid for Eigen 3, see:
+//       https://eigen.tuxfamily.org/dox/classEigen_1_1Matrix.html
+//---------------------------------------------------------------------------------
 
 namespace MathTools {
 
@@ -125,21 +134,22 @@ LinearAlgebra::SolveLinearSystem3x3(double a11, double a12, double a13, double a
 /** A and vectors are both column-first. For example A[2] is A(3,1).
  *  vectors are the right eigenvectors --- the i-th column (i=1,2,3) is
  *  the unit eigenvector corresponding to the i-th eigenvalue.
+ *  Returns whether eigen decomposition is successful.
  *  Note: The eigenvalues are SORTED FROM LOWEST TO HIGHEST. 
  *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES! */
 bool
 LinearAlgebra::ComputeEigenSymmetricMatrix3x3(double *A, double *values, double *vectors)
 {
+  int option = vectors ? Eigen::ComputeEigenvectors : Eigen::EigenvaluesOnly;
 
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigensolver(*(Eigen::Matrix3d *)A); //computation done here.
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigensolver(*(Eigen::Matrix3d *)A, option);
 
   if(eigensolver.info() != Eigen::Success)
     return false;
 
-  if(values) {
-    Eigen::Vector3d *lam = (Eigen::Vector3d *)values;
-    *lam = eigensolver.eigenvalues();
-  }
+  assert(values);
+  Eigen::Vector3d *lam = (Eigen::Vector3d *)values;
+  *lam = eigensolver.eigenvalues();
 
   if(vectors) {
     Eigen::Matrix3d *R = (Eigen::Matrix3d *)vectors;
@@ -154,6 +164,7 @@ LinearAlgebra::ComputeEigenSymmetricMatrix3x3(double *A, double *values, double 
 /** A, vectors_real, vectors_imag are all column-first. For example A[2] is A(3,1).
  *  vectors_{real,imag} are the right eigenvectors --- the i-th column (i=1,2,3) is
  *  the unit eigenvector corresponding to the i-th eigenvalue 
+ *  Returns whether eigen decomposition is successful.
  *  NOTE: The eigenvalues are NOT sorted! 
  */
 bool
@@ -161,18 +172,17 @@ LinearAlgebra::ComputeEigen3x3(double *A, double *values_real, double *values_im
                                double *vectors_real, double *vectors_imag)
 {
 
-  Eigen::EigenSolver<Eigen::Matrix3d> eigensolver(*(Eigen::Matrix3d *)A); //computation done here.
+  Eigen::EigenSolver<Eigen::Matrix3d> eigensolver(*(Eigen::Matrix3d *)A,
+                                                  vectors_real || vectors_imag);
 
   if(eigensolver.info() != Eigen::Success)
     return false;
 
-  if(values_real) {
-    assert(values_imag);
-    Eigen::Vector3cd lam = eigensolver.eigenvalues();
-    for(int i=0; i<3; i++) {
-      values_real[i] = lam(i).real();
-      values_imag[i] = lam(i).imag();
-    }
+  assert(values_real && values_imag);
+  Eigen::Vector3cd lam = eigensolver.eigenvalues();
+  for(int i=0; i<3; i++) {
+    values_real[i] = lam(i).real();
+    values_imag[i] = lam(i).imag();
   }
 
   if(vectors_real) {
@@ -190,5 +200,84 @@ LinearAlgebra::ComputeEigen3x3(double *A, double *values_real, double *values_im
 
 //---------------------------------------------------------------------------------
 
+/** A and Ainv are both column-first. For example A[2] is A(3,1).
+ *  Returns whether matrix is invertible (up to a default tolerance in Eigen, which
+ *  can be changed is needed. */
+bool
+LinearAlgebra::ComputeMatrixInverseAndDeterminant3x3(double *A, double *Ainv, double *det)
+{
+
+  bool invertible = false;
+  double det_ = 0.0;
+  Eigen::Matrix3d *A_    = (Eigen::Matrix3d *)A;
+  Eigen::Matrix3d *Ainv_ = (Eigen::Matrix3d *)Ainv;
+
+  A_->computeInverseAndDetWithCheck(*Ainv_, det_, invertible);
+
+  if(det)
+    *det = det_;
+
+  return invertible;
+
+}
+
+//---------------------------------------------------------------------------------
+// A, U, and V are all column-first. For example, A[2] is A(3,1).
+void
+LinearAlgebra::ComputeSVD3x3(double *A, double *svalues, double *U, double *V)
+{
+  int option = (U ? Eigen::ComputeFullU : 0) | (V ? Eigen::ComputeFullV : 0);
+
+  Eigen::JacobiSVD<Eigen::Matrix3d> svd(*(Eigen::Matrix3d*)A, option);
+
+  Eigen::Vector3d *svalues_ = (Eigen::Vector3d *)svalues;
+  *svalues_ = svd.singularValues();
+
+  if(U) {
+    Eigen::Matrix3d *U_ = (Eigen::Matrix3d *)U;
+    *U_ = svd.matrixU();
+  }
+
+  if(V) {
+    Eigen::Matrix3d *V_ = (Eigen::Matrix3d *)V;
+    *V_ = svd.matrixV();
+  }
+}
+
+//---------------------------------------------------------------------------------
+
+// A = R*U: R is orthogonal, U is symmetric, positive semi-definite
+void
+LinearAlgebra::ComputeRightPolarDecomposition3x3(double *A, double *R, double *U)
+{
+  double S[3];
+  ComputeSVD3x3(A, S, R, U);
+
+  Eigen::DiagonalMatrix<double, 3> S_(S[0],S[1],S[2]);
+  Eigen::Matrix3d *R_ = (Eigen::Matrix3d*)R;
+  Eigen::Matrix3d *U_ = (Eigen::Matrix3d*)U;
+
+  *R_ = (*R_)*(U_->transpose());
+  *U_ = (*U_)*S_*(U_->transpose());
+}
+
+//---------------------------------------------------------------------------------
+
+// A = U*R: R is orthogonal, U is symmetric, positive semi-definite
+void
+LinearAlgebra::ComputeLeftPolarDecomposition3x3(double *A, double *U, double *R)
+{
+  double S[3];
+  ComputeSVD3x3(A, S, U, R);
+
+  Eigen::DiagonalMatrix<double, 3> S_(S[0],S[1],S[2]);
+  Eigen::Matrix3d *U_ = (Eigen::Matrix3d*)U;
+  Eigen::Matrix3d *R_ = (Eigen::Matrix3d*)R;
+
+  *R_ = (*U_)*(R_->transpose());
+  *U_ = (*U_)*S_*(U_->transpose());
+}
+
+//---------------------------------------------------------------------------------
 
 }
