@@ -19,6 +19,15 @@ struct LinearAlgebra {
   static double
   CalculateDeterminant3x3(double *A); //column first, i.e. A[0] is A(1,1), A[1] = A(2,1)
 
+  static void 
+  CalculateTranspose3x3(double *A, double *AT);
+  
+  static void
+  CalculateMatrixMatrixProduct3x3(double *A, double *B, double *AB);
+
+  static void
+  CalculateMatrixVectorProduct3x3(double *A, double *x, double *Ax);
+
   static double
   CalculateFirstPrincipalInvariant3x3(double *A); //column first, i.e. A[0] is A(1,1), A[1] = A(2,1), ...
 
@@ -43,7 +52,7 @@ struct LinearAlgebra {
    *  Note: The eigenvalues are SORTED FROM LOWEST TO HIGHEST.
    *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES! */
   static bool
-  ComputeEigenSymmetricMatrix3x3(double *A, double *values, double *vectors = NULL);
+  CalculateEigenSymmetricMatrix3x3(double *A, double *values, double *vectors = NULL);
 
 
   /** A, vectors_real, vectors_imag are all column-first. For example A[2] is A(3,1).
@@ -52,26 +61,32 @@ struct LinearAlgebra {
    *  NOTE: The eigenvalues are NOT sorted!
    */
   static bool
-  ComputeEigen3x3(double *A, double *values_real, double *values_imag,
+  CalculateEigen3x3(double *A, double *values_real, double *values_imag,
                   double *vectors_real = NULL, double *vectors_imag = NULL);
 
   /** A and Ainv are both column-first. For example A[2] is A(3,1).
    *  Returns whether matrix is invertible (up to a default tolerance in Eigen, which
    *  can be changed is needed. */
   static bool
-  ComputeMatrixInverseAndDeterminant3x3(double *A, double *Ainv, double *det = NULL);
+  CalculateMatrixInverseAndDeterminant3x3(double *A, double *Ainv, double *det = NULL);
 
   //! A, U, and V are all column-first. For example, A[2] is A(3,1). 
   static void
-  ComputeSVD3x3(double *A, double *svalues, double *U = NULL, double *V = NULL);
+  CalculateSVD3x3(double *A, double *svalues, double *U = NULL, double *V = NULL);
 
   //! A = R*U: R is orthogonal, U is symmetric, positive semi-definite
   static void
-  ComputeRightPolarDecomposition3x3(double *A, double *R, double *U);
+  CalculateRightPolarDecomposition3x3(double *A, double *R, double *U);
 
   //! A = U*R: R is orthogonal, U is symmetric, positive semi-definite
   static void
-  ComputeLeftPolarDecomposition3x3(double *A, double *U, double *R);
+  CalculateLeftPolarDecomposition3x3(double *A, double *U, double *R);
+
+  static void
+  CalculateATransposeA3x3(double *A, double *ATA);
+
+  static void
+  CalculateAATranspose3x3(double *A, double *AAT);
 
 }; //end of class
 

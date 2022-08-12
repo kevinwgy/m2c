@@ -19,6 +19,7 @@ public:
   DM ghosted1_4dof;  
   DM ghosted1_5dof;  
   DM ghosted1_6dof;  
+  DM ghosted1_9dof;  
 
   DM ghosted2_1dof;
   DM ghosted2_3dof;

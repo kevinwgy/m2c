@@ -1,6 +1,7 @@
 #ifndef _VISCOELASTICITY_OPERATOR_H_
 #define _VISCOELASTICITY_OPERATOR_H_
 #include<ReferenceMapOperator.h>
+#include<Interpolator.h>
 
 /*********************************************************
  * class HyperelasticityOperator is responsible for
@@ -29,10 +30,13 @@ class HyperelasticityOperator
   InterpolatorBase &interpolator;
 
   //! Deformation gradient (dim = 9, i.e. 3x3 matrix)
-  SpaceVariable3D DeformGrad;
+  SpaceVariable3D F;
 
-  //! Eigenvalues of the deformation gradient
-  SpaceVariable3D Lambda; 
+  //! Determinant of deformation gradient
+  SpaceVariable3D DetF;
+
+  //! Internal variables (for temporary use), dim = 3
+  SpaceVariable3D Var1, Var2, Var3;
 
 public:
 
@@ -51,7 +55,10 @@ public:
 
   void ComputeReferenceMapResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, SpaceVariable3D &R);
 
-  void ComputeDeformationGradientAndEigenvalues;
+
+private :
+
+  void ComputeDeformationGradient(SpaceVariable3D &Xi); //!< Only within the physical domain
 
 };
 

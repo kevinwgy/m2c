@@ -138,7 +138,7 @@ LinearAlgebra::SolveLinearSystem3x3(double a11, double a12, double a13, double a
  *  Note: The eigenvalues are SORTED FROM LOWEST TO HIGHEST. 
  *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES! */
 bool
-LinearAlgebra::ComputeEigenSymmetricMatrix3x3(double *A, double *values, double *vectors)
+LinearAlgebra::CalculateEigenSymmetricMatrix3x3(double *A, double *values, double *vectors)
 {
   int option = vectors ? Eigen::ComputeEigenvectors : Eigen::EigenvaluesOnly;
 
@@ -168,7 +168,7 @@ LinearAlgebra::ComputeEigenSymmetricMatrix3x3(double *A, double *values, double 
  *  NOTE: The eigenvalues are NOT sorted! 
  */
 bool
-LinearAlgebra::ComputeEigen3x3(double *A, double *values_real, double *values_imag,
+LinearAlgebra::CalculateEigen3x3(double *A, double *values_real, double *values_imag,
                                double *vectors_real, double *vectors_imag)
 {
 
@@ -204,7 +204,7 @@ LinearAlgebra::ComputeEigen3x3(double *A, double *values_real, double *values_im
  *  Returns whether matrix is invertible (up to a default tolerance in Eigen, which
  *  can be changed is needed. */
 bool
-LinearAlgebra::ComputeMatrixInverseAndDeterminant3x3(double *A, double *Ainv, double *det)
+LinearAlgebra::CalculateMatrixInverseAndDeterminant3x3(double *A, double *Ainv, double *det)
 {
 
   bool invertible = false;
@@ -224,7 +224,7 @@ LinearAlgebra::ComputeMatrixInverseAndDeterminant3x3(double *A, double *Ainv, do
 //---------------------------------------------------------------------------------
 // A, U, and V are all column-first. For example, A[2] is A(3,1).
 void
-LinearAlgebra::ComputeSVD3x3(double *A, double *svalues, double *U, double *V)
+LinearAlgebra::CalculateSVD3x3(double *A, double *svalues, double *U, double *V)
 {
   int option = (U ? Eigen::ComputeFullU : 0) | (V ? Eigen::ComputeFullV : 0);
 
@@ -248,10 +248,10 @@ LinearAlgebra::ComputeSVD3x3(double *A, double *svalues, double *U, double *V)
 
 // A = R*U: R is orthogonal, U is symmetric, positive semi-definite
 void
-LinearAlgebra::ComputeRightPolarDecomposition3x3(double *A, double *R, double *U)
+LinearAlgebra::CalculateRightPolarDecomposition3x3(double *A, double *R, double *U)
 {
   double S[3];
-  ComputeSVD3x3(A, S, R, U);
+  CalculateSVD3x3(A, S, R, U);
 
   Eigen::DiagonalMatrix<double, 3> S_(S[0],S[1],S[2]);
   Eigen::Matrix3d *R_ = (Eigen::Matrix3d*)R;
@@ -265,10 +265,10 @@ LinearAlgebra::ComputeRightPolarDecomposition3x3(double *A, double *R, double *U
 
 // A = U*R: R is orthogonal, U is symmetric, positive semi-definite
 void
-LinearAlgebra::ComputeLeftPolarDecomposition3x3(double *A, double *U, double *R)
+LinearAlgebra::CalculateLeftPolarDecomposition3x3(double *A, double *U, double *R)
 {
   double S[3];
-  ComputeSVD3x3(A, S, U, R);
+  CalculateSVD3x3(A, S, U, R);
 
   Eigen::DiagonalMatrix<double, 3> S_(S[0],S[1],S[2]);
   Eigen::Matrix3d *U_ = (Eigen::Matrix3d*)U;
@@ -276,6 +276,73 @@ LinearAlgebra::ComputeLeftPolarDecomposition3x3(double *A, double *U, double *R)
 
   *R_ = (*U_)*(R_->transpose());
   *U_ = (*U_)*S_*(U_->transpose());
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateATransposeA3x3(double *A, double *ATA)
+{
+  ATA[0] = A[0]*A[0] + A[1]*A[1] + A[2]*A[2];
+  ATA[1] = A[3]*A[0] + A[4]*A[1] + A[5]*A[2];
+  ATA[2] = A[6]*A[0] + A[7]*A[1] + A[8]*A[2];
+  ATA[3] = ATA[1];
+  ATA[4] = A[3]*A[3] + A[4]*A[4] + A[5]*A[5];
+  ATA[5] = A[6]*A[3] + A[7]*A[4] + A[8]*A[5];
+  ATA[6] = ATA[2];
+  ATA[7] = ATA[5];
+  ATA[8] = A[6]*A[6] + A[7]*A[7] + A[8]*A[8];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateAATranspose3x3(double *A, double *AAT)
+{
+  AAT[0] = A[0]*A[0] + A[3]*A[3] + A[6]*A[6];
+  AAT[1] = A[1]*A[0] + A[4]*A[3] + A[7]*A[6];
+  AAT[2] = A[2]*A[0] + A[5]*A[3] + A[8]*A[6];
+  AAT[3] = AAT[1];
+  AAT[4] = A[1]*A[1] + A[4]*A[4] + A[7]*A[7];
+  AAT[5] = A[2]*A[1] + A[5]*A[4] + A[8]*A[7];
+  AAT[6] = AAT[2];
+  AAT[7] = AAT[5];
+  AAT[8] = A[2]*A[2] + A[5]*A[5] + A[8]*A[8];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateTranspose3x3(double *A, double *AT)
+{
+  AT[0] = A[0];
+  AT[1] = A[3];
+  AT[2] = A[6];
+  AT[3] = A[1];
+  AT[4] = A[4];
+  AT[5] = A[7];
+  AT[6] = A[2];
+  AT[7] = A[5];
+  AT[8] = A[8];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateMatrixMatrixProduct3x3(double *A, double *B, double *AB)
+{
+  for(int i=0; i<3; i++) 
+    for(int j=0; j<3; j++)
+      AB[3*i]   = A[j]*B[3*0] + A[3+j]*B[3*i+1] + A[6+j]*B[3*i+2];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateMatrixVectorProduct3x3(double *A, double *x, double *Ax)
+{
+  for(int i=0; i<3; i++) 
+    Ax[i] = A[i]*x[0] + A[3+i]*x[1] + A[6+i]*x[2];
 }
 
 //---------------------------------------------------------------------------------
