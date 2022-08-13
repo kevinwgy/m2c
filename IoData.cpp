@@ -641,18 +641,25 @@ void ANEOSBirchMurnaghanDebyeModelData::setup(const char *name, ClassAssigner *f
 HyperelasticityModelData::HyperelasticityModelData()
 {
   type = NONE;
+  lambda = 0.0;
+  mu = 0.0;
 }
 
 //------------------------------------------------------------------------------
 
 void HyperelasticityModelData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   new ClassToken<HyperelasticityModelData>(ca, "Type", this,
-           reinterpret_cast<int HyperelasticityModelData::*>(&HyperelasticityModelData::type), 2,
+           reinterpret_cast<int HyperelasticityModelData::*>(&HyperelasticityModelData::type), 3,
            "None",     HyperelasticityModelData::NONE,
-           "Constant", HyperelasticityModelData::CONSTANT);
+           "SaintVenantKirchhoff", HyperelasticityModelData::SAINTVENANT_KIRCHHOFF,
+           "NeoHookean", HyperelasticityModelData::NEO_HOOKEAN);
+
+  new ClassDouble<HyperelasticityModelData>(ca, "FirstLameConstant", this, &HyperelasticityModelData::lambda);
+  new ClassDouble<HyperelasticityModelData>(ca, "SecondLameConstant", this, &HyperelasticityModelData::mu);
+  new ClassDouble<HyperelasticityModelData>(ca, "ShearModulus", this, &HyperelasticityModelData::mu);
 }
 
 //------------------------------------------------------------------------------

@@ -338,7 +338,10 @@ struct HeatDiffusionModelData {
 
 struct HyperelasticityModelData {
 
-  enum Type {NONE = 0, CONSTANT = 1} type;
+  enum Type {NONE = 0, SAINTVENANT_KIRCHHOFF = 1, NEO_HOOKEAN = 2} type;
+
+  double lambda; //!< first Lame constant
+  double mu; //!< second Lame constant (i.e. shear modulus)
 
   HyperelasticityModelData();
   ~HyperelasticityModelData() {}
