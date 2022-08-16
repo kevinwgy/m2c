@@ -338,10 +338,13 @@ struct HeatDiffusionModelData {
 
 struct HyperelasticityModelData {
 
-  enum Type {NONE = 0, SAINTVENANT_KIRCHHOFF = 1, NEO_HOOKEAN = 2} type;
+  enum Type {NONE = 0, SAINTVENANT_KIRCHHOFF = 1, MODIFIED_SAINTVENANT_KIRCHHOFF = 2,
+             NEO_HOOKEAN = 3, MOONEY_RIVLIN = 4} type;
 
-  double lambda; //!< first Lame constant
-  double mu; //!< second Lame constant (i.e. shear modulus)
+  double youngs_modulus; 
+  double poissons_ratio;
+
+  double C01; //additional parameter for Mooney-Rivlin (dW/dI2bar)
 
   HyperelasticityModelData();
   ~HyperelasticityModelData() {}

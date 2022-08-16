@@ -641,8 +641,9 @@ void ANEOSBirchMurnaghanDebyeModelData::setup(const char *name, ClassAssigner *f
 HyperelasticityModelData::HyperelasticityModelData()
 {
   type = NONE;
-  lambda = 0.0;
-  mu = 0.0;
+  youngs_modulus = 0.0;
+  poissons_ratio = 0.0;
+  C01 = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -652,14 +653,16 @@ void HyperelasticityModelData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   new ClassToken<HyperelasticityModelData>(ca, "Type", this,
-           reinterpret_cast<int HyperelasticityModelData::*>(&HyperelasticityModelData::type), 3,
+           reinterpret_cast<int HyperelasticityModelData::*>(&HyperelasticityModelData::type), 5,
            "None",     HyperelasticityModelData::NONE,
            "SaintVenantKirchhoff", HyperelasticityModelData::SAINTVENANT_KIRCHHOFF,
-           "NeoHookean", HyperelasticityModelData::NEO_HOOKEAN);
+           "ModifiedSaintVenantKirchhoff", HyperelasticityModelData::MODIFIED_SAINTVENANT_KIRCHHOFF,
+           "NeoHookean", HyperelasticityModelData::NEO_HOOKEAN,
+           "MooneyRivlin", HyperelasticityModelData::MOONEY_RIVLIN);
 
-  new ClassDouble<HyperelasticityModelData>(ca, "FirstLameConstant", this, &HyperelasticityModelData::lambda);
-  new ClassDouble<HyperelasticityModelData>(ca, "SecondLameConstant", this, &HyperelasticityModelData::mu);
-  new ClassDouble<HyperelasticityModelData>(ca, "ShearModulus", this, &HyperelasticityModelData::mu);
+  new ClassDouble<HyperelasticityModelData>(ca, "YoungsModulus", this, &HyperelasticityModelData::youngs_modulus);
+  new ClassDouble<HyperelasticityModelData>(ca, "PoissonsRatio", this, &HyperelasticityModelData::poissons_ratio);
+  new ClassDouble<HyperelasticityModelData>(ca, "C01", this, &HyperelasticityModelData::C01);
 }
 
 //------------------------------------------------------------------------------
