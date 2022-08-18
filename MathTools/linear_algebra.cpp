@@ -297,6 +297,22 @@ LinearAlgebra::CalculateATransposeA3x3(double *A, double *ATA)
 //---------------------------------------------------------------------------------
 
 void
+LinearAlgebra::CalculateATransposeB3x3(double *A, double *B, double *ATB)
+{
+  ATB[0] = A[0]*B[0] + A[1]*B[1] + A[2]*B[2];
+  ATB[1] = A[3]*B[0] + A[4]*B[1] + A[5]*B[2];
+  ATB[2] = A[6]*B[0] + A[7]*B[1] + A[8]*B[2];
+  ATB[3] = A[0]*B[3] + A[1]*B[4] + A[2]*B[5];
+  ATB[4] = A[3]*B[3] + A[4]*B[4] + A[5]*B[5];
+  ATB[5] = A[6]*B[3] + A[7]*B[4] + A[8]*B[5];
+  ATB[6] = A[0]*B[6] + A[1]*B[7] + A[2]*B[8];
+  ATB[7] = A[3]*B[6] + A[4]*B[7] + A[5]*B[8];
+  ATB[8] = A[6]*B[6] + A[7]*B[7] + A[8]*B[8];
+}
+
+//---------------------------------------------------------------------------------
+
+void
 LinearAlgebra::CalculateAATranspose3x3(double *A, double *AAT)
 {
   AAT[0] = A[0]*A[0] + A[3]*A[3] + A[6]*A[6];
@@ -308,6 +324,22 @@ LinearAlgebra::CalculateAATranspose3x3(double *A, double *AAT)
   AAT[6] = AAT[2];
   AAT[7] = AAT[5];
   AAT[8] = A[2]*A[2] + A[5]*A[5] + A[8]*A[8];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateABTranspose3x3(double *A, double *B, double *ABT)
+{
+  ABT[0] = A[0]*B[0] + A[3]*B[3] + A[6]*B[6];
+  ABT[1] = A[1]*B[0] + A[4]*B[3] + A[7]*B[6];
+  ABT[2] = A[2]*B[0] + A[5]*B[3] + A[8]*B[6];
+  ABT[3] = A[0]*B[1] + A[3]*B[4] + A[6]*B[7];
+  ABT[4] = A[1]*B[1] + A[4]*B[4] + A[7]*B[7];
+  ABT[5] = A[2]*B[1] + A[5]*B[4] + A[8]*B[7];
+  ABT[6] = A[0]*B[2] + A[3]*B[5] + A[6]*B[8];
+  ABT[7] = A[1]*B[2] + A[4]*B[5] + A[7]*B[8];
+  ABT[8] = A[2]*B[2] + A[5]*B[5] + A[8]*B[8];
 }
 
 //---------------------------------------------------------------------------------
@@ -333,7 +365,7 @@ LinearAlgebra::CalculateMatrixMatrixProduct3x3(double *A, double *B, double *AB)
 {
   for(int i=0; i<3; i++) 
     for(int j=0; j<3; j++)
-      AB[3*i]   = A[j]*B[3*0] + A[3+j]*B[3*i+1] + A[6+j]*B[3*i+2];
+      AB[3*i+j] = A[j]*B[3*i] + A[3+j]*B[3*i+1] + A[6+j]*B[3*i+2];
 }
 
 //---------------------------------------------------------------------------------
@@ -343,6 +375,34 @@ LinearAlgebra::CalculateMatrixVectorProduct3x3(double *A, double *x, double *Ax)
 {
   for(int i=0; i<3; i++) 
     Ax[i] = A[i]*x[0] + A[3+i]*x[1] + A[6+i]*x[2];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateMatrixAPlusB3x3(double *A, double *B, double *Sum)
+{
+  for(int i=0; i<9; i++)
+    Sum[i] = A[i] + B[i];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateMatrixC1APlusC2B3x3(double C1, double *A, 
+                                            double C2, double *B, double *Sum)
+{
+  for(int i=0; i<9; j++)
+    sum[i] = C1*A[i] + C2*B[i];
+}
+
+//---------------------------------------------------------------------------------
+
+void
+LinearAlgebra::CalculateCTimesMatrixA3x3(double C, double *A, double *CA)
+{
+  for(int i=0; i<9; i++)
+    CA[i] = C*A[i];
 }
 
 //---------------------------------------------------------------------------------

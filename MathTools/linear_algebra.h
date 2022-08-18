@@ -28,6 +28,15 @@ struct LinearAlgebra {
   static void
   CalculateMatrixVectorProduct3x3(double *A, double *x, double *Ax);
 
+  static void
+  CalculateMatrixAPlusB3x3(double *A, double *B, double *Sum);
+
+  static void
+  CalculateMatrixC1APlusC2B3x3(double C1, double *A, double C2, double *B, double *Sum);
+
+  static void
+  CalculateCTimesMatrixA3x3(double C, double *A, double *CA);
+
   static double
   CalculateFirstPrincipalInvariant3x3(double *A); //column first, i.e. A[0] is A(1,1), A[1] = A(2,1), ...
 
@@ -86,7 +95,16 @@ struct LinearAlgebra {
   CalculateATransposeA3x3(double *A, double *ATA);
 
   static void
+  CalculateATransposeB3x3(double *A, double *B, double *ATB);
+
+  static void
   CalculateAATranspose3x3(double *A, double *AAT);
+
+  static void
+  CalculateABTranspose3x3(double *A, double *B, double *ABT);
+
+  static double 
+  CalculateMatrixTrace3x3(double *A) {return A[0] + A[4] + A[8];}
 
 }; //end of class
 
