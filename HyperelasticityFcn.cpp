@@ -1,5 +1,6 @@
 #include<HyperelasticityFcn.h>
 #include<linear_algebra.h>
+#include<cassert>
 
 //----------------------------------------------------------------------
 
@@ -14,7 +15,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_F(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStress(F, sigma, V);
+  GetCauchyStressTensor(F, sigma, V);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
@@ -43,7 +44,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStress(F, sigma, V);
+  GetCauchyStressTensor(F, sigma, V);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
@@ -72,7 +73,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStress(F, sigma, V);
+  GetCauchyStressTensor(F, sigma, V);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
@@ -109,7 +110,6 @@ HyperelasticityFcnBase::ConvertPK2ToCauchy(double* P, double *F, double J, doubl
 
 //----------------------------------------------------------------------
 
-void
 HyperelasticityFcnSaintVenantKirchhoff::
 HyperelasticityFcnSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBase &vf_)
     : HyperelasticityFcnBase(vf_)
@@ -132,7 +132,7 @@ void
 HyperelasticityFcnSaintVenantKirchhoff::GetCauchyStressTensor(double *F, double *V, double *sigma)
 {
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,M3x3) //M(C) = F'F: right Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,M3x3); //M(C) = F'F: right Cauchy-Green def. tensor
   for(int i=0; i<9; i+=4)
     M3x3[i] -= 1.0;     //M = M - I
   MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(0.5, M3x3, M3x3); //M(E) = 1/2(C-I): Green strain
@@ -146,13 +146,12 @@ HyperelasticityFcnSaintVenantKirchhoff::GetCauchyStressTensor(double *F, double 
   //convert to sigma (dim:6)
   double J = MathTools::LinearAlgebra::CalculateDeterminant3x3(F);
   assert(J>0.0);
-  ConvertPK2ToCauchy(M3x3, F, J, sigma)
+  ConvertPK2ToCauchy(M3x3, F, J, sigma);
 
 }
 
 //----------------------------------------------------------------------
 
-void
 HyperelasticityFcnModifiedSaintVenantKirchhoff::
 HyperelasticityFcnModifiedSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBase &vf_)
     : HyperelasticityFcnBase(vf_)
@@ -177,7 +176,7 @@ HyperelasticityFcnModifiedSaintVenantKirchhoff::GetCauchyStressTensor(double *F,
                                                                       double *V, double *sigma)
 {
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3) //N(C) = F'F: right Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
   for(int i=0; i<9; i++)
     M3x3[i] = N3x3[i];  //M = N
   for(int i=0; i<9; i+=4)
@@ -193,13 +192,12 @@ HyperelasticityFcnModifiedSaintVenantKirchhoff::GetCauchyStressTensor(double *F,
   MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B3x3(kappa, Cinv, 2.0*mu, M3x3, N3x3);
   
   //convert to sigma (dim:6)
-  ConvertPK2ToCauchy(N3x3, F, J, sigma)
+  ConvertPK2ToCauchy(N3x3, F, J, sigma);
 
 }
 
 //----------------------------------------------------------------------
 
-void
 HyperelasticityFcnNeoHookean::
 HyperelasticityFcnNeoHookean(HyperelasticityModelData &hyper, VarFcnBase &vf_)
     : HyperelasticityFcnBase(vf_)
@@ -222,8 +220,8 @@ void
 HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, double *V, double *sigma)
 {
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3) //N(C) = F'F: right Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixProduct3x3(N3x3,N3x3,M3x3); //M = C*C
+  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = C*C
 
   // calculate I1, I2, I3 (principal invariants)
   double I1 = MathTools::LinearAlgebra::CalculateMatrixTrace3x3(N3x3);
@@ -241,7 +239,7 @@ HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, double *V, double
   double factor1 = mu/J*Jf;
   double factor2 = kappa*(J-1.0) - 1.0/(3.0*J)*(mu*I1);
 
-  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3) //N(B) = FF': left Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
   MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(factor1, N3x3, N3x3);
 
   for(int i=0; i<9; i+=4)
@@ -258,7 +256,6 @@ HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, double *V, double
 
 //----------------------------------------------------------------------
 
-void
 HyperelasticityFcnMooneyRivlin::
 HyperelasticityFcnMooneyRivlin(HyperelasticityModelData &hyper, VarFcnBase &vf_)
     : HyperelasticityFcnBase(vf_)
@@ -283,8 +280,8 @@ void
 HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, double *V, double *sigma)
 {
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3) //N(C) = F'F: right Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixProduct3x3(N3x3,N3x3,M3x3); //M = C*C
+  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = C*C
 
   // calculate I1, I2, I3 (principal invariants)
   double I1 = MathTools::LinearAlgebra::CalculateMatrixTrace3x3(N3x3);
@@ -303,8 +300,8 @@ HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, double *V, doub
   double factor3 = -2.0/J*Jf*Jf*C01;
   double factor2 = kappa*(J-1.0) - 2.0/(3.0*J)*(C10*I1 + 2.0*C01*I2);
 
-  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3) //N(B) = FF': left Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixProduct3x3(N3x3, N3x3, M3x3); //M = B*B
+  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3, N3x3, M3x3); //M = B*B
 
   MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B3x3(factor1, N3x3, factor3, M3x3, N3x3);
 

@@ -392,8 +392,8 @@ void
 LinearAlgebra::CalculateMatrixC1APlusC2B3x3(double C1, double *A, 
                                             double C2, double *B, double *Sum)
 {
-  for(int i=0; i<9; j++)
-    sum[i] = C1*A[i] + C2*B[i];
+  for(int i=0; i<9; i++)
+    Sum[i] = C1*A[i] + C2*B[i];
 }
 
 //---------------------------------------------------------------------------------
