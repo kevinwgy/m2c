@@ -447,7 +447,7 @@ LambDEquation::ComputeRHS(double one_over_lambD, double zav)
       summation += r*r*saha.alpha[j][r];
   }
 
-  return factor_lambD*sqrt(nh*summation);
+  return sqrt(factor_lambD*nh*summation);
 }
 
 //--------------------------------------------------------------------------

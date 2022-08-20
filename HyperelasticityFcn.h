@@ -8,7 +8,7 @@
  * responsible for calculating the hyperelastic stress tensor.
  * Each material has a separate 'HyperelasticityFcn'
  *
- * Note 1: The input is assumed to be the *elastic* deformation
+ * Note 1: The input 'F' is assumed to be the *elastic* deformation
  *         gradient. This may not be the same as the complete
  *         deformation gradient, when there is plasticity 
  *         (or other things). 
@@ -18,7 +18,7 @@
  *         class, the "GetCauchyStress" function computes the
  *         complete stress tensor. But the "EvaluateFlux" function
  *         allows the user to make a decision between the full
- *         tensor or the deviatoric part.
+ *         tensor and the deviatoric part.
  * Note 3: Matrices follow the 'column-major' / 'column-first'
  *         convention. For example, A[1] is the A(2,1) entry.
  * Note 4: The Cauchy stress tensor is symmetric, so only 6
