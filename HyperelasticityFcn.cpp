@@ -83,9 +83,9 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double*
   }
 
   flux[0] = 0.0;
-  flux[1] = sigma[2]; //xy
-  flux[2] = sigma[4]; //yy
-  flux[3] = sigma[5]; //yz
+  flux[1] = sigma[2]; //xz
+  flux[2] = sigma[4]; //yz
+  flux[3] = sigma[5]; //zz
   flux[4] = V[1]*sigma[2] + V[2]*sigma[4] + V[3]*sigma[5];
 }
 
@@ -133,15 +133,17 @@ HyperelasticityFcnSaintVenantKirchhoff::GetCauchyStressTensor(double *F, double 
 {
 
   MathTools::LinearAlgebra::CalculateATransposeA3x3(F,M3x3); //M(C) = F'F: right Cauchy-Green def. tensor
-  for(int i=0; i<9; i+=4)
-    M3x3[i] -= 1.0;     //M = M - I
+  M3x3[0] -= 1.0;
+  M3x3[4] -= 1.0;
+  M3x3[8] -= 1.0;     //M = M - I
   MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(0.5, M3x3, M3x3); //M(E) = 1/2(C-I): Green strain
+  double lambda_trace = lambda*MathTools::LinearAlgebra::CalculateMatrixTrace3x3(M3x3);
 
   //calculates the second Piola-Kirchhoff stress tensor: P = lambda*tr(E)*I + 2*mu*E
   MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(2.0*mu, M3x3, M3x3);
-  double lambda_trace = lambda*MathTools::LinearAlgebra::CalculateMatrixTrace3x3(M3x3);
-  for(int i=0; i<9; i+=4)
-    M3x3[i] += lambda_trace;
+  M3x3[0] += lambda_trace;
+  M3x3[4] += lambda_trace;
+  M3x3[8] += lambda_trace;
   
   //convert to sigma (dim:6)
   double J = MathTools::LinearAlgebra::CalculateDeterminant3x3(F);
@@ -179,8 +181,9 @@ HyperelasticityFcnModifiedSaintVenantKirchhoff::GetCauchyStressTensor(double *F,
   MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
   for(int i=0; i<9; i++)
     M3x3[i] = N3x3[i];  //M = N
-  for(int i=0; i<9; i+=4)
-    M3x3[i] -= 1.0;     //M = M - I
+  M3x3[0] -= 1.0;
+  M3x3[4] -= 1.0;
+  M3x3[8] -= 1.0;     //M = M - I
   MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(0.5, M3x3, M3x3); //M(E) = 1/2(C-I): Green strain
 
   //calculates Cinv
@@ -220,8 +223,8 @@ void
 HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, double *V, double *sigma)
 {
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = C*C
+  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = B*B
 
   // calculate I1, I2, I3 (principal invariants)
   double I1 = MathTools::LinearAlgebra::CalculateMatrixTrace3x3(N3x3);
@@ -239,11 +242,11 @@ HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, double *V, double
   double factor1 = mu/J*Jf;
   double factor2 = kappa*(J-1.0) - 1.0/(3.0*J)*(mu*I1);
 
-  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
   MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(factor1, N3x3, N3x3);
 
-  for(int i=0; i<9; i+=4)
-    N3x3[i] += factor2;
+  N3x3[0] += factor2;
+  N3x3[4] += factor2;
+  N3x3[8] += factor2;
 
   sigma[0] = N3x3[0];
   sigma[1] = N3x3[1];
@@ -280,8 +283,8 @@ void
 HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, double *V, double *sigma)
 {
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = C*C
+  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = B*B
 
   // calculate I1, I2, I3 (principal invariants)
   double I1 = MathTools::LinearAlgebra::CalculateMatrixTrace3x3(N3x3);
@@ -300,13 +303,11 @@ HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, double *V, doub
   double factor3 = -2.0/J*Jf*Jf*C01;
   double factor2 = kappa*(J-1.0) - 2.0/(3.0*J)*(C10*I1 + 2.0*C01*I2);
 
-  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3, N3x3, M3x3); //M = B*B
-
   MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B3x3(factor1, N3x3, factor3, M3x3, N3x3);
 
-  for(int i=0; i<9; i+=4)
-    N3x3[i] += factor2;
+  N3x3[0] += factor2;
+  N3x3[4] += factor2;
+  N3x3[8] += factor2;
 
   sigma[0] = N3x3[0];
   sigma[1] = N3x3[1];
