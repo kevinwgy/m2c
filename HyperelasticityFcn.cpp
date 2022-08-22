@@ -224,20 +224,16 @@ HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, double *V, double
 {
 
   MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = B*B
 
   // calculate I1, I2, I3 (principal invariants)
-  double I1 = MathTools::LinearAlgebra::CalculateMatrixTrace3x3(N3x3);
-//  double I2 = 0.5*(I1*I1 - MathTools::LinearAlgebra::CalculateMatrixTrace3x3(M3x3));
-  double I3 = MathTools::LinearAlgebra::CalculateDeterminant3x3(N3x3);
+  double I1 = MathTools::LinearAlgebra::CalculateFirstPrincipalInvariant3x3(N3x3);
+  double I3 = MathTools::LinearAlgebra::CalculateThirdPrincipalInvariant3x3(N3x3);
   assert(I1>0.0);
-//  assert(I2>0.0);
   assert(I3>0.0);
 
   double J  = sqrt(I3);
   double Jf = pow(J, -2.0/3.0);
   I1 *= Jf;
-//  I2 *= Jf*Jf;
 
   double factor1 = mu/J*Jf;
   double factor2 = kappa*(J-1.0) - 1.0/(3.0*J)*(mu*I1);
@@ -287,9 +283,9 @@ HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, double *V, doub
   MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = B*B
 
   // calculate I1, I2, I3 (principal invariants)
-  double I1 = MathTools::LinearAlgebra::CalculateMatrixTrace3x3(N3x3);
-  double I2 = 0.5*(I1*I1 - MathTools::LinearAlgebra::CalculateMatrixTrace3x3(M3x3));
-  double I3 = MathTools::LinearAlgebra::CalculateDeterminant3x3(N3x3);
+  double I1 = MathTools::LinearAlgebra::CalculateFirstPrincipalInvariant3x3(N3x3);
+  double I2 = MathTools::LinearAlgebra::CalculateSecondPrincipalInvariant3x3(N3x3);
+  double I3 = MathTools::LinearAlgebra::CalculateThirdPrincipalInvariant3x3(N3x3);
   assert(I1>0.0);
   assert(I2>0.0);
   assert(I3>0.0);
