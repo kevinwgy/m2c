@@ -5,6 +5,7 @@
 #include <SymmetryOperator.h>
 #include <ViscosityOperator.h>
 #include <HeatDiffusionOperator.h>
+#include <HyperelasticityOperator.h>
 #include <SmoothingOperator.h>
 #include <FluxFcnBase.h>
 #include <Reconstructor.h>
@@ -57,6 +58,9 @@ class SpaceOperator
   HeatDiffusionOperator* heat_diffusion;
 
   //! Class for smoothing the solution
+  HyperelasticityOperator* heo;
+
+  //! Class for smoothing the solution
   SmoothingOperator* smooth;
 
   //! Reconstructed primitive state variables at cell boundaries
@@ -93,6 +97,8 @@ public:
 
   void SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
+  void SetHyperelasticityOperatorPointer(HyperelasticityOperator *heo_) {heo = heo_;}
+
   std::multimap<int,std::pair<int,int> > SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, 
                              std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
     
@@ -111,7 +117,8 @@ public:
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,
                        vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
-                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
+                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr,
+                       SpaceVariable3D *Xi = NULL);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}

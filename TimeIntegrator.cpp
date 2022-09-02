@@ -124,9 +124,9 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get()); // compute Rn
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute Rn
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL, EBDS.get()); // compute Rn
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute Rn
 
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
@@ -251,9 +251,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get()); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute R(V(n))
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get()); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -299,9 +299,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get());//compute R(V1) using prev.Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get(), Xi1);//compute R(V1) using prev.Phi, "loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V1)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V1)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -437,9 +437,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get()); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute R(V(n))
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get()); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -485,9 +485,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get()); //compute R(V1) using prev.Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get(), Xi1); //compute R(V1) using prev.Phi, "loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V1)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V1)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -535,9 +535,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   if(use_grad_phi)
-    spo.ComputeResidual(V2, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get()); //compute R(V2) using prev.Phi,"loose coupling"
+    spo.ComputeResidual(V2, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get(), Xi1); //compute R(V2) using prev.Phi,"loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V2, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V2)
+    spo.ComputeResidual(V2, ID, R, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V2)
 
   if(laser) {
     laser->ComputeLaserRadiance(V2,ID,*L,time);

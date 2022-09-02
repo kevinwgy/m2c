@@ -46,7 +46,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
     Tag(comm_, &(dm_all_.ghosted1_1dof)),
-    symm(NULL), visco(NULL), heat_diffusion(NULL), smooth(NULL)
+    symm(NULL), visco(NULL), heat_diffusion(NULL), heo(NULL), smooth(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -3326,7 +3326,8 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                     vector<SpaceVariable3D*> *Phi,
-                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
+                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                    SpaceVariable3D *Xi)
 {
 
 #ifdef LEVELSET_TEST
@@ -3343,6 +3344,11 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
 
   if(heat_diffusion)
     heat_diffusion->AddDiffusionFluxes(V, ID, EBDS, R);
+
+  if(heo) {
+    assert(Xi);
+    heo->AddHyperelasticityFluxes(V, ID, *Xi, EBDS, R);
+  }
 
   if(symm) {//cylindrical or spherical symmetry
     if(visco || heat_diffusion) {

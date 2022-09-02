@@ -286,6 +286,7 @@ int main(int argc, char* argv[])
                                       spo.GetMeshDeltaXYZ(), global_mesh, *interp, *grad,
                                       *(spo.GetPointerToInnerGhostNodes()),
                                       *(spo.GetPointerToOuterGhostNodes()));
+    spo.SetHyperelasticityOperatorPointer(heo);
     Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
     heo->InitializeReferenceMap(*Xi);
   }
