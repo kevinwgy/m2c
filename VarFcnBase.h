@@ -32,7 +32,8 @@ class VarFcnBase {
 
 public:
   
-  enum Type{STIFFENED_GAS = 0, MIE_GRUNEISEN = 1, JWL = 2, ANEOS_BIRCH_MURNAGHAN_DEBYE = 3, DUMMY = 4} type;
+  enum Type{STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, JWL = 3, 
+            ANEOS_BIRCH_MURNAGHAN_DEBYE = 4, DUMMY = 5} type;
 
   double rhomin,pmin;
   double rhomax,pmax;

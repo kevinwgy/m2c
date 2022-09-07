@@ -4,6 +4,7 @@
 #include <MeshGenerator.h>
 #include <Output.h>
 #include <VarFcnSG.h>
+#include <VarFcnNASG.h>
 #include <VarFcnMG.h>
 #include <VarFcnJWL.h>
 #include <VarFcnANEOSEx1.h>
@@ -100,6 +101,8 @@ int main(int argc, char* argv[])
     }
     if(it->second->eos == MaterialModelData::STIFFENED_GAS)
       vf[matid] = new VarFcnSG(*it->second);
+    else if(it->second->eos == MaterialModelData::NOBLE_ABEL_STIFFENED_GAS)
+      vf[matid] = new VarFcnNASG(*it->second);
     else if(it->second->eos == MaterialModelData::MIE_GRUNEISEN)
       vf[matid] = new VarFcnMG(*it->second);
     else if(it->second->eos == MaterialModelData::JWL)
