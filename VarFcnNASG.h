@@ -36,12 +36,10 @@ private:
   double qprime;
   double cv; //!< specific heat at constant volume
 
-  double invgam;  //!< 1/gamma
   double gam1;    //!< gamma-1
   double invgam1; //!< 1/(gamma-1)
+  double gam_pc; //!< gam*pc
   double invcv; //!< 1/cv
-  double cp; //!< gam*cv
-  double invcp; //!< 1/cp
 
 
 public:
@@ -49,29 +47,21 @@ public:
   ~VarFcnNASG() {}
 
   //! ----- EOS-Specific Functions -----
-  inline double GetPressure(double rho, double e) {return gam1*(e-q)/(1.0/rho - b) - gam*pc;}
-  inline double GetInternalEnergyPerUnitMass(double rho, double p) {return (p+gam*pc)*(1.0/rho-b)/gam1 + q;}
-  inline double GetDensity(double p, double e) {return 1.0/(gam1*(e-q)/(p+gam*pc) + b);}
+  inline double GetPressure(double rho, double e) {return gam1*(e-q)/(1.0/rho - b) - gam_pc;}
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) {return invgam1*(p+gam_pc)*(1.0/rho-b) + q;}
+  inline double GetDensity(double p, double e) {return 1.0/(gam1*(e-q)/(p+gam_pc) + b);}
   inline double GetDpdrho(double rho, double e) {double V = 1.0/rho; return gam1*V*V*(e-q)/((V-b)*(V-b));}
-  inline double GetBigGamma(double rho, double e) {double V = 1.0/rho; return gam1*V/(V-b);}
+  inline double GetBigGamma(double rho, double e) {return gam1/(1.0 - b*rho);}
 
-  inline double GetTemperature(double rho, double e) {
-    I AM HERE
-  }
+  inline double GetTemperature(double rho, double e) {return invcv*(e - q - pc*(1.0/rho - b));}
 
-  inline double GetReferenceTemperature() {return T0;}
-  inline double GetReferenceInternalEnergyPerUnitMass() {return e0;}
+  inline double GetReferenceTemperature() {return 0.0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() {return 0.0;}
 
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {
-    if(use_cv_advanced) {
-      return cv*T - pc/rho - pow(rho/rho0, gam1)*(cv*T0 - (e0 + pc/rho0));
-    } else if(use_cp) 
-      return invgam*(h0 + cp*(T-T0)) + pc/rho;
-    else
-      return e0 + cv*(T-T0);
-  }
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {return cv*T+pc*(1.0/rho-b)+q;}
   
-  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) {return invgam*h+pc/rho;}
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) {
+    double V = 1.0/rho;  return ((h+gam_pc*V)*(V-b)+V*gam1*q)/(gam*V-b);}
 
 
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + pc < 0 (Not p + gamma*pc). 
@@ -81,7 +71,7 @@ public:
         fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);
       return true;
     }
-    if(rho <= 0.0 || p+pc <= 0.0){
+    if(rho <= 0.0 || p+pc <= 0.0){ //if p+pc<=0, c^2<=0
       if(!silence && verbose>1)
         fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
       return true;
@@ -111,12 +101,10 @@ VarFcnNASG::VarFcnNASG(MaterialModelData &data) : VarFcnBase(data) {
 
   cv     = data.nasgModel.cv;
 
-  invgam = (gam==0.0) ? 0.0 : 1.0/gam;
   gam1 = gam -1.0;
   invgam1 = 1.0/gam1;
+  gam_pc = gam*pc;
   invcv = cv==0.0 ? 0.0 : 1.0/cv;
-  cp = gam*cv;
-  invcp = cp==0.0 ? 0.0 : 1.0/cp;
 
 }
 
