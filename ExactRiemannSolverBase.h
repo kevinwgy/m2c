@@ -18,7 +18,7 @@ protected:
   int numSteps_rarefaction;
   double tol_main;
   double tol_shock;
-  double tol_rarefaction; //has the dimension of pressure, should be specified as a "pressure tolerance"
+  double tol_rarefaction; // non-dimensional, for rarefaction end points
   double min_pressure, failure_threshold, pressure_at_failure;
   std::vector<std::vector<double> > integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
   std::vector<std::vector<double> > integrationPath3;
