@@ -847,6 +847,16 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
         }
   }
 
+  // arbitrary enclosures 
+  for(auto it=ic.enclosureMap.dataMap.begin(); it!=ic.enclosureMap.dataMap.end(); it++) {
+
+    print(comm, "- Applying initial condition within a user-specified enclosure (material id: %d).\n\n",
+          it->second->initialConditions.materialid);
+
+    ApplyInitialConditionWithinEnclosure(*it, v, id);
+   
+  }
+
 
   //Now, deal with embedded boundaries
   vector<double***> color;
@@ -943,6 +953,17 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   ApplyBoundaryConditions(V);   
 
   return id2closure;
+
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureData &enclosure,
+                                                    Vec5D*** v, double*** id)
+{
+
+
 
 }
 

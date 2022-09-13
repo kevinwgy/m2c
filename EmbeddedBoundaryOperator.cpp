@@ -104,6 +104,92 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 }
 
 //------------------------------------------------------------------------------------------------
+// A constructor for one-time tracking of an enclosure specified in a surface mesh
+// It supports a single mesh file, which may contain multiple enclosures
+EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, UserSpecifiedEnclosureData &enclosure)
+                        : comm(comm_), hasSurfFromOtherSolver(false),
+                          dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
+                          ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL)
+{
+  int counter = 1;
+
+  // get the correct size of surfaces and F
+  surfaces.resize(counter);
+  F.resize(counter);
+
+  surfaces_prev.resize(surfaces.size());
+  F_prev.resize(F.size());
+ 
+  // set default boundary type to "None"
+  surface_type.assign(surfaces.size(), EmbeddedSurfaceData::None);
+  iod_embedded_surfaces.assign(surfaces.size(), NULL);
+
+  // read surfaces from files
+  for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
+           it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+
+    int index = it->first;
+    if(index<0 || index>=counter) {
+      print_error("*** Error: Detected error in the indices of embedded surfaces (id = %d).", index);
+      exit_mpi();
+    }
+
+    iod_embedded_surfaces[index] = it->second;
+
+    if(index==0) {
+      if(surface_from_other_solver) {
+        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::YES) {
+          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", 
+                      index); 
+          exit_mpi();
+        } 
+        continue; //no file to read
+      } else {
+        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
+          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by user?", index); 
+          exit_mpi();
+        }
+      }
+    } else {
+      if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
+        print_error("*** Error: Currently, only one embedded surface (with id 0) can be provided by another solver.");
+        exit_mpi();
+      }
+    }
+
+    surface_type[index] = it->second->type;
+
+    ReadMeshFile(it->second->filename, surface_type[index], surfaces[index].X, surfaces[index].elems);
+
+    surfaces[index].X0 = surfaces[index].X;
+
+    // initialize the velocity vector (to 0)
+    surfaces[index].Udot.assign(surfaces[index].X.size(), 0.0);
+
+    surfaces[index].BuildConnectivities();
+    surfaces[index].CalculateNormalsAndAreas();
+/*
+    bool orientation = surfaces[index].CheckSurfaceOrientation(); 
+    bool closed = surfaces[index].CheckSurfaceClosedness();
+*/
+  }
+
+  print("- Activated the Embedded Boundary Method. Detected %d surface(s) (%d from concurrent program(s)).\n",
+        surfaces.size(), surfaces.size() - counter); 
+
+  // set NULL to intersector pointers
+  intersector.assign(surfaces.size(), NULL);
+
+  // setup output
+  for(int i=0; i<surfaces.size(); i++)
+    lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
+
+  // setup dynamics_calculator
+  SetupUserDefinedDynamicsCalculator();
+}
+
+
+//------------------------------------------------------------------------------------------------
 
 EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
 {

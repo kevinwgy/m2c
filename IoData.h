@@ -147,6 +147,20 @@ struct CylinderSphereData {
 
 //------------------------------------------------------------------------------
 
+struct UserSpecifiedEnclosureData {
+
+  const char *surface_filename; //!< surface mesh that contains one or multiple enclosures
+
+  StateVariable initialConditions;
+
+  UserSpecifiedEnclosureData();
+  ~UserSpecifiedEnclosureData() {} 
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
 struct MultiInitialConditionsData {
 
   ObjectMap<PointData>    pointMap;
@@ -155,6 +169,8 @@ struct MultiInitialConditionsData {
   ObjectMap<SpheroidData> spheroidMap;
   ObjectMap<CylinderConeData> cylinderconeMap;
   ObjectMap<CylinderSphereData> cylindersphereMap;
+
+  ObjectMap<UserSpecifiedEnclosureData> enclosureMap;
 
   void setup(const char *, ClassAssigner * = 0);
 };

@@ -137,6 +137,9 @@ private:
 
   void CreateGhostNodeLists(bool screenout);
 
+  void ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureData &enclosure,
+                                            Vec5D*** v, double*** id);
+
   void ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** v, double*** id);
 
   std::pair<int, std::pair<int,int> >

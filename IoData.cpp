@@ -272,15 +272,35 @@ Assigner *CylinderSphereData::getAssigner()
 
 //------------------------------------------------------------------------------
 
+UserSpecifiedEnclosureData::UserSpecifiedEnclosureData()
+{
+  surface_filename = "";    
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *UserSpecifiedEnclosureData::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 1, nullAssigner);
+
+  new ClassStr<UserSpecifiedEnclosureData>(ca, "SurfaceMeshFile", this,
+          &UserSpecifiedEnclosureData::surface_filename);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
 void MultiInitialConditionsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
   pointMap.setup("Point", ca);
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);
   spheroidMap.setup("Spheroid", ca);
   cylinderconeMap.setup("CylinderAndCone", ca);
   cylindersphereMap.setup("CylinderWithSphericalCaps", ca);
+  enclosureMap.setup("ArbitraryEnclosure", ca);
 }
 
 //------------------------------------------------------------------------------
