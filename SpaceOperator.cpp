@@ -5,6 +5,7 @@
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
 #include <EmbeddedBoundaryDataSet.h>
+#include <EmbeddedBoundaryOperator.h>
 #include <algorithm> //std::upper_bound
 #include <cfloat> //DBL_MAX
 #include <KDTree.h>
@@ -848,12 +849,12 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
   // arbitrary enclosures 
-  for(auto it=ic.enclosureMap.dataMap.begin(); it!=ic.enclosureMap.dataMap.end(); it++) {
+  for(auto&& enclosure : ic.enclosureMap.dataMap) {
 
     print(comm, "- Applying initial condition within a user-specified enclosure (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
+          enclosure.second->initialConditions.materialid);
 
-    ApplyInitialConditionWithinEnclosure(*it, v, id);
+    ApplyInitialConditionWithinEnclosure(*enclosure.second, v, id);
    
   }
 
@@ -963,7 +964,40 @@ SpaceOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureData &
                                                     Vec5D*** v, double*** id)
 {
 
+  //create an ad hoc EmbeddedSurfaceData
+  EmbeddedSurfaceData esd;
+  esd.provided_by_another_solver = EmbeddedSurfaceData::NO;
+  esd.surface_thickness          = enclosure.surface_thickness;
+  esd.filename                   = enclosure.surface_filename;
 
+  //create the embedded operator to track the surface
+  EmbeddedBoundaryOperator embed(comm, esd);
+  embed.SetCommAndMeshInfo(dm_all, coordinates, ghost_nodes_inner, ghost_nodes_outer,
+                           global_mesh);
+  embed.SetupIntersectors();
+
+  //track the surface, and get access to the results 
+  embed.TrackSurfaces();
+  auto EBDS = embed.GetPointerToEmbeddedBoundaryData(0);
+  double*** color = EBDS->Color_ptr->GetDataPointer();
+
+  //impose i.c. inside enclosures --- EXCLUDING occluded nodes
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(color[k][j][i] < 0) {//enclosed
+          v[k][j][i][0] = enclosure.initialConditions.density;
+          v[k][j][i][1] = enclosure.initialConditions.velocity_x;
+          v[k][j][i][2] = enclosure.initialConditions.velocity_y;
+          v[k][j][i][3] = enclosure.initialConditions.velocity_z;
+          v[k][j][i][4] = enclosure.initialConditions.pressure;
+          id[k][j][i]   = enclosure.initialConditions.materialid;
+        }
+      }
+
+  EBDS->Color_ptr->RestoreDataPointerToLocalVector();
+
+  embed.Destroy();
 
 }
 

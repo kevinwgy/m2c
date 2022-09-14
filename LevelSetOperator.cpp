@@ -4,6 +4,7 @@
 #include <DistancePointToSpheroid.h>
 #include <GradientCalculatorFD3.h>
 #include <EmbeddedBoundaryDataSet.h>
+#include <EmbeddedBoundaryOperator.h>
 
 #ifdef LEVELSET_TEST
   #include <Vector2D.h>
@@ -20,12 +21,11 @@ extern double domain_diagonal;
 LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo)
   : comm(comm_), iod(iod_), iod_ls(iod_ls_),
-#if LEVELSET_TEST == 3
     dms(dm_all_),
-#endif
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
+    global_mesh(spo.GetGlobalMeshInfo()),
     reinit(NULL),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
     scalarG2(comm_, &(dm_all_.ghosted2_1dof)),
@@ -492,6 +492,21 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
         }
   }
 
+  // arbitrary enclosures
+  bool active_arbitrary_enclosure = false;
+  for(auto&& enclosure : ic.enclosureMap.dataMap) {
+
+    if(enclosure.second->initialConditions.materialid != materialid)
+      continue; //not the right one
+
+    Phi.RestoreDataPointerAndInsert();
+    bool active = ApplyInitialConditionWithinEnclosure(*enclosure.second, Phi);
+    phi = Phi.GetDataPointer();
+
+    if(active)
+      active_arbitrary_enclosure = true;
+  }
+
 
 #if LEVELSET_TEST == 1
   // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
@@ -674,12 +689,135 @@ DONE:
   }
 
   MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
-  if(ebds_counter>0) {
+
+  if(ebds_counter>0) { 
+    //reinit must have been created (not NULL)
     print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
           materialid, ebds_counter);
     Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
+  else if(active_arbitrary_enclosure && reinit) {
+    //if reinit is NULL, should have reinitialized phi (full-domain) in ApplyInitialConditionWithinEnclosure
+    print("- Updated phi (material id: %d) based on surface mesh(es). Going to reinitialize phi.\n", materialid);
+    Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
+  }
 
+}
+
+//-----------------------------------------------------
+
+bool 
+LevelSetOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureData &enclosure,
+                                                       SpaceVariable3D &Phi)
+{
+
+  bool applied_ic = false;
+  double*** phi = Phi.GetDataPointer();
+
+  // Create a reinitializer (if not available) for one-time use within this function
+  // This is a full-domain reinitializer
+  bool created_tmp_reinit = false;
+  if(!reinit) {
+    reinit = new LevelSetReinitializer(comm, dms, iod_ls, coordinates, delta_xyz,
+                                       ghost_nodes_inner, ghost_nodes_outer);
+    created_tmp_reinit = true;
+  }
+
+  // The construction and use of EmbeddedBoundaryOperator is a repetition of what has been done in
+  // SpaceOperator::ApplyInitialConditionWithinEnclosure. However, this is a one-time effort. The
+  // overhead is acceptable.
+
+  //create an ad hoc EmbeddedSurfaceData
+  EmbeddedSurfaceData esd;
+  esd.provided_by_another_solver = EmbeddedSurfaceData::NO;
+  esd.surface_thickness          = enclosure.surface_thickness;
+  esd.filename                   = enclosure.surface_filename;
+
+  //create the embedded operator to track the surface
+  EmbeddedBoundaryOperator embed(comm, esd);
+  embed.SetCommAndMeshInfo(dms, coordinates, ghost_nodes_inner, ghost_nodes_outer,
+                           global_mesh);
+  embed.SetupIntersectors();
+
+  //track the surface, and get access to the results
+  embed.TrackSurfaces();
+  auto EBDS = embed.GetPointerToEmbeddedBoundaryData(0);
+  double*** color = EBDS->Color_ptr->GetDataPointer();
+  double*** psi   = EBDS->Phi_ptr->GetDataPointer();
+  int nLayer = EBDS->Phi_nLayer;
+  assert(nLayer>=2);
+
+  //impose i.c. for phi inside and near enclosures 
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        //Check if this node is within nLayer of the interface
+        bool near = false;
+        for(int k1 = k-nLayer; k1 <= k+nLayer; k1++)
+          for(int j1 = j-nLayer; j1 <= j+nLayer; j1++)
+            for(int i1 = i-nLayer; i1 <= i+nLayer; i1++) {
+              if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
+                continue;
+              if(color[k1][j1][i1]<0) { //this neighbor is "enclosed"
+                near = true;
+                goto DONE;
+              }
+            }
+DONE:
+
+        if(!near)
+          continue; //nothing to do
+
+        if(!applied_ic)
+          applied_ic = true;
+
+        // determine phi at [k][j][i]
+        if(color[k][j][i]<0) { //"enclosed" (must be consistent with ID specified in space operator)
+          if(phi[k][j][i]>=0)
+            phi[k][j][i] = -psi[k][j][i];
+          else
+            phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+        } 
+        else if(color[k][j][i] == 0) {//occluded
+          phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
+        } 
+        else { //"outside"
+          if(phi[k][j][i]>=0)
+            phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
+          else //this is really bad... the user should avoid this...
+            phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+        }
+      }
+
+  int tmp_int = applied_ic ? 1 : 0;
+  MPI_Allreduce(MPI_IN_PLACE, &tmp_int, 1, MPI_INT, MPI_MAX, comm);
+  if(tmp_int>0)
+    applied_ic = true;
+ 
+  if(!applied_ic) {
+    print_warning("Warning: The surface in %s may either have no enclosure, or"
+                  " lie outside the computational domain.\n", enclosure.surface_filename);
+  }
+
+  Phi.RestoreDataPointerAndInsert();
+
+  // reinitialize phi here if tmp reinit is created. Otherwise, phi will be reinitialized near
+  // the end of the function "SetInitialCondition"
+  if(created_tmp_reinit) {
+    reinit->ReinitializeFullDomain(Phi); //one-time use
+    reinit->Destroy(); 
+    delete reinit;
+    reinit = NULL;
+  }
+
+  //clean-up
+  EBDS->Color_ptr->RestoreDataPointerToLocalVector();
+  EBDS->Phi_ptr->RestoreDataPointerToLocalVector();
+
+  embed.Destroy();
+
+  return applied_ic;
 }
 
 //-----------------------------------------------------

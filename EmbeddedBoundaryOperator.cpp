@@ -21,12 +21,12 @@ extern int verbose;
 //------------------------------------------------------------------------------------------------
 
 EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver) 
-                        : comm(comm_), iod(iod_), hasSurfFromOtherSolver(surface_from_other_solver),
+                        : comm(comm_), hasSurfFromOtherSolver(surface_from_other_solver),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
                           ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL)
 {
   // count surfaces from files
-  int counter = iod.ebm.embed_surfaces.surfaces.dataMap.size();
+  int counter = iod_.ebm.embed_surfaces.surfaces.dataMap.size();
 
   // get the correct size of surfaces and F
   surfaces.resize(counter);
@@ -40,8 +40,8 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   iod_embedded_surfaces.assign(surfaces.size(), NULL);
 
   // read surfaces from files
-  for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
-           it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+  for(auto it = iod_.ebm.embed_surfaces.surfaces.dataMap.begin();
+           it != iod_.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
 
     int index = it->first;
     if(index<0 || index>=counter) {
@@ -104,90 +104,49 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 }
 
 //------------------------------------------------------------------------------------------------
-// A constructor for one-time tracking of an enclosure specified in a surface mesh
-// It supports a single mesh file, which may contain multiple enclosures
-EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, UserSpecifiedEnclosureData &enclosure)
+// A constructor for tracking a single embedded surface provided using a mesh file
+// The surface may contain multiple enclosures
+EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurfaceData &iod_surface)
                         : comm(comm_), hasSurfFromOtherSolver(false),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
                           ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL)
 {
-  int counter = 1;
 
   // get the correct size of surfaces and F
-  surfaces.resize(counter);
-  F.resize(counter);
+  surfaces.resize(1);
+  F.resize(1);
 
-  surfaces_prev.resize(surfaces.size());
-  F_prev.resize(F.size());
+  surfaces_prev.resize(1);
+  F_prev.resize(1);
  
   // set default boundary type to "None"
-  surface_type.assign(surfaces.size(), EmbeddedSurfaceData::None);
-  iod_embedded_surfaces.assign(surfaces.size(), NULL);
+  iod_embedded_surfaces.assign(1, &iod_surface);
+  surface_type.assign(1, iod_surface.type);
 
-  // read surfaces from files
-  for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
-           it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+  ReadMeshFile(iod_surface.filename, surface_type[0], surfaces[0].X, surfaces[0].elems);
 
-    int index = it->first;
-    if(index<0 || index>=counter) {
-      print_error("*** Error: Detected error in the indices of embedded surfaces (id = %d).", index);
-      exit_mpi();
-    }
+  surfaces[0].X0 = surfaces[0].X;
+  surfaces[0].Udot.assign(surfaces[0].X.size(), 0.0);
 
-    iod_embedded_surfaces[index] = it->second;
-
-    if(index==0) {
-      if(surface_from_other_solver) {
-        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::YES) {
-          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", 
-                      index); 
-          exit_mpi();
-        } 
-        continue; //no file to read
-      } else {
-        if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
-          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by user?", index); 
-          exit_mpi();
-        }
-      }
-    } else {
-      if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
-        print_error("*** Error: Currently, only one embedded surface (with id 0) can be provided by another solver.");
-        exit_mpi();
-      }
-    }
-
-    surface_type[index] = it->second->type;
-
-    ReadMeshFile(it->second->filename, surface_type[index], surfaces[index].X, surfaces[index].elems);
-
-    surfaces[index].X0 = surfaces[index].X;
-
-    // initialize the velocity vector (to 0)
-    surfaces[index].Udot.assign(surfaces[index].X.size(), 0.0);
-
-    surfaces[index].BuildConnectivities();
-    surfaces[index].CalculateNormalsAndAreas();
+  surfaces[0].BuildConnectivities();
+  surfaces[0].CalculateNormalsAndAreas();
 /*
-    bool orientation = surfaces[index].CheckSurfaceOrientation(); 
-    bool closed = surfaces[index].CheckSurfaceClosedness();
+  bool orientation = surfaces[index].CheckSurfaceOrientation(); 
+  bool closed = surfaces[index].CheckSurfaceClosedness();
 */
-  }
 
-  print("- Activated the Embedded Boundary Method. Detected %d surface(s) (%d from concurrent program(s)).\n",
-        surfaces.size(), surfaces.size() - counter); 
+  print("- Activated the Embedded Boundary Method to track the surface provided in %s\n",
+        iod_surface.filename);
 
   // set NULL to intersector pointers
-  intersector.assign(surfaces.size(), NULL);
+  intersector.assign(1, NULL);
 
   // setup output
-  for(int i=0; i<surfaces.size(); i++)
-    lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
+  lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[0]->output));
 
   // setup dynamics_calculator
   SetupUserDefinedDynamicsCalculator();
 }
-
 
 //------------------------------------------------------------------------------------------------
 
@@ -449,11 +408,13 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
         print_error("*** Error: Found multiple sets of elements (keyword 'Elements') in %s.\n", filename);
         exit_mpi();
       }
-      sscanf(line, "%*s %s", key2);
       type_reading = 2;
       found_elems = true;
-/*
+
+/*    Skipping this part. The user should specify surface type in the input file, not in the mesh
+
       // now we look for keywords for the type of structure
+      sscanf(line, "%*s %s", key2);
       strcpy(copyForType, key2);
       int l = 0;
       while((copyForType[l] != '\0') && (l < MAXLINE)) {

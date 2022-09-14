@@ -4,6 +4,7 @@
 #include <IoData.h>
 #include <Reconstructor.h>
 #include <LevelSetReinitializer.h>
+#include <GlobalMeshInfo.h>
 #include <memory> //unique_ptr
 /*******************************************
  * class LevelSetOperator drives the solution
@@ -14,13 +15,12 @@ class EmbeddedBoundaryDataSet;
 
 class LevelSetOperator
 {
-  MPI_Comm&       comm;
-  IoData &iod;
+  MPI_Comm        &comm;
+  DataManagers3D  &dms;
+  IoData          &iod;
+
   LevelSetSchemeData& iod_ls; //!< iod may have multiple levelsets, this is the relevant one.
 
-#if LEVELSET_TEST == 3
-  DataManagers3D &dms;
-#endif
 
   //! material in the phi<0 region (inside)
   int materialid;
@@ -36,6 +36,8 @@ class LevelSetOperator
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
+
+  GlobalMeshInfo &global_mesh;
 
   //! Class for spatial reconstruction (FVM)
   Reconstructor *rec;
@@ -95,29 +97,32 @@ private:
   
   void CreateGhostNodeLists(); //almost the same as the function in SpaceOperator, except bcType
 
-  // compute derivatives of phi at nodes
+  //! Apply initial condition of phi within arbitrary enclosure(s) specified using a file
+  bool ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureData &enclosure, SpaceVariable3D &Phi);
+
+  //! Compute derivatives of phi at nodes
   void ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
   void ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
 
-  // Finite difference method
+  //! Finite difference method
   void ComputeResidualFDM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
   void ComputeResidualFDM_FullDomain(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
   void ComputeResidualFDM_NarrowBand(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
 
-  // Finite volume method
+  //! Finite volume method
   void ComputeResidualFVM(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R);
 
   void Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Phi);
   void ComputeAdvectionFlux(SpaceVariable3D &R);
   void AddSourceTerm(SpaceVariable3D &Phi, SpaceVariable3D &R);
 
-  void ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi); //the narrow-band version
-  void ComputeAdvectionFluxInBand(SpaceVariable3D &R); //the narrow-band version
-  void AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D &R); //the narrow-band version
+  void ReconstructInBand(SpaceVariable3D &V, SpaceVariable3D &Phi); //!< the narrow-band version
+  void ComputeAdvectionFluxInBand(SpaceVariable3D &R); //!< the narrow-band version
+  void AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D &R); //!< the narrow-band version
 
   double ComputeLocalAdvectionFlux(double phim, double phip, double um, double up);
 
-  // Utility
+  //! Utility
   inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {
     double c0 = -(x2-x1)/((x1-x0)*(x2-x0));
     double c1 = 1.0/(x1-x0) - 1.0/(x2-x1);

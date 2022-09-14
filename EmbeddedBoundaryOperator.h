@@ -21,7 +21,6 @@ struct Vec5D;
 class EmbeddedBoundaryOperator {
 
   MPI_Comm &comm;
-  IoData &iod;
 
   bool hasSurfFromOtherSolver; //!< currently, at most 1 surface can come from another solver (to be generalized)
 
@@ -58,6 +57,10 @@ public:
    
   //! Constructor: Without intersector (pointers are set to NULL) or M2C mesh info
   EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver = false);
+
+  //! Another constructor for tracking a single embedded surface provided using a mesh file
+  EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurfaceData &iod_surface);
+
   ~EmbeddedBoundaryOperator();
 
   void Destroy();

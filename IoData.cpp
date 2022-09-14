@@ -275,16 +275,20 @@ Assigner *CylinderSphereData::getAssigner()
 UserSpecifiedEnclosureData::UserSpecifiedEnclosureData()
 {
   surface_filename = "";    
+  surface_thickness = 1.0e-8;
 }
 
 //------------------------------------------------------------------------------
 
 Assigner *UserSpecifiedEnclosureData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 1, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 2, nullAssigner);
 
   new ClassStr<UserSpecifiedEnclosureData>(ca, "SurfaceMeshFile", this,
           &UserSpecifiedEnclosureData::surface_filename);
+
+  new ClassDouble<UserSpecifiedEnclosureData>(ca, "SurfaceThickness", this, 
+          &UserSpecifiedEnclosureData::surface_thickness);
 
   return ca;
 }

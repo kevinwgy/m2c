@@ -150,6 +150,7 @@ struct CylinderSphereData {
 struct UserSpecifiedEnclosureData {
 
   const char *surface_filename; //!< surface mesh that contains one or multiple enclosures
+  double surface_thickness; //!< artificial thickness of the surface
 
   StateVariable initialConditions;
 

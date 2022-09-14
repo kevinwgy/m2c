@@ -127,6 +127,8 @@ public:
   vector<GhostPoint>* GetPointerToInnerGhostNodes() {return &ghost_nodes_inner;}
   vector<GhostPoint>* GetPointerToOuterGhostNodes() {return &ghost_nodes_outer;}
 
+  GlobalMeshInfo& GetGlobalMeshInfo() {return global_mesh;}
+
   void Destroy();
 
 private:
