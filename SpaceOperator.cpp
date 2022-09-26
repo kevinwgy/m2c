@@ -505,9 +505,9 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
   MPI_Allreduce(MPI_IN_PLACE, &nInner, 1, MPI_INT, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &nOuter, 1, MPI_INT, MPI_SUM, comm);
   if(screenout) {
-    print(comm,"- Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
+    print(comm,"  o Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
           nInner);
-    print(comm,"- Number of ghost nodes outside computational domain: %d\n",
+    print(comm,"  o Number of ghost nodes outside computational domain: %d\n",
           nOuter);
     print(comm,"\n");
   }
@@ -1015,10 +1015,10 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
     if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
 
       if(iod.ic.type == IcData::PLANAR)
-        print(comm, "- Applying the initial condition specified in %s (planar).\n", 
+        print(comm, "- Applying the initial condition specified in %s (planar).\n\n", 
               iod.ic.user_specified_ic);
       else
-        print(comm, "- Applying the initial condition specified in %s (with cylindrical symmetry).\n", 
+        print(comm, "- Applying the initial condition specified in %s (with cylindrical symmetry).\n\n", 
               iod.ic.user_specified_ic);
  
       Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
@@ -1124,7 +1124,7 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
 
       int N = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
 
-      print(comm, "- Applying the initial condition specified in %s (%d points, cylindrical symmetry).\n", 
+      print(comm, "- Applying the initial condition specified in %s (%d points, cylindrical symmetry).\n\n", 
             iod.ic.user_specified_ic, N);
 
       //Store sample points in a KDTree (K = 2)
@@ -1319,7 +1319,7 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
 
     else if (iod.ic.type == IcData::SPHERICAL) {
 
-      print(comm, "- Applying the initial condition specified in %s (with spherical symmetry).\n", 
+      print(comm, "- Applying the initial condition specified in %s (with spherical symmetry).\n\n", 
             iod.ic.user_specified_ic);
  
       double x;

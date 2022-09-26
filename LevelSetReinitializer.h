@@ -85,10 +85,11 @@ public:
 
   void Destroy();
 
-  void ReinitializeFullDomain(SpaceVariable3D &Phi); //reinitialize phi in the entire domain
+  void ReinitializeFullDomain(SpaceVariable3D &Phi, int special_maxIts = 0); //reinitialize phi in the entire domain
 
   void ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, SpaceVariable3D &UsefulG2,
-                          SpaceVariable3D &Active, vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
+                          SpaceVariable3D &Active, vector<Int3> &useful_nodes, vector<Int3> &active_nodes,
+                          int special_maxIts = 0);
 
   // For narrow-band level set method
   void ConstructNarrowBand(SpaceVariable3D &Phi,

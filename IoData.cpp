@@ -282,13 +282,15 @@ UserSpecifiedEnclosureData::UserSpecifiedEnclosureData()
 
 Assigner *UserSpecifiedEnclosureData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 2, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
 
   new ClassStr<UserSpecifiedEnclosureData>(ca, "SurfaceMeshFile", this,
           &UserSpecifiedEnclosureData::surface_filename);
 
   new ClassDouble<UserSpecifiedEnclosureData>(ca, "SurfaceThickness", this, 
           &UserSpecifiedEnclosureData::surface_thickness);
+
+  initialConditions.setup("InitialState", ca);
 
   return ca;
 }
@@ -1078,7 +1080,7 @@ LevelSetReinitializationData::LevelSetReinitializationData()
 {
   frequency = -1;
   frequency_dt = -1.0;
-  maxIts = 20;
+  maxIts = 30;
   cfl = 0.8;
   convergence_tolerance = 2.0e-4;
   firstLayerTreatment = FIXED;

@@ -89,8 +89,8 @@ public:
 
   void ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID);
 
-  void TrackSurfaces();
-  void TrackUpdatedSurfaces();
+  double TrackSurfaces(int phi_layers = 3); //!< by default, calculate phi for 3 layers on each side
+  double TrackUpdatedSurfaces();
 
   void ApplyUserDefinedSurfaceDynamics(double t, double dt);
 

@@ -66,7 +66,7 @@ LevelSetReinitializer::Destroy()
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
+LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi, int special_maxIts)
 {
   // Step 1: Prep: Tag first layer nodes & store the sign function
   vector<FirstLayerNode> firstLayer;
@@ -95,7 +95,8 @@ RETRY_FullDomain:
 
   double residual = 0.0, dphi_max = 0.0;
   int iter;
-  for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
+  int maxIts = (special_maxIts>0) ? special_maxIts : iod_ls.reinit.maxIts;
+  for(iter = 0; iter < maxIts; iter++) {
 
     Phi0.AXPlusBY(0.0, 1.0, Phi);
 
@@ -146,10 +147,10 @@ RETRY_FullDomain:
   }
 
   // apply failsafe
-  if(iter==iod_ls.reinit.maxIts) {
+  if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
                   "Tol = %e.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(dphi_max<0.1) //ok...
+    if(dphi_max<0.02) //ok...
       return;
     if(cfl < 0.02) {//failed...
       print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
@@ -169,7 +170,8 @@ RETRY_FullDomain:
 void
 LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, 
                            SpaceVariable3D &UsefulG2,SpaceVariable3D &Active, 
-                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
+                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes,
+                           int special_maxIts)
 {
 
   // update phi_max and phi_min (only for use in updating new useful nodes)
@@ -207,7 +209,8 @@ RETRY_NarrowBand:
   
   double residual = 0.0, dphi_max = 0.0;
   int iter;
-  for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
+  int maxIts = (special_maxIts>0) ? special_maxIts : iod_ls.reinit.maxIts;
+  for(iter = 0; iter < maxIts; iter++) {
 
     AXPlusBYInBandPlusOne(0.0, Phi0, 1.0, Phi);
 
@@ -264,10 +267,10 @@ RETRY_NarrowBand:
   }
 
   //Failsafe
-  if(iter==iod_ls.reinit.maxIts) {
+  if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
                   "Tol = %e. Retrying.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(dphi_max<0.1) //ok...
+    if(dphi_max<0.02) //ok...
       return; 
     if(cfl < 0.02) {//failed...
       print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 

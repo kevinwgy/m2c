@@ -89,7 +89,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 */
   }
 
-  print("- Activated the Embedded Boundary Method. Detected %d surface(s) (%d from concurrent program(s)).\n",
+  print("- Activated the Embedded Boundary Method. Detected %d surface(s) (%d from concurrent program(s)).\n\n",
         surfaces.size(), surfaces.size() - counter); 
 
   // set NULL to intersector pointers
@@ -135,7 +135,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurf
   bool closed = surfaces[index].CheckSurfaceClosedness();
 */
 
-  print("- Activated the Embedded Boundary Method to track the surface provided in %s\n",
+  print("- Activated the Embedded Boundary Method to track the surface provided in %s\n\n",
         iod_surface.filename);
 
   // set NULL to intersector pointers
@@ -817,9 +817,13 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
 //------------------------------------------------------------------------------------------------
 
-void
-EmbeddedBoundaryOperator::TrackSurfaces()
+double
+EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
 {
+  assert(phi_layers>0);
+
+  double max_dist = -DBL_MAX;
+
   for(auto&& surf : surfaces)
     surf.CalculateNormalsAndAreas();
 
@@ -827,23 +831,29 @@ EmbeddedBoundaryOperator::TrackSurfaces()
   vector<bool> hasOutlet(intersector.size(), false);
   vector<bool> hasOccluded(intersector.size(), false);
   vector<int> numRegions(intersector.size(), 0);
-  int phi_layers = 3;
   for(int i = 0; i < intersector.size(); i++) {
     bool a, b, c;
     int d;
-    intersector[i]->TrackSurfaceFullCourse(a, b, c, d, phi_layers);
+    double max_dist0 = intersector[i]->TrackSurfaceFullCourse(a, b, c, d, phi_layers);
+    if(max_dist0>max_dist)
+      max_dist = max_dist0;
+
     hasInlet[i] = a;
     hasOutlet[i] = b;
     hasOccluded[i] = c;
     numRegions[i] = d;
   }
+
+  return max_dist;
 }
 
 //------------------------------------------------------------------------------------------------
 
-void
+double
 EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 {
+  double max_dist = -DBL_MAX;
+
   int phi_layers = 3;
   for(int i=0; i<intersector.size(); i++) {
     if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
@@ -852,8 +862,12 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 
     surfaces[i].CalculateNormalsAndAreas();
 
-    intersector[i]->RecomputeFullCourse(surfaces_prev[i].X, phi_layers);
+    double max_dist0 = intersector[i]->RecomputeFullCourse(surfaces_prev[i].X, phi_layers);
+    if(max_dist0>max_dist)
+      max_dist = max_dist0;
   }
+
+  return max_dist;
 }
 
 //------------------------------------------------------------------------------------------------

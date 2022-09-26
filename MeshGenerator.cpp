@@ -116,7 +116,7 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
 
 
   // Print mesh statistics to the screen
-  print("\nMesh Statistics:\n");
+  print("\n- Mesh Statistics:\n");
   print("  X-Direction: [%e, %e], %d nodes/cells, dx_min = %e, dx_max = %e.\n", x0, xmax, x.size(), 
          *std::min_element(dx.begin(), dx.end()), *std::max_element(dx.begin(), dx.end()));
   print("  Y-Direction: [%e, %e], %d nodes/cells, dy_min = %e, dy_max = %e.\n", y0, ymax, y.size(), 

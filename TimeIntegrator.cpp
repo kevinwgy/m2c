@@ -618,11 +618,11 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     // Reinitialize level set (also apply boundary conditions)
     if(resolved_conflicts>0) { //must reinitialize
       for(int i=0; i<Phi.size(); i++) 
-        lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true/*"must_do"*/);
+        lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0/*no-special-maxIts*/, true/*"must_do"*/);
     } else {
       if(subcycle==0) { //frequency specified by user
         for(int i=0; i<Phi.size(); i++) 
-          lso[i]->Reinitialize(time, dts, time_step, *Phi[i], false/*"must_do"*/);
+          lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0/*no-special-maxIts*/, false/*"must_do"*/);
       }
     }
 
@@ -646,7 +646,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
         mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
         for(int i=0; i<Phi.size(); i++)
-          lso[i]->Reinitialize(time, dts, time_step, *Phi[i], true); //will NOT change sign of phi
+          lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0, true); //will NOT change sign of phi
         mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, embed ? embed->GetPointerToIntersectors() : nullptr,
                                        ID); //should only update ID of unresolved cells      
       }

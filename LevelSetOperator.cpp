@@ -26,6 +26,8 @@ LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoD
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
     global_mesh(spo.GetGlobalMeshInfo()),
+    spo_ghost_nodes_inner(*spo.GetPointerToInnerGhostNodes()),
+    spo_ghost_nodes_outer(*spo.GetPointerToOuterGhostNodes()),
     reinit(NULL),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
     scalarG2(comm_, &(dm_all_.ghosted2_1dof)),
@@ -500,8 +502,10 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
       continue; //not the right one
 
     Phi.RestoreDataPointerAndInsert();
+    coordinates.RestoreDataPointerToLocalVector();
     bool active = ApplyInitialConditionWithinEnclosure(*enclosure.second, Phi);
     phi = Phi.GetDataPointer();
+    coords = (Vec3D***)coordinates.GetDataPointer();
 
     if(active)
       active_arbitrary_enclosure = true;
@@ -606,6 +610,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
 
   int ebds_counter = 0;
+
   if(EBDS && surf_and_color) {
     if(!reinit) {
       print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary. In this case, \n"
@@ -632,11 +637,13 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
       double*** color = (*EBDS)[surf]->Color_ptr->GetDataPointer();
       double*** psi   = (*EBDS)[surf]->Phi_ptr->GetDataPointer();
+      double*** cpi   = (*EBDS)[surf]->ClosestPointIndex_ptr->GetDataPointer();
      
       for(int k=k0; k<kmax; k++)
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
     
+/*
             //Check if this node is within nLayer of the interface
             bool near = false;
             for(int k1 = k-nLayer; k1 <= k+nLayer; k1++)
@@ -653,6 +660,9 @@ DONE:
 
             if(!near) 
               continue; //nothing to do
+*/
+            if(cpi[k][j][i]<0 && color[k][j][i] != mycolor)
+              continue;
 
             ebds_counter++;
 
@@ -675,6 +685,7 @@ DONE:
 
       (*EBDS)[surf]->Color_ptr->RestoreDataPointerToLocalVector();
       (*EBDS)[surf]->Phi_ptr->RestoreDataPointerToLocalVector();
+      (*EBDS)[surf]->ClosestPointIndex_ptr->RestoreDataPointerToLocalVector();
     }
   }
 
@@ -694,12 +705,12 @@ DONE:
     //reinit must have been created (not NULL)
     print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
           materialid, ebds_counter);
-    Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
+    Reinitialize(0.0, 1.0, 0.0, Phi, 400, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
   else if(active_arbitrary_enclosure && reinit) {
     //if reinit is NULL, should have reinitialized phi (full-domain) in ApplyInitialConditionWithinEnclosure
     print("- Updated phi (material id: %d) based on surface mesh(es). Going to reinitialize phi.\n", materialid);
-    Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
+    Reinitialize(0.0, 1.0, 0.0, Phi, 400, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
 
 }
@@ -735,15 +746,17 @@ LevelSetOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureDat
 
   //create the embedded operator to track the surface
   EmbeddedBoundaryOperator embed(comm, esd);
-  embed.SetCommAndMeshInfo(dms, coordinates, ghost_nodes_inner, ghost_nodes_outer,
+  embed.SetCommAndMeshInfo(dms, coordinates, spo_ghost_nodes_inner, spo_ghost_nodes_outer,
                            global_mesh);
   embed.SetupIntersectors();
 
   //track the surface, and get access to the results
-  embed.TrackSurfaces();
+  double max_dist = embed.TrackSurfaces(5); //compute "phi" for 5 layers
   auto EBDS = embed.GetPointerToEmbeddedBoundaryData(0);
+
   double*** color = EBDS->Color_ptr->GetDataPointer();
   double*** psi   = EBDS->Phi_ptr->GetDataPointer();
+  double*** cpi   = EBDS->ClosestPointIndex_ptr->GetDataPointer();
   int nLayer = EBDS->Phi_nLayer;
   assert(nLayer>=2);
 
@@ -752,22 +765,8 @@ LevelSetOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureDat
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
 
-        //Check if this node is within nLayer of the interface
-        bool near = false;
-        for(int k1 = k-nLayer; k1 <= k+nLayer; k1++)
-          for(int j1 = j-nLayer; j1 <= j+nLayer; j1++)
-            for(int i1 = i-nLayer; i1 <= i+nLayer; i1++) {
-              if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
-                continue;
-              if(color[k1][j1][i1]<0) { //this neighbor is "enclosed"
-                near = true;
-                goto DONE;
-              }
-            }
-DONE:
-
-        if(!near)
-          continue; //nothing to do
+        if(cpi[k][j][i]<0 && color[k][j][i]>=0)
+          continue;
 
         if(!applied_ic)
           applied_ic = true;
@@ -800,12 +799,23 @@ DONE:
                   " lie outside the computational domain.\n", enclosure.surface_filename);
   }
 
+  // Give other enclosed nodes "phi_min" (to avoid large jumps)
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(color[k][j][i]<0 && phi[k][j][i]<-max_dist) //"enclosed" 
+          phi[k][j][i] = -max_dist; 
+        else if(color[k][j][i]>0 && phi[k][j][i]>max_dist)
+          phi[k][j][i] = max_dist;
+      }
+
   Phi.RestoreDataPointerAndInsert();
 
   // reinitialize phi here if tmp reinit is created. Otherwise, phi will be reinitialized near
   // the end of the function "SetInitialCondition"
   if(created_tmp_reinit) {
-    reinit->ReinitializeFullDomain(Phi); //one-time use
+    ApplyBoundaryConditions(Phi); //need this before reinitialization!
+    reinit->ReinitializeFullDomain(Phi, 400); //one-time use
     reinit->Destroy(); 
     delete reinit;
     reinit = NULL;
@@ -814,6 +824,7 @@ DONE:
   //clean-up
   EBDS->Color_ptr->RestoreDataPointerToLocalVector();
   EBDS->Phi_ptr->RestoreDataPointerToLocalVector();
+  EBDS->ClosestPointIndex_ptr->RestoreDataPointerToLocalVector();
 
   embed.Destroy();
 
@@ -1488,7 +1499,8 @@ void LevelSetOperator::AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D
 
 //-----------------------------------------------------
 
-bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi, bool must_do)
+bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi,
+                                    int special_maxIts, bool must_do)
 {
   if(must_do && !reinit) {
     print_error("*** Error: Reinitialization for level set (matid = %d) is requested, but not specified "
@@ -1505,10 +1517,10 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
 
   if(narrow_band) {
 //    print("- Reinitializing the level set function (material id: %d), bandwidth = %d.\n", materialid, iod_ls.bandwidth);
-    reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+    reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes, special_maxIts);
   } else {
 //    print("- Reinitializing the level set function (material id: %d).\n", materialid);
-    reinit->ReinitializeFullDomain(Phi);
+    reinit->ReinitializeFullDomain(Phi, special_maxIts);
   }
 
   return true;

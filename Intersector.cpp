@@ -153,7 +153,7 @@ Intersector::GetElementsInScope1(std::vector<int> &elems_in_scope)
 
 //-------------------------------------------------------------------------
 
-void
+double
 Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers)
 {
   assert(phi_layers>=1);
@@ -171,7 +171,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
     nLayer = phi_layers;
   }
   BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
-  CalculateUnsignedDistanceNearSurface(phi_layers);
+  double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
 
   hasInlet_  = hasInlet;
   hasOutlet_ = hasOutlet;
@@ -196,11 +196,13 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
   MPI_Barrier(comm);
   exit_mpi();
 */
+
+  return dist_max;
 }
 
 //-------------------------------------------------------------------------
 
-void
+double
 Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
 {
   assert(phi_layers>=1);
@@ -215,8 +217,9 @@ Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
     nLayer = phi_layers;
   }
   BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
-  CalculateUnsignedDistanceNearSurface(phi_layers);
+  double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
 
+  return dist_max;
 }
 
 //-------------------------------------------------------------------------
@@ -1193,11 +1196,13 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
 
 //-------------------------------------------------------------------------
 
-void
+double
 Intersector::CalculateUnsignedDistanceNearSurface(int nL)
 {
 
   assert(nLayer = nL);
+
+  double max_dist = -DBL_MAX;
 
   FindNodalCandidates(BBmin_n, BBmax_n, tree_n, CandidatesIndex_n, candidates_n);
 
@@ -1270,6 +1275,8 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
       closest_points.push_back(std::make_pair(*it, cp));
       cpi[k][j][i] = closest_points.size() - 1;
 
+      if(dist>max_dist)
+        max_dist = dist;
 /*
       //verification
       double dist_true = fabs(19.4555 - sqrt(x_glob[i]*x_glob[i]+y_glob[j]*y_glob[j]));
@@ -1292,11 +1299,13 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
     this_layer = next_layer;
   }
 
+  MPI_Allreduce(MPI_IN_PLACE, &max_dist, 1, MPI_DOUBLE, MPI_MAX, comm);
 
   CandidatesIndex_n.RestoreDataPointerToLocalVector();
   ClosestPointIndex.RestoreDataPointerToLocalVector(); //cannot communicate, because "closest_points" do not.
   Phi.RestoreDataPointerAndInsert(); 
 
+  return max_dist;
 }
 
 //-------------------------------------------------------------------------

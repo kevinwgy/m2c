@@ -34,6 +34,10 @@ class LevelSetOperator
   vector<GhostPoint> ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   vector<GhostPoint> ghost_nodes_outer; //!< ghost nodes outside the physical domain
 
+  //! These are the same ghost_nodes in SpaceOperator
+  vector<GhostPoint>& spo_ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  vector<GhostPoint>& spo_ghost_nodes_outer; //!< ghost nodes outside the physical domain
+
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
@@ -77,7 +81,8 @@ public:
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
 
   bool Reinitialize(double time, double dt, int time_step,
-                    SpaceVariable3D &Phi, bool must_do = false); //true: reinitialization is done; false: not this time
+                    SpaceVariable3D &Phi, int special_maxIts = 0,//!< if >0, will use it instead of iod value
+                    bool must_do = false); //!< true: reinitialization is done; false: not this time
 
   void ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, vector<Int3> &new_nodes);
 
