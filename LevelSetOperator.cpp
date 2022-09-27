@@ -676,7 +676,7 @@ DONE:
               phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
             } else { //"outside"
               if(phi[k][j][i]>=0)
-                phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
+                phi[k][j][i] = std::min(phi[k][j][i], psi[k][j][i]);
               else //this is really bad... the user should avoid this...
                 phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
             }
@@ -705,12 +705,12 @@ DONE:
     //reinit must have been created (not NULL)
     print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
           materialid, ebds_counter);
-    Reinitialize(0.0, 1.0, 0.0, Phi, 400, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
+    Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
   else if(active_arbitrary_enclosure && reinit) {
     //if reinit is NULL, should have reinitialized phi (full-domain) in ApplyInitialConditionWithinEnclosure
     print("- Updated phi (material id: %d) based on surface mesh(es). Going to reinitialize phi.\n", materialid);
-    Reinitialize(0.0, 1.0, 0.0, Phi, 400, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
+    Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
 
 }
@@ -783,7 +783,7 @@ LevelSetOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureDat
         } 
         else { //"outside"
           if(phi[k][j][i]>=0)
-            phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
+            phi[k][j][i] = std::min(phi[k][j][i], psi[k][j][i]);
           else //this is really bad... the user should avoid this...
             phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
         }
@@ -815,7 +815,7 @@ LevelSetOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureDat
   // the end of the function "SetInitialCondition"
   if(created_tmp_reinit) {
     ApplyBoundaryConditions(Phi); //need this before reinitialization!
-    reinit->ReinitializeFullDomain(Phi, 400); //one-time use
+    reinit->ReinitializeFullDomain(Phi, 600); //one-time use
     reinit->Destroy(); 
     delete reinit;
     reinit = NULL;

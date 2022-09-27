@@ -269,7 +269,7 @@ RETRY_NarrowBand:
   //Failsafe
   if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
-                  "Tol = %e. Retrying.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+                  "Tol = %e.", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
     if(dphi_max<0.02) //ok...
       return; 
     if(cfl < 0.02) {//failed...
@@ -277,6 +277,7 @@ RETRY_NarrowBand:
                   residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       exit_mpi();
     } else {
+      print_warning(" Retrying.\n");
       cfl /= 1.5;
       AXPlusBYInBandPlusOne(0.0, Phi, 1.0, Phibk); //set Phi = Phibk and retry
       goto RETRY_NarrowBand;

@@ -854,8 +854,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
     print(comm, "- Applying initial condition within a user-specified enclosure (material id: %d).\n\n",
           enclosure.second->initialConditions.materialid);
 
+    coordinates.RestoreDataPointerToLocalVector();
+
     ApplyInitialConditionWithinEnclosure(*enclosure.second, v, id);
-   
+
+    coords = (Vec3D***)coordinates.GetDataPointer();
   }
 
 
