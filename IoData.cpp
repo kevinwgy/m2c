@@ -380,7 +380,7 @@ void MeshData::setup(const char *name, ClassAssigner *father)
 
   // Inside the code: Farfield0 = Farfield = Inlet, Farfield1 = Outlet
   new ClassToken<MeshData>(ca, "BoundaryConditionX0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 11,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 12,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
@@ -388,9 +388,10 @@ void MeshData::setup(const char *name, ClassAssigner *father)
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
-                               "NoSlipWall", 4, "Symmetry", 5);
+                               "NoSlipWall", 4, "Symmetry", 5,
+                               "Overset", 6);
   new ClassToken<MeshData>(ca, "BoundaryConditionXmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 11,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 12,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
@@ -398,9 +399,10 @@ void MeshData::setup(const char *name, ClassAssigner *father)
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
-                               "NoSlipWall", 4, "Symmetry", 5);
+                               "NoSlipWall", 4, "Symmetry", 5,
+                               "Overset", 6);
   new ClassToken<MeshData>(ca, "BoundaryConditionY0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 11,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 12,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
@@ -408,9 +410,10 @@ void MeshData::setup(const char *name, ClassAssigner *father)
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
-                               "NoSlipWall", 4, "Symmetry", 5);
+                               "NoSlipWall", 4, "Symmetry", 5,
+                               "Overset", 6);
   new ClassToken<MeshData>(ca, "BoundaryConditionYmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 11,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 12,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
@@ -418,9 +421,10 @@ void MeshData::setup(const char *name, ClassAssigner *father)
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
-                               "NoSlipWall", 4, "Symmetry", 5);
+                               "NoSlipWall", 4, "Symmetry", 5,
+                               "Overset", 6);
   new ClassToken<MeshData>(ca, "BoundaryConditionZ0", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 11,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 12,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
@@ -428,9 +432,10 @@ void MeshData::setup(const char *name, ClassAssigner *father)
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
-                               "NoSlipWall", 4, "Symmetry", 5);
+                               "NoSlipWall", 4, "Symmetry", 5,
+                               "Overset", 6);
   new ClassToken<MeshData>(ca, "BoundaryConditionZmax", this,
-                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 11,
+                               reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 12,
                                "None", 0, 
                                "Inlet", 1, "Outlet", 2, //option 1
                                "Farfield0", 1, "Farfield1", 2, //option 2,
@@ -438,7 +443,8 @@ void MeshData::setup(const char *name, ClassAssigner *father)
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
-                               "NoSlipWall", 4, "Symmetry", 5);
+                               "NoSlipWall", 4, "Symmetry", 5,
+                               "Overset", 6);
  } 
 
 //------------------------------------------------------------------------------
@@ -2757,6 +2763,24 @@ void AerosCouplingData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+AerofCouplingData::AerofCouplingData()
+{
+  type = NONE;
+}
+
+//------------------------------------------------------------------------------
+
+void AerofCouplingData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassToken<AerofCouplingData> (ca, "Type", this,
+     reinterpret_cast<int AerofCouplingData::*>(&AerofCouplingData::type), 2,
+     "None", 0, "OversetGrids", 1);
+}
+
+//------------------------------------------------------------------------------
+
 ConcurrentProgramsData::ConcurrentProgramsData()
 {
 
@@ -2766,8 +2790,9 @@ ConcurrentProgramsData::ConcurrentProgramsData()
 
 void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
   aeros.setup("AeroS");
+  aerof.setup("AeroF");
 } 
 
 //------------------------------------------------------------------------------

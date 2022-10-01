@@ -202,7 +202,8 @@ struct MeshData {
   ObjectMap<MeshResolution1DPointData>  ypoints_map;
   ObjectMap<MeshResolution1DPointData>  zpoints_map;
 
-  enum BcType {NONE = 0, INLET = 1, OUTLET = 2, SLIPWALL = 3, STICKWALL = 4, SYMMETRY = 5, SIZE = 6};
+  enum BcType {NONE = 0, INLET = 1, OUTLET = 2, SLIPWALL = 3, STICKWALL = 4, SYMMETRY = 5, 
+               OVERSET = 6, SIZE = 7};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
 
   MeshData();
@@ -1251,9 +1252,24 @@ struct AerosCouplingData {
 
 //------------------------------------------------------------------------------
 
+struct AerofCouplingData {
+
+  enum Type {NONE = 0, OVERSET_GRIDS = 1} type;
+
+  AerofCouplingData();
+  ~AerofCouplingData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ConcurrentProgramsData {
 
   AerosCouplingData aeros;
+
+  AerofCouplingData aerof;
 
   ConcurrentProgramsData();
   ~ConcurrentProgramsData() {} 
