@@ -4,6 +4,8 @@
 #include<IoData.h>
 #include<SpaceVariable.h>
 #include<AerosMessenger.h>
+#include<AerofMessenger.h>
+#include<M2CTwinMessenger.h>
 
 /***********************************************************************
 * Class ConcurrentProgramsHandler is responsible for splitting the MPI
@@ -47,7 +49,11 @@ class ConcurrentProgramsHandler {
   MPI_Comm aeros_comm;  //!< this is just c[aeros_color], a communicator that includes
                         //!< M2C and AERO-S processes
 
-  //! TODO: other software/programs can be added later
+  AerofMessenger *aerof;
+  MPI_Comm aerof_comm;
+
+  M2CTwinMessenger *m2c_twin;
+  MPI_Comm m2c_twin_comm;
 
   
 public:

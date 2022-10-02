@@ -2781,6 +2781,25 @@ void AerofCouplingData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+M2CTwinningData::M2CTwinningData()
+{
+  type = NONE;
+}
+
+//------------------------------------------------------------------------------
+
+void M2CTwinningData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassToken<M2CTwinningData> (ca, "Type", this,
+     reinterpret_cast<int M2CTwinningData::*>(&M2CTwinningData::type), 2,
+     "None", 0, "OversetGrids", 1);
+}
+
+//------------------------------------------------------------------------------
+
+
 ConcurrentProgramsData::ConcurrentProgramsData()
 {
 
@@ -2790,9 +2809,10 @@ ConcurrentProgramsData::ConcurrentProgramsData()
 
 void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
   aeros.setup("AeroS");
   aerof.setup("AeroF");
+  m2c_twin.setup("M2CTwin");
 } 
 
 //------------------------------------------------------------------------------

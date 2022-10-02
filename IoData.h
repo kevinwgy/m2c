@@ -1265,11 +1265,26 @@ struct AerofCouplingData {
 
 //------------------------------------------------------------------------------
 
+struct M2CTwinningData {
+
+  enum Type {NONE = 0, OVERSET_GRIDS = 1} type;
+
+  M2CTwinningData();
+  ~M2CTwinningData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ConcurrentProgramsData {
 
   AerosCouplingData aeros;
 
   AerofCouplingData aerof;
+
+  M2CTwinningData m2c_twin;
 
   ConcurrentProgramsData();
   ~ConcurrentProgramsData() {} 

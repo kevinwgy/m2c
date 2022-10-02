@@ -5,17 +5,27 @@
 
 ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm global_comm_, MPI_Comm &comm_)
                          : iod_concurrent(iod_.concurrent), global_comm(global_comm_), 
-                           m2c_comm(global_comm_), aeros_comm(), aeros(NULL)
+                           m2c_comm(global_comm_), aeros_comm(), aeros(NULL),
+                           aerof_comm(), aerof(NULL), m2c_twin_comm(), m2c_twin(NULL)
 {
 
   // check if M2C is coupled with any other programs 
-  int aeros_color = -1;
-  if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
+  int aeros_color    = -1;
+  int aerof_color    = -1;
+  int m2c_twin_color = -1;
+
+  // Within the family... Common codes allow multiple (more than 2) solvers coupled together
+  if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE ||
+     iod_concurrent.aerof.type     != AerofCouplingData::NONE ||
+     iod_concurrent.m2c_twin.type  != M2CTwinningData::NONE) {
     coupled = true;
-    //The following parameters are the same as "FLUID_ID", "STRUCT_ID" and "MAX_CODES" in AERO-S
-    m2c_color = 0; 
-    aeros_color = 1;
+    //The following parameters are the same as "FLUID_ID" and "MAX_CODES" in AERO-S and AERO-F
+    m2c_color = 0;  //!< TODO: Need to take care of importer / exporter roles
     maxcolor = 4; 
+
+    if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
+      aeros_color = 1; //"STRUCT_ID" in AERO-S
+
   }
   else
     coupled = false;

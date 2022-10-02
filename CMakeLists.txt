@@ -71,6 +71,8 @@ IoData.cpp
 SpaceVariable.cpp
 ConcurrentProgramsHandler.cpp
 AerosMessenger.cpp
+AerofMessenger.cpp
+M2CTwinMessenger.cpp
 TriangulatedSurface.cpp
 CrackingSurface.cpp
 Intersector.cpp
