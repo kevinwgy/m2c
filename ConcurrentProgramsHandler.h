@@ -24,7 +24,7 @@
 //! Concurrent programs handler
 class ConcurrentProgramsHandler {
 
-  ConcurrentProgramsData &iod_concurrent; //!< user inputs
+  IoData &iod; //!< user inputs
 
   bool coupled; //!< whether M2C is coupled to (i.e. running concurrently w/) any other programs
 

@@ -79,12 +79,19 @@ int main(int argc, char* argv[])
 
   //! Initialize Embedded Boundary Operator, if needed
   EmbeddedBoundaryOperator *embed = NULL;
-  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
+  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
     embed = new EmbeddedBoundaryOperator(comm, iod, true); 
-    concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
-                                    embed->GetPointerToForcesOnSurface(0));
-  } else if(iod.ebm.embed_surfaces.surfaces.dataMap.size() != 0)
+  else if(iod.ebm.embed_surfaces.surfaces.dataMap.size() != 0)
     embed = new EmbeddedBoundaryOperator(comm, iod, false);
+
+  //! Call Messengers' initializers (which may require different inputs)
+  if(concurrent.Coupled()) {
+    if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
+      concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
+                                      embed->GetPointerToForcesOnSurface(0));
+    else
+      concurrent.InitializeMessengers(NULL, NULL);
+  }
 
 
   //! Initialize VarFcn (EOS, etc.) 

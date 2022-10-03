@@ -4,40 +4,95 @@
 //---------------------------------------------------------
 
 ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm global_comm_, MPI_Comm &comm_)
-                         : iod_concurrent(iod_.concurrent), global_comm(global_comm_), 
+                         : iod(iod_), global_comm(global_comm_), 
                            m2c_comm(global_comm_), aeros_comm(), aeros(NULL),
                            aerof_comm(), aerof(NULL), m2c_twin_comm(), m2c_twin(NULL)
 {
+  coupled = false; //default
 
   // check if M2C is coupled with any other programs 
   int aeros_color    = -1;
   int aerof_color    = -1;
   int m2c_twin_color = -1;
 
-  // Within the family... Common codes allow multiple (more than 2) solvers coupled together
-  if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE ||
-     iod_concurrent.aerof.type     != AerofCouplingData::NONE ||
-     iod_concurrent.m2c_twin.type  != M2CTwinningData::NONE) {
+  // If coupled with another instantiation of M2C (through overset grids), figure out my role
+  int twinning_status = 0; //0~non-existent, 1~I am the ``leader'', 2~I am the ``follower''
+  if(iod.concurrent.aerof.type == M2CTwinningData::OVERSET_GRIDS) {
+    // IMPORTANT: If mesh has "OVERSET" boundaries --> "leader"; otherwise --> follower
+    if(iod_.mesh.bc_x0 == MeshData::OVERSET || iod_.mesh.bc_xmax == MeshData::OVERSET ||
+       iod_.mesh.bc_y0 == MeshData::OVERSET || iod_.mesh.bc_ymax == MeshData::OVERSET ||
+       iod_.mesh.bc_z0 == MeshData::OVERSET || iod_.mesh.bc_zmax == MeshData::OVERSET)
+      twinning_status = 1;
+    else
+      twinning_status = 2;
+  }
+
+  if(twinning_status == 2) { 
+    coupled = true;
+    m2c_color = 2; // my color
+    m2c_twin_color = 0; // the leader's color
+    maxcolor = 4;
+
+    // Because M2C cannot be coupled with M2C-follower and AERO-F at the same time, AERO-F and the
+    // M2C-follower share the same ``color'' (2).
+
+    //A follower to another M2C instantiation cannot be coupled with others
+    if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE ||
+       iod.concurrent.aerof.type     != AerofCouplingData::NONE) {
+      fprintf(stderr,"\033[0;31m*** Error: A follower M2C instantiation cannot be coupled with "
+                     "other software.\033[0m\n");
+      exit(-1);
+    }
+  }
+  // Either not coupled with anything, or if coupled, this is the leader M2C instantiation
+  else if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE ||
+          iod.concurrent.aerof.type     != AerofCouplingData::NONE ||
+          iod.concurrent.m2c_twin.type  != M2CTwinningData::NONE) {
+    // Within the family... Common codes allow multiple (more than 2) solvers coupled together
     coupled = true;
     //The following parameters are the same as "FLUID_ID" and "MAX_CODES" in AERO-S and AERO-F
-    m2c_color = 0;  //!< TODO: Need to take care of importer / exporter roles
+    m2c_color = 0; // my color
     maxcolor = 4; 
 
-    if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
+    if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
       aeros_color = 1; //"STRUCT_ID" in AERO-S
+    if(iod.concurrent.aerof.type     != AerofCouplingData::NONE)
+      aerof_color = 2; //"AEROF_ID_FOR_M2C" in AERO-F
+    if(iod.concurrent.m2c_twin.type  != M2CTwinningData::NONE) {
+      assert(twinning_status = 1);
+      m2c_twin_color = 2;
+    }
 
+    if(iod.concurrent.m2c_twin.type != M2CTwinningData::NONE &&
+       iod.concurrent.aerof.type    != AerofCouplingData::NONE) {
+      fprintf(stderr,"\033[0;31m*** Error: Cannot be coupled with AERO-F and another instantiation of M2C"
+                     "at the same time.\033[0m\n");
+      exit(-1);
+    }
   }
-  else
-    coupled = false;
-
 
   // simultaneous operations w/ other programs 
   if(coupled)
     SetupCommunicators();
 
   // create inter-communicators 
-  if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
+  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
     aeros_comm = c[aeros_color];
+    int aeros_size(-1);
+    MPI_Comm_size(aeros_comm, &aeros_size);
+    assert(aeros_size>0);
+  }
+  if(iod.concurrent.aerof.type != AerofCouplingData::NONE) {
+    aerof_comm = c[aerof_color];
+    int aerof_size(-1);
+    MPI_Comm_size(aerof_comm, &aerof_size);
+    assert(aerof_size>0);
+  }
+  if(iod.concurrent.m2c_twin.type != M2CTwinningData::NONE) {
+    m2c_twin_comm = c[m2c_twin_color];
+    int m2c_twin_size(-1);
+    MPI_Comm_size(m2c_twin_comm, &m2c_twin_size);
+    assert(m2c_twin_size>0);
   }
 
   // time-step size suggested by other solvers, will be updated
@@ -60,15 +115,21 @@ ConcurrentProgramsHandler::~ConcurrentProgramsHandler()
 void
 ConcurrentProgramsHandler::InitializeMessengers(TriangulatedSurface *surf_, vector<Vec3D> *F_) //for AERO-S messengers
 {
-  if(iod_concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
+  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE) {
 
     assert(surf_); //cannot be NULL
     assert(F_); //cannot be NULL
-    aeros = new AerosMessenger(iod_concurrent.aeros, m2c_comm, aeros_comm, *surf_, *F_); 
+    aeros = new AerosMessenger(iod.concurrent.aeros, m2c_comm, aeros_comm, *surf_, *F_); 
 
     dt = aeros->GetTimeStepSize();
     tmax = aeros->GetMaxTime();
   }
+
+  if(iod.concurrent.aerof.type != AerofCouplingData::NONE) {
+    aerof = new AerofMessenger(iod.concurrent XXXX I AM HERE XXXX
+
+  }
+
 }
 
 //---------------------------------------------------------
