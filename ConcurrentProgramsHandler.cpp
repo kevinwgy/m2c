@@ -16,8 +16,8 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
   int m2c_twin_color = -1;
 
   // If coupled with another instantiation of M2C (through overset grids), figure out my role
-  int twinning_status = 0; //0~non-existent, 1~I am the ``leader'', 2~I am the ``follower''
-  if(iod.concurrent.aerof.type == M2CTwinningData::OVERSET_GRIDS) {
+  twinning_status = 0; //0~non-existent, 1~I am the ``leader'', 2~I am the ``follower''
+  if(iod.concurrent.m2c_twin.type == M2CTwinningData::OVERSET_GRIDS) {
     // IMPORTANT: If mesh has "OVERSET" boundaries --> "leader"; otherwise --> follower
     if(iod_.mesh.bc_x0 == MeshData::OVERSET || iod_.mesh.bc_xmax == MeshData::OVERSET ||
        iod_.mesh.bc_y0 == MeshData::OVERSET || iod_.mesh.bc_ymax == MeshData::OVERSET ||
@@ -108,6 +108,8 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
 ConcurrentProgramsHandler::~ConcurrentProgramsHandler()
 {
   if(aeros) delete aeros;
+  if(aerof) delete aerof;
+  if(m2c_twin) delete m2c_twin;
 }
 
 //---------------------------------------------------------
@@ -126,8 +128,11 @@ ConcurrentProgramsHandler::InitializeMessengers(TriangulatedSurface *surf_, vect
   }
 
   if(iod.concurrent.aerof.type != AerofCouplingData::NONE) {
-    aerof = new AerofMessenger(iod.concurrent XXXX I AM HERE XXXX
+    aerof = new AerofMessenger(iod, m2c_comm, aerof_comm);
+  }
 
+  if(iod.concurrent.m2c_twin.type != M2CTwinningData::NONE) {
+    m2c_twin = new M2CTwinMessenger(iod, m2c_comm, m2c_twin_comm, twinning_status);
   }
 
 }
@@ -192,6 +197,15 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping()
     dt = aeros->GetTimeStepSize();
     tmax = aeros->GetMaxTime();
   }
+
+  if(aerof) {
+    aerof->CommunicateBeforeTimeStepping();
+  }
+
+  if(m2c_twin) {
+    m2c_twin->CommunicateBeforeTimeStepping();
+  }
+
 }
 
 //---------------------------------------------------------
@@ -204,6 +218,15 @@ ConcurrentProgramsHandler::FirstExchange()
     dt = aeros->GetTimeStepSize();
     tmax = aeros->GetMaxTime();
   }
+
+  if(aerof) {
+    aerof->FirstExchange();
+  }
+
+  if(m2c_twin) {
+    m2c_twin->FirstExchange();
+  }
+
 }
 
 //---------------------------------------------------------
@@ -216,6 +239,15 @@ ConcurrentProgramsHandler::Exchange()
     dt = aeros->GetTimeStepSize();
     tmax = aeros->GetMaxTime();
   }
+
+  if(aerof) {
+    aerof->Exchange();
+  }
+
+  if(m2c_twin) {
+    m2c_twin->Exchange();
+  }
+
 }
 
 //---------------------------------------------------------
@@ -228,6 +260,15 @@ ConcurrentProgramsHandler::FinalExchange()
     dt = aeros->GetTimeStepSize();
     tmax = aeros->GetMaxTime();
   }
+
+  if(aerof) {
+    aerof->FinalExchange();
+  }
+
+  if(m2c_twin) {
+    m2c_twin->FinalExchange();
+  }
+
 }
 
 //---------------------------------------------------------

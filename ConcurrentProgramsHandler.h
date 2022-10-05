@@ -54,7 +54,7 @@ class ConcurrentProgramsHandler {
 
   M2CTwinMessenger *m2c_twin;
   MPI_Comm m2c_twin_comm;
-
+  int twinning_status; //!< 0~non-existent, 1~I am the ``leader'', 2~I am the ``follower''
   
 public:
 
