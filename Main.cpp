@@ -368,7 +368,8 @@ int main(int argc, char* argv[])
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
 
   if(concurrent.Coupled()) {
-    concurrent.CommunicateBeforeTimeStepping(); 
+    concurrent.CommunicateBeforeTimeStepping(spo.GetMeshCoordinates(), *(spo.GetPointerToOuterGhostNodes()),
+                                             global_mesh);
   }
 
   if(embed) {
@@ -389,8 +390,10 @@ int main(int argc, char* argv[])
   double tmax = iod.ts.maxTime;
   double dts = 0.0;
   if(concurrent.Coupled()) {
-    dts =  concurrent.GetTimeStepSize();
-    tmax = concurrent.GetMaxTime(); //std::max(iod.ts.maxTime, concurrent.GetMaxTime());
+    dts =  concurrent.GetTimeStepSize(); //should return negative or 0 if not specified
+    double tmaxs = concurrent.GetMaxTime(); //should return negative or 0 if not specified
+    if(tmaxs>0) //if "concurrent" returns a tmax, use it.
+      tmax = tmaxs;
   }
 
   while(t<tmax && time_step<iod.ts.maxIts) {
@@ -415,7 +418,7 @@ int main(int argc, char* argv[])
         dt = tmax - t;
       }
 
-      if(!concurrent.Coupled())
+      if(!concurrent.Coupled() || dts<=0)
         dts = dt;
  
       if(dts<=dt)

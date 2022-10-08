@@ -70,7 +70,10 @@ public:
   double GetMaxTime() {return tmax;}
 
   //! The main functions that handle communications
-  void CommunicateBeforeTimeStepping(); //!< called before the 1st time step
+  void CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
+                                     std::vector<GhostPoint> &ghost_nodes_outer_,
+                                     GlobalMeshInfo &global_mesh_); 
+
   void FirstExchange(); //!< called at the the 1st time step
   void Exchange(); //!< called every time step (except 1st and last)
   void FinalExchange(); //!< at the last time step

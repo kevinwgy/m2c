@@ -96,8 +96,8 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
   }
 
   // time-step size suggested by other solvers, will be updated
-  dt = 0.0;
-  tmax = 0.0;
+  dt = -1.0;
+  tmax = -1.0;
 
   // outputs the m2c communicator
   comm_ = m2c_comm;
@@ -190,7 +190,9 @@ ConcurrentProgramsHandler::Destroy()
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::CommunicateBeforeTimeStepping()
+ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
+                               vector<GhostPoint> &ghost_nodes_outer_,
+                               GlobalMeshInfo &global_mesh_)
 {
   if(aeros) {
     aeros->CommunicateBeforeTimeStepping();
@@ -203,7 +205,7 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping()
   }
 
   if(m2c_twin) {
-    m2c_twin->CommunicateBeforeTimeStepping();
+    m2c_twin->CommunicateBeforeTimeStepping(coordinates_, ghost_nodes_outer_, global_mesh_);
   }
 
 }
