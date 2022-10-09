@@ -2,9 +2,8 @@
 #define _M2C_TWIN_MESSENGER_H_
 
 #include<IoData.h>
-#include<SpaceVariable.h>
-#include<GhostPoint.h>
 #include<GlobalMeshInfo.h>
+#include<FloodFiller.h>
 
 /*************************************************************
  * Class M2CTwinMessenger is responsible for communicating with
@@ -23,6 +22,7 @@ class M2CTwinMessenger {
   enum TwinningStatus {LEADER = 1, FOLLOWER = 2} twinning_status; 
 
   SpaceVariable3D *coordinates;
+  std::vector<GhostPoint> *ghost_nodes_inner;
   std::vector<GhostPoint> *ghost_nodes_outer;
   GlobalMeshInfo *global_mesh;
 
@@ -31,7 +31,11 @@ class M2CTwinMessenger {
   //! For both the ``leader'' and the ``follower'', one package for each remote processor
   std::vector<std::vector<Int3> > import_nodes;
   std::vector<std::vector<GhostPoint> > export_points;
+  GlobalMeshInfo global_mesh_twin;
 
+  //! For the ``follower''
+  SpaceVariable3D *TMP;
+  FloodFill *floodfiller;
 
 public:
 
@@ -40,7 +44,8 @@ public:
   void Destroy();
 
   //! Exchange data w/ M2C Twin (called before the first time step)
-  void CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
+  void CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, DataManagers3D &dms_,
+                                     vector<GhostPoint> &ghost_nodes_inner_,
                                      vector<GhostPoint> &ghost_nodes_outer_,
                                      GlobalMeshInfo &global_mesh_);
 

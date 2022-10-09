@@ -41,6 +41,7 @@ public:
  *******************************************
  */
 class SpaceVariable3D {
+
   MPI_Comm*  comm; 
   DM*        dm;   
   Vec        globalVec;  //!< each process only stores a local portion, without ghost

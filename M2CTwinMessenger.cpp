@@ -3,19 +3,19 @@
 #include<climits>
 #include<algorithm> //std::find
 
-#define M2C_M2C_INITIAL_TAG1 38601
-#define M2C_M2C_INITIAL_TAG2 38602
 
 using std::vector;
 
 extern int verbose;
+extern int INACTIVE_MATERIAL_ID;
 
 //---------------------------------------------------------------
 
 M2CTwinMessenger::M2CTwinMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_,
                                    int status_)
               : iod(iod_), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
-                coordinates(NULL), ghost_nodes_outer(NULL), global_mesh(NULL)
+                coordinates(NULL), ghost_nodes_inner(NULL), ghost_nodes_outer(NULL),
+                global_mesh(NULL), TMP(NULL), floodfiller(NULL)
 {
 
   MPI_Comm_rank(m2c_comm, &m2c_rank);
@@ -26,31 +26,50 @@ M2CTwinMessenger::M2CTwinMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &
     twinning_status = LEADER;
   else
     twinning_status = FOLLOWER;
-
 }
 
 //---------------------------------------------------------------
 
 M2CTwinMessenger::~M2CTwinMessenger()
-{ }
+{
+  if(TMP)         delete TMP;
+  if(floodfiller) delete floodfiller;
+}
 
 //---------------------------------------------------------------
 
 void
 M2CTwinMessenger::Destroy()
-{ }
+{
+  if(TMP)
+    TMP->Destroy();
+  if(floodfiller)
+    floodfiller->Destroy();
+}
 
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
+M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, DataManagers3D &dms_
+                                                vector<GhostPoint> &ghost_nodes_inner_,
                                                 vector<GhostPoint> &ghost_nodes_outer_,
                                                 GlobalMeshInfo &global_mesh_)
 {
 
   coordinates       = &coordinates_;
+  ghost_nodes_inner = &ghost_nodes_outer_;
   ghost_nodes_outer = &ghost_nodes_outer_;
   global_mesh       = &global_mesh_;
+
+  if(twinning_status = LEADER) {
+
+
+  } else {// FOLLOWER
+    TMP = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_1dof));  
+    floodfiller = new FloodFill(m2c_comm, dms_, ghost_nodes_inner_, ghost_nodes_outer_);
+  }
+
+
 
   if(twinning_status == LEADER) {
 
@@ -116,6 +135,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
     }
 
     MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
 
     // -----------------------------------------------
     // Step 3. Construct import_nodes; avoid duplicates
@@ -171,7 +191,36 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
     }
     MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
     
-   
+
+    // -----------------------------------------------
+    // Step 4. Send global mesh to follower proc 0, who will then broadcast the info
+    // -----------------------------------------------
+    if(m2c_rank==0) {
+      int mysize;
+
+      mysize = global_mesh->x_glob.size();
+      MPI_Send(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Send(global_mesh->x_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);  
+      mysize = global_mesh->dx_glob.size();
+      MPI_Send(&mysize, 1, MPI_INT, 0, 0/*tag*/, joint_comm);
+      MPI_Send(global_mesh->dx_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);  
+
+      mysize = global_mesh->y_glob.size();
+      MPI_Send(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Send(global_mesh->y_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);  
+      mysize = global_mesh->dy_glob.size();
+      MPI_Send(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Send(global_mesh->dy_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);  
+
+      mysize = global_mesh->z_glob.size();
+      MPI_Send(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Send(global_mesh->z_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);  
+      mysize = global_mesh->dz_glob.size();
+      MPI_Send(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Send(global_mesh->dz_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);  
+
+      
+    } 
   }
 
   else { // Follower
@@ -237,7 +286,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
       if(found[proc].size()>0) {
         send_requests.push_back(MPI_Request());
         MPI_Isend(found[proc].data(), found[proc].size(), proc, m2c_rank/*tag*/, joint_comm,
-          &send_requests.back()); 
+                  &send_requests.back()); 
       }
     }
     MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
@@ -282,147 +331,110 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
     
 
     // -----------------------------------------------
-    // Step 4. Find import_nodes
+    // Step 4. Get info about leader's mesh
     // -----------------------------------------------
-    I AM HERE
+    if(m2c_rank==0) { //receives data from leader proc #0, then broadcast
+      int mysize;
 
+      // x
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      assert(mysize>0);
+      global_mesh_twin.x_glob.resize(mysize);
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-  }
+      MPI_Recv(global_mesh_twin->x_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin->x_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
+      // dx
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      assert(mysize>0);
+      global_mesh_twin.dx_glob.resize(mysize);
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
+      MPI_Recv(global_mesh_twin->dx_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin->dx_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
+      // y
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      assert(mysize>0);
+      global_mesh_twin.y_glob.resize(mysize);
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
+      MPI_Recv(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
+      // dy
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      assert(mysize>0);
+      global_mesh_twin.dy_glob.resize(mysize);
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-    int my_data_count = 3*import_nodes.size();
+      MPI_Recv(global_mesh_twin->dy_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin->dy_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
-    vector<int> counts;
-    if(m2c_rank == worker) // I am the receiver
-      counts.resize(m2c_size, -1);
+      // z
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      assert(mysize>0);
+      global_mesh_twin.z_glob.resize(mysize);
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-    // Gather the number of import nodes from each processor
-    MPI_Gather(&my_data_count, 1, MPI_INT, counts.data(), 1, MPI_INT, worker, m2c_comm);
+      MPI_Recv(global_mesh_twin->z_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin->z_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
-    vector<int> displacements;
-    int counter = 0;
-    if(m2c_rank == worker) {
-      displacements.resize(m2c_size,-1);
-      for(int i=0; i<displacements.size(); i++) {
-        displacements[i] = counter;
-        counter += counts[i];
-      }
+      // dz
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      assert(mysize>0);
+      global_mesh_twin.dz_glob.resize(mysize);
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
+
+      MPI_Recv(global_mesh_twin->dz_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin->dz_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+
+    } else {
+      int mysize;
+
+      // x
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
+      assert(mysize>0);
+      global_mesh_twin.x_glob.resize(mysize);
+      MPI_Bcast(global_mesh_twin->x_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+       
+      // dx
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
+      assert(mysize>0);
+      global_mesh_twin.dx_glob.resize(mysize);
+      MPI_Bcast(global_mesh_twin->dx_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+       
+      // y
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
+      assert(mysize>0);
+      global_mesh_twin.y_glob.resize(mysize);
+      MPI_Bcast(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+       
+      // dy
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
+      assert(mysize>0);
+      global_mesh_twin.dy_glob.resize(mysize);
+      MPI_Bcast(global_mesh_twin->dy_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+       
+      // z
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
+      assert(mysize>0);
+      global_mesh_twin.y_glob.resize(mysize);
+      MPI_Bcast(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+       
+      // dz
+      MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
+      assert(mysize>0);
+      global_mesh_twin.dz_glob.resize(mysize);
+      MPI_Bcast(global_mesh_twin->dz_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
     }
 
-    // Gather the import nodes on "worker"
-    vector<Int3> all_data;
-    if(m2c_rank == worker) //receiver
-      all_data.resize(counter);
-
-    MPI_Gatherv((int*)import_nodes.data(), my_data_count, MPI_INT, (int*)all_data.data(),
-                counts.data(), displacements.data(), MPI_INT, worker, m2c_comm);
-
-
-    // -----------------------------------------------
-    // Step 2. Worker passes ALL the import nodes to ALL
-    //         processors running the M2C twin
-    // -----------------------------------------------
-    vector<Vec3D> all_import_nodes_coords;
-    if(m2c_rank == worker) {
-      all_import_nodes_coords.reserve(all_data.size());
-      for(auto&& ijk : all_data)
-        all_import_nodes_coords.push_back(global_mesh->GetXYZ(ijk));
-
-      int numFollowerProcs(0);
-      MPI_Comm_remote_size(joint_comm, &numFollowerProcs);
-
-      // Send number of nodes
-      vector<MPI_Request> send_requests;
-      for(int proc = 0; proc < numFollowerProcs; proc++) {
-        send_requests.push_back(MPI_Request());
-        MPI_Isend(&counter, 1, MPI_INT, proc, M2C_M2C_INITIAL_TAG1, joint_comm, &send_requests.back());
-      }
-      MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
-
-      // Send data
-      send_requests.clear();
-      for(int proc = 0; proc < numFollowerProcs; proc++) {
-        send_requests.push_back(MPI_Request());
-        MPI_Isend((double*)all_import_nodes_coords, 3*all_import_nodes_coords.size(), MPI_DOUBLE,
-                  proc, M2C_M2C_INITIAL_TAG2, joint_comm, &send_requests.back());
-      }
-      MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
-    } 
-
-  }
-
-  else { //FOLLOWER
-
-    // -----------------------------------------------
-    // Step 1. Each processor receives ALL the expected
-    //         nodes from the "worker" processor of the
-    //         Leader M2C.
-    // -----------------------------------------------
-    int worker = 0;
-
-    int leader_worker = 0; //must be the same as above
-    int numLeaderProcs = 0;
-    MPI_Comm_remote_size(joint_comm, &numLeaderProcs);
-
-
-    MPI_Request recv_request;
-    int counter = 0;
-    MPI_Irecv(&counter, 1, MPI_INT, leader_worker, M2C_M2C_INITIAL_TAG1, joint_comm, &recv_request);
-    MPI_Wait(&recv_request, MPI_STATUSES_IGNORE);
-
-    assert(counter%3 == 0);
-    vector<Vec3D> all_nodes_coords(counter/3);
-    MPI_Irecv((double*)all_nodes_coords, counter, MPI_DOUBLE, leader_worker, M2C_M2C_INITIAL_TAG2, 
-              joint_comm, &recv_request);
-    MPI_Wait(&recv_request, MPI_STATUSES_IGNORE);
-
-
-    // -----------------------------------------------
-    // Step 2. Find the location of each ``expected node''
-    // -----------------------------------------------
-    vector<int> found(all_nodes_coords.size(), m2c_size); //default value: m2c_size
-    vector<GhostPoint> export_points;
-    Int3 ijk0;
-    Vec3D xi;
-    for(int i=0; i<all_nodes_coords.size(); i++)
-      if(global_mesh->FindElementCoveringPoint(all_nodes_coords[i], ijk0, &xi, true)) {
-        found[i] = m2c_rank;
-        export_points.push_back(GhostPoint(ijk0, xi));
-      }
-    } 
-    MPI_Allreduce(MPI_IN_PLACE, found.data(), found.size(), MPI_INT, MPI_MIN, m2c_comm);
-    for(int i=0; i<found.size(); i++)
-      if(found[i] == m2c_size) { //this point is not adopted...
-        print_error("*** Error: M2C Follower cannot find point (%e %e %e) in "
-                    "the domain.\n", all_nodes_coords[i][0], all_nodes_coords[i][1],
-                    all_nodes_coords[i][2]);
-        exit_mpi();
-      }
-
-    // -----------------------------------------------
-    // Step 3. Send ownerships to Leader
-    // -----------------------------------------------
-    if(m2c_rank == worker) {
-      
-      vector<int> packages[numLeaderProcs];
-      
-
-
-
-
-    }
-
-    // -----------------------------------------------
-    // Step 4. Find out the import nodes
-    // -----------------------------------------------
+    // Now, global_mesh_twin has been created...
 
 
   }
-    
+
 }
 
 //---------------------------------------------------------------
