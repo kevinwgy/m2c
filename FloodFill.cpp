@@ -46,6 +46,8 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
   MPI_Comm_size(comm, &mpi_size);
   MPI_Comm_rank(comm, &mpi_rank);
 
+  assert(Obs.NumDOF() == 3);
+
   Vec3D***     ob = (Vec3D***) Obs.GetDataPointer();
   double*** color = Color.GetDataPointer();
 

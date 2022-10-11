@@ -3,7 +3,7 @@
 
 #include<IoData.h>
 #include<GlobalMeshInfo.h>
-#include<FloodFiller.h>
+#include<FloodFill.h>
 
 /*************************************************************
  * Class M2CTwinMessenger is responsible for communicating with
@@ -34,7 +34,9 @@ class M2CTwinMessenger {
   GlobalMeshInfo global_mesh_twin;
 
   //! For the ``follower''
-  SpaceVariable3D *TMP;
+  SpaceVariable3D *TMP; //!< dim = 1
+  SpaceVariable3D *TMP3; //!< dim = 3
+  SpaceVariable3D *Color; //!< dim = 1
   FloodFill *floodfiller;
 
 public:

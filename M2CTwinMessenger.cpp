@@ -15,7 +15,7 @@ M2CTwinMessenger::M2CTwinMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &
                                    int status_)
               : iod(iod_), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
                 coordinates(NULL), ghost_nodes_inner(NULL), ghost_nodes_outer(NULL),
-                global_mesh(NULL), TMP(NULL), floodfiller(NULL)
+                global_mesh(NULL), TMP(NULL), TMP3(NULL), Color(NULL)floodfiller(NULL)
 {
 
   MPI_Comm_rank(m2c_comm, &m2c_rank);
@@ -33,6 +33,8 @@ M2CTwinMessenger::M2CTwinMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &
 M2CTwinMessenger::~M2CTwinMessenger()
 {
   if(TMP)         delete TMP;
+  if(TMP3)        delete TMP3;
+  if(Color)       delete Color;
   if(floodfiller) delete floodfiller;
 }
 
@@ -43,6 +45,10 @@ M2CTwinMessenger::Destroy()
 {
   if(TMP)
     TMP->Destroy();
+  if(TMP3)
+    TMP3->Destroy();
+  if(Color)
+    Color->Destroy();
   if(floodfiller)
     floodfiller->Destroy();
 }
@@ -66,6 +72,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
   } else {// FOLLOWER
     TMP = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_1dof));  
+    TMP3 = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_3dof)); //dof: 3 
+    Color = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_1dof));  
     floodfiller = new FloodFill(m2c_comm, dms_, ghost_nodes_inner_, ghost_nodes_outer_);
   }
 
@@ -219,6 +227,17 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       MPI_Send(&mysize, 1, MPI_INT, 0, 0, joint_comm);
       MPI_Send(global_mesh->dz_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);  
 
+      // receive the location(s) of the overset boundaries
+      vector<int> overset_boundary(6, 0); //xmin, xmax, ymin, ymax, zmin, zmax. 1 means yes.
+
+      if(iod.mesh.bc_x0   == MeshData::OVERSET)  overset_boundary[0] = 1;
+      if(iod.mesh.bc_xmax == MeshData::OVERSET)  overset_boundary[1] = 1;
+      if(iod.mesh.bc_y0   == MeshData::OVERSET)  overset_boundary[2] = 1;
+      if(iod.mesh.bc_ymax == MeshData::OVERSET)  overset_boundary[3] = 1;
+      if(iod.mesh.bc_z0   == MeshData::OVERSET)  overset_boundary[4] = 1;
+      if(iod.mesh.bc_zmax == MeshData::OVERSET)  overset_boundary[5] = 1;
+
+      MPI_Send(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, 0, joint_comm);
       
     } 
   }
@@ -268,8 +287,11 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       Vec3D xi;
       for(int i=0; i<export_points_all[proc].size(); i++) { 
         if(global_mesh->FindElementCoveringPoint(export_points_all[proc][i], ijk0, &xi, true)) {
-          found[proc].push_back(i);
-          export_points[proc].push_back(GhostPoint(ijk0, xi));
+          if(coordinates->IsHere(ijk0[0],ijk0[1],ijk0[2], true/*include_ghost*/) &&
+             coordinates->IsHere(ijk0[0]+1,ijk0[1]+1,ijk0[2]+1, true/*include_ghost*/)) {
+            found[proc].push_back(i);
+            export_points[proc].push_back(GhostPoint(ijk0, xi));
+          }
         }
       }
 
@@ -325,14 +347,26 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       for(dup : dups[proc]) {
         auto it = std::find(found[proc].begin(), found[proc].end(), dup);
         assert(it != found[proc].end());
-        export_points.erase(export_points.begin() + (int)(it - found[proc].begin()));
+        export_points[proc].erase(export_points[proc].begin() + (int)(it - found[proc].begin()));
       }
     }
     
+    //Tag nodes involved in interpolations ("red boxes" in KW's notes)
+    double*** tag = TMP->GetDataPointer(); //value is 0 by default
+    for(int proc = 0; proc < numLeaderProcs; proc++)
+      for(auto&& gp : export_points[proc]) 
+        for(int k=gp.ijk[2]; k<=gp.ijk[2]+1; k++)
+          for(int j=gp.ijk[1]; j<=gp.ijk[1]+1; j++)
+            for(int i=gp.ijk[0]; i<=gp.ijk[0]+1; i++)
+              tag[k][j][i] = 1;
+    TMP->RestoreDataPointerAndInsert();
+
 
     // -----------------------------------------------
     // Step 4. Get info about leader's mesh
     // -----------------------------------------------
+    vector<int> overset_boundary(6, 0); //xmin, xmax, ymin, ymax, zmin, zmax, 1 means yes
+  
     if(m2c_rank==0) { //receives data from leader proc #0, then broadcast
       int mysize;
 
@@ -342,8 +376,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       global_mesh_twin.x_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin->x_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
-      MPI_Bcast(global_mesh_twin->x_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Recv(global_mesh_twin.x_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin.x_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // dx
       MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
@@ -351,8 +385,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       global_mesh_twin.dx_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin->dx_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
-      MPI_Bcast(global_mesh_twin->dx_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Recv(global_mesh_twin.dx_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin.dx_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // y
       MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
@@ -360,8 +394,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       global_mesh_twin.y_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
-      MPI_Bcast(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Recv(global_mesh_twin.y_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin.y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // dy
       MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
@@ -369,8 +403,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       global_mesh_twin.dy_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin->dy_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
-      MPI_Bcast(global_mesh_twin->dy_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Recv(global_mesh_twin.dy_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin.dy_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // z
       MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
@@ -378,8 +412,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       global_mesh_twin.z_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin->z_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
-      MPI_Bcast(global_mesh_twin->z_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Recv(global_mesh_twin.z_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin.z_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // dz
       MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
@@ -387,8 +421,12 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       global_mesh_twin.dz_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin->dz_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
-      MPI_Bcast(global_mesh_twin->dz_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Recv(global_mesh_twin.dz_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Bcast(global_mesh_twin.dz_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+
+      // receive the location(s) of the overset boundaries
+      MPI_Recv(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, 0, joint_comm);
+      MPI_Bcast(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, m2c_comm);
 
     } else {
       int mysize;
@@ -397,42 +435,113 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
       assert(mysize>0);
       global_mesh_twin.x_glob.resize(mysize);
-      MPI_Bcast(global_mesh_twin->x_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Bcast(global_mesh_twin.x_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
        
       // dx
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
       assert(mysize>0);
       global_mesh_twin.dx_glob.resize(mysize);
-      MPI_Bcast(global_mesh_twin->dx_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Bcast(global_mesh_twin.dx_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
        
       // y
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
       assert(mysize>0);
       global_mesh_twin.y_glob.resize(mysize);
-      MPI_Bcast(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Bcast(global_mesh_twin.y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
        
       // dy
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
       assert(mysize>0);
       global_mesh_twin.dy_glob.resize(mysize);
-      MPI_Bcast(global_mesh_twin->dy_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Bcast(global_mesh_twin.dy_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
        
       // z
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
       assert(mysize>0);
-      global_mesh_twin.y_glob.resize(mysize);
-      MPI_Bcast(global_mesh_twin->y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      global_mesh_twin.z_glob.resize(mysize);
+      MPI_Bcast(global_mesh_twin.z_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
        
       // dz
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
       assert(mysize>0);
       global_mesh_twin.dz_glob.resize(mysize);
-      MPI_Bcast(global_mesh_twin->dz_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+      MPI_Bcast(global_mesh_twin.dz_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
+
+      // receive the location(s) of the overset boundaries
+      MPI_Bcast(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, m2c_comm);
     }
 
-    // Now, global_mesh_twin has been created...
+    // Now, global_mesh_twin has been created. overset_boundary has also been created.
 
 
+    // -----------------------------------------------
+    // Step 5. Identify import nodes ("green boxes" in KW notes) 
+    //         and send to leader procs
+    // -----------------------------------------------
+    double*** tag    = TMP->GetDataPointer();
+    Vec3D***  coords = (Vec3D***)coordinates->GetDataPointer();
+    Vec3D***  xx     = (Vec3D***)TMP3->GetDataPointer(); //value is 0 by default
+    int i0, j0, k0, imax, jmax, kmax;
+    coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax); 
+
+    // if the node is (1) inside the domain of leader's mesh AND (2) adjacent to either 
+    // a red box or a real node outside leader's domain, then we tag it ("a green box")
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+
+          if(!global_mesh_twin.IsPointInDomain(coords[k][j][i], false))
+            continue;
+
+          if(tag[k][j][i] != 0) //already has a "status" (red or green box)
+            continue;
+
+          bool green = (tag[k][j][i-1]==1 || tag[k][j][i+1]==1 ||
+                        tag[k][j-1][i]==1 || tag[k][j+1][i]==1 ||
+                        tag[k-1][j][i]==1 || tag[k+1][j][i]==1); //adjacet to red box?
+          if(!green) {
+            if( (coordinates->IsHere(i-1,j,k) && 
+                 !global_mesh_twin.IsPointInDomain(coords[k][j][i-1], false)) ||
+                (coordinates->IsHere(i+1,j,k) && 
+                 !global_mesh_twin.IsPointInDomain(coords[k][j][i+1], false)) ||
+                (coordinates->IsHere(i,j-1,k) && 
+                 !global_mesh_twin.IsPointInDomain(coords[k][j-1][i], false)) ||
+                (coordinates->IsHere(i,j+1,k) && 
+                 !global_mesh_twin.IsPointInDomain(coords[k][j+1][i], false)) ||
+                (coordinates->IsHere(i,j,k-1) && 
+                 !global_mesh_twin.IsPointInDomain(coords[k-1][j][i], false)) ||
+                (coordinates->IsHere(i,j,k+1) && 
+                 !global_mesh_twin.IsPointInDomain(coords[k+1][j][i], false)) )
+              green = true; //adjacent to a real node outside leader's domain
+          } 
+
+          if(green) {
+            tag[k][j][i] = 2; //register a green box
+
+            // block adjacent edges (6 of them) --- to verify that the green boxes 
+            // form a closed surface
+            xx[k][j][i] = Vec3D(1,1,1); 
+            xx[k+1][j][i][2] = xx[k][j+1][i][1] = xx[k][j][i+1][1] = 1;
+          }
+     
+        }
+
+    TMP->RestoreDataPointerAndInsert();
+    coordinates->RestoreDataPointerToLocalVector();
+    TMP3->RestoreDataPointerAndInsert();
+
+    // verify that the green boxes (tag = 2) form a closed interface in the outer
+    // mesh that separates nodes that are "active" and "inactive"
+    std::set<INt3> occluded_nodes; //not used
+    int nReg = floodfiller->FillBasedOnEdgeObstructions(TMP3, 0/*non_obstruction_flag*/, 
+                                                        occluded_nodes, Color);
+    if(nReg != 2) {
+      print_error("*** Error: Detected error in overset grids (M2C-M2C). Number of regions: %d."
+                  " Should be 2.\n", nReg);
+      exit(-1);
+    }
+ 
+    //TODO: Send green boxes to leader procs. (I AM HERE)
   }
 
 }
