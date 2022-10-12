@@ -190,9 +190,11 @@ ConcurrentProgramsHandler::Destroy()
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_,
-                               vector<GhostPoint> &ghost_nodes_outer_,
-                               GlobalMeshInfo &global_mesh_)
+ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_,
+                               DataManagers3D *dms_,
+                               std::vector<GhostPoint> *ghost_nodes_inner_,
+                               std::vector<GhostPoint> *ghost_nodes_outer_,
+                               GlobalMeshInfo *global_mesh_)
 {
   if(aeros) {
     aeros->CommunicateBeforeTimeStepping();
@@ -205,7 +207,8 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D &coordi
   }
 
   if(m2c_twin) {
-    m2c_twin->CommunicateBeforeTimeStepping(coordinates_, ghost_nodes_outer_, global_mesh_);
+    m2c_twin->CommunicateBeforeTimeStepping(coordinates_, dms_, ghost_nodes_inner_,
+                                            ghost_nodes_outer_, global_mesh_);
   }
 
 }

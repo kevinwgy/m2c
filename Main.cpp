@@ -368,8 +368,10 @@ int main(int argc, char* argv[])
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
 
   if(concurrent.Coupled()) {
-    concurrent.CommunicateBeforeTimeStepping(spo.GetMeshCoordinates(), *(spo.GetPointerToOuterGhostNodes()),
-                                             global_mesh);
+    concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
+                                             spo.GetPointerToInnerGhostNodes(),
+                                             spo.GetPointerToOuterGhostNodes(),
+                                             &global_mesh);
   }
 
   if(embed) {

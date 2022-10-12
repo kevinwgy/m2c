@@ -15,7 +15,7 @@ M2CTwinMessenger::M2CTwinMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &
                                    int status_)
               : iod(iod_), m2c_comm(m2c_comm_), joint_comm(joint_comm_),
                 coordinates(NULL), ghost_nodes_inner(NULL), ghost_nodes_outer(NULL),
-                global_mesh(NULL), TMP(NULL), TMP3(NULL), Color(NULL)floodfiller(NULL)
+                global_mesh(NULL), TMP(NULL), TMP3(NULL), Color(NULL), floodfiller(NULL)
 {
 
   MPI_Comm_rank(m2c_comm, &m2c_rank);
@@ -56,25 +56,31 @@ M2CTwinMessenger::Destroy()
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, DataManagers3D &dms_
-                                                vector<GhostPoint> &ghost_nodes_inner_,
-                                                vector<GhostPoint> &ghost_nodes_outer_,
-                                                GlobalMeshInfo &global_mesh_)
+M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
+                                                vector<GhostPoint> *ghost_nodes_inner_,
+                                                vector<GhostPoint> *ghost_nodes_outer_,
+                                                GlobalMeshInfo *global_mesh_)
 {
 
-  coordinates       = &coordinates_;
-  ghost_nodes_inner = &ghost_nodes_outer_;
-  ghost_nodes_outer = &ghost_nodes_outer_;
-  global_mesh       = &global_mesh_;
+  assert(coordinates_);
+  assert(dms_);
+  assert(ghost_nodes_inner_);
+  assert(ghost_nodes_outer_);
+  assert(global_mesh_);
 
-  if(twinning_status = LEADER) {
+  coordinates       = coordinates_;
+  ghost_nodes_inner = ghost_nodes_inner_;
+  ghost_nodes_outer = ghost_nodes_outer_;
+  global_mesh       = global_mesh_;
+
+  if(twinning_status == LEADER) {
 
 
   } else {// FOLLOWER
-    TMP = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_1dof));  
-    TMP3 = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_3dof)); //dof: 3 
-    Color = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_1dof));  
-    floodfiller = new FloodFill(m2c_comm, dms_, ghost_nodes_inner_, ghost_nodes_outer_);
+    TMP = new SpaceVariable3D(m2c_comm, &(dms_->ghosted1_1dof));  
+    TMP3 = new SpaceVariable3D(m2c_comm, &(dms_->ghosted1_3dof)); //dof: 3 
+    Color = new SpaceVariable3D(m2c_comm, &(dms_->ghosted1_1dof));  
+    floodfiller = new FloodFill(m2c_comm, *dms_, *ghost_nodes_inner_, *ghost_nodes_outer_);
   }
 
 
@@ -89,7 +95,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     // -----------------------------------------------
     vector<Int3> import_all;
     vector<Vec3D> import_all_coords;
-    for(auto&& ghost : ghost_nodes_outer)
+    for(auto&& ghost : *ghost_nodes_outer)
       if(ghost.bcType == (int)MeshData::OVERSET && 
          ghost.type_projection == GhostPoint::FACE) {
         import_all.push_back(ghost.ijk);
@@ -137,7 +143,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       if(nNodes[proc]>0) {
         found[proc].resize(nNodes[proc]);
         recv_requests.push_back(MPI_Request());
-        MPI_Irecv(found[proc].data(), found[proc].size(), proc, proc, joint_comm,
+        MPI_Irecv(found[proc].data(), found[proc].size(), MPI_INT, proc, proc, joint_comm,
                   &recv_requests.back()); 
       }
     }
@@ -159,7 +165,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
           owner[id] = proc;
           import_nodes[proc].push_back(import_all[id]);  
         } else //duplicates
-          duplicates.insert(make_pair(proc, id));
+          duplicates.insert(std::make_pair(proc, id));
       }
     }
 
@@ -192,7 +198,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       for(int proc = 0; proc < numFollowerProcs; proc++) {
         if(dups[proc].size()>0) {
           send_requests.push_back(MPI_Request());
-          MPI_Isend(dups[proc].data(), dups[proc].size(), proc, m2c_rank, joint_comm,
+          MPI_Isend(dups[proc].data(), dups[proc].size(), MPI_INT, proc, m2c_rank, joint_comm,
                     &send_requests.back()); 
         }
       }
@@ -284,8 +290,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       Vec3D xi;      
       for(int i=0; i<export_points_all[proc].size(); i++) {
         if(global_mesh->FindElementCoveringPoint(export_points_all[proc][i], ijk0, &xi, true)) {
-          if(coordinates->IsHere(ijk0[0], ijk[1], ijk[2], true/*include_ghost*/) &&
-             coordinates->IsHere(ijk0[0]+1,ijk[1]+1,ijk[2]+1, true/*include_ghost*/)) {
+          if(coordinates->IsHere(ijk0[0], ijk0[1], ijk0[2], true/*include_ghost*/) &&
+             coordinates->IsHere(ijk0[0]+1,ijk0[1]+1,ijk0[2]+1, true/*include_ghost*/)) {
              found[proc].push_back(i);
              export_points[proc].push_back(GhostPoint(ijk0,xi));
           } 
@@ -299,10 +305,10 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
     send_requests.clear();
 
-    for(int proc=0; proc<numLeaderProcs; proc++) {
+    for(int proc=0; proc<numFollowerProcs; proc++) {
       if(found[proc].size()>0) {
         send_requests.push_back(MPI_Request());
-        MPI_Isend(found[proc].data(), found[proc].size(), proc, m2c_rank, joint_comm,
+        MPI_Isend(found[proc].data(), found[proc].size(), MPI_INT, proc, m2c_rank, joint_comm,
                   &send_requests.back());
       }
     }
@@ -416,7 +422,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       // It is legit to have size = 0 in MPI. It still transfers "metadata", which is unnecessary
       if(found[proc].size()>0) {
         send_requests.push_back(MPI_Request());
-        MPI_Isend(found[proc].data(), found[proc].size(), proc, m2c_rank/*tag*/, joint_comm,
+        MPI_Isend(found[proc].data(), found[proc].size(), MPI_INT, proc, m2c_rank/*tag*/, joint_comm,
                   &send_requests.back()); 
       }
     }
@@ -441,7 +447,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     for(int proc = 0; proc < numLeaderProcs; proc++) {
       if(ndup[proc]>0) {
-        dups[proc].resize(ndups[proc]);
+        dups[proc].resize(ndup[proc]);
 
         recv_requests.push_back(MPI_Request());
         MPI_Irecv(dups[proc].data(), dups[proc].size(), MPI_INT, proc, proc,
@@ -480,61 +486,61 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       int mysize;
 
       // x
-      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       assert(mysize>0);
       global_mesh_twin.x_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin.x_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Recv(global_mesh_twin.x_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       MPI_Bcast(global_mesh_twin.x_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // dx
-      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       assert(mysize>0);
       global_mesh_twin.dx_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin.dx_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Recv(global_mesh_twin.dx_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       MPI_Bcast(global_mesh_twin.dx_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // y
-      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       assert(mysize>0);
       global_mesh_twin.y_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin.y_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Recv(global_mesh_twin.y_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       MPI_Bcast(global_mesh_twin.y_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // dy
-      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       assert(mysize>0);
       global_mesh_twin.dy_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin.dy_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Recv(global_mesh_twin.dy_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       MPI_Bcast(global_mesh_twin.dy_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // z
-      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       assert(mysize>0);
       global_mesh_twin.z_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin.z_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Recv(global_mesh_twin.z_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       MPI_Bcast(global_mesh_twin.z_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // dz
-      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm);
+      MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       assert(mysize>0);
       global_mesh_twin.dz_glob.resize(mysize);
       MPI_Bcast(&mysize, 1, MPI_INT, 0, m2c_comm);
 
-      MPI_Recv(global_mesh_twin.dz_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm);
+      MPI_Recv(global_mesh_twin.dz_glob.data(), mysize, MPI_DOUBLE, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       MPI_Bcast(global_mesh_twin.dz_glob.data(), mysize, MPI_DOUBLE, 0, m2c_comm);
 
       // receive the location(s) of the overset boundaries
-      MPI_Recv(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, 0, joint_comm);
+      MPI_Recv(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);
       MPI_Bcast(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, m2c_comm);
 
     } else {
@@ -590,7 +596,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<Int3> import_all;
     vector<Vec3D> import_all_coords;
 
-    double*** tag    = TMP->GetDataPointer();
+    tag    = TMP->GetDataPointer();
     Vec3D***  coords = (Vec3D***)coordinates->GetDataPointer();
     Vec3D***  xx     = (Vec3D***)TMP3->GetDataPointer(); //value is 0 by default
     int i0, j0, k0, imax, jmax, kmax;
@@ -648,8 +654,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     // verify that the green boxes (tag = 2) form a closed interface in the outer
     // mesh that separates nodes that are "active" and "inactive"
     std::set<Int3> occluded_nodes; //not used
-    int nReg = floodfiller->FillBasedOnEdgeObstructions(TMP3, 0/*non_obstruction_flag*/, 
-                                                        occluded_nodes, Color);
+    int nReg = floodfiller->FillBasedOnEdgeObstructions(*TMP3, 0/*non_obstruction_flag*/, 
+                                                        occluded_nodes, *Color);
     if(nReg != 2) {
       print_error("*** Error: Detected error in overset grids (M2C-M2C). Number of regions: %d."
                   " Should be 2.\n", nReg);
@@ -696,7 +702,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       if(nNodes[proc]>0) {
         found[proc].resize(nNodes[proc]);
         recv_requests.push_back(MPI_Request()); 
-        MPI_Irecv(found[proc].data(), found[proc].size(), proc, proc, joint_comm,
+        MPI_Irecv(found[proc].data(), found[proc].size(), MPI_INT, proc, proc, joint_comm,
                   &recv_requests.back());
       }
     }
@@ -717,7 +723,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
           owner[id] = proc;
           import_nodes[proc].push_back(import_all[id]);
         } else //duplicates
-          duplicates.insert(make_pair(proc, id));
+          duplicates.insert(std::make_pair(proc, id));
       }
     }
 
@@ -753,7 +759,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       for(int proc=0; proc<numLeaderProcs; proc++) {
         if(dups[proc].size()>0) {
           send_requests.push_back(MPI_Request());
-          MPI_Isend(dups[proc].data(), dups[proc].size(), proc, m2c_rank, joint_comm,
+          MPI_Isend(dups[proc].data(), dups[proc].size(), MPI_INT, proc, m2c_rank, joint_comm,
                     &send_requests.back());
         }
       }

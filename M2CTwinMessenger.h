@@ -46,10 +46,10 @@ public:
   void Destroy();
 
   //! Exchange data w/ M2C Twin (called before the first time step)
-  void CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, DataManagers3D &dms_,
-                                     vector<GhostPoint> &ghost_nodes_inner_,
-                                     vector<GhostPoint> &ghost_nodes_outer_,
-                                     GlobalMeshInfo &global_mesh_);
+  void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
+                                     vector<GhostPoint> *ghost_nodes_inner_,
+                                     vector<GhostPoint> *ghost_nodes_outer_,
+                                     GlobalMeshInfo *global_mesh_);
 
   //! Exchange data w/ M2C Twin (called at the first time step)
   void FirstExchange();
