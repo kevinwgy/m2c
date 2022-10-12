@@ -125,7 +125,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<int> nNodes(numFollowerProcs, 0);
     if(nNodes_all>0) {
       for(int proc = 0; proc < numFollowerProcs; proc++) {
-        recv_requests.push_back(MPI_Request);
+        recv_requests.push_back(MPI_Request());
         MPI_Irecv(&nNodes[proc], 1, MPI_INT, proc, proc, joint_comm, &recv_requests.back());
       }
       MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
@@ -134,8 +134,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     vector<int> found[numFollowerProcs];
     for(int proc = 0; proc < numFollowerProcs; proc++) {
-      if(nNodes[proc].size()>0) {
-        found[proc].resize(nNodes[proc].size());
+      if(nNodes[proc]>0) {
+        found[proc].resize(nNodes[proc]);
         recv_requests.push_back(MPI_Request());
         MPI_Irecv(found[proc].data(), found[proc].size(), proc, proc, joint_comm,
                   &recv_requests.back()); 
@@ -165,12 +165,12 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     // make sure there are no orphans
     for(int i=0; i<owner.size(); i++) {
-      if(own == -1) {
+      if(owner[i] == -1) {
         fprintf(stderr,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
                        " up by any follower processor.\033[0m\n", import_all[i][0], 
                        import_all[i][1], import_all[i][2], import_all_coords[i][0],
                        import_all_coords[i][1], import_all_coords[i][2]);
-        exit_mpi();
+        exit(-1);
       }
     } 
 
@@ -188,17 +188,18 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       }
       MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
       send_requests.clear();
+
+      for(int proc = 0; proc < numFollowerProcs; proc++) {
+        if(dups[proc].size()>0) {
+          send_requests.push_back(MPI_Request());
+          MPI_Isend(dups[proc].data(), dups[proc].size(), proc, m2c_rank, joint_comm,
+                    &send_requests.back()); 
+        }
+      }
+      MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+      send_requests.clear(); 
     }
 
-    for(int proc = 0; proc < numFollowerProcs; proc++) {
-      if(dups[proc].size()>0) {
-        send_requests.push_back(MPI_Request());
-        MPI_Isend(dups[proc].data(), dups[proc].size(), proc, m2c_rank, joint_comm,
-                  &send_requests.back()); 
-      }
-    }
-    MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
-    
 
     // -----------------------------------------------
     // Step 4. Send global mesh to follower proc 0, who will then broadcast the info
@@ -240,6 +241,114 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       MPI_Send(overset_boundary.data(), overset_boundary.size(), MPI_INT, 0, 0, joint_comm);
       
     } 
+
+
+    // -----------------------------------------------
+    // Step 5. Receive nodes from follower procs
+    // -----------------------------------------------
+    recv_requests.clear();
+    nNodes.assign(numFollowerProcs, 0);
+    for(int proc=0; proc<numFollowerProcs; proc++) {
+      recv_requests.push_back(MPI_Request());
+      MPI_Irecv(&(nNodes[proc]), 1, MPI_INT, proc, proc, joint_comm,
+                &recv_requests.back());
+    }
+    MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
+
+    vector<Vec3D> export_points_all[numFollowerProcs];
+    for(int proc=0; proc<numFollowerProcs; proc++) {
+      export_points_all[proc].resize(nNodes[proc]);
+      if(nNodes[proc]>0) {
+        recv_requests.push_back(MPI_Request());
+        MPI_Irecv((double*)export_points_all[proc].data(), 3*nNodes[proc], MPI_DOUBLE,
+                  proc, proc, joint_comm, &recv_requests.back());
+      }
+    }
+    MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
+
+
+    // -----------------------------------------------
+    // Step 6. Locate nodes and send a package to each follower proc
+    // -----------------------------------------------
+    export_points.resize(numFollowerProcs);
+    for(int proc=0; proc<numFollowerProcs; proc++) {
+
+      found[proc].clear();
+
+      if(export_points_all[proc].empty())
+        continue;
+
+      Int3 ijk0;
+      Vec3D xi;      
+      for(int i=0; i<export_points_all[proc].size(); i++) {
+        if(global_mesh->FindElementCoveringPoint(export_points_all[proc][i], ijk0, &xi, true)) {
+          if(coordinates->IsHere(ijk0[0], ijk[1], ijk[2], true/*include_ghost*/) &&
+             coordinates->IsHere(ijk0[0]+1,ijk[1]+1,ijk[2]+1, true/*include_ghost*/)) {
+             found[proc].push_back(i);
+             export_points[proc].push_back(GhostPoint(ijk0,xi));
+          } 
+        }
+      }
+
+      int count = export_points[proc].size();
+      send_requests.push_back(MPI_Request());
+      MPI_Isend(&count, 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
+    }
+    MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+    send_requests.clear();
+
+    for(int proc=0; proc<numLeaderProcs; proc++) {
+      if(found[proc].size()>0) {
+        send_requests.push_back(MPI_Request());
+        MPI_Isend(found[proc].data(), found[proc].size(), proc, m2c_rank, joint_comm,
+                  &send_requests.back());
+      }
+    }
+    MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+    send_requests.clear();
+
+
+    // -----------------------------------------------
+    // Step 7. Receive duplicates (if any) and remove them
+    // -----------------------------------------------
+    for(int proc=0; proc<numFollowerProcs; proc++)
+      dups[proc].clear();
+    vector<int> ndup(numFollowerProcs,0);
+    recv_requests.clear();
+
+    for(int proc=0; proc<numFollowerProcs; proc++) {
+      if(export_points_all[proc].empty())
+        continue;
+
+      recv_requests.push_back(MPI_Request());
+      MPI_Irecv(&ndup[proc], 1, MPI_INT, proc, proc, joint_comm, &recv_requests.back());
+    }
+    MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
+
+    for(int proc=0; proc<numFollowerProcs; proc++) {
+      if(ndup[proc]>0) {
+        dups[proc].resize(ndup[proc]);
+
+        recv_requests.push_back(MPI_Request());
+        MPI_Irecv(dups[proc].data(), dups[proc].size(), MPI_INT, proc, proc,
+                  joint_comm, &recv_requests.back());
+      }
+    }
+    MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
+
+    //find duplicates and remove them
+    for(int proc=0; proc<numFollowerProcs; proc++) {
+      for(auto&& dup : dups[proc]) {
+        auto it = std::find(found[proc].begin(), found[proc].end(), dup);
+        assert(it != found[proc].end());
+        export_points[proc].erase(export_points[proc].begin() + (int)(it - found[proc].begin()));
+      }
+    }
+
   }
 
   else { // Follower
@@ -344,7 +453,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     
     //find duplicates and remove them
     for(int proc = 0; proc < numLeaderProcs; proc++) {
-      for(dup : dups[proc]) {
+      for(auto&& dup : dups[proc]) {
         auto it = std::find(found[proc].begin(), found[proc].end(), dup);
         assert(it != found[proc].end());
         export_points[proc].erase(export_points[proc].begin() + (int)(it - found[proc].begin()));
@@ -476,8 +585,11 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     // -----------------------------------------------
     // Step 5. Identify import nodes ("green boxes" in KW notes) 
-    //         and send to leader procs
+    //         and send all of them to all leader procs
     // -----------------------------------------------
+    vector<Int3> import_all;
+    vector<Vec3D> import_all_coords;
+
     double*** tag    = TMP->GetDataPointer();
     Vec3D***  coords = (Vec3D***)coordinates->GetDataPointer();
     Vec3D***  xx     = (Vec3D***)TMP3->GetDataPointer(); //value is 0 by default
@@ -518,6 +630,9 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
           if(green) {
             tag[k][j][i] = 2; //register a green box
 
+            import_all.push_back(Int3(i,j,k));
+            import_all_coords.push_back(coords[k][j][i]);
+
             // block adjacent edges (6 of them) --- to verify that the green boxes 
             // form a closed surface
             xx[k][j][i] = Vec3D(1,1,1); 
@@ -532,7 +647,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     // verify that the green boxes (tag = 2) form a closed interface in the outer
     // mesh that separates nodes that are "active" and "inactive"
-    std::set<INt3> occluded_nodes; //not used
+    std::set<Int3> occluded_nodes; //not used
     int nReg = floodfiller->FillBasedOnEdgeObstructions(TMP3, 0/*non_obstruction_flag*/, 
                                                         occluded_nodes, Color);
     if(nReg != 2) {
@@ -541,7 +656,111 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       exit(-1);
     }
  
-    //TODO: Send green boxes to leader procs. (I AM HERE)
+    // Send green boxes to leader procs.
+    int nNodes_all = import_all.size();
+    send_requests.clear();
+    for(int proc=0; proc<numLeaderProcs; proc++) {
+      send_requests.push_back(MPI_Request());
+      MPI_Isend(&nNodes_all, 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm,
+                &send_requests.back());
+    }    
+    MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+    send_requests.clear();
+
+    if(nNodes_all>0) {
+      for(int proc=0; proc<numLeaderProcs; proc++) {
+        send_requests.push_back(MPI_Request());
+        MPI_Isend((double*)import_all_coords.data(), 3*nNodes_all, MPI_DOUBLE,
+                  proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
+      }    
+      MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+      send_requests.clear();
+    }
+
+    // -----------------------------------------------
+    // Step 6. Receive adoption info from leaders
+    // -----------------------------------------------
+    recv_requests.clear();
+    nNodes.assign(numLeaderProcs,0);
+    if(nNodes_all>0) {
+      for(int proc=0; proc<numLeaderProcs; proc++) {
+        recv_requests.push_back(MPI_Request());
+        MPI_Irecv(&nNodes[proc], 1, MPI_INT, proc, proc, joint_comm, &recv_requests.back());
+      }
+    }
+    MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
+
+    for(int proc=0; proc<numLeaderProcs; proc++) {
+      found[proc].clear();
+      if(nNodes[proc]>0) {
+        found[proc].resize(nNodes[proc]);
+        recv_requests.push_back(MPI_Request()); 
+        MPI_Irecv(found[proc].data(), found[proc].size(), proc, proc, joint_comm,
+                  &recv_requests.back());
+      }
+    }
+    MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
+
+
+    // -----------------------------------------------
+    // Step 7. Construct import_nodes; avoid duplication
+    // -----------------------------------------------
+    import_nodes.resize(numLeaderProcs);
+
+    std::multimap<int,int> duplicates;
+    vector<int> owner(import_all.size(),-1);
+    for(int proc=0; proc<numLeaderProcs; proc++) {
+      for(auto&& id : found[proc]) {
+        if(owner[id]<0) {
+          owner[id] = proc;
+          import_nodes[proc].push_back(import_all[id]);
+        } else //duplicates
+          duplicates.insert(make_pair(proc, id));
+      }
+    }
+
+    // make sure there are no orphans
+    for(int i=0; i<owner.size(); i++) {
+      if(owner[i] == -1) {
+        fprintf(stderr,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
+                       " up by any leader processor.\033[0m\n", import_all[i][0],
+                       import_all[i][1], import_all[i][2], import_all_coords[i][0],
+                       import_all_coords[i][1], import_all_coords[i][2]);
+        exit(-1);
+      }
+    }
+
+    // notify leaders about duplication, which should be erased
+    send_requests.clear();
+    for(int proc=0; proc<numLeaderProcs; proc++)
+      dups[proc].clear();
+
+    if(nNodes_all>0) {
+
+      for(auto&& nod : duplicates)
+        dups[nod.first].push_back(nod.second);
+
+      for(int proc=0; proc<numLeaderProcs; proc++) {
+        send_requests.push_back(MPI_Request());
+        int ndup = dups[proc].size();
+        MPI_Isend(&ndup, 1, MPI_INT, proc, m2c_rank, joint_comm, &send_requests.back()); 
+      }
+      MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+      send_requests.clear();
+
+      for(int proc=0; proc<numLeaderProcs; proc++) {
+        if(dups[proc].size()>0) {
+          send_requests.push_back(MPI_Request());
+          MPI_Isend(dups[proc].data(), dups[proc].size(), proc, m2c_rank, joint_comm,
+                    &send_requests.back());
+        }
+      }
+      MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+      send_requests.clear();
+    }
+
   }
 
 }
