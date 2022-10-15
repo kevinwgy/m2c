@@ -26,7 +26,8 @@ class M2CTwinMessenger {
   std::vector<GhostPoint> *ghost_nodes_outer;
   GlobalMeshInfo *global_mesh;
 
-  std::vector<double> temp_buffer;
+  std::vector<std::vector<double> > import_buffer;
+  std::vector<std::vector<double> > export_buffer;
 
   //! For both the ``leader'' and the ``follower'', one package for each remote processor
   std::vector<std::vector<Int3> > import_nodes;
@@ -59,6 +60,14 @@ public:
 
   //! Exchange data w/ M2C Twin (called at the last time step)
   void FinalExchange();
+
+private:
+
+  //! Exchange data between M2C twins
+  void ExchangeData(SpaceVariable3D &V);
+
+  //! Interpolate and transfer
+  void InterpolateDataAndTransfer(SpaceVariable3D &V, TwinningStatus sender);
 
 };
 

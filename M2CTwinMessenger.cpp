@@ -1,4 +1,5 @@
 #include<M2CTwinMessenger.h>
+#include<trilinear_interpolation.h>
 #include<cassert>
 #include<climits>
 #include<algorithm> //std::find
@@ -793,6 +794,119 @@ void
 M2CTwinMessenger::FinalExchange()
 {
 
+}
+
+//---------------------------------------------------------------
+
+void
+M2CTwinMessenger::ExchangeData(SpaceVariable3D &V)
+{
+  //First send data from follower to leader, then the opposite way (See KW's notes)
+  InterpolateDataAndTransfer(V, FOLLOWER);
+  InterpolateDataAndTransfer(V, LEADER);
+}
+
+//---------------------------------------------------------------
+
+void
+M2CTwinMessenger::InterpolateDataAndTransfer(SpaceVariable3D &V, TwinningStatus sender)
+{
+
+  int numTwinProcs(-1);
+  MPI_Comm_remote_size(joint_comm, &numTwinProcs);
+
+  // ----------------------------------------
+  // Step 1. Check buffer size. Extend if needed.
+  // ----------------------------------------
+  int dim(-1);
+  if(import_buffer.size() != numTwinProcs)
+    import_buffer.resize(numTwinProcs);
+  for(int proc=0; proc<numTwinProcs; proc++) {
+    if(import_nodes[proc].size()>0) {
+      dim = import_buffer[proc].size()/import_nodes[proc].size();
+      break;
+    }
+  }
+  if(dim<V.NumDOF()) {
+    dim = V.NumDOF();
+    for(int proc=0; proc<numTwinProcs; proc++)
+      import_buffer[proc].resize(dim*import_nodes[proc].size());
+  }
+
+  dim = -1;
+  if(export_buffer.size() != numTwinProcs)
+    export_buffer.resize(numTwinProcs);
+  for(int proc=0; proc<numTwinProcs; proc++) {
+    if(export_points[proc].size()>0) {
+      dim = export_buffer[proc].size()/export_points[proc].size();
+      break;
+    }
+  }
+  if(dim<V.NumDOF()) {
+    dim = V.NumDOF();
+    for(int proc=0; proc<numTwinProcs; proc++)
+      export_buffer[proc].resize(dim*export_points[proc].size());
+  }
+
+  // ----------------------------------------
+  // Step 2. Interpolate data and transfer
+  // ----------------------------------------
+  dim = V.NumDOF();
+
+  if(twinning_status == sender) { 
+
+    vector<MPI_Request> send_requests;
+    double*** v = V.GetDataPointer();
+    for(int proc=0; proc<numTwinProcs; proc++) {
+
+      if(export_points[proc].size()==0)
+        continue;
+
+      for(int p=0; p<export_points[proc].size(); p++) {
+        int i = export_points[proc][p].ijk[0]; 
+        int j = export_points[proc][p].ijk[1]; 
+        int k = export_points[proc][p].ijk[2]; 
+        for(int d=0; d<dim; d++)     
+          export_buffer[proc][dim*p+d] 
+              = MathTools::trilinear_interpolation(v[k][j][i*dim+d], v[k][j][(i+1)*dim+d], 
+                    v[k][j+1][i*dim+d], v[k][j+1][(i+1)*dim+d], v[k+1][j][i*dim+d], 
+                    v[k+1][j][(i+1)*dim+d], v[k+1][j+1][i*dim+d], v[k+1][j+1][(i+1)*dim+d],
+                    (double*)export_points[proc][p].xi);
+      }
+      
+      send_requests.push_back(MPI_Request());
+      MPI_Isend(export_buffer[proc].data(), dim*export_points[proc].size(), MPI_DOUBLE, proc, 
+                m2c_rank/*tag*/, joint_comm, &send_requests.back());
+    }
+    MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+    send_requests.clear();
+
+    V.RestoreDataPointerToLocalVector();
+  
+  } else { //receiver
+
+    vector<MPI_Request> recv_requests;
+    for(int proc=0; proc<numTwinProcs; proc++) {
+      if(import_nodes[proc].size()>0) {
+        recv_requests.push_back(MPI_Request());
+        MPI_Irecv(import_buffer[proc].data(), dim*import_nodes[proc].size(), MPI_DOUBLE, 
+                  proc, proc, joint_comm, &recv_requests.back()); 
+      }
+    }
+    MPI_Waitall(recv_requests.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
+    recv_requests.clear();
+
+    double*** v = V.GetDataPointer();
+    for(int proc=0; proc<numTwinProcs; proc++) {
+      for(int p=0; p<import_nodes[proc].size(); p++) {
+        Int3 &ijk(import_nodes[proc][p]);
+        for(int d=0; d<dim; d++) 
+          v[ijk[2]][ijk[1]][ijk[0]*dim+d] = import_buffer[proc][p*dim+d];
+      }
+    }
+    V.RestoreDataPointerAndInsert();
+
+  }
 }
 
 //---------------------------------------------------------------
