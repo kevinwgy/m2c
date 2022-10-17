@@ -50,7 +50,8 @@ public:
   void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
                                      vector<GhostPoint> *ghost_nodes_inner_,
                                      vector<GhostPoint> *ghost_nodes_outer_,
-                                     GlobalMeshInfo *global_mesh_);
+                                     GlobalMeshInfo *global_mesh_, SpaceVariable3D *ID,
+                                     std::set<Int3> *spo_frozen_nodes);
 
   //! Exchange data w/ M2C Twin (called at the first time step)
   void FirstExchange();

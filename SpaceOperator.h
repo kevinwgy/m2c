@@ -45,6 +45,9 @@ class SpaceOperator
 
   GlobalMeshInfo &global_mesh;
 
+  //! Nodes/cells where residual should be re-set to 0. (Assigned by other modules)
+  std::set<Int3> *frozen_nodes_ptr;
+
   //! Class for spatial reconstruction
   Reconstructor rec;
 
@@ -128,6 +131,8 @@ public:
   vector<GhostPoint>* GetPointerToOuterGhostNodes() {return &ghost_nodes_outer;}
 
   GlobalMeshInfo& GetGlobalMeshInfo() {return global_mesh;}
+
+  void SetPointerToFrozenNodes(std::set<Int3>* fnodes_) {frozen_nodes_ptr = fnodes_;}
 
   void Destroy();
 

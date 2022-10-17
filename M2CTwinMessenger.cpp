@@ -6,6 +6,7 @@
 
 
 using std::vector;
+using std::set;
 
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
@@ -60,7 +61,8 @@ void
 M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
                                                 vector<GhostPoint> *ghost_nodes_inner_,
                                                 vector<GhostPoint> *ghost_nodes_outer_,
-                                                GlobalMeshInfo *global_mesh_)
+                                                GlobalMeshInfo *global_mesh_,
+                                                SpaceVariable3D *ID, set<Int3> *spo_frozen_nodes)
 {
 
   assert(coordinates_);
@@ -68,6 +70,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, D
   assert(ghost_nodes_inner_);
   assert(ghost_nodes_outer_);
   assert(global_mesh_);
+  assert(ID);
+  assert(spo_frozen_nodes);
 
   coordinates       = coordinates_;
   ghost_nodes_inner = ghost_nodes_inner_;
@@ -600,6 +604,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, D
     tag    = TMP->GetDataPointer();
     Vec3D***  coords = (Vec3D***)coordinates->GetDataPointer();
     Vec3D***  xx     = (Vec3D***)TMP3->GetDataPointer(); //value is 0 by default
+    double*** id     = ID->GetDataPointer(); //set inactive id
+
     int i0, j0, k0, imax, jmax, kmax;
     coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax); 
 
@@ -635,22 +641,29 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, D
           } 
 
           if(green) {
+
             tag[k][j][i] = 2; //register a green box
 
             import_all.push_back(Int3(i,j,k));
             import_all_coords.push_back(coords[k][j][i]);
+ 
+            //add to "frozen nodes"
+            spo_frozen_nodes->insert(Int3(i,j,k));
 
             // block adjacent edges (6 of them) --- to verify that the green boxes 
             // form a closed surface
             xx[k][j][i] = Vec3D(1,1,1); 
             xx[k+1][j][i][2] = xx[k][j+1][i][1] = xx[k][j][i+1][1] = 1;
-          }
+
+          } else
+            id[k][j][i] = INACTIVE_MATERIAL_ID;
      
         }
 
     TMP->RestoreDataPointerAndInsert();
     coordinates->RestoreDataPointerToLocalVector();
     TMP3->RestoreDataPointerAndInsert();
+    ID->RestoreDataPointerAndInsert();
 
     // verify that the green boxes (tag = 2) form a closed interface in the outer
     // mesh that separates nodes that are "active" and "inactive"

@@ -73,7 +73,8 @@ public:
   void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
                                      std::vector<GhostPoint> *ghost_nodes_inner_,
                                      std::vector<GhostPoint> *ghost_nodes_outer_,
-                                     GlobalMeshInfo *global_mesh_); 
+                                     GlobalMeshInfo *global_mesh_, SpaceVariable3D *ID,
+                                     std::set<Int3> *spo_frozen_nodes); 
 
 
   void FirstExchange(); //!< called at the the 1st time step

@@ -47,7 +47,8 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
     Tag(comm_, &(dm_all_.ghosted1_1dof)),
-    symm(NULL), visco(NULL), heat_diffusion(NULL), heo(NULL), smooth(NULL)
+    symm(NULL), visco(NULL), heat_diffusion(NULL), heo(NULL), smooth(NULL),
+    frozen_nodes_ptr(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -3416,12 +3417,18 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
   }
 
-  // -------------------------------------------------
-  // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
-  // -------------------------------------------------
+
   Vec5D***    r = (Vec5D***) R.GetDataPointer();
   double*** vol = (double***)volume.GetDataPointer();
 
+  if(frozen_nodes_ptr) {
+    for(auto&& fn : *frozen_nodes_ptr)
+      r[fn[2]][fn[1]][fn[0]] = 0.0; //re-set residual to 0 for frozen nodes/cells
+  }
+
+  // -------------------------------------------------
+  // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
+  // -------------------------------------------------
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++) 
       for(int i=i0; i<imax; i++) {

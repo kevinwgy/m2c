@@ -85,7 +85,8 @@ DynamicLoadCalculator::RunForAeroS()
   lagout.OutputTriangulatedMesh(surface->X0, surface->elems);
   lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, true);
 
-  concurrent.CommunicateBeforeTimeStepping(NULL,NULL,NULL,NULL,NULL); //AERO-S doesn't need these...
+  concurrent.CommunicateBeforeTimeStepping(NULL,NULL,NULL,NULL,NULL,NULL,
+                                           NULL); //AERO-S doesn't need these...
   dt   = concurrent.GetTimeStepSize();
   tmax = concurrent.GetMaxTime();
 

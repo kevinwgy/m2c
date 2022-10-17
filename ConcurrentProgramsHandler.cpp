@@ -194,7 +194,8 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
                                DataManagers3D *dms_,
                                std::vector<GhostPoint> *ghost_nodes_inner_,
                                std::vector<GhostPoint> *ghost_nodes_outer_,
-                               GlobalMeshInfo *global_mesh_)
+                               GlobalMeshInfo *global_mesh_, 
+                               SpaceVariable3D *ID, std::set<Int3> *spo_frozen_nodes)
 {
   if(aeros) {
     aeros->CommunicateBeforeTimeStepping();
@@ -203,12 +204,27 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
   }
 
   if(aerof) {
+    assert(coordinates_);
+    assert(dms_);
+    assert(ghost_nodes_inner_);
+    assert(ghost_nodes_outer_);
+    assert(global_mesh_);
+    assert(ID);
+    assert(spo_frozen_nodes);
     aerof->CommunicateBeforeTimeStepping();
   }
 
   if(m2c_twin) {
+    assert(coordinates_);
+    assert(dms_);
+    assert(ghost_nodes_inner_);
+    assert(ghost_nodes_outer_);
+    assert(global_mesh_);
+    assert(ID);
+    assert(spo_frozen_nodes);
     m2c_twin->CommunicateBeforeTimeStepping(coordinates_, dms_, ghost_nodes_inner_,
-                                            ghost_nodes_outer_, global_mesh_);
+                                            ghost_nodes_outer_, global_mesh_, 
+                                            ID, spo_frozen_nodes);
   }
 
 }

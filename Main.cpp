@@ -201,6 +201,12 @@ int main(int argc, char* argv[])
   if(embed) //even if id2closure is empty, we must still still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
+  /** Create a set that stores additional nodes/cells where solutions should *not* be updated
+    * In the vast majority of cases, this set should be empty. Use it only when other options
+    * are impossible or a lot more intrusive.*/
+  std::set<Int3> spo_frozen_nodes;
+  spo.SetPointerToFrozenNodes(&spo_frozen_nodes); 
+
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
   std::vector<SpaceVariable3D*>  Phi;
@@ -371,7 +377,9 @@ int main(int argc, char* argv[])
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
                                              spo.GetPointerToInnerGhostNodes(),
                                              spo.GetPointerToOuterGhostNodes(),
-                                             &global_mesh);
+                                             &global_mesh, 
+                                             &ID, //updated in inactive regions (overset grids)
+                                             &spo_frozen_nodes); //updated w/ "green boxes" (overset grids)
   }
 
   if(embed) {
@@ -392,8 +400,8 @@ int main(int argc, char* argv[])
   double tmax = iod.ts.maxTime;
   double dts = 0.0;
   if(concurrent.Coupled()) {
-    dts =  concurrent.GetTimeStepSize(); //should return negative or 0 if not specified
-    double tmaxs = concurrent.GetMaxTime(); //should return negative or 0 if not specified
+    dts =  concurrent.GetTimeStepSize(); //should return negative if not specified
+    double tmaxs = concurrent.GetMaxTime(); //should return negative if not specified
     if(tmaxs>0) //if "concurrent" returns a tmax, use it.
       tmax = tmaxs;
   }
@@ -410,23 +418,31 @@ int main(int argc, char* argv[])
       // Compute time step size
       spo.ComputeTimeStepSize(V, ID, dt, cfl); 
 
-      if(concurrent.Coupled() && dt>dtleft) { //reduce dt to match the structure
-        cfl *= dtleft/dt;
-        dt = dtleft;
-      }
+      // Modify dt and cfl, dtleft if needed
+      if(concurrent.GetTimeStepSize()>0) {//concurrent solver provides a "dts"
+        if(dt>dtleft) { //dt should be reduced to dtleft
+          cfl *= dtleft/dt;
+          dt = dtleft;
+        }
+      } else
+        dtleft = dt;
 
-      if(t+dt >= tmax) { //update dt at the LAST time step so it terminates at tmax
+      if(t+dt > tmax) { //update dt at the LAST time step so it terminates at tmax
         cfl *= (tmax - t)/dt;
         dt = tmax - t;
+        dtleft = dt;
       }
 
-      if(!concurrent.Coupled() || dts<=0)
+      // If concurrent programs do not specify dt, set dts = dt
+      if(concurrent.GetTimeStepSize()<=0.0)
         dts = dt;
  
       if(dts<=dt)
-        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
+              time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
       else
-        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", time_step, subcycle+1, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
+              time_step, subcycle+1, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
 
       //----------------------------------------------------
       // Move forward by one time-step: Update V, Phi, and ID
@@ -457,8 +473,13 @@ int main(int argc, char* argv[])
           concurrent.Exchange();
       } 
 
-      dts =  concurrent.GetTimeStepSize();
-      tmax = concurrent.GetMaxTime(); //at final time-step, tmax is set to a very small number
+      double dts_tmp = concurrent.GetTimeStepSize();
+      if(dts_tmp>0)
+        dts = dts_tmp;
+
+      double tmax_tmp = concurrent.GetMaxTime(); //at final time-step, tmax is set to a very small number
+      if(tmax_tmp>0)
+        tmax = tmax_tmp;
     }
 
     if(embed) {
