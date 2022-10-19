@@ -248,7 +248,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
-  bool run_heat = time_step< 140000;
+  bool run_heat = time_step< 110000000;
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)

@@ -498,6 +498,45 @@ void StiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+NobleAbelStiffenedGasModelData::NobleAbelStiffenedGasModelData()
+{
+
+  specificHeatRatio = 1.4;
+  pressureConstant  = 0.0;
+  volumeConstant    = 0.0;
+  energyConstant    = 0.0;
+  entropyConstant   = 0.0;
+
+  cv = 0.0;
+
+}
+
+//------------------------------------------------------------------------------
+
+void NobleAbelStiffenedGasModelData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+
+  new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "SpecificHeatRatio", this,
+                      &NobleAbelStiffenedGasModelData::specificHeatRatio);
+  new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "PressureConstant", this,
+                      &NobleAbelStiffenedGasModelData::pressureConstant);
+  new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "VolumeConstant", this,
+                      &NobleAbelStiffenedGasModelData::volumeConstant);
+  new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "EnergyConstant", this,
+                      &NobleAbelStiffenedGasModelData::energyConstant);
+  new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "EntropyConstant", this,
+                      &NobleAbelStiffenedGasModelData::entropyConstant);
+
+  new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "SpecificHeatAtConstantVolume", this,
+                      &NobleAbelStiffenedGasModelData::cv);
+
+}
+
+
+//------------------------------------------------------------------------------
+
 MieGruneisenModelData::MieGruneisenModelData() 
 {
   // default values are for copper
@@ -623,11 +662,12 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
-                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 3,
+                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 4,
                                  "StiffenedGas", MaterialModelData::STIFFENED_GAS, 
+                                 "NobleAbelStiffenedGas", MaterialModelData::NOBLE_ABEL_STIFFENED_GAS, 
                                  "MieGruneisen", MaterialModelData::MIE_GRUNEISEN,
                                  "JonesWilkinsLee", MaterialModelData::JWL);
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
@@ -638,6 +678,7 @@ Assigner *MaterialModelData::getAssigner()
   new ClassDouble<MaterialModelData>(ca, "DensityPrescribedAtFailure", this, &MaterialModelData::failsafe_density);
 
   sgModel.setup("StiffenedGasModel", ca);
+  nasgModel.setup("NobleAbelStiffenedGasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
   jwlModel.setup("JonesWilkinsLeeModel", ca);
 
@@ -2185,7 +2226,7 @@ IonizationData::IonizationData()
   electron_charge = 1.602176634e-19;  //unit: A.s (Coulombs)
   electron_mass = 9.1093837015e-28; //unit: g
   boltzmann_constant = 1.38064852e-14; //unit: (mm^2).g/(s^2*K)  (dim: [energy]/[temperature])
-  vacuum_permittivity = 8.8541878128e-9; //unit: g/(s^2)  (dim: [force]/[length])
+  vacuum_permittivity = 8.8541878128e-24; //unit: (s^4.A^2)/(g*mm^3)  (dim: [electrical capacitance]/[length])
 }
 
 //------------------------------------------------------------------------------

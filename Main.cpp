@@ -4,6 +4,7 @@
 #include <MeshGenerator.h>
 #include <Output.h>
 #include <VarFcnSG.h>
+#include <VarFcnNASG.h>
 #include <VarFcnMG.h>
 #include <VarFcnJWL.h>
 #include <VarFcnDummy.h>
@@ -17,8 +18,8 @@
 #include <HyperelasticityOperator.h>
 #include <SpecialToolsDriver.h>
 #include <set>
-//#include <string>
-//using std::to_string;
+#include <string>
+using std::to_string;
 #include <limits>
 
 // for timing
@@ -98,6 +99,8 @@ int main(int argc, char* argv[])
     }
     if(it->second->eos == MaterialModelData::STIFFENED_GAS)
       vf[matid] = new VarFcnSG(*it->second);
+    else if(it->second->eos == MaterialModelData::NOBLE_ABEL_STIFFENED_GAS)
+      vf[matid] = new VarFcnNASG(*it->second);
     else if(it->second->eos == MaterialModelData::MIE_GRUNEISEN)
       vf[matid] = new VarFcnMG(*it->second);
     else if(it->second->eos == MaterialModelData::JWL)
@@ -458,8 +461,8 @@ int main(int argc, char* argv[])
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
 
     //For debug
-    /*
-    if(time_step > 50800 && time_step < 51100){
+    /*    
+    if(time_step > 40000 && time_step < 41100){
       char* filename;
       string fname = "Snapshots_";
       fname += to_string(time_step);
@@ -467,7 +470,8 @@ int main(int argc, char* argv[])
       filename = &fname[0];
       V.StoreMeshCoordinates(spo.GetMeshCoordinates());
       V.WriteToVTRFile(filename,"V");
-    }*/
+    }
+    */
 
   }
 
