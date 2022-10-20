@@ -463,14 +463,16 @@ int main(int argc, char* argv[])
       embed->OutputResults(t, dts, time_step, false/*force_write*/); //!< write displacement and nodal loads to file
     }
 
+
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
+    double dts0 = dts; //the previous time step size
     if(concurrent.Coupled()) {
 
       if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
         if(time_step==1)
-          concurrent.FirstExchange();
+          concurrent.FirstExchange(&V, dts, tmax, !(t<tmax && time_step<iod.ts.maxIts));
         else
-          concurrent.Exchange();
+          concurrent.Exchange(&V, dts, tmax, !(t<tmax && time_step<iod.ts.maxIts));
       } 
 
       double dts_tmp = concurrent.GetTimeStepSize();
@@ -483,7 +485,7 @@ int main(int argc, char* argv[])
     }
 
     if(embed) {
-      embed->ApplyUserDefinedSurfaceDynamics(t, dts); //update surfaces provided through input (not conccurent solver)
+      embed->ApplyUserDefinedSurfaceDynamics(t, dts0); //update surfaces provided through input (not conccurent solver)
       embed->TrackUpdatedSurfaces();
       int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                    embed->GetPointerToEmbeddedBoundaryData(),
@@ -496,7 +498,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
+    out.OutputSolutions(t, dts0, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
 
   }
 

@@ -40,6 +40,8 @@ class M2CTwinMessenger {
   SpaceVariable3D *Color; //!< dim = 1
   FloodFill *floodfiller;
 
+  double dt, tmax;
+
 public:
 
   M2CTwinMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &joint_comm_, int status_);
@@ -47,20 +49,28 @@ public:
   void Destroy();
 
   //! Exchange data w/ M2C Twin (called before the first time step)
-  void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
-                                     vector<GhostPoint> *ghost_nodes_inner_,
-                                     vector<GhostPoint> *ghost_nodes_outer_,
-                                     GlobalMeshInfo *global_mesh_, SpaceVariable3D *ID,
-                                     std::set<Int3> *spo_frozen_nodes);
+  void CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, DataManagers3D &dms_,
+                                     vector<GhostPoint> &ghost_nodes_inner_,
+                                     vector<GhostPoint> &ghost_nodes_outer_,
+                                     GlobalMeshInfo &global_mesh_, SpaceVariable3D &ID,
+                                     std::set<Int3> &spo_frozen_nodes);
 
-  //! Exchange data w/ M2C Twin (called at the first time step)
-  void FirstExchange();
+  //! Exchange data w/ M2C Twin (called at the end of the first time step)
+  //! dt0 is the size of the last completed time-step
+  void FirstExchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step);
 
   //! Exchange data w/ M2C Twin (called at every time step except first and last)
-  void Exchange();
+  //! dt0 is the size of the last completed time-step
+  void Exchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step);
 
   //! Exchange data w/ M2C Twin (called at the last time step)
   void FinalExchange();
+
+  //! Get time step size
+  double GetTimeStepSize() {assert(twinning_status==FOLLOWER); return dt;}
+
+  //! Get max time 
+  double GetMaxTime() {assert(twinning_status==FOLLOWER); return tmax;}
 
 private:
 

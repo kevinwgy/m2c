@@ -28,6 +28,10 @@ M2CTwinMessenger::M2CTwinMessenger(IoData &iod_, MPI_Comm &m2c_comm_, MPI_Comm &
     twinning_status = LEADER;
   else
     twinning_status = FOLLOWER;
+
+  dt = -1.0;
+  tmax = -1.0;
+
 }
 
 //---------------------------------------------------------------
@@ -58,34 +62,26 @@ M2CTwinMessenger::Destroy()
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
-                                                vector<GhostPoint> *ghost_nodes_inner_,
-                                                vector<GhostPoint> *ghost_nodes_outer_,
-                                                GlobalMeshInfo *global_mesh_,
-                                                SpaceVariable3D *ID, set<Int3> *spo_frozen_nodes)
+M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, DataManagers3D &dms_,
+                                                vector<GhostPoint> &ghost_nodes_inner_,
+                                                vector<GhostPoint> &ghost_nodes_outer_,
+                                                GlobalMeshInfo &global_mesh_,
+                                                SpaceVariable3D &ID, set<Int3> &spo_frozen_nodes)
 {
 
-  assert(coordinates_);
-  assert(dms_);
-  assert(ghost_nodes_inner_);
-  assert(ghost_nodes_outer_);
-  assert(global_mesh_);
-  assert(ID);
-  assert(spo_frozen_nodes);
-
-  coordinates       = coordinates_;
-  ghost_nodes_inner = ghost_nodes_inner_;
-  ghost_nodes_outer = ghost_nodes_outer_;
-  global_mesh       = global_mesh_;
+  coordinates       = &coordinates_;
+  ghost_nodes_inner = &ghost_nodes_inner_;
+  ghost_nodes_outer = &ghost_nodes_outer_;
+  global_mesh       = &global_mesh_;
 
   if(twinning_status == LEADER) {
 
 
   } else {// FOLLOWER
-    TMP = new SpaceVariable3D(m2c_comm, &(dms_->ghosted1_1dof));  
-    TMP3 = new SpaceVariable3D(m2c_comm, &(dms_->ghosted1_3dof)); //dof: 3 
-    Color = new SpaceVariable3D(m2c_comm, &(dms_->ghosted1_1dof));  
-    floodfiller = new FloodFill(m2c_comm, *dms_, *ghost_nodes_inner_, *ghost_nodes_outer_);
+    TMP = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_1dof));  
+    TMP3 = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_3dof)); //dof: 3 
+    Color = new SpaceVariable3D(m2c_comm, &(dms_.ghosted1_1dof));  
+    floodfiller = new FloodFill(m2c_comm, dms_, ghost_nodes_inner_, ghost_nodes_outer_);
   }
 
 
@@ -604,7 +600,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, D
     tag    = TMP->GetDataPointer();
     Vec3D***  coords = (Vec3D***)coordinates->GetDataPointer();
     Vec3D***  xx     = (Vec3D***)TMP3->GetDataPointer(); //value is 0 by default
-    double*** id     = ID->GetDataPointer(); //set inactive id
+    double*** id     = ID.GetDataPointer(); //set inactive id
 
     int i0, j0, k0, imax, jmax, kmax;
     coordinates->GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax); 
@@ -648,7 +644,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, D
             import_all_coords.push_back(coords[k][j][i]);
  
             //add to "frozen nodes"
-            spo_frozen_nodes->insert(Int3(i,j,k));
+            spo_frozen_nodes.insert(Int3(i,j,k));
 
             // block adjacent edges (6 of them) --- to verify that the green boxes 
             // form a closed surface
@@ -663,7 +659,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, D
     TMP->RestoreDataPointerAndInsert();
     coordinates->RestoreDataPointerToLocalVector();
     TMP3->RestoreDataPointerAndInsert();
-    ID->RestoreDataPointerAndInsert();
+    ID.RestoreDataPointerAndInsert();
 
     // verify that the green boxes (tag = 2) form a closed interface in the outer
     // mesh that separates nodes that are "active" and "inactive"
@@ -783,22 +779,46 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, D
 
   }
 
+  if(twinning_status == FOLLOWER) {
+    // in terms of time-stepping, the follower is one-step behind the leader --> O(dt) error
+    dt   = 1.0e-40; //essentially, 0.
+    tmax = DBL_MAX;
+  }
 }
 
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::FirstExchange()
+M2CTwinMessenger::FirstExchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step)
 {
-
+  Exchange(V,dt0,tmax0,last_step); 
 }
 
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::Exchange()
+M2CTwinMessenger::Exchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step)
 {
+  ExchangeData(V);
 
+  // leader sends dt and tmax to follower
+  if(twinning_status == LEADER) {
+    if(m2c_rank==0) {
+      if(last_step) //send a very small tmax to follower to trigger its termination
+        tmax0 = 1.0e-40;
+      double buf[2] = {dt0, tmax0};
+      MPI_Send(buf, 2, MPI_DOUBLE, 0, 0, joint_comm);
+    }
+  } else {
+    double buf[2];
+    if(m2c_rank==0)
+      MPI_Recv(buf, 2, MPI_DOUBLE, 0, 0, joint_comm, MPI_STATUS_IGNORE);
+    MPI_Bcast(buf, 2, MPI_DOUBLE, 0, m2c_comm);
+
+    dt   = buf[0];
+    tmax = buf[1];
+  } 
+ 
 }
 
 //---------------------------------------------------------------
@@ -806,7 +826,7 @@ M2CTwinMessenger::Exchange()
 void
 M2CTwinMessenger::FinalExchange()
 {
-
+  // Nothing needs to be done.
 }
 
 //---------------------------------------------------------------

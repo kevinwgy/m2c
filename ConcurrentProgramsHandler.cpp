@@ -222,9 +222,14 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
     assert(global_mesh_);
     assert(ID);
     assert(spo_frozen_nodes);
-    m2c_twin->CommunicateBeforeTimeStepping(coordinates_, dms_, ghost_nodes_inner_,
-                                            ghost_nodes_outer_, global_mesh_, 
-                                            ID, spo_frozen_nodes);
+    m2c_twin->CommunicateBeforeTimeStepping(*coordinates_, *dms_, *ghost_nodes_inner_,
+                                            *ghost_nodes_outer_, *global_mesh_, 
+                                            *ID, *spo_frozen_nodes);
+    if(twinning_status==2) { 
+      // in terms of time-stepping, the follower is one-step behind the leader --> O(dt) error
+      dt = m2c_twin->GetTimeStepSize();
+      tmax = m2c_twin->GetMaxTime();
+    }
   }
 
 }
@@ -232,7 +237,7 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::FirstExchange()
+ConcurrentProgramsHandler::FirstExchange(SpaceVariable3D *V, double dt0, double tmax0, bool last_step)
 {
   if(aeros) {
     aeros->FirstExchange();
@@ -241,11 +246,23 @@ ConcurrentProgramsHandler::FirstExchange()
   }
 
   if(aerof) {
+    assert(V);
+    assert(dt0>=0.0);
+    assert(tmax0>=0.0);
     aerof->FirstExchange();
   }
 
   if(m2c_twin) {
-    m2c_twin->FirstExchange();
+    if(twinning_status==1) {
+      assert(dt0>=0.0);
+      assert(tmax0>=0.0);
+    }
+    assert(V);
+    m2c_twin->FirstExchange(*V, dt0, tmax0, last_step);
+    if(twinning_status==2) {
+      dt = m2c_twin->GetTimeStepSize();
+      tmax = m2c_twin->GetMaxTime();
+    }
   }
 
 }
@@ -253,7 +270,7 @@ ConcurrentProgramsHandler::FirstExchange()
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::Exchange()
+ConcurrentProgramsHandler::Exchange(SpaceVariable3D *V, double dt0, double tmax0, bool last_step)
 {
   if(aeros) {
     aeros->Exchange();
@@ -262,11 +279,23 @@ ConcurrentProgramsHandler::Exchange()
   }
 
   if(aerof) {
+    assert(V);
+    assert(dt0>=0.0);
+    assert(tmax0>=0.0);
     aerof->Exchange();
   }
 
   if(m2c_twin) {
-    m2c_twin->Exchange();
+    if(twinning_status==1) {
+      assert(dt0>=0.0);
+      assert(tmax0>=0.0);
+    }
+    assert(V);
+    m2c_twin->Exchange(*V, dt0, tmax0, last_step);
+    if(twinning_status==2) {
+      dt = m2c_twin->GetTimeStepSize();
+      tmax = m2c_twin->GetMaxTime();
+    }
   }
 
 }

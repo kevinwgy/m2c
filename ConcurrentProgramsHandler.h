@@ -70,15 +70,19 @@ public:
   double GetMaxTime() {return tmax;}
 
   //! The main functions that handle communications
-  void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_, DataManagers3D *dms_,
-                                     std::vector<GhostPoint> *ghost_nodes_inner_,
-                                     std::vector<GhostPoint> *ghost_nodes_outer_,
-                                     GlobalMeshInfo *global_mesh_, SpaceVariable3D *ID,
-                                     std::set<Int3> *spo_frozen_nodes); 
+  void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_ = NULL, DataManagers3D *dms_ = NULL,
+                                     std::vector<GhostPoint> *ghost_nodes_inner_ = NULL,
+                                     std::vector<GhostPoint> *ghost_nodes_outer_ = NULL,
+                                     GlobalMeshInfo *global_mesh_ = NULL, SpaceVariable3D *ID = NULL,
+                                     std::set<Int3> *spo_frozen_nodes = NULL); 
 
 
-  void FirstExchange(); //!< called at the the 1st time step
-  void Exchange(); //!< called every time step (except 1st and last)
+  void FirstExchange(SpaceVariable3D *V = NULL, double dt0 = -1.0, double tmax0 = -1.0,
+                     bool last_step = false); //!< called at the the 1st time step
+
+  void Exchange(SpaceVariable3D *V = NULL, double dt0 = -1.0, double tmax0 = -1.0,
+                bool last_step = false); //!< called every time step (except 1st and last)
+
   void FinalExchange(); //!< at the last time step
 
 private:
