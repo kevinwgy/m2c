@@ -2512,6 +2512,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   linePlots.setup("LinePlot", ca);
 
+  planePlots.setup("Plane", ca);
+
   materialVolumes.setup("MaterialVolumes", ca);
 
 }
@@ -2628,6 +2630,45 @@ Assigner* LinePlot::getAssigner()
 }
 
 //------------------------------------------------------------------------------
+
+PlanePlot::PlanePlot() {
+
+  x0 = y0 = z0 = 0.0;
+  normal_x = 0.0;
+  normal_y = 0.0;
+  normal_z = 1.0;
+
+  frequency = -100;
+  frequency_dt = -1.0;
+
+  filename_base = "";
+}
+
+//------------------------------------------------------------------------------
+
+Assigner* PlanePlot::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+
+  new ClassStr<PlanePlot>(ca, "FileName", this, &PlanePlot::filename_base);
+
+  new ClassInt<PlanePlot>(ca, "Frequency", this, &PlanePlot::frequency);
+  new ClassDouble<PlanePlot>(ca, "TimeInterval", this, &PlanePlot::frequency_dt);
+
+  new ClassDouble<PlanePlot>(ca, "X0", this, &PlanePlot::x0);
+  new ClassDouble<PlanePlot>(ca, "Y0", this, &PlanePlot::y0);
+  new ClassDouble<PlanePlot>(ca, "Z0", this, &PlanePlot::z0);
+  new ClassDouble<PlanePlot>(ca, "Normal_x", this, &PlanePlot::normal_x);
+  new ClassDouble<PlanePlot>(ca, "Normal_y", this, &PlanePlot::normal_y);
+  new ClassDouble<PlanePlot>(ca, "Normal_z", this, &PlanePlot::normal_z);
+
+  return ca;
+
+}
+
+//------------------------------------------------------------------------------
+
 
 EmbeddedSurfaceData::EmbeddedSurfaceData()
 {

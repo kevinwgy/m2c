@@ -1040,6 +1040,26 @@ struct LinePlot {
 
 //------------------------------------------------------------------------------
 
+struct PlanePlot {
+
+  PlanePlot();
+  ~PlanePlot() {}
+
+  Assigner *getAssigner();
+
+  const char *filename_base; //!< filename without path
+
+  double x0,y0,z0;
+  double normal_x, normal_y, normal_z;
+
+  int frequency;
+  double frequency_dt;
+
+};
+
+//------------------------------------------------------------------------------
+
+
 struct MaterialVolumes {
 
   const char *filename;
@@ -1128,6 +1148,8 @@ struct OutputData {
   Probes probes;
 
   ObjectMap<LinePlot> linePlots;
+
+  ObjectMap<PlanePlot> planePlots;
 
   MaterialVolumes materialVolumes;
 
