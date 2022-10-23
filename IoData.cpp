@@ -2512,7 +2512,7 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   linePlots.setup("LinePlot", ca);
 
-  planePlots.setup("Plane", ca);
+  planePlots.setup("CutPlane", ca);
 
   materialVolumes.setup("MaterialVolumes", ca);
 
@@ -2641,7 +2641,22 @@ PlanePlot::PlanePlot() {
   frequency = -100;
   frequency_dt = -1.0;
 
-  filename_base = "";
+  density = "";
+  pressure = "";
+  temperature = "";
+  delta_temperature = "";
+  velocity_x = "";
+  velocity_y = "";
+  velocity_z = "";
+  materialid = "";
+  laser_radiance = "";
+  levelset0 = "";
+  levelset1 = "";
+  levelset2 = "";
+  levelset3 = "";
+  levelset4 = "";
+  ionization_result = "";
+
 }
 
 //------------------------------------------------------------------------------
@@ -2649,7 +2664,7 @@ PlanePlot::PlanePlot() {
 Assigner* PlanePlot::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 25, nullAssigner);
 
   new ClassStr<PlanePlot>(ca, "FileName", this, &PlanePlot::filename_base);
 
@@ -2662,6 +2677,22 @@ Assigner* PlanePlot::getAssigner()
   new ClassDouble<PlanePlot>(ca, "Normal_x", this, &PlanePlot::normal_x);
   new ClassDouble<PlanePlot>(ca, "Normal_y", this, &PlanePlot::normal_y);
   new ClassDouble<PlanePlot>(ca, "Normal_z", this, &PlanePlot::normal_z);
+
+  new ClassStr<PlanePlot>(ca, "Density", this, &PlanePlot::density);
+  new ClassStr<PlanePlot>(ca, "Pressure", this, &PlanePlot::pressure);
+  new ClassStr<PlanePlot>(ca, "Temperature", this, &PlanePlot::temperature);
+  new ClassStr<PlanePlot>(ca, "DeltaTemperature", this, &PlanePlot::delta_temperature);
+  new ClassStr<PlanePlot>(ca, "VelocityX", this, &PlanePlot::velocity_x);
+  new ClassStr<PlanePlot>(ca, "VelocityY", this, &PlanePlot::velocity_y);
+  new ClassStr<PlanePlot>(ca, "VelocityZ", this, &PlanePlot::velocity_z);
+  new ClassStr<PlanePlot>(ca, "MaterialID", this, &PlanePlot::materialid);
+  new ClassStr<PlanePlot>(ca, "LaserRadiance", this, &PlanePlot::laser_radiance);
+  new ClassStr<PlanePlot>(ca, "LevelSet0", this, &PlanePlot::levelset0);
+  new ClassStr<PlanePlot>(ca, "LevelSet1", this, &PlanePlot::levelset1);
+  new ClassStr<PlanePlot>(ca, "LevelSet2", this, &PlanePlot::levelset2);
+  new ClassStr<PlanePlot>(ca, "LevelSet3", this, &PlanePlot::levelset3);
+  new ClassStr<PlanePlot>(ca, "LevelSet4", this, &PlanePlot::levelset4);
+  new ClassStr<PlanePlot>(ca, "IonizationResult", this, &PlanePlot::ionization_result);
 
   return ca;
 
