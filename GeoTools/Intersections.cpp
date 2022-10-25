@@ -1,6 +1,10 @@
 #include <Intersections.h>
 #include <cassert>
 #include <cfloat> //DBL_MAX
+#include <algorithm> //std::sort
+
+using std::vector;
+using std::set;
 
 namespace GeoTools {
 
@@ -213,6 +217,189 @@ LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis
     return false;
   else
     return true;
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// Connectivities of 8-noded box element  
+//    7-------------6
+//  4/_|________5_/|
+//   | |         | |
+//   | |         | |
+//   | |3________+_|2
+//  0|/_________1|/
+//
+int E2N[12][2] = //edge to node connectivity [min-node, max-node]
+    {{0,1}, {1,2}, {3,2}, {0,3}, {0,4}, {1,5}, {2,6}, {3,7}, {4,5}, {5,6}, {7,6}, {4,7}};
+int N2N[8][3] = //node to node connectivity
+      {{1,3,4}, {0,2,5}, {1,3,6}, {0,2,7}, {0,5,7}, {1,4,6}, {2,5,7}, {3,4,6}};
+int N2E[8][3] = //node to edge connectivity
+      {{0,3,4}, {0,1,5}, {1,2,6}, {2,3,7}, {4,8,11}, {5,8,9}, {6,9,10}, {7,10,11}};
+int ECoPlane[12][6] = //edge to co-planar edge connectivity
+      {{1,2,3,4,5,8}, {0,2,3,5,6,9}, {0,1,3,6,7,10}, {0,1,2,4,7,11}, {0,5,8,3,7,11},
+       {0,4,8,1,6,9}, {1,5,9,2,7,10}, {2,6,10,3,4,11}, {0,4,5,9,10,11}, {1,5,6,8,10,11},
+       {2,6,7,8,9,11}, {3,4,7,8,9,10}};
+
+// ------------------------------------------------------------------------------------------------------------
+
+bool
+PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax, 
+                           vector<Vec3D> *intersections)
+{
+
+  if(N.norm()==0)
+    return false;
+
+  N /= N.norm();
+
+  Vec3D dV = Vmax - Vmin;
+  assert(dV[0]>=0 && dV[1]>=0 && dV[2]>=0); 
+
+  // fast check
+  double upper_bound = 1.01*dV.norm();
+  if(fabs((Vmax-O)*N)>upper_bound || fabs((Vmin-O)*N)>upper_bound)
+    return false;
+
+
+  double TOL = 1.0e-20;
+
+  // order the 8 vertices based on rule specified above
+  Vec3D V[8] = {Vmin, Vec3D(Vmax[0],Vmin[1],Vmin[2]), Vec3D(Vmax[0],Vmax[1],Vmin[2]),
+                Vec3D(Vmin[0],Vmax[1],Vmin[2]),
+                Vec3D(Vmin[0],Vmin[1],Vmax[2]), Vec3D(Vmax[0],Vmin[1],Vmax[2]),
+                Vmax, Vec3D(Vmin[0],Vmax[1],Vmax[2])};
+                       
+  int status[8];
+  double dist[8];
+  set<int> xnodes;
+  int pos_count(0), zer_count(0), neg_count(0);
+  for(int i=0; i<8; i++) {
+    dist[i] = (V[i]-O)*N;
+    if(dist[i]>TOL) {
+      status[i] = 1;
+      pos_count++;
+    } else if(dist[i]<-TOL) {
+      status[i] = -1;
+      neg_count++;
+    } else {
+      status[i] = 0;
+      zer_count++;
+      xnodes.insert(i);
+    }
+  }
+
+  if(zer_count==0 && (pos_count==0 || neg_count==0))
+    return false;
+
+  // Now, there must be intersections!
+
+  if(!intersections)
+    return true; // no need to compute anything else
+
+  set<int> xedges;
+  for(int i=0; i<12; i++) {
+    if(status[E2N[i][0]]==0 || status[E2N[i][1]]==0)
+      continue;
+    if(status[E2N[i][0]] != status[E2N[i][1]]) 
+      xedges.insert(i);
+  }
+  
+  int nPoints = xedges.size()+xnodes.size();
+  assert(nPoints>0);
+
+  // fill intersections
+  if(intersections->size()<nPoints)
+    intersection->resize(nPoints);
+ 
+  int counter = 0;
+  pair<bool, int> tip; //<node?, node or edge number>
+
+  // find the starter
+  if(!xnodes.empty()) {
+    (*intersection)[counter++] = V[xnodes.front()];
+    tip.first = true;
+    tip.second = xnodes.front();
+    xnodes.erase(xnodes.begin());
+  } else {
+    double d1 = fabs(dist[E2N[xedges.front()][0]]);
+    double d2 = fabs(dist[E2N[xedges.front()][1]]);
+    double sum = d1 + d2;
+    assert(sum>0);
+    (*intersection)[counter++] = (d2*V[E2N[xedges.front()][0]] + 
+                                d1*V[E2N[xedges.front()][1]])/sum;
+    tip.first = false;
+    tip.second = xedges.front();
+    xedges.erase(xedges.begin());
+  }
+
+  // complete the loop
+  int iter = 0;
+  while(!xnodes.empty() || !xedges.empty()) {
+
+    int me = tip.second;
+
+    for(auto it = xnodes.begin(); it != xnodes.end(); it++) {
+      if(tip.first) { //tip is a node
+        if(N2N[me][0] == *it || N2N[me][1] == *it || N2N[me][2] == *it) {
+          (*intersection)[counter++] = V[*it];
+          tip.second = *it;
+          xnodes.erase(it); 
+          break;
+        }
+      } else { //tip is an edge
+        if(E2N[me][0] == *it || E2N[me][1] == *it) {
+          (*intersection)[counter++] = V[*it];
+          tip.first = true; //new tip is a node
+          tip.second = *it;
+          xnodes.erase(it);
+          break;
+        }
+      }
+    }
+
+    for(auto it = xedges.begin(); it != xedges.end(); it++) {
+      if(tip.first) { //tip is a node
+        if(N2N[me][0] == E2N[*it][0] || N2N[me][0] == E2N[*it][1] ||
+           N2N[me][1] == E2N[*it][0] || N2N[me][1] == E2N[*it][1] ||
+           N2N[me][2] == E2N[*it][0] || N2N[me][2] == E2N[*it][1]) {
+          double d1 = fabs(dist[E2N[*it][0]]);
+          double d2 = fabs(dist[E2N[*it][1]]);
+          double sum = d1 + d2;
+          assert(sum>0);
+          (*intersection)[counter++] = (d2*V[E2N[*it][0]] + d1*V[E2N[*it][1]])/sum;
+          tip.first = false;  //new tip is an edge
+          tip.second = *it;
+          xedges.erase(it);
+          break;
+        }
+      } else { // tip is an edge
+        bool found = false;
+        for(int j=0; int j<6; j++)
+          if(ECoPlane[me][i] == *it) {
+            found = true;
+            break;
+          }
+        if(found) {
+          double d1 = fabs(dist[E2N[*it][0]]);
+          double d2 = fabs(dist[E2N[*it][1]]);
+          double sum = d1 + d2;
+          assert(sum>0);
+          (*intersection)[counter++] = (d2*V[E2N[*it][0]] + d1*V[E2N[*it][1]])/sum;
+          tip.second = *it;
+          xedges.erase(it);
+          break;
+        }
+      }
+    } 
+
+    if(++iter>=10) //no way. something is wrong
+      break; //avoid infinite loop (should not occur anyway)
+  }
+
+  assert(iter<10);
+  assert(counter==nPoints);    
+
+  return true;
+
 }
 
 // ------------------------------------------------------------------------------------------------------------

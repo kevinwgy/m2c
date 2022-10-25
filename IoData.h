@@ -1042,14 +1042,12 @@ struct LinePlot {
 
 struct PlanePlot {
 
-  enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
-              DELTA_TEMPERATURE = 6, MATERIALID = 7, LASERRADIANCE = 8, LEVELSET0 = 9, LEVELSET1 = 10, 
-              LEVELSET2 = 11, LEVELSET3 = 12, LEVELSET4 = 13, IONIZATION = 14, SIZE = 15};
+  enum Vars  {DENSITY = 0, VELOCITY = 1, PRESSURE = 2, TEMPERATURE = 3, 
+              DELTA_TEMPERATURE = 4, MATERIALID = 5, LASERRADIANCE = 6, LEVELSET0 = 7, LEVELSET1 = 8, 
+              LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, IONIZATION = 12, SIZE = 13};
 
   const char *density;
-  const char *velocity_x;
-  const char *velocity_y;
-  const char *velocity_z;
+  const char *velocity;
   const char *pressure;
   const char *temperature;
   const char *delta_temperature;

@@ -2645,9 +2645,7 @@ PlanePlot::PlanePlot() {
   pressure = "";
   temperature = "";
   delta_temperature = "";
-  velocity_x = "";
-  velocity_y = "";
-  velocity_z = "";
+  velocity = "";
   materialid = "";
   laser_radiance = "";
   levelset0 = "";
@@ -2664,7 +2662,7 @@ PlanePlot::PlanePlot() {
 Assigner* PlanePlot::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 25, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 23, nullAssigner);
 
   new ClassStr<PlanePlot>(ca, "FileName", this, &PlanePlot::filename_base);
 
@@ -2682,9 +2680,7 @@ Assigner* PlanePlot::getAssigner()
   new ClassStr<PlanePlot>(ca, "Pressure", this, &PlanePlot::pressure);
   new ClassStr<PlanePlot>(ca, "Temperature", this, &PlanePlot::temperature);
   new ClassStr<PlanePlot>(ca, "DeltaTemperature", this, &PlanePlot::delta_temperature);
-  new ClassStr<PlanePlot>(ca, "VelocityX", this, &PlanePlot::velocity_x);
-  new ClassStr<PlanePlot>(ca, "VelocityY", this, &PlanePlot::velocity_y);
-  new ClassStr<PlanePlot>(ca, "VelocityZ", this, &PlanePlot::velocity_z);
+  new ClassStr<PlanePlot>(ca, "Velocity", this, &PlanePlot::velocity);
   new ClassStr<PlanePlot>(ca, "MaterialID", this, &PlanePlot::materialid);
   new ClassStr<PlanePlot>(ca, "LaserRadiance", this, &PlanePlot::laser_radiance);
   new ClassStr<PlanePlot>(ca, "LevelSet0", this, &PlanePlot::levelset0);

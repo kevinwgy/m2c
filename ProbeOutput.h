@@ -58,8 +58,9 @@ public:
            std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D* L /* laser radiance*/,
            bool force_write);
 
-private:
-
+public:
+  //! Utililty functions
+  
   double InterpolateSolutionAtProbe(Int3& ijk, std::pair<int, std::array<bool,8> >& ijk_valid,
                                     Vec3D &trilinear_coords, double ***v, int dim, int p);
 

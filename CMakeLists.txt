@@ -90,6 +90,7 @@ GradientCalculatorFD3.cpp
 ViscosityOperator.cpp
 HeatDiffusionOperator.cpp
 ProbeOutput.cpp
+PlaneOutput.cpp
 MaterialVolumeOutput.cpp
 Output.cpp
 Reconstructor.cpp
