@@ -37,7 +37,8 @@ bool LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y
 //! "intersections" are ordered such that the the points form the intersection polygon
 bool PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, //!< point and normal that define the plane
                                 Vec3D& Vmin, Vec3D& Vmax, //!< two corners of the axis-aligned box
-                                std::vector<Vec3D> *intersections = NULL); //!< output: intersections
+                                std::vector<Vec3D> *intersections = NULL, //!< output: intersections
+                                double tolerance = 0.0); //!< tolerance for distance (abs. value)
                                
 
 } //end of namespace

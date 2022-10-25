@@ -238,12 +238,13 @@ int ECoPlane[12][6] = //edge to co-planar edge connectivity
       {{1,2,3,4,5,8}, {0,2,3,5,6,9}, {0,1,3,6,7,10}, {0,1,2,4,7,11}, {0,5,8,3,7,11},
        {0,4,8,1,6,9}, {1,5,9,2,7,10}, {2,6,10,3,4,11}, {0,4,5,9,10,11}, {1,5,6,8,10,11},
        {2,6,7,8,9,11}, {3,4,7,8,9,10}};
+int NOppo[8] = {6, 7, 4, 5, 2, 3, 0, 1};//node to opposite corner node 
 
 // ------------------------------------------------------------------------------------------------------------
 
 bool
 PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax, 
-                           vector<Vec3D> *intersections)
+                           vector<Vec3D> *intersections, double tolerance)
 {
 
   if(N.norm()==0)
@@ -254,13 +255,13 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
   Vec3D dV = Vmax - Vmin;
   assert(dV[0]>=0 && dV[1]>=0 && dV[2]>=0); 
 
+  assert(tolerance>=0.0);
+
   // fast check
-  double upper_bound = 1.01*dV.norm();
+  double upper_bound = 1.01*dV.norm() + tolerance;
   if(fabs((Vmax-O)*N)>upper_bound || fabs((Vmin-O)*N)>upper_bound)
     return false;
 
-
-  double TOL = 1.0e-20;
 
   // order the 8 vertices based on rule specified above
   Vec3D V[8] = {Vmin, Vec3D(Vmax[0],Vmin[1],Vmin[2]), Vec3D(Vmax[0],Vmax[1],Vmin[2]),
@@ -274,10 +275,10 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
   int pos_count(0), zer_count(0), neg_count(0);
   for(int i=0; i<8; i++) {
     dist[i] = (V[i]-O)*N;
-    if(dist[i]>TOL) {
+    if(dist[i]>tolerance) {
       status[i] = 1;
       pos_count++;
-    } else if(dist[i]<-TOL) {
+    } else if(dist[i]<-tolerance) {
       status[i] = -1;
       neg_count++;
     } else {
@@ -308,26 +309,26 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
 
   // fill intersections
   if(intersections->size()<nPoints)
-    intersection->resize(nPoints);
+    intersections->resize(nPoints);
  
   int counter = 0;
-  pair<bool, int> tip; //<node?, node or edge number>
+  std::pair<bool, int> tip; //<node?, node or edge number>
 
   // find the starter
   if(!xnodes.empty()) {
-    (*intersection)[counter++] = V[xnodes.front()];
+    (*intersections)[counter++] = V[*xnodes.begin()];
     tip.first = true;
-    tip.second = xnodes.front();
+    tip.second = *xnodes.begin();
     xnodes.erase(xnodes.begin());
   } else {
-    double d1 = fabs(dist[E2N[xedges.front()][0]]);
-    double d2 = fabs(dist[E2N[xedges.front()][1]]);
+    double d1 = fabs(dist[E2N[*xedges.begin()][0]]);
+    double d2 = fabs(dist[E2N[*xedges.begin()][1]]);
     double sum = d1 + d2;
     assert(sum>0);
-    (*intersection)[counter++] = (d2*V[E2N[xedges.front()][0]] + 
-                                d1*V[E2N[xedges.front()][1]])/sum;
+    (*intersections)[counter++] = (d2*V[E2N[*xedges.begin()][0]] + 
+                                   d1*V[E2N[*xedges.begin()][1]])/sum;
     tip.first = false;
-    tip.second = xedges.front();
+    tip.second = *xedges.begin();
     xedges.erase(xedges.begin());
   }
 
@@ -339,15 +340,15 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
 
     for(auto it = xnodes.begin(); it != xnodes.end(); it++) {
       if(tip.first) { //tip is a node
-        if(N2N[me][0] == *it || N2N[me][1] == *it || N2N[me][2] == *it) {
-          (*intersection)[counter++] = V[*it];
+        if(NOppo[me] != *it) { //co-planar, acceptable
+          (*intersections)[counter++] = V[*it];
           tip.second = *it;
           xnodes.erase(it); 
           break;
         }
       } else { //tip is an edge
         if(E2N[me][0] == *it || E2N[me][1] == *it) {
-          (*intersection)[counter++] = V[*it];
+          (*intersections)[counter++] = V[*it];
           tip.first = true; //new tip is a node
           tip.second = *it;
           xnodes.erase(it);
@@ -365,7 +366,7 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
           double d2 = fabs(dist[E2N[*it][1]]);
           double sum = d1 + d2;
           assert(sum>0);
-          (*intersection)[counter++] = (d2*V[E2N[*it][0]] + d1*V[E2N[*it][1]])/sum;
+          (*intersections)[counter++] = (d2*V[E2N[*it][0]] + d1*V[E2N[*it][1]])/sum;
           tip.first = false;  //new tip is an edge
           tip.second = *it;
           xedges.erase(it);
@@ -373,8 +374,8 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
         }
       } else { // tip is an edge
         bool found = false;
-        for(int j=0; int j<6; j++)
-          if(ECoPlane[me][i] == *it) {
+        for(int j=0; j<6; j++)
+          if(ECoPlane[me][j] == *it) {
             found = true;
             break;
           }
@@ -383,7 +384,7 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
           double d2 = fabs(dist[E2N[*it][1]]);
           double sum = d1 + d2;
           assert(sum>0);
-          (*intersection)[counter++] = (d2*V[E2N[*it][0]] + d1*V[E2N[*it][1]])/sum;
+          (*intersections)[counter++] = (d2*V[E2N[*it][0]] + d1*V[E2N[*it][1]])/sum;
           tip.second = *it;
           xedges.erase(it);
           break;
