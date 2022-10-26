@@ -2641,6 +2641,8 @@ PlanePlot::PlanePlot() {
   frequency = -100;
   frequency_dt = -1.0;
 
+  mesh = "";
+
   density = "";
   pressure = "";
   temperature = "";
@@ -2662,9 +2664,7 @@ PlanePlot::PlanePlot() {
 Assigner* PlanePlot::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 23, nullAssigner);
-
-  new ClassStr<PlanePlot>(ca, "FileName", this, &PlanePlot::filename_base);
+  ClassAssigner *ca = new ClassAssigner("normal", 22, nullAssigner);
 
   new ClassInt<PlanePlot>(ca, "Frequency", this, &PlanePlot::frequency);
   new ClassDouble<PlanePlot>(ca, "TimeInterval", this, &PlanePlot::frequency_dt);
@@ -2675,6 +2675,8 @@ Assigner* PlanePlot::getAssigner()
   new ClassDouble<PlanePlot>(ca, "Normal_x", this, &PlanePlot::normal_x);
   new ClassDouble<PlanePlot>(ca, "Normal_y", this, &PlanePlot::normal_y);
   new ClassDouble<PlanePlot>(ca, "Normal_z", this, &PlanePlot::normal_z);
+
+  new ClassStr<PlanePlot>(ca, "Mesh", this, &PlanePlot::mesh);
 
   new ClassStr<PlanePlot>(ca, "Density", this, &PlanePlot::density);
   new ClassStr<PlanePlot>(ca, "Pressure", this, &PlanePlot::pressure);

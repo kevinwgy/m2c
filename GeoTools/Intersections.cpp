@@ -1,4 +1,6 @@
 #include <Intersections.h>
+#include <set>
+#include <utility> //std::pair
 #include <cassert>
 #include <cfloat> //DBL_MAX
 #include <algorithm> //std::sort
@@ -242,13 +244,13 @@ int NOppo[8] = {6, 7, 4, 5, 2, 3, 0, 1};//node to opposite corner node
 
 // ------------------------------------------------------------------------------------------------------------
 
-bool
+int
 PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax, 
                            vector<Vec3D> *intersections, double tolerance)
 {
 
   if(N.norm()==0)
-    return false;
+    return 0;
 
   N /= N.norm();
 
@@ -260,7 +262,7 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
   // fast check
   double upper_bound = 1.01*dV.norm() + tolerance;
   if(fabs((Vmax-O)*N)>upper_bound || fabs((Vmin-O)*N)>upper_bound)
-    return false;
+    return 0;
 
 
   // order the 8 vertices based on rule specified above
@@ -289,12 +291,9 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
   }
 
   if(zer_count==0 && (pos_count==0 || neg_count==0))
-    return false;
+    return 0;
 
   // Now, there must be intersections!
-
-  if(!intersections)
-    return true; // no need to compute anything else
 
   set<int> xedges;
   for(int i=0; i<12; i++) {
@@ -306,6 +305,9 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
   
   int nPoints = xedges.size()+xnodes.size();
   assert(nPoints>0);
+
+  if(!intersections)
+    return nPoints; // no need to compute anything else
 
   // fill intersections
   if(intersections->size()<nPoints)
@@ -399,7 +401,7 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
   assert(iter<10);
   assert(counter==nPoints);    
 
-  return true;
+  return nPoints;
 
 }
 

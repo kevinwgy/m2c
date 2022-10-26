@@ -1046,6 +1046,8 @@ struct PlanePlot {
               DELTA_TEMPERATURE = 4, MATERIALID = 5, LASERRADIANCE = 6, LEVELSET0 = 7, LEVELSET1 = 8, 
               LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, IONIZATION = 12, SIZE = 13};
 
+  const char *mesh;
+
   const char *density;
   const char *velocity;
   const char *pressure;

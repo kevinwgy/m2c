@@ -35,10 +35,11 @@ bool LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y
 
 //! Checks whether a plane cuts an axis-aligned box. If yes, find edge-plane intersections
 //! "intersections" are ordered such that the the points form the intersection polygon
-bool PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, //!< point and normal that define the plane
-                                Vec3D& Vmin, Vec3D& Vmax, //!< two corners of the axis-aligned box
-                                std::vector<Vec3D> *intersections = NULL, //!< output: intersections
-                                double tolerance = 0.0); //!< tolerance for distance (abs. value)
+//! returns the number of intersection points
+int PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, //!< point and normal that define the plane
+                               Vec3D& Vmin, Vec3D& Vmax, //!< two corners of the axis-aligned box
+                               std::vector<Vec3D> *intersections = NULL, //!< output: intersections (dim might change!!)
+                               double tolerance = 0.0); //!< tolerance for distance (abs. value)
                                
 
 } //end of namespace

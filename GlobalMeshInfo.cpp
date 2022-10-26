@@ -132,6 +132,14 @@ GlobalMeshInfo::GetXYZ(Int3 ijk)
 
 //------------------------------------------------------------------
 
+Vec3D
+GlobalMeshInfo::GetDXYZ(Int3 ijk)
+{
+  return Vec3D(GetDx(ijk[0]), GetDy(ijk[1]), GetDz(ijk[2]));
+}
+
+//------------------------------------------------------------------
+
 bool
 GlobalMeshInfo::IsPointInDomain(Vec3D &p, bool include_ghost_layer)
 {

@@ -2,6 +2,7 @@
 #define _PLANE_OUTPUT_H_
 
 #include<ProbeOutput.h>
+#include<GlobalMeshInfo.h>
 
 /** Class PlaneOutput is responsible for interpolating solutions on a plane,
  *  and printing the solution to a file. Upon initialization, the mesh of
@@ -27,20 +28,26 @@ class PlaneOutput {
   int iFrame;
   double last_snapshot_time;
 
-  FILE *file[PlanePlot::SIZE]; //!< one file per solution variable
-  
+  std::string filename[PlanePlot::SIZE]; //!< one file per solution variable
+  std::string filename_mesh;
+ 
   //! points and interpolated solutions within subdomain
   std::vector<Vec3D> points;
   std::vector<double> sol1; 
   std::vector<Vec3D> sol3; 
-  std::set<Int3> ijk;
+  std::vector<Int3> ijk;
   std::vector<std::pair<int, std::array<bool,8> > > ijk_valid;
   std::vector<Vec3D> trilinear_coords;
-  std::vector<int> loc2glob; //!< point map: local to global
 
   //! interpolated solutions for the entire mesh
   std::vector<double> sol1_global;
   std::vector<Vec3D> sol3_global;
+
+  //! for MPI communication (only defined on proc 0)
+  std::vector<int> package_disp1;
+  std::vector<int> package_size1;
+  std::vector<int> package_disp3; 
+  std::vector<int> package_size3;
 
 public:
 
@@ -50,7 +57,7 @@ public:
   
   ~PlaneOutput();
 
-  void InitializeOutput(SpaceVariable3D &coordinates); //!< Setup mesh and interpolation
+  void InitializeOutput(SpaceVariable3D &coordinates); //!< Setup mesh & interpolation, print mesh
 
   void WriteSolutionOnPlane(double time, double dt, int time_step, SpaceVariable3D &V, 
                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
