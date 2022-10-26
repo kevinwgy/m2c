@@ -53,6 +53,18 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     line_outputs[line_number] = new ProbeOutput(comm, iod.output, vf, ion, line_number);
   }
 
+  // setup plane plots
+  int numPlanes = iod.output.planePlots.dataMap.size();
+  plane_outputs.resize(numPlanes, NULL);
+  for(auto&& plane : iod.output.planePlots.dataMap) {
+    int plane_number = plane.first;
+    if(plane_number<0 || plane_number>=numPlanes) {
+      print_error("*** Error: Detected error in plane output. Plane number = %d (should be between 0 and %d)\n",
+                  plane_number, numPlanes-1); 
+      exit_mpi();
+    }
+    plane_outputs[plane_number] = new PlaneOutput(comm, iod.output, *plane.second, vf, global_mesh, ion);
+  }
 
   // check ionization requests
   if(iod.output.ionization_output_requested() && !ion) {
@@ -69,6 +81,8 @@ Output::~Output()
   if(pvdfile) fclose(pvdfile);
   for(int i=0; i<line_outputs.size(); i++)
     if(line_outputs[i]) delete line_outputs[i];
+  for(int i=0; i<plane_outputs.size(); i++)
+    if(plane_outputs[i]) delete plane_outputs[i];
 }
 
 //--------------------------------------------------------------------------
@@ -77,9 +91,14 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 {
   scalar.StoreMeshCoordinates(coordinates);
   vector3.StoreMeshCoordinates(coordinates);
+
   probe_output.SetupInterpolation(coordinates);
+
   for(int i=0; i<line_outputs.size(); i++)
     line_outputs[i]->SetupInterpolation(coordinates);
+
+  for(auto&& plane : plane_outputs)
+    plane->InitializeOutput(coordinates);
 
   if(iod.output.mesh_filename[0] != 0)
     OutputMeshInformation(coordinates);
@@ -106,6 +125,10 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
   //write solutions along lines
   for(int i=0; i<line_outputs.size(); i++)
     line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, V, ID, Phi, L, force_write);
+
+  //write solutions on planes
+  for(auto&& plane : plane_outputs)
+    plane->WriteSolutionOnPlane(time, dt, time_step, V, ID, Phi, L, force_write);
 
   //write material volumes
   matvol_output.WriteSolution(time, dt, time_step, ID, force_write);

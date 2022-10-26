@@ -1,7 +1,7 @@
 #ifndef _PLANE_OUTPUT_H_
 #define _PLANE_OUTPUT_H_
 
-#include<ProbeOutput.h>
+#include<IonizationOperator.h>
 #include<GlobalMeshInfo.h>
 
 /** Class PlaneOutput is responsible for interpolating solutions on a plane,
@@ -20,8 +20,7 @@ class PlaneOutput {
 
   GlobalMeshInfo &global_mesh;
 
-  //! using "ProbeOutput" to post-process and interpolate solutions
-  ProbeOutput probe_util; 
+  IonizationOperator *ion; //!< for post-processing
 
   int frequency;
   double frequency_dt;
@@ -63,6 +62,22 @@ public:
                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
                             SpaceVariable3D* L, bool force_write);
 
+private:
+
+  void GetScalarSolutionAndWrite(double time, double*** v, int dim, int p, std::string& fname);
+
+  void GetVec3SolutionAndWrite(double time, double*** v, int dim, int p, std::string& fname);
+
+  void GetTemperatureAndWrite(double time, double*** v, double*** id, std::string& fname);
+
+  void GetDeltaTemperatureAndWrite(double time, double*** v, double*** id, std::string& fname);
+
+  void GetIonizationAndWrite(double time, double*** v, double*** id, std::string& fname);
+
+
+  void WriteScalarSolutionToFile(double time, std::vector<double>& S, std::string& fname);
+
+  void WriteVec3SolutionToFile(double time, std::vector<Vec3D>& S, std::string& fname);
 
 };
 

@@ -1,6 +1,7 @@
 #ifndef _OUTPUT_H_
 #define _OUTPUT_H_
 #include <ProbeOutput.h>
+#include <PlaneOutput.h>
 #include <MaterialVolumeOutput.h>
 #include <TerminalVisualization.h>
 #include <stdio.h>
@@ -33,6 +34,8 @@ class Output
 
   ProbeOutput probe_output;
   std::vector<ProbeOutput*> line_outputs;
+
+  std::vector<PlaneOutput*> plane_outputs;
 
   MaterialVolumeOutput matvol_output;
 
