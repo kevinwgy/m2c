@@ -371,11 +371,11 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
     for(int i=0; i<elems_global.size(); i++) {
       if(elems_global[i][2]==elems_global[i][3]) //triangle
         fprintf(file, "%10d    4    %10d    %10d    %10d\n", i+1,
-                elems_global[i][0], elems_global[i][1], elems_global[i][2]);
+                elems_global[i][0]+1, elems_global[i][1]+1, elems_global[i][2]+1);
       else //quad
         fprintf(file, "%10d    2    %10d    %10d    %10d    %10d\n", i+1,
-                elems_global[i][0], elems_global[i][1], elems_global[i][2],
-                elems_global[i][3]);
+                elems_global[i][0]+1, elems_global[i][1]+1, elems_global[i][2]+1,
+                elems_global[i][3]+1);
     }
     fclose(file);
 

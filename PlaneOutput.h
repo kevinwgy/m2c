@@ -10,6 +10,9 @@
  *  Each solution snapshot is appended to the end of the existing solution file.
  *  To visualize the result, the user may use "xp2exo" to combine the mesh and
  *  the solutions into an exo (Exodus II) file.
+ *  Note: The mesh of the plane have duplicated nodes, when simulation is performed
+ *  on more than one processor core. Nonetheless, the solutions at the duplicates
+ *  should be identical.
  */
 class PlaneOutput {
 
