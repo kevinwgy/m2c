@@ -35,22 +35,20 @@ PlaneOutput::PlaneOutput(MPI_Comm &comm_, OutputData &iod_output_, PlanePlot &io
     exit_mpi();
   }
   n /= n.norm();
-  print("- [Cut-Plane] Coords = (%e, %e, %e), Normal = (%e, %e, %e).\n", p[0], p[1], p[2],
+  print("\n- [Cut-Plane]: Coords = (%e, %e, %e), Normal = (%e, %e, %e).\n", p[0], p[1], p[2],
         n[0], n[1], n[2]);
 
 
   if(iod_pplot.mesh[0] == 0) {
-    print_error("*** Error: [Cut-Plane] Mesh file name is not provided.\n");
+    print_error("*** Error: Cut-plane output: Mesh file name is not provided.\n");
     exit(-1);
   } 
 
   // ----------------------------------------------
-  // RETURN IF NOT PROC 0 (ONLY PROC 0 CONTINUES)
+  // Get proc number
   // ----------------------------------------------
   int mpi_rank(-1);
   MPI_Comm_rank(comm, &mpi_rank);
-  if(mpi_rank != WORKER_PROC)
-    return;
 
 
   // ----------------------------------------------
@@ -60,99 +58,137 @@ PlaneOutput::PlaneOutput(MPI_Comm &comm_, OutputData &iod_output_, PlanePlot &io
 
   if (iod_pplot.density[0] != 0) {
     filename[PlanePlot::DENSITY] = string(iod_output_.prefix) + string(iod_pplot.density);
-    FILE *file = fopen(filename[PlanePlot::DENSITY].c_str(), "w");
-    fprintf(file, "Scalar Density under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::DENSITY].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar Density under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.velocity[0] != 0) {
     filename[PlanePlot::VELOCITY] = string(iod_output_.prefix) + string(iod_pplot.velocity);
-    FILE *file = fopen(filename[PlanePlot::VELOCITY].c_str(), "w");
-    fprintf(file, "Vector Velocity under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::VELOCITY].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Vector Velocity under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.pressure[0] != 0) {
     filename[PlanePlot::PRESSURE] = string(iod_output_.prefix) + string(iod_pplot.pressure);
-    FILE *file = fopen(filename[PlanePlot::PRESSURE].c_str(), "w");
-    fprintf(file, "Scalar Pressure under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::PRESSURE].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar Pressure under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.temperature[0] != 0) {
     filename[PlanePlot::TEMPERATURE] = string(iod_output_.prefix) + string(iod_pplot.temperature);
-    FILE *file = fopen(filename[PlanePlot::TEMPERATURE].c_str(), "w");
-    fprintf(file, "Scalar Temperature under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::TEMPERATURE].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar Temperature under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.delta_temperature[0] != 0) {
     filename[PlanePlot::DELTA_TEMPERATURE] = string(iod_output_.prefix) + string(iod_pplot.delta_temperature);
-    FILE *file = fopen(filename[PlanePlot::DELTA_TEMPERATURE].c_str(), "w");
-    fprintf(file, "Scalar DeltaTemperature under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::DELTA_TEMPERATURE].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar DeltaTemperature under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.materialid[0] != 0) {
     filename[PlanePlot::MATERIALID] = string(iod_output_.prefix) + string(iod_pplot.materialid);
-    FILE *file = fopen(filename[PlanePlot::MATERIALID].c_str(), "w");
-    fprintf(file, "Scalar MaterialID under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::MATERIALID].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar MaterialID under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.laser_radiance[0] != 0) {
     filename[PlanePlot::LASERRADIANCE] = string(iod_output_.prefix) + string(iod_pplot.laser_radiance);
-    FILE *file = fopen(filename[PlanePlot::LASERRADIANCE].c_str(), "w");
-    fprintf(file, "Scalar LaserRadiance under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::LASERRADIANCE].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar LaserRadiance under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
-
 
   if (iod_pplot.levelset0[0] != 0) {
     filename[PlanePlot::LEVELSET0] = string(iod_output_.prefix) + string(iod_pplot.levelset0);
-    FILE *file = fopen(filename[PlanePlot::LEVELSET0].c_str(), "w");
-    fprintf(file, "Scalar LevelSet0 under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::LEVELSET0].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar LevelSet0 under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.levelset1[0] != 0) {
     filename[PlanePlot::LEVELSET1] = string(iod_output_.prefix) + string(iod_pplot.levelset1);
-    FILE *file = fopen(filename[PlanePlot::LEVELSET1].c_str(), "w");
-    fprintf(file, "Scalar LevelSet1 under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::LEVELSET1].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar LevelSet1 under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.levelset2[0] != 0) {
     filename[PlanePlot::LEVELSET2] = string(iod_output_.prefix) + string(iod_pplot.levelset2);
-    FILE *file = fopen(filename[PlanePlot::LEVELSET2].c_str(), "w");
-    fprintf(file, "Scalar LevelSet2 under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::LEVELSET2].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar LevelSet2 under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.levelset3[0] != 0) {
     filename[PlanePlot::LEVELSET3] = string(iod_output_.prefix) + string(iod_pplot.levelset3);
-    FILE *file = fopen(filename[PlanePlot::LEVELSET3].c_str(), "w");
-    fprintf(file, "Scalar LevelSet3 under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::LEVELSET3].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar LevelSet3 under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.levelset4[0] != 0) {
     filename[PlanePlot::LEVELSET4] = string(iod_output_.prefix) + string(iod_pplot.levelset4);
-    FILE *file = fopen(filename[PlanePlot::LEVELSET4].c_str(), "w");
-    fprintf(file, "Scalar LevelSet4 under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::LEVELSET4].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar LevelSet4 under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
   if (iod_pplot.ionization_result[0] != 0) {
     if(!ion) {
-      fprintf(stderr,"\033[0;31m*** Error: Requested ionization result, "
-              "without specifying an ionization model.\033[0m\n");
-      exit(-1);
+      print_error("*** Error: Requested ionization result, "
+                  "without specifying an ionization model.\n");
+      exit_mpi();
     }
     filename[PlanePlot::IONIZATION] = string(iod_output_.prefix) + string(iod_pplot.ionization_result);
-    FILE *file = fopen(filename[PlanePlot::IONIZATION].c_str(), "w");
-    fprintf(file, "Scalar IonizationResult under load for SurfaceNodes\n");
-    fclose(file);
+    if(mpi_rank == WORKER_PROC) {
+      FILE *file = fopen(filename[PlanePlot::IONIZATION].c_str(), "w");
+      assert(file); //if file is not opened, the pointer would be NULL
+      fprintf(file, "Scalar IonizationResult under load for SurfaceNodes\n");
+      fclose(file);
+    }
   }
 
 }
@@ -283,6 +319,9 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
   int nNodes = points.size();
   int nElems = elems.size();
 
+  sol1.resize(nNodes);
+  sol3.resize(nNodes);
+
   // ---------------
   // MPI comms
   // ---------------
@@ -363,6 +402,7 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
   if(mpi_rank==WORKER_PROC) {
 
     FILE *file = fopen(filename_mesh.c_str(), "a");
+    assert(file); //if file is not opened, the pointer would be NULL
     fprintf(file, "Nodes CutPlaneNodes\n");
     for(int i=0; i<sol3_global.size(); i++)
       fprintf(file, "%10d    %16.8e    %16.8e    %16.8e\n",
@@ -387,6 +427,7 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
     for(int i=0; i<PlanePlot::SIZE; i++)
       if(!filename[i].empty()) {
         FILE *file = fopen(filename[i].c_str(), "a");
+        assert(file); //if file is not opened, the pointer would be NULL
         fprintf(file,"%ld\n", sol1_global.size());
         fclose(file);
       }
@@ -440,7 +481,7 @@ PlaneOutput::WriteSolutionOnPlane(double time, double dt, int time_step, SpaceVa
       exit_mpi();
     }
     double*** l  = (double***)L->GetDataPointer();
-    GetScalarSolutionAndWrite(time, l, 1, 0, filename[PlanePlot::MATERIALID]);
+    GetScalarSolutionAndWrite(time, l, 1, 0, filename[PlanePlot::LASERRADIANCE]);
     L->RestoreDataPointerToLocalVector();
   }
 
@@ -926,6 +967,7 @@ PlaneOutput::WriteScalarSolutionToFile(double time, vector<double>& S, string& f
   //writes to file
   if(mpi_rank==WORKER_PROC) {
     FILE *file = fopen(fname.c_str(), "a");
+    assert(file); //if file is not opened, the pointer would be NULL
     fprintf(file,"%e\n", time);
     for(auto&& s : S)
       fprintf(file,"%16.8e\n", s);
@@ -944,6 +986,7 @@ PlaneOutput::WriteVec3SolutionToFile(double time, vector<Vec3D>& S, string& fnam
   //writes to file
   if(mpi_rank==WORKER_PROC) {
     FILE *file = fopen(fname.c_str(), "a");
+    assert(file); //if file is not opened, the pointer would be NULL
     fprintf(file,"%e\n", time);
     for(auto&& s : S)
       fprintf(file,"%16.8e    %16.8e    %16.8e\n", s[0], s[1], s[2]);

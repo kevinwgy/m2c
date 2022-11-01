@@ -32,7 +32,7 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     }
     locations[pid] = Vec3D(it->second->locationX, it->second->locationY, it->second->locationZ);
 
-    print("- [Probe] Node %d: Coords = (%e, %e, %e).\n", 
+    print("\n- [Probe] Node %d: Coords = (%e, %e, %e).\n", 
           it->first, locations[pid][0], locations[pid][1], locations[pid][2]);
   }
 
@@ -168,6 +168,7 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
                          IonizationOperator* ion_, int line_number_) : 
              comm(comm_), iod_output(iod_output_), vf(vf_), ion(ion_)
 {
+
   iFrame = 0;
 
   line_number = line_number_;
@@ -178,6 +179,9 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
   frequency = line->frequency;
   frequency_dt = line->frequency_dt;
   last_snapshot_time = -1.0;
+
+  print("\n- [Line Plot] (%e, %e, %e) --> (%e, %e, %e), %d points.\n", 
+        line->x0, line->y0, line->z0, line->x1, line->y1, line->z1, line->numPoints);
 
   locations.clear();
   if(numNodes > 1) {
