@@ -661,7 +661,7 @@ struct ExactRiemannSolverData {
 
 struct MultiPhaseData {
 
-  enum Flux {EXACT = 0, NUMERICAL = 1} flux;
+  enum Flux {EXACT = 0, NUMERICAL = 1, LOCAL_LAX_FRIEDRICHS = 2} flux;
 
   enum ReconstructionAtInterface {CONSTANT = 0, LINEAR = 1} recon;
 

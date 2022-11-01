@@ -1,5 +1,6 @@
-#include <Utils.h>
 #include <SpaceOperator.h>
+#include <Utils.h>
+#include <FluxFcnLLF.h>
 #include <Vector3D.h>
 #include <Vector5D.h>
 #include <GeoTools.h>
@@ -35,6 +36,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
                              bool screenout) 
   : comm(comm_), dm_all(dm_all_),
     iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
+    interfluxFcn(NULL),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)), global_mesh(global_mesh_),
@@ -68,6 +70,14 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
     smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
     
+  if(iod.multiphase.flux == MultiPhaseData::LOCAL_LAX_FRIEDRICHS) {
+    if(iod.multiphase.phasechange_type == MultiPhaseData::RIEMANN_SOLUTION) {
+      print_error("*** Error: MultiPhase::Flux = LocalLaxFriedrichs is incompatible with PhaseChange = RiemannSolution.\n");
+      exit_mpi();
+    }
+    interfluxFcn = new FluxFcnLLF(varFcn, iod);
+  }
+
 }
 
 //-----------------------------------------------------
@@ -78,6 +88,7 @@ SpaceOperator::~SpaceOperator()
   if(visco) delete visco;
   if(heat_diffusion) delete heat_diffusion;
   if(smooth) delete smooth;
+  if(interfluxFcn) delete interfluxFcn;
 }
 
 //-----------------------------------------------------
@@ -2482,6 +2493,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   int riemann_errors = 0; 
   int err;
 
+  bool use_LLF_at_interface = (iod.multiphase.flux == MultiPhaseData::LOCAL_LAX_FRIEDRICHS);
+
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
   Vec3D vwallf(0.0), vwallb(0.0), nwallf(0.0), nwallb(0.0);
@@ -2552,44 +2565,54 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             if(neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) {
 
-              // determine the axis/direction of the 1D Riemann problem
-              Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
-              //Solve 1D Riemann problem
-              if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              else//linear reconstruction w/ limitor
-                err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-
-              if(err)
-                riemann_errors++;
-
-              //Clip Riemann solution and check it
-              varFcn[neighborid]->ClipDensityAndPressure(Vsm);
-              varFcn[neighborid]->CheckState(Vsm);
-              varFcn[myid]->ClipDensityAndPressure(Vsp);
-              varFcn[myid]->CheckState(Vsp);
-
-              if(riemann_solutions && !err) {//store Riemann solution for "phase-change update" 
-                ind[0] = k; ind[1] = j; ind[2] = i;
-                riemann_solutions->left[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
-                ind[2] = i-1;
-                riemann_solutions->right[ind] = std::make_pair((Vec5D)Vsp, myid); 
-              }
-
-              if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
-                fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux1);
+              if(use_LLF_at_interface) {
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(0/*F*/, v[k][j][i-1]/*Vm*/, neighborid,
+                                                                        v[k][j][i]/*Vp*/, myid, localflux1);
+                else
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, neighborid,
+                                                                        vl[k][j][i]/*Vp*/, myid, localflux1);
                 localflux2 = localflux1;
-              } else {//Numerical flux function
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                } else {//linear reconstruction w/ limiter
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux2);
+              } 
+              else { 
+                // determine the axis/direction of the 1D Riemann problem
+                Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
+
+                //Solve 1D Riemann problem
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                else//linear reconstruction w/ limitor
+                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+                if(err)
+                  riemann_errors++;
+
+                //Clip Riemann solution and check it
+                varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+                varFcn[neighborid]->CheckState(Vsm);
+                varFcn[myid]->ClipDensityAndPressure(Vsp);
+                varFcn[myid]->CheckState(Vsp);
+
+                if(riemann_solutions && !err) {//store Riemann solution for "phase-change update" 
+                  ind[0] = k; ind[1] = j; ind[2] = i;
+                  riemann_solutions->left[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+                  ind[2] = i-1;
+                  riemann_solutions->right[ind] = std::make_pair((Vec5D)Vsp, myid); 
+                }
+
+                if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+                  fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux1);
+                  localflux2 = localflux1;
+                } else {//Numerical flux function
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
+                  } else {//linear reconstruction w/ limiter
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux2);
+                  }
                 }
               }
-
             } else { // This should only occur when embedded surface has an issue (skip)
               localflux1 = 0.0;
               localflux2 = 0.0;
@@ -2670,44 +2693,54 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             if(neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) {
 
-              // determine the axis/direction of the 1D Riemann problem
-              Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
-              //Solve 1D Riemann problem
-              if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              else
-                err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-
-              if(err)
-                riemann_errors++;
-
-              //Clip Riemann solution and check it
-              varFcn[neighborid]->ClipDensityAndPressure(Vsm);
-              varFcn[neighborid]->CheckState(Vsm);
-              varFcn[myid]->ClipDensityAndPressure(Vsp);
-              varFcn[myid]->CheckState(Vsp);
-
-              if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
-                ind[0] = k; ind[1] = j; ind[2] = i;
-                riemann_solutions->bottom[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
-                ind[1] = j-1;
-                riemann_solutions->top[ind] = std::make_pair((Vec5D)Vsp, myid); 
-              }
-
-              if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
-                fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux1);
+              if(use_LLF_at_interface) {
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(1/*G*/, v[k][j-1][i]/*Vm*/, neighborid,
+                                                                        v[k][j][i]/*Vp*/, myid, localflux1);
+                else
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, neighborid,
+                                                                        vb[k][j][i]/*Vp*/, myid, localflux1);
                 localflux2 = localflux1;
-              } else {//Numerical flux function
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                } else {
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux2);
+              }
+              else {
+                // determine the axis/direction of the 1D Riemann problem
+                Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
+
+                //Solve 1D Riemann problem
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                else
+                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+                if(err)
+                  riemann_errors++;
+
+                //Clip Riemann solution and check it
+                varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+                varFcn[neighborid]->CheckState(Vsm);
+                varFcn[myid]->ClipDensityAndPressure(Vsp);
+                varFcn[myid]->CheckState(Vsp);
+
+                if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
+                  ind[0] = k; ind[1] = j; ind[2] = i;
+                  riemann_solutions->bottom[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+                  ind[1] = j-1;
+                  riemann_solutions->top[ind] = std::make_pair((Vec5D)Vsp, myid); 
+                }
+
+                if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+                  fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux1);
+                  localflux2 = localflux1;
+                } else {//Numerical flux function
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
+                  } else {
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux2);
+                  }
                 }
               }
-
             } else { // This should only occur when embedded surface has an issue (skip)
               localflux1 = 0.0;
               localflux2 = 0.0;
@@ -2787,41 +2820,52 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             if(neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) {
 
-              // determine the axis/direction of the 1D Riemann problem
-              Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
-              //Solve 1D Riemann problem
-              if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              else
-                err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-
-              if(err)
-                riemann_errors++;
-
-              //Clip Riemann solution and check it
-              varFcn[neighborid]->ClipDensityAndPressure(Vsm);
-              varFcn[neighborid]->CheckState(Vsm);
-              varFcn[myid]->ClipDensityAndPressure(Vsp);
-              varFcn[myid]->CheckState(Vsp);
-
-              if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
-                ind[0] = k; ind[1] = j; ind[2] = i;
-                riemann_solutions->back[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
-                ind[0] = k-1;
-                riemann_solutions->front[ind] = std::make_pair((Vec5D)Vsp, myid); 
-              }
-
-              if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
-                fluxFcn.EvaluateFluxFunction_H(Vmid, midid, localflux1);
+              if(use_LLF_at_interface) {
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(2/*H*/, v[k-1][j][i]/*Vm*/, neighborid,
+                                                                        v[k][j][i]/*Vp*/, myid, localflux1);
+                else
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, neighborid,
+                                                                        vk[k][j][i]/*Vp*/, myid, localflux1);
                 localflux2 = localflux1;
-              } else {//Numerical flux function
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                } else {
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux2);
+              }
+              else {
+                // determine the axis/direction of the 1D Riemann problem
+                Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
+
+                //Solve 1D Riemann problem
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
+                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                else
+                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+
+                if(err)
+                  riemann_errors++;
+
+                //Clip Riemann solution and check it
+                varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+                varFcn[neighborid]->CheckState(Vsm);
+                varFcn[myid]->ClipDensityAndPressure(Vsp);
+                varFcn[myid]->CheckState(Vsp);
+
+                if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
+                  ind[0] = k; ind[1] = j; ind[2] = i;
+                  riemann_solutions->back[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+                  ind[0] = k-1;
+                  riemann_solutions->front[ind] = std::make_pair((Vec5D)Vsp, myid); 
+                }
+
+                if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+                  fluxFcn.EvaluateFluxFunction_H(Vmid, midid, localflux1);
+                  localflux2 = localflux1;
+                } else {//Numerical flux function
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
+                  } else {
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux2);
+                  }
                 }
               }
             } else { // This should only occur when embedded surface has an issue (skip)

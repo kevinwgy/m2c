@@ -26,6 +26,8 @@ class SpaceOperator
   IoData&                   iod;
   FluxFcnBase&              fluxFcn;
 
+  FluxFcnBase*              interfluxFcn; //!< used only when Multi-Material Flux = LocalLaxFriedrichs
+
   vector<VarFcnBase*>& varFcn; //!< each material has a varFcn
 
   //! Exact Riemann problem solver (multi-phase)

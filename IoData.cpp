@@ -1305,8 +1305,8 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<MultiPhaseData>
     (ca, "Flux", this,
-     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::flux), 2,
-     "Exact", 0, "Numerical", 1);
+     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::flux), 3,
+     "Exact", 0, "Numerical", 1, "LocalLaxFriedrichs", 2);
 
   new ClassToken<MultiPhaseData>
     (ca, "ReconstructionAtInterface", this,

@@ -62,6 +62,12 @@ public:
     print_error("*** Error: ComputeNumericalFluxAtCellInterface function not defined.\n"); 
     exit_mpi();}
 
+  //! Computes flux across material interface. Currently, only available in the case of Local Lax-Friedrichs (LLF)
+  virtual void ComputeNumericalFluxAtMaterialInterface(int dir/*0~x,1~y,2~z*/, double *Vminus/*left*/, int idm,
+                                                       double *Vplus/*right*/, int idp, double *F) {
+    print_error("*** Error: ComputeNumericalFluxAtMaterialInterface function not defined.\n"); 
+    exit_mpi();}
+
 };
 
 //----------------------------------------------------------------------------------------
