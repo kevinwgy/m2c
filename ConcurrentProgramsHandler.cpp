@@ -16,18 +16,18 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
   int m2c_twin_color = -1;
 
   // If coupled with another instantiation of M2C (through overset grids), figure out my role
-  twinning_status = 0; //0~non-existent, 1~I am the ``leader'', 2~I am the ``follower''
+  twinning_status = NONE; //0~non-existent, 1~I am the ``leader'', 2~I am the ``follower''
   if(iod.concurrent.m2c_twin.type == M2CTwinningData::OVERSET_GRIDS) {
     // IMPORTANT: If mesh has "OVERSET" boundaries --> "leader"; otherwise --> follower
     if(iod_.mesh.bc_x0 == MeshData::OVERSET || iod_.mesh.bc_xmax == MeshData::OVERSET ||
        iod_.mesh.bc_y0 == MeshData::OVERSET || iod_.mesh.bc_ymax == MeshData::OVERSET ||
        iod_.mesh.bc_z0 == MeshData::OVERSET || iod_.mesh.bc_zmax == MeshData::OVERSET)
-      twinning_status = 1;
+      twinning_status = LEADER;
     else
-      twinning_status = 2;
+      twinning_status = FOLLOWER;
   }
 
-  if(twinning_status == 2) { 
+  if(twinning_status == FOLLOWER) { 
     coupled = true;
     m2c_color = 2; // my color
     m2c_twin_color = 0; // the leader's color
@@ -59,7 +59,7 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
     if(iod.concurrent.aerof.type     != AerofCouplingData::NONE)
       aerof_color = 2; //"AEROF_ID_FOR_M2C" in AERO-F
     if(iod.concurrent.m2c_twin.type  != M2CTwinningData::NONE) {
-      assert(twinning_status = 1);
+      assert(twinning_status = LEADER);
       m2c_twin_color = 2;
     }
 
@@ -225,7 +225,7 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
     m2c_twin->CommunicateBeforeTimeStepping(*coordinates_, *dms_, *ghost_nodes_inner_,
                                             *ghost_nodes_outer_, *global_mesh_, 
                                             *ID, *spo_frozen_nodes);
-    if(twinning_status==2) { 
+    if(twinning_status==FOLLOWER) { 
       // in terms of time-stepping, the follower is one-step behind the leader --> O(dt) error
       dt = m2c_twin->GetTimeStepSize();
       tmax = m2c_twin->GetMaxTime();
@@ -253,13 +253,13 @@ ConcurrentProgramsHandler::FirstExchange(SpaceVariable3D *V, double dt0, double 
   }
 
   if(m2c_twin) {
-    if(twinning_status==1) {
+    if(twinning_status==LEADER) {
       assert(dt0>=0.0);
       assert(tmax0>=0.0);
     }
     assert(V);
     m2c_twin->FirstExchange(*V, dt0, tmax0, last_step);
-    if(twinning_status==2) {
+    if(twinning_status==FOLLOWER) {
       dt = m2c_twin->GetTimeStepSize();
       tmax = m2c_twin->GetMaxTime();
     }
@@ -286,13 +286,13 @@ ConcurrentProgramsHandler::Exchange(SpaceVariable3D *V, double dt0, double tmax0
   }
 
   if(m2c_twin) {
-    if(twinning_status==1) {
+    if(twinning_status==LEADER) {
       assert(dt0>=0.0);
       assert(tmax0>=0.0);
     }
     assert(V);
     m2c_twin->Exchange(*V, dt0, tmax0, last_step);
-    if(twinning_status==2) {
+    if(twinning_status==FOLLOWER) {
       dt = m2c_twin->GetTimeStepSize();
       tmax = m2c_twin->GetMaxTime();
     }

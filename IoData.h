@@ -53,6 +53,19 @@ struct StateVariable {
 
   void setup(const char *, ClassAssigner * = 0);
 
+  StateVariable &operator=(const StateVariable& s2) {
+    materialid = s2.materialid;  density = s2.density;  velocity_x = s2.velocity_x;
+    velocity_y = s2.velocity_y;  velocity_z = s2.velocity_z;  pressure = s2.pressure;
+    temperature = s2.temperature;  internal_energy_per_mass = s2.internal_energy_per_mass;
+    return *this;}
+
+  bool operator==(const StateVariable& s2) {
+    if(materialid != s2.materialid || density != s2.density || velocity_x != s2.velocity_x ||
+       velocity_y != s2.velocity_y || velocity_z != s2.velocity_z || pressure != s2.pressure ||
+       temperature != s2.temperature || internal_energy_per_mass != s2.internal_energy_per_mass)
+      return false;
+    else
+      return true;}
 };
 
 //------------------------------------------------------------------------------
@@ -797,6 +810,8 @@ struct BcsData {
 //------------------------------------------------------------------------------
 
 struct IcData {
+
+  StateVariable default_ic;
 
   //-----------------------------------------------------------------------
   //! initial condition specified using simple geometric entities (e.g., point, plane,)

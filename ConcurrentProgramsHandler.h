@@ -54,7 +54,7 @@ class ConcurrentProgramsHandler {
 
   M2CTwinMessenger *m2c_twin;
   MPI_Comm m2c_twin_comm;
-  int twinning_status; //!< 0~non-existent, 1~I am the ``leader'', 2~I am the ``follower''
+  enum TwinningStatus {NONE = 0, LEADER = 1, FOLLOWER = 2} twinning_status;
   
 public:
 
@@ -65,9 +65,10 @@ public:
   void InitializeMessengers(TriangulatedSurface *surf_, vector<Vec3D> *F_);
   void Destroy();
 
-  bool Coupled() {return coupled;}
-  double GetTimeStepSize() {return dt;}
-  double GetMaxTime() {return tmax;}
+  inline bool Coupled() {return coupled;}
+  inline enum TwinningStatus GetTwinningStatus() {return twinning_status;}
+  inline double GetTimeStepSize() {return dt;}
+  inline double GetMaxTime() {return tmax;}
 
   //! The main functions that handle communications
   void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_ = NULL, DataManagers3D *dms_ = NULL,

@@ -255,7 +255,7 @@ void printHeader(int argc, char *argv[])
     cout << endl;
     cout << "Revision: " << GIT_REV << " | " << "Branch: " << GIT_BRANCH << " | " << "Tag: " << GIT_TAG << endl;
     cout << "Computation started at: " << getCurrentDateTime() << endl;
-    cout << "Using " << size << " processor cores." << endl;
+    cout << "Using " << size << " processor cores (including concurrent programs)." << endl;
     cout << "Command:";
     for(int i=0; i<argc; i++)
       cout << " " << argv[i];

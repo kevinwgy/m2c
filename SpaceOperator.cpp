@@ -684,21 +684,20 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
   double*** id = (double***) ID.GetDataPointer();
 
-  //! apply the inlet (i.e. farfield) state
-  if(iod.bc.inlet.materialid != 0) {
-    print_error(comm, "*** Error: Material at the inlet boundary should have MaterialID = 0. (Found %d instead.)\n", 
-                iod.bc.inlet.materialid);
-    exit_mpi();
-  }
+  //! apply the default initial condition (usually, the farfield/inlet b.c.)
+  if(iod.ic.default_ic.materialid != 0)
+    print_warning(comm, "Warning: Material ID of the default initial state is %d. In most cases, it should be 0.\n",
+                  iod.ic.default_ic.materialid);
+  
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
-        v[k][j][i][0] = iod.bc.inlet.density;
-        v[k][j][i][1] = iod.bc.inlet.velocity_x;
-        v[k][j][i][2] = iod.bc.inlet.velocity_y;
-        v[k][j][i][3] = iod.bc.inlet.velocity_z;
-        v[k][j][i][4] = iod.bc.inlet.pressure;
-        id[k][j][i]   = iod.bc.inlet.materialid;
+        v[k][j][i][0] = iod.ic.default_ic.density;
+        v[k][j][i][1] = iod.ic.default_ic.velocity_x;
+        v[k][j][i][2] = iod.ic.default_ic.velocity_y;
+        v[k][j][i][3] = iod.ic.default_ic.velocity_z;
+        v[k][j][i][4] = iod.ic.default_ic.pressure;
+        id[k][j][i]   = iod.ic.default_ic.materialid;
       }
 
 
@@ -1614,6 +1613,11 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       v[k][j][i][2] = -1.0*v[im_k][im_j][im_i][2];
       v[k][j][i][3] = -1.0*v[im_k][im_j][im_i][3];
       v[k][j][i][4] =      v[im_k][im_j][im_i][4];
+    } 
+    else if(it->bcType == MeshData::OVERSET) {
+
+      // nothing to be done here. ghost nodes will be populated elsewhere
+      
     } else {
       fprintf(stderr,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
       exit(-1);
@@ -1621,307 +1625,6 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 
   }
 
-/*
-  //! Left boundary
-  if(ii0==-1) { 
-    switch (iod.mesh.bc_x0) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] = iod.bc.inlet.density;
-            v[k][j][ii0][1] = iod.bc.inlet.velocity_x;
-            v[k][j][ii0][2] = iod.bc.inlet.velocity_y;
-            v[k][j][ii0][3] = iod.bc.inlet.velocity_z;
-            v[k][j][ii0][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] = iod.bc.outlet.density;
-            v[k][j][ii0][1] = iod.bc.outlet.velocity_x;
-            v[k][j][ii0][2] = iod.bc.outlet.velocity_y;
-            v[k][j][ii0][3] = iod.bc.outlet.velocity_z;
-            v[k][j][ii0][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] =      v[k][j][ii0+1][0];
-            v[k][j][ii0][1] = -1.0*v[k][j][ii0+1][1];
-            v[k][j][ii0][2] =      v[k][j][ii0+1][2];
-            v[k][j][ii0][3] =      v[k][j][ii0+1][3]; 
-            v[k][j][ii0][4] =      v[k][j][ii0+1][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] =      v[k][j][ii0+1][0];
-            v[k][j][ii0][1] = -1.0*v[k][j][ii0+1][1];
-            v[k][j][ii0][2] = -1.0*v[k][j][ii0+1][2];
-            v[k][j][ii0][3] = -1.0*v[k][j][ii0+1][3]; 
-            v[k][j][ii0][4] =      v[k][j][ii0+1][4];
-          }
-        break;
-       default :
-        print_error(comm, "*** Error: Boundary condition at x=x0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Right boundary
-  if(iimax==NX+1) { 
-    switch (iod.mesh.bc_xmax) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] = iod.bc.inlet.density;
-            v[k][j][iimax-1][1] = iod.bc.inlet.velocity_x;
-            v[k][j][iimax-1][2] = iod.bc.inlet.velocity_y;
-            v[k][j][iimax-1][3] = iod.bc.inlet.velocity_z;
-            v[k][j][iimax-1][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] = iod.bc.outlet.density;
-            v[k][j][iimax-1][1] = iod.bc.outlet.velocity_x;
-            v[k][j][iimax-1][2] = iod.bc.outlet.velocity_y;
-            v[k][j][iimax-1][3] = iod.bc.outlet.velocity_z;
-            v[k][j][iimax-1][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] =      v[k][j][iimax-2][0];
-            v[k][j][iimax-1][1] = -1.0*v[k][j][iimax-2][1];
-            v[k][j][iimax-1][2] =      v[k][j][iimax-2][2];
-            v[k][j][iimax-1][3] =      v[k][j][iimax-2][3]; 
-            v[k][j][iimax-1][4] =      v[k][j][iimax-2][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] =      v[k][j][iimax-2][0];
-            v[k][j][iimax-1][1] = -1.0*v[k][j][iimax-2][1];
-            v[k][j][iimax-1][2] = -1.0*v[k][j][iimax-2][2];
-            v[k][j][iimax-1][3] = -1.0*v[k][j][iimax-2][3]; 
-            v[k][j][iimax-1][4] =      v[k][j][iimax-2][4];
-          }
-        break;
-       default :
-        print_error(comm, "*** Error: Boundary condition at x=xmax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Bottom boundary
-  if(jj0==-1) { 
-    switch (iod.mesh.bc_y0) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] = iod.bc.inlet.density;
-            v[k][jj0][i][1] = iod.bc.inlet.velocity_x;
-            v[k][jj0][i][2] = iod.bc.inlet.velocity_y;
-            v[k][jj0][i][3] = iod.bc.inlet.velocity_z;
-            v[k][jj0][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] = iod.bc.outlet.density;
-            v[k][jj0][i][1] = iod.bc.outlet.velocity_x;
-            v[k][jj0][i][2] = iod.bc.outlet.velocity_y;
-            v[k][jj0][i][3] = iod.bc.outlet.velocity_z;
-            v[k][jj0][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] =      v[k][jj0+1][i][0];
-            v[k][jj0][i][1] =      v[k][jj0+1][i][1];
-            v[k][jj0][i][2] = -1.0*v[k][jj0+1][i][2];
-            v[k][jj0][i][3] =      v[k][jj0+1][i][3]; 
-            v[k][jj0][i][4] =      v[k][jj0+1][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] =      v[k][jj0+1][i][0];
-            v[k][jj0][i][1] = -1.0*v[k][jj0+1][i][1];
-            v[k][jj0][i][2] = -1.0*v[k][jj0+1][i][2];
-            v[k][jj0][i][3] = -1.0*v[k][jj0+1][i][3]; 
-            v[k][jj0][i][4] =      v[k][jj0+1][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at y=y0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Top boundary
-  if(jjmax==NY+1) { 
-    switch (iod.mesh.bc_ymax) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] = iod.bc.inlet.density;
-            v[k][jjmax-1][i][1] = iod.bc.inlet.velocity_x;
-            v[k][jjmax-1][i][2] = iod.bc.inlet.velocity_y;
-            v[k][jjmax-1][i][3] = iod.bc.inlet.velocity_z;
-            v[k][jjmax-1][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] = iod.bc.outlet.density;
-            v[k][jjmax-1][i][1] = iod.bc.outlet.velocity_x;
-            v[k][jjmax-1][i][2] = iod.bc.outlet.velocity_y;
-            v[k][jjmax-1][i][3] = iod.bc.outlet.velocity_z;
-            v[k][jjmax-1][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] =      v[k][jjmax-2][i][0];
-            v[k][jjmax-1][i][1] =      v[k][jjmax-2][i][1];
-            v[k][jjmax-1][i][2] = -1.0*v[k][jjmax-2][i][2];
-            v[k][jjmax-1][i][3] =      v[k][jjmax-2][i][3]; 
-            v[k][jjmax-1][i][4] =      v[k][jjmax-2][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] =      v[k][jjmax-2][i][0];
-            v[k][jjmax-1][i][1] = -1.0*v[k][jjmax-2][i][1];
-            v[k][jjmax-1][i][2] = -1.0*v[k][jjmax-2][i][2];
-            v[k][jjmax-1][i][3] = -1.0*v[k][jjmax-2][i][3]; 
-            v[k][jjmax-1][i][4] =      v[k][jjmax-2][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at y=ymax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Back boundary (z min)
-  if(kk0==-1) { 
-    switch (iod.mesh.bc_z0) {
-      case MeshData::INLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] = iod.bc.inlet.density;
-            v[kk0][j][i][1] = iod.bc.inlet.velocity_x;
-            v[kk0][j][i][2] = iod.bc.inlet.velocity_y;
-            v[kk0][j][i][3] = iod.bc.inlet.velocity_z;
-            v[kk0][j][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] = iod.bc.outlet.density;
-            v[kk0][j][i][1] = iod.bc.outlet.velocity_x;
-            v[kk0][j][i][2] = iod.bc.outlet.velocity_y;
-            v[kk0][j][i][3] = iod.bc.outlet.velocity_z;
-            v[kk0][j][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] =      v[kk0+1][j][i][0];
-            v[kk0][j][i][1] =      v[kk0+1][j][i][1];
-            v[kk0][j][i][2] =      v[kk0+1][j][i][2];
-            v[kk0][j][i][3] = -1.0*v[kk0+1][j][i][3]; 
-            v[kk0][j][i][4] =      v[kk0+1][j][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] =      v[kk0+1][j][i][0];
-            v[kk0][j][i][1] = -1.0*v[kk0+1][j][i][1];
-            v[kk0][j][i][2] = -1.0*v[kk0+1][j][i][2];
-            v[kk0][j][i][3] = -1.0*v[kk0+1][j][i][3]; 
-            v[kk0][j][i][4] =      v[kk0+1][j][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at z=z0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Front boundary (z max)
-  if(kkmax==NZ+1) { 
-    switch (iod.mesh.bc_zmax) {
-      case MeshData::INLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] = iod.bc.inlet.density;
-            v[kkmax-1][j][i][1] = iod.bc.inlet.velocity_x;
-            v[kkmax-1][j][i][2] = iod.bc.inlet.velocity_y;
-            v[kkmax-1][j][i][3] = iod.bc.inlet.velocity_z;
-            v[kkmax-1][j][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] = iod.bc.outlet.density;
-            v[kkmax-1][j][i][1] = iod.bc.outlet.velocity_x;
-            v[kkmax-1][j][i][2] = iod.bc.outlet.velocity_y;
-            v[kkmax-1][j][i][3] = iod.bc.outlet.velocity_z;
-            v[kkmax-1][j][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] =      v[kkmax-2][j][i][0];
-            v[kkmax-1][j][i][1] =      v[kkmax-2][j][i][1];
-            v[kkmax-1][j][i][2] =      v[kkmax-2][j][i][2];
-            v[kkmax-1][j][i][3] = -1.0*v[kkmax-2][j][i][3]; 
-            v[kkmax-1][j][i][4] =      v[kkmax-2][j][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] =      v[kkmax-2][j][i][0];
-            v[kkmax-1][j][i][1] = -1.0*v[kkmax-2][j][i][1];
-            v[kkmax-1][j][i][2] = -1.0*v[kkmax-2][j][i][2];
-            v[kkmax-1][j][i][3] = -1.0*v[kkmax-2][j][i][3]; 
-            v[kkmax-1][j][i][4] =      v[kkmax-2][j][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at z=zmax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-*/
 
   ApplyBoundaryConditionsGeometricEntities(v);
 

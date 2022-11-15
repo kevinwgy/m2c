@@ -1551,7 +1551,7 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
 
@@ -1562,6 +1562,8 @@ void IcData::setup(const char *name, ClassAssigner *father)
   new ClassToken<IcData> (ca, "InterpolationFunction", this,
         reinterpret_cast<int IcData::*>(&IcData::rbf), 4, "Multiquadric", 0, 
         "InverseMultiquadric", 1, "ThinPlateSpline", 2, "Gaussian", 3);
+
+  default_ic.setup("DefaultInitialState");
 
   multiInitialConditions.setup("GeometricEntities");
 }
@@ -1625,7 +1627,7 @@ void IcData::readUserSpecifiedIC()
   }
 
   input.close();
-  //print("Read user-specified initial condition.\n");
+
 }
 
 //------------------------------------------------------------------------------
@@ -3120,6 +3122,13 @@ void IoData::finalize()
   //READ ADDITIONAL FILES
   if(strcmp(ic.user_specified_ic, ""))
     ic.readUserSpecifiedIC(); 
+
+  //assign default initial state to farfield/inlet b.c. if user did not specify a
+  //default (TODO: This logic would fail if user-specified default i.c. is exactly the same
+  //as the default StateVariable(). But this is highly unlikely...)
+  if(ic.default_ic == StateVariable() &&
+     !(bc.inlet == ic.default_ic))
+    ic.default_ic = bc.inlet;
 
   //FIX Levelset output (TODO: need a better way...)
   output.levelset[0] = output.levelset0;

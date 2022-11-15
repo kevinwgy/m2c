@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
   //! Initialize MPI 
   MPI_Init(NULL,NULL); //called together with all concurrent programs -> MPI_COMM_WORLD
 
-  //! Print header (global proc #1, assumed to be a M2C proc)
+  //! Print header (global proc #0, assumed to be a M2C proc)
   m2c_comm = MPI_COMM_WORLD; //temporary, just for the next few lines of code
   printHeader(argc, argv);
 
