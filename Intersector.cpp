@@ -858,7 +858,7 @@ Intersector::FloodFillColors()
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
     if(it->type_projection != GhostPoint::FACE)
       continue;
-    if(it->bcType == MeshData::INLET) {
+    if(it->bcType == MeshData::INLET || it->bcType == MeshData::OVERSET) {
       Int3& ijk(it->image_ijk);
       inlet_color.insert(color[ijk[2]][ijk[1]][ijk[0]]);
     } else if(it->bcType == MeshData::OUTLET) {
