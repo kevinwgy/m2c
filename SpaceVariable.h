@@ -172,6 +172,9 @@ public:
            k>=internal_ghost_k0 && k<internal_ghost_kmax;
   }
 
+  inline bool IsHereOrConnectedGhost(int i, int j, int k)
+  {return int(i<i0 || i>=imax) + int(j<j0 || j>=jmax) + int(k<k0 || k>=kmax) <= 1;}
+
   //! operators
   void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
   void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y

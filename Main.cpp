@@ -374,16 +374,47 @@ int main(int argc, char* argv[])
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
 
   if(concurrent.Coupled()) {
+    fprintf(stderr,"I am here.\n"); fflush(stderr);
+    MPI_Barrier(MPI_COMM_WORLD);
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
                                              spo.GetPointerToInnerGhostNodes(),
                                              spo.GetPointerToOuterGhostNodes(),
                                              &global_mesh, 
                                              &ID, //updated in inactive regions (overset grids)
                                              &spo_frozen_nodes); //updated w/ "green boxes" (overset grids)
+    fprintf(stderr,"I am here 2.\n"); fflush(stderr);
+    
+
+    SpaceVariable3D Test(comm, &(dms.ghosted1_1dof));
+    double*** test = Test.GetDataPointer();
+    SpaceVariable3D& coordinates(spo.GetMeshCoordinates());
+    Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+    int ii0,jj0,kk0,iimax,jjmax,kkmax;
+    coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax); 
+    double PI = 2.0*acos(0.0);
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
+          if(concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::LEADER)
+            test[k][j][i] = cos(coords[k][j][i][0]*10.0*PI)*sin(coords[k][j][i][1]*5.0*PI);
+          else if(fabs(coords[k][j][i][0])>=2.0 || coords[k][j][i][1]>=2.0)
+            test[k][j][i] = cos(coords[k][j][i][0]*10.0*PI)*sin(coords[k][j][i][1]*5.0*PI);
+        }
+    coordinates.RestoreDataPointerToLocalVector();
+    Test.RestoreDataPointerAndInsert();
+    concurrent.FirstExchange(&Test, 1.0e-8, 1.0, false);
+    Test.StoreMeshCoordinates(coordinates);
+    if(concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::LEADER)
+      Test.WriteToVTRFile("Solution1.vtr","Test");
+    else
+      Test.WriteToVTRFile("Solution2.vtr","Test");
+
+
+    MPI_Barrier(MPI_COMM_WORLD); exit(-1);
   }
 
   if(embed) {
-    embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not conccurent solver)
+    embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not concurrent solver)
     embed->TrackUpdatedSurfaces();
     int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                  embed->GetPointerToEmbeddedBoundaryData(),
@@ -485,7 +516,7 @@ int main(int argc, char* argv[])
     }
 
     if(embed) {
-      embed->ApplyUserDefinedSurfaceDynamics(t, dts0); //update surfaces provided through input (not conccurent solver)
+      embed->ApplyUserDefinedSurfaceDynamics(t, dts0); //update surfaces provided through input (not concurrent solver)
       embed->TrackUpdatedSurfaces();
       int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                    embed->GetPointerToEmbeddedBoundaryData(),

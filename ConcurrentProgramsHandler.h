@@ -54,7 +54,11 @@ class ConcurrentProgramsHandler {
 
   M2CTwinMessenger *m2c_twin;
   MPI_Comm m2c_twin_comm;
-  enum TwinningStatus {NONE = 0, LEADER = 1, FOLLOWER = 2} twinning_status;
+
+public:
+  enum TwinningStatus {NONE = 0, LEADER = 1, FOLLOWER = 2};
+private:
+  TwinningStatus twinning_status;
   
 public:
 

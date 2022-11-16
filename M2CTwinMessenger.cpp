@@ -99,6 +99,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     for(auto&& ghost : *ghost_nodes_outer)
       if(ghost.bcType == (int)MeshData::OVERSET && 
          ghost.type_projection == GhostPoint::FACE) {
+        if(!coordinates->IsHereOrConnectedGhost(ghost.ijk[0], ghost.ijk[1], ghost.ijk[2]))
+          continue; //Skip ghost nodes at corners/edges of the subdomain --- they are not needed
         import_all.push_back(ghost.ijk);
         import_all_coords.push_back(global_mesh->GetXYZ(ghost.ijk));
       }
@@ -108,6 +110,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<MPI_Request> send_requests;
     for(int proc = 0; proc < numFollowerProcs; proc++) {
       send_requests.push_back(MPI_Request());
+      //fprintf(stderr,"Leader proc %d sends nNodes_all = %d to Follower %d.\n", m2c_rank, nNodes_all, proc);
       MPI_Isend(&nNodes_all, 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, 
                 &send_requests.back());
     }
@@ -293,8 +296,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
         if(global_mesh->FindElementCoveringPoint(export_points_all[proc][i], ijk0, &xi, true)) {
           if(coordinates->IsHere(ijk0[0], ijk0[1], ijk0[2], true/*include_ghost*/) &&
              coordinates->IsHere(ijk0[0]+1,ijk0[1]+1,ijk0[2]+1, true/*include_ghost*/)) {
-             found[proc].push_back(i);
-             export_points[proc].push_back(GhostPoint(ijk0,xi));
+            found[proc].push_back(i);
+            export_points[proc].push_back(GhostPoint(ijk0,xi));
           } 
         }
       }
@@ -421,6 +424,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     for(int proc = 0; proc < numLeaderProcs; proc++) {
       // It is legit to have size = 0 in MPI. It still transfers "metadata", which is unnecessary
+      //fprintf(stderr,"Follower %d adopts %ld black points from Leader %d.\n", m2c_rank, found[proc].size(), proc); 
       if(found[proc].size()>0) {
         send_requests.push_back(MPI_Request());
         MPI_Isend(found[proc].data(), found[proc].size(), MPI_INT, proc, m2c_rank/*tag*/, joint_comm,
@@ -475,6 +479,16 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
           for(int j=gp.ijk[1]; j<=gp.ijk[1]+1; j++)
             for(int i=gp.ijk[0]; i<=gp.ijk[0]+1; i++)
               tag[k][j][i] = 1;
+    TMP->RestoreDataPointerAndAdd(); //Note: "Add" allows us to keep track of ALL involved points,
+                                     //      "Insert" would lead to some points being lost in the comm.
+    tag = TMP->GetDataPointer();
+    int ii0,jj0,kk0,iimax,jjmax,kkmax;
+    coordinates->GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++)
+          if(tag[k][j][i]>0)
+            tag[k][j][i] = 1; //tag should be 0 or 1
     TMP->RestoreDataPointerAndInsert();
 
 
@@ -663,7 +677,15 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     // verify that the green boxes (tag = 2) form a closed interface in the outer
     // mesh that separates nodes that are "active" and "inactive"
-    std::set<Int3> occluded_nodes; //not used
+    std::set<Int3> occluded_nodes; //to be filled w/ green boxes, including internal ghosts
+    tag = TMP->GetDataPointer();
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++)
+          if(tag[k][j][i]==2)
+            occluded_nodes.insert(Int3(i,j,k)); // green box
+    TMP->RestoreDataPointerToLocalVector();
+    
     int nReg = floodfiller->FillBasedOnEdgeObstructions(*TMP3, 0/*non_obstruction_flag*/, 
                                                         occluded_nodes, *Color);
     if(nReg != 2) {
