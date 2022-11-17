@@ -224,6 +224,7 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
   Vec3D Vmin, Vmax, dxyz_over_two;
   vector<Vec3D> xlocal(6);
   vector<array<int,4> > elems;
+  vector<Vec3D> points_dup;
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
@@ -233,14 +234,22 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
         Vmax = coords[k][j][i] + dxyz_over_two;
         int np = GeoTools::PlaneCuttingAxisAlignedBox(pop,normal,Vmin,Vmax,&xlocal,0);
 
+        if(i==0 && j==0 && k==0) {
+          fprintf(stderr,"Got you. np = %d. (%e %e %e) (%e %e %e) : (%e %e %e) (%e %e %e) (%e %e %e) (%e %e %e).\n",
+                  np, Vmin[0], Vmin[1], Vmin[2],
+                  Vmax[0], Vmax[1], Vmax[2],
+                  xlocal[0][0], xlocal[0][1], xlocal[0][2], xlocal[1][0], xlocal[1][1], xlocal[1][2],
+                  xlocal[2][0], xlocal[2][1], xlocal[2][2], xlocal[3][0], xlocal[3][1], xlocal[3][2]);
+
+        }
+
         if(np<3)
           continue;
 
         //got at least a triangle
 
-        int n0 = points.size();
-        points.insert(points.end(), xlocal.begin(), xlocal.begin()+np);
-
+        int n0 = points_dup.size();
+        points_dup.insert(points_dup.end(), xlocal.begin(), xlocal.begin()+np);
 
         assert(np<=6);
         switch(np) {
@@ -252,67 +261,93 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
             break;
           case 5: 
             elems.push_back(array<int,4>{n0,n0+1,n0+2,n0+3});
-            elems.push_back(array<int,4>{n0,n0+3,n0+4});
+            elems.push_back(array<int,4>{n0,n0+3,n0+4,n0+4});
             break;
           case 6:
             elems.push_back(array<int,4>{n0,n0+1,n0+2,n0+3});
             elems.push_back(array<int,4>{n0,n0+3,n0+4,n0+5});
             break;
         }  
+     }
 
-        // interpolation info
-        Int3 ijk0;
-        Vec3D xi0;
-        for(int n=0; n<np; n++) {
 
-          bool found = global_mesh.FindElementCoveringPoint(xlocal[n], ijk0, &xi0, true);
-          assert(found);
-          assert(coordinates.IsHere(ijk0[0],ijk0[1],ijk0[2],true) &&
-                 coordinates.IsHere(ijk0[0]+1,ijk0[1]+1,ijk0[2]+1,true));
-
-          ijk.push_back(ijk0);
-          trilinear_coords.push_back(xi0);
-
-          ijk_valid.push_back(std::make_pair(8, array<bool,8>{true,true,true,true,
-                                                              true,true,true,true}));
-          int ii(ijk0[0]), jj(ijk0[1]), kk(ijk0[2]);
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj,kk)) {//c000
-            ijk_valid.back().first--;
-            ijk_valid.back().second[0] = false;
-          }
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj,kk)) {//c100
-            ijk_valid.back().first--;
-            ijk_valid.back().second[1] = false;
-          }
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj+1,kk)) {//c010
-            ijk_valid.back().first--;
-            ijk_valid.back().second[2] = false;
-          }
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj+1,kk)) {//c110
-            ijk_valid.back().first--;
-            ijk_valid.back().second[3] = false;
-          }
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj,kk+1)) {//c001
-            ijk_valid.back().first--;
-            ijk_valid.back().second[4] = false;
-          }
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj,kk+1)) {//c101
-            ijk_valid.back().first--;
-            ijk_valid.back().second[5] = false;
-          }
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj+1,kk+1)) {//c011
-            ijk_valid.back().first--;
-            ijk_valid.back().second[6] = false;
-          }
-          if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj+1,kk+1)) {//c111
-            ijk_valid.back().first--;
-            ijk_valid.back().second[7] = false;
-          } 
-          assert(ijk_valid.back().first>0);
-
+  // eliminate duplicated nodes (within each subdomain)
+  vector<int> nodemap;
+  if(!points_dup.empty()) {
+    nodemap.resize(points_dup.size());
+    for(int n=0; n<points_dup.size(); n++) {
+      bool found = false;
+      for(int i=0; i<points.size(); i++) {
+        if((points_dup[n]-points[i]).norm()<1e-12) {
+          nodemap[n] = i;
+          found = true;
+          break;
         }
-
       }
+      if(!found) {
+        points.push_back(points_dup[n]);
+        nodemap[n] = points.size()-1;
+      }
+    }
+  }
+
+  for(auto&& elem : elems)
+    for(int n=0; n<4; n++)
+      elem[n] = nodemap[elem[n]];
+
+
+  // get interpolation info
+  Int3 ijk0;
+  Vec3D xi0;
+  for(int n=0; n<points.size(); n++) {
+
+    bool found = global_mesh.FindElementCoveringPoint(points[n], ijk0, &xi0, true);
+    assert(found);
+    assert(coordinates.IsHere(ijk0[0],ijk0[1],ijk0[2],true) &&
+           coordinates.IsHere(ijk0[0]+1,ijk0[1]+1,ijk0[2]+1,true));
+
+    ijk.push_back(ijk0);
+    trilinear_coords.push_back(xi0);
+
+    ijk_valid.push_back(std::make_pair(8, array<bool,8>{true,true,true,true,
+                                                        true,true,true,true}));
+    int ii(ijk0[0]), jj(ijk0[1]), kk(ijk0[2]);
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj,kk)) {//c000
+      ijk_valid.back().first--;
+      ijk_valid.back().second[0] = false;
+    }
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj,kk)) {//c100
+      ijk_valid.back().first--;
+      ijk_valid.back().second[1] = false;
+    }
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj+1,kk)) {//c010
+      ijk_valid.back().first--;
+      ijk_valid.back().second[2] = false;
+    }
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj+1,kk)) {//c110
+      ijk_valid.back().first--;
+      ijk_valid.back().second[3] = false;
+    }
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj,kk+1)) {//c001
+      ijk_valid.back().first--;
+      ijk_valid.back().second[4] = false;
+    }
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj,kk+1)) {//c101
+      ijk_valid.back().first--;
+      ijk_valid.back().second[5] = false;
+    }
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii,jj+1,kk+1)) {//c011
+      ijk_valid.back().first--;
+      ijk_valid.back().second[6] = false;
+    }
+    if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii+1,jj+1,kk+1)) {//c111
+      ijk_valid.back().first--;
+      ijk_valid.back().second[7] = false;
+    } 
+    assert(ijk_valid.back().first>0);
+
+  }
+
 
   coordinates.RestoreDataPointerToLocalVector();
 
@@ -392,16 +427,17 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
   if(mpi_rank==WORKER_PROC) {
     for(int proc=1; proc<mpi_size; proc++) {
       int n0 = package_disp1[proc];
-      for(int e=elems_disp[proc]/4; e<nElems_all[proc]; e++)
+      int first_elem = elems_disp[proc]/4;
+      for(int e=0; e<nElems_all[proc]; e++)
         for(int n=0; n<4; n++)
-          elems_global[e][n] += n0;
+          elems_global[first_elem+e][n] += n0;
     }
   }
 
   // WORKER_PROC prints mesh to file 
   if(mpi_rank==WORKER_PROC) {
 
-    FILE *file = fopen(filename_mesh.c_str(), "a");
+    FILE *file = fopen(filename_mesh.c_str(), "w");
     assert(file); //if file is not opened, the pointer would be NULL
     fprintf(file, "Nodes CutPlaneNodes\n");
     for(int i=0; i<sol3_global.size(); i++)
