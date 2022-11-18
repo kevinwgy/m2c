@@ -234,15 +234,6 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
         Vmax = coords[k][j][i] + dxyz_over_two;
         int np = GeoTools::PlaneCuttingAxisAlignedBox(pop,normal,Vmin,Vmax,&xlocal,0);
 
-        if(i==0 && j==0 && k==0) {
-          fprintf(stderr,"Got you. np = %d. (%e %e %e) (%e %e %e) : (%e %e %e) (%e %e %e) (%e %e %e) (%e %e %e).\n",
-                  np, Vmin[0], Vmin[1], Vmin[2],
-                  Vmax[0], Vmax[1], Vmax[2],
-                  xlocal[0][0], xlocal[0][1], xlocal[0][2], xlocal[1][0], xlocal[1][1], xlocal[1][2],
-                  xlocal[2][0], xlocal[2][1], xlocal[2][2], xlocal[3][0], xlocal[3][1], xlocal[3][2]);
-
-        }
-
         if(np<3)
           continue;
 

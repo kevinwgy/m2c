@@ -259,11 +259,6 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
 
   assert(tolerance>=0.0);
 
-  bool gotyou = false;
-  if(fabs((Vmin-Vec3D(-6.000000e+00,0.000000e+00,0.000000e+00)).norm())<1e-6 &&
-     fabs((Vmax-Vec3D(-5.804710e+00,5.036348e-02,5.036348e-02)).norm())<1e-6)
-    gotyou = true;
-
   // fast check
   double upper_bound = 1.01*dV.norm() + tolerance;
   if(fabs((Vmax-O)*N)>upper_bound || fabs((Vmin-O)*N)>upper_bound)
@@ -299,8 +294,6 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
     return 0;
 
   // Now, there must be intersections!
-
-  if(gotyou) fprintf(stderr,"Status: %d %d %d %d %d %d %d %d\n", status[0], status[1], status[2], status[3], status[4], status[5], status[6], status[7]);
 
   set<int> xedges;
   for(int i=0; i<12; i++) {
@@ -341,10 +334,6 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
     xedges.erase(xedges.begin());
   }
 
-  if(gotyou)
-    for(auto it = xedges.begin(); it != xedges.end(); it++)
-      fprintf(stderr,"Got you: xedge = %d.\n", *it);
-
   // complete the loop
   int iter = 0;
   while(!xnodes.empty() || !xedges.empty()) {
@@ -379,7 +368,6 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
            N2N[me][2] == E2N[*it][0] || N2N[me][2] == E2N[*it][1]) {
           double d1 = fabs(dist[E2N[*it][0]]);
           double d2 = fabs(dist[E2N[*it][1]]);
-          if(gotyou) fprintf(stderr,"Got you: xedge %d: d1 = %e, d2 = %e.\n", *it, d1, d2);
           double sum = d1 + d2;
           assert(sum>0);
           (*intersections)[counter++] = (d2*V[E2N[*it][0]] + d1*V[E2N[*it][1]])/sum;

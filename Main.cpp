@@ -374,17 +374,14 @@ int main(int argc, char* argv[])
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
 
   if(concurrent.Coupled()) {
-    fprintf(stderr,"I am here.\n"); fflush(stderr);
-    MPI_Barrier(MPI_COMM_WORLD);
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
                                              spo.GetPointerToInnerGhostNodes(),
                                              spo.GetPointerToOuterGhostNodes(),
                                              &global_mesh, 
                                              &ID, //updated in inactive regions (overset grids)
                                              &spo_frozen_nodes); //updated w/ "green boxes" (overset grids)
-    fprintf(stderr,"I am here 2.\n"); fflush(stderr);
     
-
+/*
     SpaceVariable3D Test(comm, &(dms.ghosted1_1dof));
     double*** test = Test.GetDataPointer();
     SpaceVariable3D& coordinates(spo.GetMeshCoordinates());
@@ -411,6 +408,7 @@ int main(int argc, char* argv[])
 
 
     MPI_Barrier(MPI_COMM_WORLD); exit(-1);
+*/
   }
 
   if(embed) {
