@@ -384,7 +384,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
   double*** id  = (double***)ID.GetDataPointer();
   double***  l  = L? L->GetDataPointer() : NULL;
   std::vector<double***> phi;
-  for(int i=0; i<Phi.size(); i++)
+  for(int i=0; i<(int)Phi.size(); i++)
     phi.push_back((double***)Phi[i]->GetDataPointer());
 
 
@@ -403,7 +403,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
       double laser_rad = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], l, 1, 0);
       print(file, "%16.8e  ", laser_rad);
     }
-    for(int i=0; i<Phi.size(); i++) {
+    for(int i=0; i<(int)Phi.size(); i++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi[i], 1, 0);
       print(file, "%16.8e  ", sol);
     }
@@ -422,7 +422,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
   if(L) L->RestoreDataPointerToLocalVector();
-  for(int i=0; i<Phi.size(); i++)
+  for(int i=0; i<(int)Phi.size(); i++)
     Phi[i]->RestoreDataPointerToLocalVector();
 
   iFrame++;

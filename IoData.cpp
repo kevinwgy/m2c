@@ -1991,7 +1991,7 @@ void IcData::readUserSpecifiedIC_GeneralCylindrical(std::fstream &input)
 
   // Now start reading the data in the axial direction
   double data;
-  bool found_radial = false;
+  //bool found_radial = false;
   for(int r=0; r<INT_MAX; r++) {
 
     getline(input, line);
@@ -2881,7 +2881,7 @@ ConcurrentProgramsData::ConcurrentProgramsData()
 
 void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  //ClassAssigner *ca = new ClassAssigner(name, 3, father);
   aeros.setup("AeroS");
   aerof.setup("AeroF");
   m2c_twin.setup("M2CTwin");

@@ -159,7 +159,6 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
   ijk.resize(nrows*ncols);
   Vec3D xyz;
   xyz[pindex] = coord;
-  double h = hmin, v = vmin;
   for(int j=0; j<nrows; j++) {
     xyz[vindex] = vmax - j*dv;
     for(int i=0; i<ncols; i++) {
@@ -559,7 +558,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Density";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -572,7 +571,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Velocity (Magnitude)";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -586,7 +585,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Pressure";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -600,7 +599,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     solution_name = "Temperature";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
     double*** id = ID.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -617,7 +616,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Material ID";
     double*** id = ID.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -634,7 +633,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
       exit(-1);
     }
     double*** laser = L->GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -651,7 +650,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
       exit(-1);
     }
     double*** phi = Phi[0]->GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -668,7 +667,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
       exit(-1);
     }
     double*** phi = Phi[1]->GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -686,7 +685,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     }
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
     double*** id = ID.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];

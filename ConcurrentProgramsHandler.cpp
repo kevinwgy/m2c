@@ -183,7 +183,7 @@ ConcurrentProgramsHandler::SetupCommunicators()
 void
 ConcurrentProgramsHandler::Destroy()
 {
-  for(int i=0; i<c.size(); i++)
+  for(int i=0; i<(int)c.size(); i++)
     MPI_Comm_free(&c[i]);
 }
 

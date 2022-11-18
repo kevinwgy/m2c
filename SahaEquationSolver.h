@@ -57,8 +57,8 @@ protected:
     ZavEquation(double kb, double T, double nh, double me, double h, std::vector<AtomicIonizationData>& elem_);
     ~ZavEquation() {}
     double operator() (double zav) {return zav - ComputeRHS(zav);}
-    double GetFProd(int r, int j) {assert(j<fprod.size() && r<fprod[j].size()); return fprod[j][r];}
-    double GetZej(double zav, int j) {assert(j<fprod.size()); return ComputeRHS_ElementJ(zav, j);}
+    double GetFProd(int r, int j) {assert(j<(int)fprod.size() && r<(int)fprod[j].size()); return fprod[j][r];}
+    double GetZej(double zav, int j) {assert(j<(int)fprod.size()); return ComputeRHS_ElementJ(zav, j);}
   private:
     double ComputeRHS(double zav); //!< compute the right-hand-side of the Zav equation
     double ComputeRHS_ElementJ(double zav, int j);

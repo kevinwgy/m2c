@@ -25,7 +25,7 @@ IonizationOperator::IonizationOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
     print("- Initializing Saha Equation solver for material %d.\n", it->first);
     saha[it->first] = new SahaEquationSolver(*(it->second), iod, varFcn_[it->first], &comm_);
   }
-  for(int i=0; i<saha.size(); i++) { //create dummy solvers for materials w/o ionization model
+  for(int i=0; i<(int)saha.size(); i++) { //create dummy solvers for materials w/o ionization model
     if(saha[i] == NULL)
       saha[i] = new SahaEquationSolver(iod, varFcn_[i]); 
   }

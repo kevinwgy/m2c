@@ -79,7 +79,7 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
     }
     GetDataInFile(file, E[i], 10000, true);
     file.close();
-    if(max_size<E[i].size())
+    if(max_size<(int)E[i].size())
       max_size = E[i].size();
   }
   print("    * Read %d excitation energy files: %sX%s. Max excited state: %d.\n", atomic_number,
@@ -101,7 +101,7 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
     }
     GetDataInFile(file, g[i], 10000, true);
     file.close();
-    if(max_size<g[i].size())
+    if(max_size<(int)g[i].size())
       max_size = g[i].size();
   }
   print("    * Read %d degeneracy files: %sX%s. Max excited state: %d.\n", atomic_number,
@@ -191,7 +191,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
   std::tuple<double,double,double>& coeffs(UsCoeffs[r]);
 
   double factor(0);
-  for(int i=0; i<E[r].size(); i++){
+  for(int i=0; i<(int)E[r].size(); i++){
     factor = -E[r][i]/kb;
     if(factor!=0)
       break;
@@ -232,7 +232,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
     T[i] = (my_start_id+i==0) ? sample_Tmin : factor/log(expmin+(my_start_id+i)*delta_exp); 
             //expmin can be 0 if Tmin is small (but nonzero)
                 
-  for(int k=0; k<U.size(); k++) {
+  for(int k=0; k<(int)U.size(); k++) {
 
     for(int i=0; i<my_block_size; i++)
       U[k][my_start_id+i] = CalculatePartitionFunctionOnTheFly2(r, T[i], max_terms[r] - k); 
@@ -325,7 +325,7 @@ AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T,
     int nsize = std::min(int(std::upper_bound(E[r].begin(), E[r].end(), I[r]-deltaI) - E[r].begin()),
                          (int)g[r].size());
     k = max_terms[r] - nsize;
-    assert(k>=0 && k<spline[r].size());
+    assert(k>=0 && k<(int)spline[r].size());
   }
 
   if(interpolation==1) 

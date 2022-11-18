@@ -55,7 +55,7 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
 
   for(auto it = iod_eqs.materials.dataMap.begin(); it != iod_eqs.materials.dataMap.end(); it++) {
     int matid = it->first;
-    if(matid < 0 || matid >= visFcn.size()) {
+    if(matid < 0 || matid >= (int)visFcn.size()) {
       print_error("*** Error: Detected error in the specification of material indices (id = %d).\n", matid);
       exit_mpi();
     }
@@ -80,7 +80,7 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
 
 ViscosityOperator::~ViscosityOperator()
 {
-  for(int i=0; i<visFcn.size(); i++)
+  for(int i=0; i<(int)visFcn.size(); i++)
     delete visFcn[i];
 }
 

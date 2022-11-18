@@ -47,7 +47,7 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
 
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
     int matid = it->first;
-    if(matid < 0 || matid >= hyperFcn.size()) {
+    if(matid < 0 || matid >= (int)hyperFcn.size()) {
       print_error("*** Error: Detected error in the specification of material indices (id = %d).\n", matid);
       exit_mpi();
     }
@@ -78,7 +78,7 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
 
 HyperelasticityOperator::~HyperelasticityOperator()
 {
-  for(int i=0; i<hyperFcn.size(); i++)
+  for(int i=0; i<(int)hyperFcn.size(); i++)
     delete hyperFcn[i];
 }
 

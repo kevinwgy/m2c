@@ -138,7 +138,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
 
   // store local colors at inner ghost nodes (used in Part II)
   vector<int> ghost_nodes_inner_color(ghost_nodes_inner.size(), -1);
-  for(int i=0; i<ghost_nodes_inner.size(); i++) {
+  for(int i=0; i<(int)ghost_nodes_inner.size(); i++) {
     Int3 &ijk(ghost_nodes_inner[i].ijk);
     ghost_nodes_inner_color[i] = color[ijk[2]][ijk[1]][ijk[0]];
   }
@@ -161,7 +161,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
   set<Int3> equiv; //[0]: local color;  [1]: owner id;  [2]: color from owner
   vector<bool> unique_color(mycolor+1, true); //whether color is uniquely inside subdomain
 
-  for(int i=0; i<ghost_nodes_inner.size(); i++) {
+  for(int i=0; i<(int)ghost_nodes_inner.size(); i++) {
     Int3 &ijk(ghost_nodes_inner[i].ijk);
     if(ghost_nodes_inner_color[i] == 0) {//occluded
       assert(color[ijk[2]][ijk[1]][ijk[0]]==0); //should be occluded from owner
@@ -232,7 +232,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
   counter = 0;
   if(mpi_rank == worker) {
     displacements.resize(mpi_size,-1); 
-    for(int i=0; i<displacements.size(); i++) {
+    for(int i=0; i<(int)displacements.size(); i++) {
       displacements[i] = counter;
       counter += counts[i];
     }

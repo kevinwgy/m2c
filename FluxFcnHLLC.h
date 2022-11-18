@@ -56,28 +56,21 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   //Based on Hu et al., 2009 and Toro's book Chapter 10. Also see Kevin's notes
   
   // 1. Compute the intermediate state variables (with "hat")
-  double rho_hat, u_hat, v_hat, w_hat, H_hat, c_hat;
+  double rho_hat, u_hat, v_hat, w_hat, c_hat;
   
   rho_hat = sqrt(Vm[0]*Vp[0]);
 
   double sqrt_rhom = sqrt(Vm[0]);
   double sqrt_rhop = sqrt(Vp[0]);
 
-  double Hm = vf[id]->ComputeTotalEnthalpyPerUnitMass(Vm);
-  double Hp = vf[id]->ComputeTotalEnthalpyPerUnitMass(Vp);
-  H_hat = Average(sqrt_rhom, Hm, sqrt_rhop, Hp);
-
   // now calculate c_hat step by step
   double drho = Vp[0] - Vm[0];
-  double du   = Vp[1] - Vm[1];
-  double dv   = Vp[2] - Vm[2];
-  double dw   = Vp[3] - Vm[3];
   double dp   = Vp[4] - Vm[4];
 
   double diffvelo;
-  if     (dir==0) diffvelo = du; //x --> du;
-  else if(dir==1) diffvelo = dv; //y --> dv;
-  else            diffvelo = dw; //z --> dw;
+  if     (dir==0) diffvelo = Vp[1] - Vm[1]; //x --> du;
+  else if(dir==1) diffvelo = Vp[2] - Vm[2]; //y --> dv;
+  else            diffvelo = Vp[3] - Vm[3]; //z --> dw;
 
   double diff = diffvelo/(sqrt_rhom+sqrt_rhop); 
   double p_over_rho_hat = Average(sqrt_rhom, Vm[4]/Vm[0], sqrt_rhop, Vp[4]/Vp[0])

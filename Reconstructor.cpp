@@ -314,7 +314,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
   Vec3D*** A    = (Vec3D***)CoeffA.GetDataPointer();
   Vec3D*** B    = (Vec3D***)CoeffB.GetDataPointer();
   Vec3D*** K    = (Vec3D***)CoeffK.GetDataPointer();
-  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  //Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   //user-specified "Fixes"
   double*** fixed = FixedByUser ? FixedByUser->GetDataPointer() : NULL;
@@ -591,7 +591,7 @@ RETRY:
           }
 
           if(xf.size()>0) {
-            for(int s=0; s<xf.size(); s++) {
+            for(int s=0; s<(int)xf.size(); s++) {
               if(xf[s][k][j][i][0]>=0 || (i+1<NX && xf[s][k][j][i+1][0]>=0))
                 setValue(sigmax, 0.0, nDOF);
               if(xf[s][k][j][i][1]>=0 || (j+1<NY && xf[s][k][j+1][i][1]>=0))
@@ -810,7 +810,7 @@ RETRY:
   CoeffB.RestoreDataPointerToLocalVector(); //!< no changes to vector
   CoeffK.RestoreDataPointerToLocalVector(); //!< no changes to vector
   V.RestoreDataPointerToLocalVector(); //!< no changes to vector
-  delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
+  //delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
 
   if(FixedByUser) FixedByUser->RestoreDataPointerToLocalVector();
 

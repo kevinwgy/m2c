@@ -316,7 +316,7 @@ AerosMessenger::Negotiate()
       }
     }
 
-    if(pack2local.size() != numCPUMatchedNodes) {
+    if((int)pack2local.size() != numCPUMatchedNodes) {
       fprintf(stderr, "\033[0;31m*** Error (proc %d): wrong number of matched nodes (%d instead of %d).\n\033[0m",
               m2c_rank, (int)pack2local.size(), numCPUMatchedNodes);
       exit(-1);
@@ -354,8 +354,8 @@ AerosMessenger::GetInfo()
   dt     = info[1];
   tmax   = info[2];
 
-  int rstrt = int(info[3]); //not used
-  int smode = int(info[4]); //not used
+  //int rstrt = int(info[3]); //not used
+  //int smode = int(info[4]); //not used
 
   // check for consistency in algorithm number
   if(iod_aeros.fsi_algo == AerosCouplingData::A6)
@@ -563,7 +563,7 @@ AerosMessenger::SendForce()
     //
 
     // prepare package
-    for(int i=0; i<pack2local.size(); i++) {
+    for(int i=0; i<(int)pack2local.size(); i++) {
       for(int j=0; j<3; j++)
         temp_buffer[3*i+j] = F[pack2local[i]][j];
     //  fprintf(stderr,"temp_buffer[%d] = %e %e %e.\n", i, temp_buffer[3*i], temp_buffer[3*i+1], temp_buffer[3*i+2]);

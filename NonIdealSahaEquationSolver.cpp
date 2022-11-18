@@ -21,7 +21,7 @@ NonIdealSahaEquationSolver::NonIdealSahaEquationSolver(MaterialIonizationModel& 
 
   f.resize(elem.size(), vector<double>());
   alpha.resize(elem.size(), vector<double>());
-  for(int j=0; j<f.size(); j++) {
+  for(int j=0; j<(int)f.size(); j++) {
     f[j].resize(elem[j].rmax+1, 0.0);
     alpha[j].resize(elem[j].rmax+1, 0.0);
   }
@@ -183,7 +183,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     nh = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (it==alpha_rj.begin() && r==0) ? 1.0 : 0.0;
     }
     return;
@@ -198,7 +198,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -298,7 +298,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -312,8 +312,8 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     int j = it->first; //element id
     vector<double> &my_alpha = it->second; //alpha_r
 
-    if(j>=elem.size()) {//this material does not have element j
-      for(int r=0; r<my_alpha.size(); r++)
+    if(j>=(int)elem.size()) {//this material does not have element j
+      for(int r=0; r<(int)my_alpha.size(); r++)
         my_alpha[r] = 0.0;
       continue;
     }
@@ -333,7 +333,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
       my_alpha[max_size] = 0;
 
     //too many slots? put 0
-    for(int r=max_size+1; r<my_alpha.size(); r++)
+    for(int r=max_size+1; r<(int)my_alpha.size(); r++)
       my_alpha[r] = 0.0;
   }
 
@@ -441,7 +441,7 @@ double NonIdealSahaEquationSolver::
 LambDEquation::ComputeRHS(double one_over_lambD, double zav)
 {
   double summation = zav; 
-  for(int j=0; j<saha.elem.size(); j++) {
+  for(int j=0; j<(int)saha.elem.size(); j++) {
     saha.ComputeStateForElement(j, T, nh, zav, one_over_lambD, true);  //we need alphas 
     for(int r=1; r<=saha.elem[j].rmax; r++)
       summation += r*r*saha.alpha[j][r];
@@ -466,7 +466,7 @@ double NonIdealSahaEquationSolver::LambDEquation::
 ZavEquation::ComputeRHS(double zav)
 {
   double rhs = 0.0;
-  for(int j=0; j<saha.elem.size(); j++)
+  for(int j=0; j<(int)saha.elem.size(); j++)
     rhs += saha.ComputeStateForElement(j, T, nh, zav, one_over_lambD, false); //we don't need alpha here
 
   return rhs;

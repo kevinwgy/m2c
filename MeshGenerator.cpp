@@ -198,10 +198,10 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
     xi[k+1] = (a==0.0) ? xi[k] + b/kappa : (xi[k] + b/a)*exp(a/kappa) - b/a;
 
     if(xi[k+1] >= xp2) {
-      if(k+1==N && i+1 == xpoints.size()-1) {//done
+      if(k+1==N && i+1 == (int)xpoints.size()-1) {//done
         xi[k+1] = xp2;
         break;
-      } else if(k+1==N || i+1 == xpoints.size()-1) {
+      } else if(k+1==N || i+1 == (int)xpoints.size()-1) {
         print_error("*** Error: Cannot generate mesh (possibly a software bug)\n");
         exit_mpi();
       }

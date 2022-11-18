@@ -164,7 +164,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<int> owner(import_all.size(),-1);
     for(int proc = 0; proc < numFollowerProcs; proc++) {
       for(auto&& id : found[proc]) {
-        assert(id>=0 && id<import_all.size());
+        assert(id>=0 && id<(int)import_all.size());
         if(owner[id]<0) {
           owner[id] = proc;
           import_nodes[proc].push_back(import_all[id]);  
@@ -174,7 +174,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     }
 
     // make sure there are no orphans
-    for(int i=0; i<owner.size(); i++) {
+    for(int i=0; i<(int)owner.size(); i++) {
       if(owner[i] == -1) {
         fprintf(stderr,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
                        " up by any follower processor.\033[0m\n", import_all[i][0], 
@@ -292,7 +292,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
       Int3 ijk0;
       Vec3D xi;      
-      for(int i=0; i<export_points_all[proc].size(); i++) {
+      for(int i=0; i<(int)export_points_all[proc].size(); i++) {
         if(global_mesh->FindElementCoveringPoint(export_points_all[proc][i], ijk0, &xi, true)) {
           if(coordinates->IsHere(ijk0[0], ijk0[1], ijk0[2], true/*include_ghost*/) &&
              coordinates->IsHere(ijk0[0]+1,ijk0[1]+1,ijk0[2]+1, true/*include_ghost*/)) {
@@ -404,7 +404,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
       Int3 ijk0;
       Vec3D xi;
-      for(int i=0; i<export_points_all[proc].size(); i++) { 
+      for(int i=0; i<(int)export_points_all[proc].size(); i++) { 
         if(global_mesh->FindElementCoveringPoint(export_points_all[proc][i], ijk0, &xi, true)) {
           if(coordinates->IsHere(ijk0[0],ijk0[1],ijk0[2], true/*include_ghost*/) &&
              coordinates->IsHere(ijk0[0]+1,ijk0[1]+1,ijk0[2]+1, true/*include_ghost*/)) {
@@ -760,7 +760,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     }
 
     // make sure there are no orphans
-    for(int i=0; i<owner.size(); i++) {
+    for(int i=0; i<(int)owner.size(); i++) {
       if(owner[i] == -1) {
         fprintf(stderr,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
                        " up by any leader processor.\033[0m\n", import_all[i][0],
@@ -874,7 +874,7 @@ M2CTwinMessenger::InterpolateDataAndTransfer(SpaceVariable3D &V, TwinningStatus 
   // Step 1. Check buffer size. Extend if needed.
   // ----------------------------------------
   int dim(-1);
-  if(import_buffer.size() != numTwinProcs)
+  if((int)import_buffer.size() != numTwinProcs)
     import_buffer.resize(numTwinProcs);
   for(int proc=0; proc<numTwinProcs; proc++) {
     if(import_nodes[proc].size()>0) {
@@ -889,7 +889,7 @@ M2CTwinMessenger::InterpolateDataAndTransfer(SpaceVariable3D &V, TwinningStatus 
   }
 
   dim = -1;
-  if(export_buffer.size() != numTwinProcs)
+  if((int)export_buffer.size() != numTwinProcs)
     export_buffer.resize(numTwinProcs);
   for(int proc=0; proc<numTwinProcs; proc++) {
     if(export_points[proc].size()>0) {
@@ -917,7 +917,7 @@ M2CTwinMessenger::InterpolateDataAndTransfer(SpaceVariable3D &V, TwinningStatus 
       if(export_points[proc].size()==0)
         continue;
 
-      for(int p=0; p<export_points[proc].size(); p++) {
+      for(int p=0; p<(int)export_points[proc].size(); p++) {
         int i = export_points[proc][p].ijk[0]; 
         int j = export_points[proc][p].ijk[1]; 
         int k = export_points[proc][p].ijk[2]; 
@@ -953,7 +953,7 @@ M2CTwinMessenger::InterpolateDataAndTransfer(SpaceVariable3D &V, TwinningStatus 
 
     double*** v = V.GetDataPointer();
     for(int proc=0; proc<numTwinProcs; proc++) {
-      for(int p=0; p<import_nodes[proc].size(); p++) {
+      for(int p=0; p<(int)import_nodes[proc].size(); p++) {
         Int3 &ijk(import_nodes[proc][p]);
         for(int d=0; d<dim; d++) 
           v[ijk[2]][ijk[1]][ijk[0]*dim+d] = import_buffer[proc][p*dim+d];

@@ -78,7 +78,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
           //For example, v[k][-1][-1] is generally invalid (not populated).
           //In this type of cases, switch to one-sided difference (1st order)
           if(i==0 && (j==-1 || j==NY || k==-1 || k==NZ)) {
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = (v[k][j][(i+1)*DOFin+pin] - v[k][j][i*DOFin+pin])
@@ -86,7 +86,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             }
           }
           else if(i==NX-1 && (j==-1 || j==NY || k==-1 || k==NZ)) {
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = (v[k][j][i*DOFin+pin] - v[k][j][(i-1)*DOFin+pin])
@@ -94,7 +94,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             }
           }
           else { //the normal central differencing scheme
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = cx[k][j][i][0]*v[k][j][(i-1)*DOFin+pin]
@@ -121,7 +121,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             continue;
 
           if(j==0 && (i==-1 || i==NX || k==-1 || k==NZ)) {
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = (v[k][j+1][i*DOFin+pin] - v[k][j][i*DOFin+pin])
@@ -129,7 +129,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             }
           }
           else if(j==NY-1 && (i==-1 || i==NX || k==-1 || k==NZ)) {
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = (v[k][j][i*DOFin+pin] - v[k][j-1][i*DOFin+pin])
@@ -137,7 +137,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             }
           }
           else { //the normal central differencing scheme
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = cy[k][j][i][0]*v[k][j-1][i*DOFin+pin]
@@ -164,7 +164,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             continue;
 
           if(k==0 && (i==-1 || i==NX || j==-1 || j==NY)) {
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = (v[k+1][j][i*DOFin+pin] - v[k][j][i*DOFin+pin])
@@ -172,7 +172,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             }
           }
           else if(k==NZ-1 && (i==-1 || i==NX || j==-1 || j==NY)) {
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = (v[k][j][i*DOFin+pin] - v[k-1][j][i*DOFin+pin])
@@ -180,7 +180,7 @@ void GradientCalculatorCentral::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,
             }
           }
           else { //the normal central differencing scheme
-            for(int id=0; id<input_dof.size(); id++) {
+            for(int id=0; id<(int)input_dof.size(); id++) {
               pin  = input_dof[id];
               pout = output_dof[id];
               dv[k][j][i*DOFout+pout] = cz[k][j][i][0]*v[k-1][j][i*DOFin+pin]
@@ -324,7 +324,7 @@ void GradientCalculatorCentral::CentralDifferencingAtCellInterfaces(int dir/*0~d
             continue;
 
           double dx = coords[k][j][i][0] - coords[k][j][i-1][0];
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             dv[k][j][i*DOFout+pout] = (v[k][j][i*DOFin+pin] - v[k][j][(i-1)*DOFin+pin])/dx;
@@ -340,7 +340,7 @@ void GradientCalculatorCentral::CentralDifferencingAtCellInterfaces(int dir/*0~d
             continue;
 
           double dy = coords[k][j][i][1] - coords[k][j-1][i][1];
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             dv[k][j][i*DOFout+pout] = (v[k][j][i*DOFin+pin] - v[k][j-1][i*DOFin+pin])/dy;
@@ -356,7 +356,7 @@ void GradientCalculatorCentral::CentralDifferencingAtCellInterfaces(int dir/*0~d
             continue;
 
           double dz = coords[k][j][i][2] - coords[k-1][j][i][2];
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             dv[k][j][i*DOFout+pout] = (v[k][j][i*DOFin+pin] - v[k-1][j][i*DOFin+pin])/dz;

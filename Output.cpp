@@ -79,9 +79,9 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
 Output::~Output()
 {
   if(pvdfile) fclose(pvdfile);
-  for(int i=0; i<line_outputs.size(); i++)
+  for(int i=0; i<(int)line_outputs.size(); i++)
     if(line_outputs[i]) delete line_outputs[i];
-  for(int i=0; i<plane_outputs.size(); i++)
+  for(int i=0; i<(int)plane_outputs.size(); i++)
     if(plane_outputs[i]) delete plane_outputs[i];
 }
 
@@ -94,7 +94,7 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 
   probe_output.SetupInterpolation(coordinates);
 
-  for(int i=0; i<line_outputs.size(); i++)
+  for(int i=0; i<(int)line_outputs.size(); i++)
     line_outputs[i]->SetupInterpolation(coordinates);
 
   for(auto&& plane : plane_outputs)
@@ -123,7 +123,7 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
   probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, force_write);
 
   //write solutions along lines
-  for(int i=0; i<line_outputs.size(); i++)
+  for(int i=0; i<(int)line_outputs.size(); i++)
     line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, V, ID, Phi, L, force_write);
 
   //write solutions on planes
@@ -463,17 +463,17 @@ void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
   MPI_Allreduce(MPI_IN_PLACE, y.data(), y.size(), MPI_DOUBLE, MPI_MAX, comm);
   MPI_Allreduce(MPI_IN_PLACE, z.data(), z.size(), MPI_DOUBLE, MPI_MAX, comm);
 
-  for(int i=0; i<std::max(std::max(x.size(),y.size()),z.size()); i++) {
+  for(int i=0; i<std::max(std::max((int)x.size(),(int)y.size()),(int)z.size()); i++) {
     print(file,"%8d\t", i-nGhost);
-    if(i<x.size())
+    if(i<(int)x.size())
       print(file,"%16.8e\t", x[i]);
     else
       print(file,"                \t");
-    if(i<y.size())
+    if(i<(int)y.size())
       print(file,"%16.8e\t", y[i]);
     else
       print(file,"                \t");
-    if(i<z.size())
+    if(i<(int)z.size())
       print(file,"%16.8e", z[i]);
     else
       print(file,"                ");

@@ -266,9 +266,9 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
   vector<int> nodemap;
   if(!points_dup.empty()) {
     nodemap.resize(points_dup.size());
-    for(int n=0; n<points_dup.size(); n++) {
+    for(int n=0; n<(int)points_dup.size(); n++) {
       bool found = false;
-      for(int i=0; i<points.size(); i++) {
+      for(int i=0; i<(int)points.size(); i++) {
         if((points_dup[n]-points[i]).norm()<1e-12) {
           nodemap[n] = i;
           found = true;
@@ -290,7 +290,7 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
   // get interpolation info
   Int3 ijk0;
   Vec3D xi0;
-  for(int n=0; n<points.size(); n++) {
+  for(int n=0; n<(int)points.size(); n++) {
 
     bool found = global_mesh.FindElementCoveringPoint(points[n], ijk0, &xi0, true);
     assert(found);
@@ -431,11 +431,11 @@ PlaneOutput::InitializeOutput(SpaceVariable3D &coordinates)
     FILE *file = fopen(filename_mesh.c_str(), "w");
     assert(file); //if file is not opened, the pointer would be NULL
     fprintf(file, "Nodes CutPlaneNodes\n");
-    for(int i=0; i<sol3_global.size(); i++)
+    for(int i=0; i<(int)sol3_global.size(); i++)
       fprintf(file, "%10d    %16.8e    %16.8e    %16.8e\n",
               i+1, sol3_global[i][0], sol3_global[i][1], sol3_global[i][2]);
     fprintf(file, "Elements CutPlane using CutPlaneNodes\n");
-    for(int i=0; i<elems_global.size(); i++) {
+    for(int i=0; i<(int)elems_global.size(); i++) {
       if(elems_global[i][2]==elems_global[i][3]) //triangle
         fprintf(file, "%10d    4    %10d    %10d    %10d\n", i+1,
                 elems_global[i][0]+1, elems_global[i][1]+1, elems_global[i][2]+1);
@@ -565,7 +565,7 @@ PlaneOutput::GetScalarSolutionAndWrite(double time, double*** v, int dim, int p,
   // interpolate solution
   int i,j,k;
   double c[8]; //c000,c100,c010,c110,c001,c101,c011,c111;
-  for(int node=0; node<points.size(); node++) {
+  for(int node=0; node<(int)points.size(); node++) {
     i = ijk[node][0];
     j = ijk[node][1];
     k = ijk[node][2];
@@ -608,7 +608,7 @@ PlaneOutput::GetVec3SolutionAndWrite(double time, double*** v, int dim, int p, s
   // interpolate solution
   int i,j,k;
   Vec3D c[8]; //c000,c100,c010,c110,c001,c101,c011,c111;
-  for(int node=0; node<points.size(); node++) {
+  for(int node=0; node<(int)points.size(); node++) {
     i = ijk[node][0];
     j = ijk[node][1];
     k = ijk[node][2];
@@ -655,7 +655,7 @@ PlaneOutput::GetTemperatureAndWrite(double time, double*** v, double*** id, stri
   double c[8]; //c000,c100,c010,c110,c001,c101,c011,c111;
   double rho, p, e;
   int dim = 5, myid;
-  for(int node=0; node<points.size(); node++) {
+  for(int node=0; node<(int)points.size(); node++) {
 
     i = ijk[node][0];
     j = ijk[node][1];
@@ -770,7 +770,7 @@ PlaneOutput::GetDeltaTemperatureAndWrite(double time, double*** v, double*** id,
   double c[8]; //c000,c100,c010,c110,c001,c101,c011,c111;
   double rho, p, e;
   int dim = 5, myid;
-  for(int node=0; node<points.size(); node++) {
+  for(int node=0; node<(int)points.size(); node++) {
 
     i = ijk[node][0];
     j = ijk[node][1];
@@ -887,7 +887,7 @@ PlaneOutput::GetIonizationAndWrite(double time, double*** v, double*** id, strin
   Vec3D c[8]; //c000,c100,c010,c110,c001,c101,c011,c111;
   double rho, p;
   int dim = 5, myid;
-  for(int node=0; node<points.size(); node++) {
+  for(int node=0; node<(int)points.size(); node++) {
 
     i = ijk[node][0];
     j = ijk[node][1];

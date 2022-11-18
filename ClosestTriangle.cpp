@@ -112,7 +112,7 @@ void ClosestTriangle::checkVertex(int ip1, int trId, double trDist) {
     }
     periTri[nPairs++] = trId;
     int repeated1, repeated2;
-    int repeated_nodes = registerNodes(ip1,trId, repeated1, repeated2);
+    registerNodes(ip1,trId, repeated1, repeated2);
     bool thisSign = (trDist >= 0);
 
     if((thisSign != isPositive || !isConsistent)/* && !hasBeenFixed*/) { // need to figure out the correct sign...
@@ -387,7 +387,6 @@ int ClosestTriangle::findTesterStatus(Vec3D xt) const
 //  Vec3D xdebug(-4.348610e+00, -5.030928e+00, -6.636450e-02);
 //  bool debug = (xt-xdebug).norm()<1.0e-5 ? true : false;
 
-  set<int> &vertices = node2node[n1]; //vertices in the direct neighborhood of n1
   set<int> &elements = node2elem[n1]; //elements in the direct neighborhood of n1
   double mindist = 1.0e14;
   const double eps = 1.0e-14;

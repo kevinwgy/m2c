@@ -367,7 +367,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
           //calculate unsigned distance from node to the boundary of the cylinder-cone
           dist = DBL_MAX;
-          for(int l=0; l<lineSegments.size(); l++)
+          for(int l=0; l<(int)lineSegments.size(); l++)
             dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
                                  lineSegments[l].first, lineSegments[l].second, toto));
 
@@ -435,7 +435,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
           }
           else {
             dist = DBL_MAX;
-            for(int l=0; l<lineSegments.size(); l++)
+            for(int l=0; l<(int)lineSegments.size(); l++)
               dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
                                    lineSegments[l].first, lineSegments[l].second, toto));
           } 
@@ -1341,7 +1341,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   double*** wfdata = wf.GetDataPointer();
   double*** res    = R.GetDataPointer(); //residual, on the right-hand-side of the ODE
   double*** active = Active.GetDataPointer();
-  double*** useful = UsefulG2.GetDataPointer();
+  //double*** useful = UsefulG2.GetDataPointer();
 
   //initialize R to 0
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++)
@@ -1409,7 +1409,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   wk.RestoreDataPointerToLocalVector();
   wf.RestoreDataPointerToLocalVector();
   Active.RestoreDataPointerToLocalVector();
-  UsefulG2.RestoreDataPointerToLocalVector();
+  //UsefulG2.RestoreDataPointerToLocalVector();
 
   R.RestoreDataPointerAndInsert(); //insert
 }

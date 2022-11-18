@@ -31,7 +31,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
-  for(int i=0; i<lso.size(); i++)
+  for(int i=0; i<(int)lso.size(); i++)
     ls2matid[i] = lso[i]->GetMaterialID();
 
   // Initialize phase/material transition functions (if specified by user)
@@ -45,7 +45,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
     for(auto it = iod.eqs.transitions.dataMap.begin(); it != iod.eqs.transitions.dataMap.end(); it++) {
       int i = it->second->from_id;
       int j = it->second->to_id;
-      if(i<0 || i>=varFcn.size() || j<0 || j>=varFcn.size() || i==j) {
+      if(i<0 || i>=(int)varFcn.size() || j<0 || j>=(int)varFcn.size() || i==j) {
         print_error("*** Error: Detected input error in Material/Phase Transition [%d] (%d -> %d).\n", it->first,
                     i, j); 
         exit_mpi();
@@ -64,7 +64,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
       int j = it->second->to_id;
       if(i!=0) {
         bool found = false;
-        for(int ls = 0; ls < lso.size(); ls++) {
+        for(int ls = 0; ls < (int)lso.size(); ls++) {
           if(ls2matid[ls] == i) {
             found = true;
             break;
@@ -78,7 +78,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
       }
       if(j!=0) {
         bool found = false;
-        for(int ls = 0; ls < lso.size(); ls++) {
+        for(int ls = 0; ls < (int)lso.size(); ls++) {
           if(ls2matid[ls] == j) {
             found = true;
             break;
@@ -111,7 +111,7 @@ MultiPhaseOperator::Destroy()
 
   Lambda.Destroy();
 
-  for(int i=0; i<trans.size(); i++)
+  for(int i=0; i<(int)trans.size(); i++)
     for(auto it = trans[i].begin(); it != trans[i].end(); it++)
       delete *it;
 }
@@ -353,7 +353,7 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
 
   vector<double***> phi; //may remain empty if there are no orphans
   vector<double***> phi_ebm; //..
-  for(int ls=0; ls<Phi.size(); ls++) 
+  for(int ls=0; ls<(int)Phi.size(); ls++) 
     phi.push_back(Phi[ls]->GetDataPointer());
   for(auto&& ebds : *EBDS)
     phi_ebm.push_back(ebds->Phi_ptr->GetDataPointer()); //unsigned distance, always>=0
@@ -373,14 +373,14 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
           // update phi first (id will be switched back later)
           // first, we determine the absolute value of phi (checking both level sets and dist to surf)
           double newphi = DBL_MAX;
-          for(int ls=0; ls<phi.size(); ls++)
+          for(int ls=0; ls<(int)phi.size(); ls++)
             newphi = std::min(newphi, fabs(phi[ls][k][j][i]));
           for(auto&& phis : phi_ebm)
             newphi = std::min(newphi, phis[k][j][i]);
           if(newphi==0)
             newphi = 1.0e-20; //avoid exactly 0
 
-          for(int ls=0; ls<phi.size(); ls++) {
+          for(int ls=0; ls<(int)phi.size(); ls++) {
             if(ls2matid[ls] == id[k][j][i]) { //this is the ID we are swtiching away from
               assert(phi[ls][k][j][i]<0.0); 
               phi[ls][k][j][i] = newphi; //make it positive
@@ -420,16 +420,16 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
 
   // Restore
   IDn.RestoreDataPointerToLocalVector();
-  for(int surf=0; surf<phi_ebm.size(); surf++)
+  for(int surf=0; surf<(int)phi_ebm.size(); surf++)
     (*EBDS)[surf]->Phi_ptr->RestoreDataPointerToLocalVector();
 
   if(total_corrected>0) {
-    for(int ls=0; ls<phi.size(); ls++) //phi may be empty, which is fine here.
+    for(int ls=0; ls<(int)phi.size(); ls++) //phi may be empty, which is fine here.
       Phi[ls]->RestoreDataPointerAndInsert();
     ID.RestoreDataPointerAndInsert();
   }  
   else {
-    for(int ls=0; ls<phi.size(); ls++) //phi may be empty, which is fine here.
+    for(int ls=0; ls<(int)phi.size(); ls++) //phi may be empty, which is fine here.
       Phi[ls]->RestoreDataPointerToLocalVector();
     ID.RestoreDataPointerToLocalVector();
   }
@@ -570,7 +570,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   // Step 4: Find out external ghosts that need to be updated at the end.
   // --------------------------------------------------------
   std::list<int> ghosts;
-  for(int i=0; i<ghost_nodes_outer->size(); i++) {
+  for(int i=0; i<(int)ghost_nodes_outer->size(); i++) {
     GhostPoint& g((*ghost_nodes_outer)[i]);
     if(g.type_projection != GhostPoint::FACE)
       continue;
@@ -631,7 +631,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
     //      Note: One node should not be swept by multiple surfaces!
     int i,j,k,i2,j2,k2;
     vector<std::pair<Int3,bool> > neighbors; //useful neighbors, paired w/ connected or not
-    for(int surf=0; surf<swept.size(); surf++) {
+    for(int surf=0; surf<(int)swept.size(); surf++) {
       for(auto it = swept[surf].begin(); it != swept[surf].end();) {
         i = (*it)[0];
         j = (*it)[1];
@@ -660,7 +660,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
               if(nei.second) //connected
                 id_votes[id[nei.first[2]][nei.first[1]][nei.first[0]]]++;
             int myvote = 0;
-            for(int s=0; s<id_votes.size(); s++)
+            for(int s=0; s<(int)id_votes.size(); s++)
               if(id_votes[s]>myvote) {
                 myid = s;
                 myvote = id_votes[s];
@@ -1540,7 +1540,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   // Step 2: Figure out which level set functions
   //         need to be updated
   //---------------------------------------------
-  for(int ls = 0; ls < Phi.size(); ls++)
+  for(int ls = 0; ls < (int)Phi.size(); ls++)
     phi_updated[ls] = (affected_ids.find(ls2matid[ls]) != affected_ids.end());
   MPI_Allreduce(MPI_IN_PLACE, (int*)phi_updated.data(), Phi.size(), MPI_INT, MPI_MAX, comm);
 
@@ -1668,7 +1668,7 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
             //1. find a unique owner
             int new_owner = owner[0];
             double max_phi = fabs(phi[owner[0]][k][j][i]);
-            for(int ind=1; ind<owner.size(); ind++) {
+            for(int ind=1; ind<(int)owner.size(); ind++) {
               if(fabs(phi[owner[ind]][k][j][i])>max_phi) {
                 new_owner = owner[ind];
                 max_phi = fabs(phi[owner[ind]][k][j][i]);
@@ -2001,7 +2001,7 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
   double*** id  = ID.GetDataPointer();
 
-  for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
+  for(int ls = 0; ls<(int)Phi.size(); ls++) {//loop through all the level set functions
   
     if(phi_updated[ls] == 0)
       continue; //this level set function is not involved
@@ -2074,7 +2074,7 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
   }
 
   // For debug only
-  for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
+  for(int ls = 0; ls<(int)Phi.size(); ls++) {//loop through all the level set functions
   
     if(phi_updated[ls] == 0)
       continue; //this level set function is not involved

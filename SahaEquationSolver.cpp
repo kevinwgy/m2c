@@ -103,7 +103,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     nh = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (it==alpha_rj.begin() && r==0) ? 1.0 : 0.0;
     }
     return;
@@ -118,7 +118,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -187,7 +187,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -206,8 +206,8 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     int j = it->first; //element id
     vector<double> &alpha = it->second; //alpha_r
 
-    if(j>=elem.size()) {//this material does not have element j
-      for(int r=0; r<alpha.size(); r++)
+    if(j>=(int)elem.size()) {//this material does not have element j
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = 0.0;
       continue;
     }
@@ -225,7 +225,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
       alpha[0] = zej/denom;
     else {
       alpha[0] = 1.0;
-      for(int r=1; r<alpha.size(); r++)
+      for(int r=1; r<(int)alpha.size(); r++)
         alpha[r] = 0.0;
       return;
     }
@@ -247,7 +247,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
       alpha[max_size] = 0;
 
     //too many slots? put 0
-    for(int r=max_size+1; r<alpha.size(); r++)
+    for(int r=max_size+1; r<(int)alpha.size(); r++)
       alpha[r] = 0.0;
   }
 
@@ -268,7 +268,7 @@ SahaEquationSolver::ZavEquation::ZavEquation(double kb, double T, double nh, dou
   // compute fprod
   fprod.assign(elem.size(), vector<double>());
   double Ur0, Ur1, f1;
-  for(int j=0; j<fprod.size(); j++) {
+  for(int j=0; j<(int)fprod.size(); j++) {
 
     fprod[j].resize(elem[j].rmax+1, 0);
 
@@ -300,7 +300,7 @@ SahaEquationSolver::ZavEquation::ComputeRHS(double zav)
 {
   double rhs = 0.0;
 
-  for(int j=0; j<elem.size(); j++)
+  for(int j=0; j<(int)elem.size(); j++)
     rhs += ComputeRHS_ElementJ(zav, j);
 
   return rhs;

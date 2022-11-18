@@ -93,7 +93,7 @@ KDTree<Obj, dim, CompType>::KDTree(int nobj, Obj *allObjs, int depth) {
     int i, d;
     for(d = 0; d < dim; ++d)
       w[d] = 0.0;
-    for(int i = 0; i < nObj; ++i)
+    for(i = 0; i < nObj; ++i)
       for(d = 0; d < dim; ++d)
         w[d] = std::max(w[d], obj[i].width(d));
     return;

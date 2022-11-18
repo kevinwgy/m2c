@@ -70,7 +70,7 @@ void InterpolatorLinear::InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/,
           if(k==kkmax-1 || j==jjmax-1) 
             continue; //either done in another subdomain, or not needed (outside physical domain)
 
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             vout[k][j][i*DOFout+pout] = cl[k][j][i-1]*vin[k][j][(i-1)*DOFin+pin] 
@@ -94,7 +94,7 @@ void InterpolatorLinear::InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/,
           if(i==iimax-1 || k==kkmax-1)
             continue;
 
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             vout[k][j][i*DOFout+pout] = cb[k][j-1][i]*vin[k][j-1][i*DOFin+pin] 
@@ -118,7 +118,7 @@ void InterpolatorLinear::InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/,
           if(i==iimax-1 || j==jjmax-1)
             continue;
 
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             vout[k][j][i*DOFout+pout] = ck[k-1][j][i]*vin[k-1][j][i*DOFin+pin] 

@@ -97,12 +97,12 @@ int main(int argc, char* argv[])
   //! Initialize VarFcn (EOS, etc.) 
 
   std::vector<VarFcnBase *> vf;
-  for(int i=0; i<iod.eqs.materials.dataMap.size(); i++)
+  for(int i=0; i<(int)iod.eqs.materials.dataMap.size(); i++)
     vf.push_back(NULL); //allocate space for the VarFcn pointers
 
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
     int matid = it->first;
-    if(matid < 0 || matid >= vf.size()) {
+    if(matid < 0 || matid >= (int)vf.size()) {
       print_error("*** Error: Detected error in the specification of material indices (id = %d).\n", matid);
       exit_mpi();
     }
@@ -211,9 +211,26 @@ int main(int argc, char* argv[])
   std::vector<LevelSetOperator*> lso;
   std::vector<SpaceVariable3D*>  Phi;
   std::set<int> ls_tracker;
+  int ls_input_id_min = 9999, ls_input_id_max = -9999;
+  for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
+    if(ls_tracker.find(it->first) != ls_tracker.end()){
+      print_error("*** Error: Detected two level sets with the same id (%d).\n", it->first);
+      exit_mpi();
+    }
+    ls_tracker.insert(it->first);
+    ls_input_id_min = std::min(ls_input_id_min, it->first);
+    ls_input_id_max = std::max(ls_input_id_max, it->first);
+  } 
+  if(ls_input_id_min<0 || ls_input_id_max>=(int)ls_tracker.size()){
+    print_error("*** Error: Level set ids should start from 0 and have no gaps.\n"); 
+    exit_mpi();
+  }
+  lso.resize(ls_tracker.size(),NULL);
+  Phi.resize(ls_tracker.size(),NULL);
+  ls_tracker.clear(); //for re-use
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
-    if(matid<=0 || matid>=vf.size()) { //cannot use ls to track material 0
+    if(matid<=0 || matid>=(int)vf.size()) { //cannot use ls to track material 0
       print_error("*** Error: Cannot initialize a level set for tracking material %d.\n", matid);
       exit_mpi();
     }
@@ -222,8 +239,8 @@ int main(int argc, char* argv[])
       exit_mpi();
     }
     ls_tracker.insert(matid);    
-    lso.push_back(new LevelSetOperator(comm, dms, iod, *it->second, spo));
-    Phi.push_back(new SpaceVariable3D(comm, &(dms.ghosted1_1dof)));
+    lso[it->first] = new LevelSetOperator(comm, dms, iod, *it->second, spo);
+    Phi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
 
     auto closures = id2closure.equal_range(matid);
     if(closures.first != closures.second) {//found this matid
@@ -237,8 +254,14 @@ int main(int argc, char* argv[])
       lso.back()->SetInitialCondition(*Phi.back());
 
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
-          lso.size()-1, matid);
+          it->first, matid);
   }  
+
+  // check for user effor
+  for(int ls=0; ls<OutputData::MAXLS; ls++)
+    if(iod.output.levelset[ls] == OutputData::ON && ls>=(int)Phi.size()) {
+      print_error("*** Error: Cannot output level set %d, which is undefined.\n"); exit_mpi();}
+
 
 #ifdef LEVELSET_TEST
   if(!lso.empty()) {
@@ -250,7 +273,7 @@ int main(int argc, char* argv[])
   
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
-  if(lso.size()>1) { //at each node, at most one "phi" can be negative
+  if((int)lso.size()>1) { //at each node, at most one "phi" can be negative
     int overlap = mpo.CheckLevelSetOverlapping(Phi);
     if(overlap>0) {
       print_error("*** Error: Found overlapping material subdomains. Number of overlapped cells "
@@ -420,7 +443,7 @@ int main(int argc, char* argv[])
     spo.ClipDensityAndPressure(V,ID);
     if(boundary_swept) {
       spo.ApplyBoundaryConditions(V);
-      for(int i=0; i<Phi.size(); i++) 
+      for(int i=0; i<(int)Phi.size(); i++) 
         lso[i]->ApplyBoundaryConditions(*Phi[i]);
     }
   }
@@ -447,6 +470,12 @@ int main(int argc, char* argv[])
       // Compute time step size
       spo.ComputeTimeStepSize(V, ID, dt, cfl); 
 
+      if(concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::LEADER)
+        fprintf(stderr,"[Leader] dts = %e, Calculated dt = %e, cfl = %e.\n", dts, dt, cfl);
+      else
+        fprintf(stderr,"[Follower] dts = %e, Calculated dt = %e, cfl = %e.\n", dts, dt, cfl);
+
+ 
       // Modify dt and cfl, dtleft if needed
       if(concurrent.GetTimeStepSize()>0) {//concurrent solver provides a "dts"
         if(dt>dtleft) { //dt should be reduced to dtleft
@@ -465,6 +494,12 @@ int main(int argc, char* argv[])
       // If concurrent programs do not specify dt, set dts = dt
       if(concurrent.GetTimeStepSize()<=0.0)
         dts = dt;
+
+      if(concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::LEADER)
+        fprintf(stderr,"[Leader] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
+      else
+        fprintf(stderr,"[Follower] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
+
  
       if(dts<=dt)
         print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
@@ -478,9 +513,23 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
+
+
+
+      MPI_Barrier(MPI_COMM_WORLD); 
+
+
+
       integrator->AdvanceOneTimeStep(V, ID, Phi, L, Xi, t, dt, time_step, subcycle, dts); 
+
+
+      MPI_Barrier(MPI_COMM_WORLD); 
+
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
+
+      fprintf(stderr,"Got here.\n");
+      MPI_Barrier(MPI_COMM_WORLD); exit(-1);
 
     } while (concurrent.Coupled() && dtleft != 0.0);
 
@@ -522,7 +571,7 @@ int main(int argc, char* argv[])
       spo.ClipDensityAndPressure(V,ID);
       if(boundary_swept) {
         spo.ApplyBoundaryConditions(V);
-        for(int i=0; i<Phi.size(); i++) 
+        for(int i=0; i<(int)Phi.size(); i++) 
           lso[i]->ApplyBoundaryConditions(*Phi[i]);
       }
     }
@@ -565,7 +614,7 @@ int main(int argc, char* argv[])
   if(embed) {embed->Destroy(); delete embed;}
 
   //! Detroy the levelsets
-  for(int ls = 0; ls<lso.size(); ls++) {
+  for(int ls = 0; ls<(int)lso.size(); ls++) {
     Phi[ls]->Destroy(); delete Phi[ls];
     lso[ls]->Destroy(); delete lso[ls];
   }
@@ -591,7 +640,7 @@ int main(int argc, char* argv[])
   delete integrator;
   delete ff;
 
-  for(int i=0; i<vf.size(); i++)
+  for(int i=0; i<(int)vf.size(); i++)
     delete vf[i];
 
   PetscFinalize();

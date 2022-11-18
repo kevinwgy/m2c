@@ -150,7 +150,7 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaFace(Int3 &ghost, std::vector<I
 
   scenario = FACE_REMOTE;
   double denom = 0;
-  for(int i=0; i<node_tmp.size(); i++) {
+  for(int i=0; i<(int)node_tmp.size(); i++) {
     if(node_tmp[i] != ghost) {
       node.push_back(node_tmp[i]);
       coeff.push_back(coeff_tmp[i]);
@@ -161,7 +161,7 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaFace(Int3 &ghost, std::vector<I
   }
   if(scenario == FACE_SHARED) {
     assert(denom != 0.0);
-    for(int i=0; i<coeff.size(); i++)
+    for(int i=0; i<(int)coeff.size(); i++)
       coeff[i] /= denom; 
   }
   //Formula: v(ghost) = sum ( coeff[i]*v(node[i]) )
@@ -185,7 +185,7 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaElem(Int3 &ghost, std::vector<I
 
   scenario = ELEMENT_REMOTE;
   double denom = 0;
-  for(int i=0; i<node_tmp.size(); i++) {
+  for(int i=0; i<(int)node_tmp.size(); i++) {
     if(node_tmp[i] != ghost) {
       node.push_back(node_tmp[i]);
       coeff.push_back(coeff_tmp[i]);
@@ -196,7 +196,7 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaElem(Int3 &ghost, std::vector<I
   }
   if(scenario == ELEMENT_SHARED) {
     assert(denom != 0.0);
-    for(int i=0; i<coeff.size(); i++)
+    for(int i=0; i<(int)coeff.size(); i++)
       coeff[i] /= denom; 
   }
   //Formula: v(ghost) = sum ( coeff[i]*v(node[i]) )
@@ -223,7 +223,7 @@ double
 EmbeddedBoundaryFormula::Evaluate(double*** v)
 {
   double res = constant;
-  for(int i=0; i<node.size(); i++)   
+  for(int i=0; i<(int)node.size(); i++)   
     res += coeff[i]*v[node[i][2]/*k*/][node[i][1]/*j*/][node[i][0]/*i*/];
 
   return res;
@@ -236,7 +236,7 @@ EmbeddedBoundaryFormula::Evaluate(std::vector<double>& v)
 {
   assert(v.size() == node.size());
   double res = constant;
-  for(int i=0; i<v.size(); i++)   
+  for(int i=0; i<(int)v.size(); i++)   
     res += coeff[i]*v[i];
 
   return res;

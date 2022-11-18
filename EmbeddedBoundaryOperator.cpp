@@ -96,7 +96,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   intersector.assign(surfaces.size(), NULL);
 
   // setup output
-  for(int i=0; i<surfaces.size(); i++)
+  for(int i=0; i<(int)surfaces.size(); i++)
     lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
 
   // setup dynamics_calculator
@@ -153,7 +153,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurf
 EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
 {
 
-  for(int i=0; i<intersector.size(); i++)
+  for(int i=0; i<(int)intersector.size(); i++)
     if(intersector[i])
       delete intersector[i];
 
@@ -173,7 +173,7 @@ EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
 void
 EmbeddedBoundaryOperator::Destroy()
 {
-  for(int i=0; i<intersector.size(); i++)
+  for(int i=0; i<(int)intersector.size(); i++)
     if(intersector[i])
       intersector[i]->Destroy();
 }
@@ -197,7 +197,7 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
 void
 EmbeddedBoundaryOperator::SetupIntersectors()
 {
-  for(int i=0; i<intersector.size(); i++) {
+  for(int i=0; i<(int)intersector.size(); i++) {
     intersector[i] = new Intersector(comm, *dms_ptr, *iod_embedded_surfaces[i], surfaces[i],
                                      *coordinates_ptr, *ghost_nodes_inner_ptr, *ghost_nodes_outer_ptr,
                                      *global_mesh_ptr);
@@ -213,7 +213,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
   // Part 1: Find inactive colors. Warning: When multiple surfaces have inactive regions that are close
   //         to each other or overlapping, the information collected here is invalid.
   inactive_colors.clear();
-  for(int i=0; i<surfaces.size(); i++) {
+  for(int i=0; i<(int)surfaces.size(); i++) {
     unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
     int nRegions = EBDS->nRegions; //this is the number of *closures*. Colors -1, -2, ...
     for(int color = -1; color>=-nRegions; color--) {
@@ -232,7 +232,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 
   // Part 2: Find inactive_elem_status. Needed for force computation
   inactive_elem_status.resize(surfaces.size());
-  for(int surf=0; surf<surfaces.size(); surf++)
+  for(int surf=0; surf<(int)surfaces.size(); surf++)
     inactive_elem_status[surf].assign(surfaces[surf].elems.size(), 0);
 
   vector<bool> touched(surfaces.size(), false);
@@ -245,7 +245,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
       vector<int> tmp;
       intersector[surf]->FindColorBoundary(this_color, tmp);
       assert(tmp.size() == status.size());
-      for(int i=0; i<tmp.size(); i++) {
+      for(int i=0; i<(int)tmp.size(); i++) {
         if(tmp[i]==1) {
           if(status[i]==0)
             status[i] = 1;
@@ -272,7 +272,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
   // output the wetted sides (i.e. active_elem_status)
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
-  for(int surf=0; surf<surfaces.size(); surf++) {
+  for(int surf=0; surf<(int)surfaces.size(); surf++) {
 
     if(mpi_rank != 0)
       continue;
@@ -305,7 +305,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
       // Write nodes
       out << "Nodes WettedSurfacePoints" << std::endl;
       Vec3D p,q;
-      for(int i=0; i<Es.size(); i++) {
+      for(int i=0; i<(int)Es.size(); i++) {
         Int3 &nod(Es[i]);
         switch (status[i]) {
           case 0 : //both sides are wetted
@@ -337,7 +337,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 
       // Write line segments / "markers"
       out << "Elements Markers using WettedSurfacePoints" << std::endl;
-      for(int i=0; i<Es.size(); i++) {
+      for(int i=0; i<(int)Es.size(); i++) {
         out << std::setw(10) << i+1 << "  1  "  //"1" for line segment 
             << std::setw(10) << 2*i+1
             << std::setw(10) << 2*i+2 << std::endl;
@@ -368,7 +368,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
   }
  
   int MAXLINE = 500;
-  char line[MAXLINE], key1[MAXLINE], key2[MAXLINE], copyForType[MAXLINE];
+  char line[MAXLINE], key1[MAXLINE], key2[MAXLINE]; //, copyForType[MAXLINE];
 
   int num0 = 0;
   int num1 = 0;
@@ -510,7 +510,7 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
       old2new[id] = current_id;
       current_id++;
     }
-    assert(current_id==Xs.size());
+    assert(current_id==(int)Xs.size());
   } 
   else { //in good shape
     vector<bool> nodecheck(nNodes, false);
@@ -654,7 +654,7 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
   assert(F.size() == F_prev.size());
 
   // loop through all the surfaces
-  for(int i = 0; i < F.size(); i++) {
+  for(int i = 0; i < (int)F.size(); i++) {
 
     if(F_prev[i].size()>0) //not the first time
       assert(F[i].size() == F_prev[i].size());
@@ -662,7 +662,7 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
       F_prev[i].assign(F[i].size(),Vec3D(0.0));
 
     // copy force
-    for(int j=0; j<F[i].size(); j++)
+    for(int j=0; j<(int)F[i].size(); j++)
       F_prev[i][j] = F[i][j];
 
     if(surfaces_prev[i].X.size()>0) //not the first time
@@ -671,7 +671,7 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
       surfaces_prev[i].X.assign(surfaces[i].X.size(),Vec3D(0.0));
       
     // copy nodal coords
-    for(int j=0; j<surfaces[i].X.size(); j++)
+    for(int j=0; j<(int)surfaces[i].X.size(); j++)
       surfaces_prev[i].X[j] = surfaces[i].X[j];
   }
 }
@@ -689,7 +689,7 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
   double*** id = ID.GetDataPointer();
   
   // loop through all the embedded surfaces
-  for(int surf=0; surf<surfaces.size(); surf++) {
+  for(int surf=0; surf<(int)surfaces.size(); surf++) {
 
     // Clear force vector
     vector<Vec3D>&  Fs(F[surf]); //Nodal loads (TO BE COMPUTED)
@@ -831,7 +831,7 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
   vector<bool> hasOutlet(intersector.size(), false);
   vector<bool> hasOccluded(intersector.size(), false);
   vector<int> numRegions(intersector.size(), 0);
-  for(int i = 0; i < intersector.size(); i++) {
+  for(int i = 0; i < (int)intersector.size(); i++) {
     bool a, b, c;
     int d;
     double max_dist0 = intersector[i]->TrackSurfaceFullCourse(a, b, c, d, phi_layers);
@@ -855,7 +855,7 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
   double max_dist = -DBL_MAX;
 
   int phi_layers = 3;
-  for(int i=0; i<intersector.size(); i++) {
+  for(int i=0; i<(int)intersector.size(); i++) {
     if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
        strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
       continue; //this surface is fixed...
@@ -875,7 +875,7 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 void
 EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
 {
-  for(int surf=0; surf<surfaces.size(); surf++) {
+  for(int surf=0; surf<(int)surfaces.size(); surf++) {
     if(strcmp(iod_embedded_surfaces[surf]->dynamics_calculator, "") == 0)
       continue; //not specified for this surface
     UserDefinedDynamics *calculator(std::get<0>(dynamics_calculator[surf]));
@@ -886,7 +886,7 @@ EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
     vector<Vec3D> disp(Xs.size(), 0.0);
     calculator->GetUserDefinedDynamics(t, disp.size(), (double*)X0.data(), (double*)Xs.data(),
                                        (double*)disp.data(), (double*)surfaces[surf].Udot.data());
-    for(int i=0; i<Xs.size(); i++) {
+    for(int i=0; i<(int)Xs.size(); i++) {
       for(int j=0; j<3; j++)
         Xs[i][j] = X0[i][j] + disp[i][j];
     }
@@ -900,7 +900,7 @@ EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData()
 {
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > p(new vector<unique_ptr<EmbeddedBoundaryDataSet> >());
 
-  for(int i=0; i<intersector.size(); i++) {
+  for(int i=0; i<(int)intersector.size(); i++) {
     assert(intersector[i]); //should not call this function if surfaces are not "tracked"
     p->push_back(intersector[i]->GetPointerToResults());
   }
@@ -913,7 +913,7 @@ EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData()
 unique_ptr<EmbeddedBoundaryDataSet>
 EmbeddedBoundaryOperator::GetPointerToEmbeddedBoundaryData(int i)
 {
-  assert(i>=0 && i<intersector.size());
+  assert(i>=0 && i<(int)intersector.size());
   assert(intersector[i]);
   return intersector[i]->GetPointerToResults();
 }
@@ -924,7 +924,7 @@ void
 EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
 {
   dynamics_calculator.assign(surfaces.size(), std::make_tuple(nullptr,nullptr,nullptr));
-  for(int i=0; i<surfaces.size(); i++) {
+  for(int i=0; i<(int)surfaces.size(); i++) {
     if(strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
       continue; //not specified for this surface
     if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::YES) {
@@ -970,7 +970,7 @@ EmbeddedBoundaryOperator::SetupUserDefinedDynamicsCalculator()
 void
 EmbeddedBoundaryOperator::OutputSurfaces()
 {
-  for(int i=0; i<lagout.size(); i++)
+  for(int i=0; i<(int)lagout.size(); i++)
     lagout[i].OutputTriangulatedMesh(surfaces[i].X0, surfaces[i].elems);
 }
 
@@ -979,7 +979,7 @@ EmbeddedBoundaryOperator::OutputSurfaces()
 void
 EmbeddedBoundaryOperator::OutputResults(double time, double dt, int time_step, bool force_write)
 {
-  for(int i=0; i<lagout.size(); i++)
+  for(int i=0; i<(int)lagout.size(); i++)
     lagout[i].OutputResults(time, dt, time_step, surfaces[i].X0, surfaces[i].X, F[i], force_write);
 }
 

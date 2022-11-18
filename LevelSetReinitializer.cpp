@@ -661,7 +661,7 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   Vec3D gradphi;
   double gradphi_norm;
   double epsx, epsy, epsz;
-  for(int n=0; n<firstLayer.size(); n++) {
+  for(int n=0; n<(int)firstLayer.size(); n++) {
 
     // This must be a node in the interior of the subdomain (see how firstLayer is populated)
     i = firstLayer[n].i; 
@@ -1142,7 +1142,6 @@ LevelSetReinitializer::ComputeNormalDirectionBeyondFirstLayer(SpaceVariable3D &P
     normal[it->k][it->j][it->i] = it->nphi0;
 
   // loop through the interior of the subdomain
-  double a,b,c,d,e,f, ap,am, bp,bm, cp,cm, dp,dm, ep,em, fp,fm;
 
 
   if(UsefulG2 && useful_nodes) { //narrow-band level set method
@@ -1486,7 +1485,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   double*** level  = Level.GetDataPointer();
   double*** useful = UsefulG2.GetDataPointer();
   double*** active = Active.GetDataPointer();
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  //Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
@@ -1532,7 +1531,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
 
       }
   Level.RestoreDataPointerAndInsert();
-  coordinates.RestoreDataPointerToLocalVector();
+  //coordinates.RestoreDataPointerToLocalVector();
 
   // Update useful_nodes and active_nodes to get the changes at boundary
   level = Level.GetDataPointer();

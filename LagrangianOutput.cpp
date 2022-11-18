@@ -51,7 +51,7 @@ LagrangianOutput::OutputTriangulatedMesh(vector<Vec3D>& X0, vector<Int3>& elems)
 
     out << "Nodes MyNodes" << endl;
 
-    for(int i=0; i<X0.size(); i++) 
+    for(int i=0; i<(int)X0.size(); i++) 
       out << std::setw(10) << i+1 
           << std::setw(14) << std::scientific << X0[i][0]
           << std::setw(14) << std::scientific << X0[i][1] 
@@ -59,7 +59,7 @@ LagrangianOutput::OutputTriangulatedMesh(vector<Vec3D>& X0, vector<Int3>& elems)
 
     out << "Elements MyElems using MyNodes" << endl;
 
-    for(int i=0; i<elems.size(); i++)
+    for(int i=0; i<(int)elems.size(); i++)
       out << std::setw(10) << i+1 << "  4  "  //"4" for triangle elements
           << std::setw(10) << elems[i][0]+1
           << std::setw(10) << elems[i][1]+1
@@ -124,7 +124,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
     }
 
     fprintf(disp_file,"%e\n", t);
-    for(int i=0; i<X0.size(); i++)
+    for(int i=0; i<(int)X0.size(); i++)
       fprintf(disp_file,"%12.8e    %12.8e    %12.8e\n", X[i][0]-X0[i][0], X[i][1]-X0[i][1], X[i][2]-X0[i][2]);
 
     fclose(disp_file);

@@ -69,11 +69,11 @@ public:
   bool HasSurfaceFromOtherSolver() {return hasSurfFromOtherSolver;} //!< index of surface from other solver is 0
 
   vector<TriangulatedSurface> *GetPointerToSurfaces() {return &surfaces;}
-  TriangulatedSurface         *GetPointerToSurface(int i) {assert(i>=0 && i<surfaces.size()); return &surfaces[i];}
+  TriangulatedSurface         *GetPointerToSurface(int i) {assert(i>=0 && i<(int)surfaces.size()); return &surfaces[i];}
   vector<vector<Vec3D> >      *GetPointerToForces() {return &F;}
-  vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<F.size()); return &F[i];}
+  vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<(int)F.size()); return &F[i];}
   vector<Intersector*>        *GetPointerToIntersectors() {return &intersector;}
-  Intersector                 *GetPointerToIntersector(int i) {assert(i>=0 && i<intersector.size()); return intersector[i];}
+  Intersector                 *GetPointerToIntersector(int i) {assert(i>=0 && i<(int)intersector.size()); return intersector[i];}
 
   std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > GetPointerToEmbeddedBoundaryData();
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToEmbeddedBoundaryData(int i); 

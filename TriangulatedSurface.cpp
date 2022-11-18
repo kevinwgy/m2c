@@ -84,7 +84,7 @@ void TriangulatedSurface::CalculateNormalsAndAreas()
         fprintf(stderr, "*** Error: Cannot handle a mix of triangles and line segments.\n");
         exit(-1);
       }
-    for(int i=0; i<X.size(); i++)
+    for(int i=0; i<(int)X.size(); i++)
       if(X[i][2] != 0) {
         fprintf(stderr, "*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
                      X[i][2]);
@@ -112,7 +112,7 @@ TriangulatedSurface::CheckSurfaceOrientation()
   assert(!degenerate);
 
   map<iipair, ibpair> edgeMap;
-  for (int iTriangle=0; iTriangle<elems.size(); iTriangle++) {
+  for (int iTriangle=0; iTriangle<(int)elems.size(); iTriangle++) {
     int from1, to1, from2, to2, from3, to3;
     from1 = elems[iTriangle][0];  to1 = elems[iTriangle][1];
     from2 = elems[iTriangle][1];  to2 = elems[iTriangle][2];
@@ -148,7 +148,7 @@ TriangulatedSurface::CheckSurfaceOrientationAndClosedness()
 
   std::multimap<int,int> edges;
   int p1, p2;
-  for(int i=0; i<elems.size(); i++) {
+  for(int i=0; i<(int)elems.size(); i++) {
     for(int j=0; j<3; j++) {//loop through the three edges
       p1 = elems[i][j];
       p2 = elems[i][(j+1)%3];
@@ -178,7 +178,7 @@ TriangulatedSurface::CheckSurfaceClosedness()
 
   std::multimap<int,int> edges;
   int p1, p2;
-  for(int i=0; i<elems.size(); i++) {
+  for(int i=0; i<(int)elems.size(); i++) {
     for(int j=0; j<3; j++) {//loop through the three edges
       p1 = elems[i][j];
       p2 = elems[i][(j+1)%3];

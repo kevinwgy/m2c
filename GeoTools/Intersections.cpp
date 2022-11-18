@@ -310,7 +310,7 @@ PlaneCuttingAxisAlignedBox(Vec3D& O, Vec3D& N, Vec3D& Vmin, Vec3D& Vmax,
     return nPoints; // no need to compute anything else
 
   // fill intersections
-  if(intersections->size()<nPoints)
+  if((int)intersections->size()<nPoints)
     intersections->resize(nPoints);
  
   int counter = 0;

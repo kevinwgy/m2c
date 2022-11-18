@@ -16,7 +16,7 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
                   : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_), embed(embed_),
                     heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)) 
 {
-  for(int i=0; i<lso.size(); i++) {
+  for(int i=0; i<(int)lso.size(); i++) {
     ls_mat_id.push_back(lso[i]->GetMaterialID());
 
     Phi_tmp.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
@@ -36,7 +36,7 @@ TimeIntegratorBase::Destroy()
 {
   IDn.Destroy();
 
-  for(int i=0; i<Phi_tmp.size(); i++) {
+  for(int i=0; i<(int)Phi_tmp.size(); i++) {
     Phi_tmp[i]->Destroy(); 
     delete Phi_tmp[i];
   }
@@ -57,7 +57,7 @@ TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D
                   Un(comm_, &(dms_.ghosted1_5dof)),
                   Rn(comm_, &(dms_.ghosted1_5dof)), Rn_xi(NULL)
 {
-  for(int i=0; i<lso.size(); i++) {
+  for(int i=0; i<(int)lso.size(); i++) {
     Rn_ls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
 
@@ -69,7 +69,7 @@ TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D
 
 TimeIntegratorFE::~TimeIntegratorFE()
 {
-  for(int i=0; i<Rn_ls.size(); i++)
+  for(int i=0; i<(int)Rn_ls.size(); i++)
     delete Rn_ls[i];
 
   if(Rn_xi)
@@ -85,7 +85,7 @@ void TimeIntegratorFE::Destroy()
   Un.Destroy();
   Rn.Destroy();
 
-  for(int i=0; i<Rn_ls.size(); i++) {
+  for(int i=0; i<(int)Rn_ls.size(); i++) {
     Rn_ls[i]->Destroy(); delete Rn_ls[i];
   }
 
@@ -107,12 +107,16 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
 
+  int mpi_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+  fprintf(stderr,"[%d] I am here.\n", mpi_rank);
+
   // Make a copy of Phi for update of material ID. 
   if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
-    for(int i=0; i<Phi.size(); i++)
+    for(int i=0; i<(int)Phi.size(); i++)
       Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
   } else {
-    for(int i=0; i<Phi.size(); i++)
+    for(int i=0; i<(int)Phi.size(); i++)
       lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
   }
 
@@ -123,11 +127,15 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
+  MPI_Barrier(MPI_COMM_WORLD);
+  fprintf(stderr,"[%d] I am here 0.5. use_grad_phi = %d\n", mpi_rank, use_grad_phi);
   if(use_grad_phi)
     spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute Rn
   else //using mesh normal at material interface
     spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute Rn
 
+  MPI_Barrier(MPI_COMM_WORLD);
+  fprintf(stderr,"[%d] I am here 0.6.\n", mpi_rank);
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
   spo.PrimitiveToConservative(V, ID, Un); // get Un
@@ -136,10 +144,11 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
 
+  fprintf(stderr,"[%d] I am here 2.\n", mpi_rank);
   // -------------------------------------------------------------------------------
   // Forward Euler step for the level set equation(s): Phi(n+1) = Phi(n) + dt*R(Phi(n))
   // -------------------------------------------------------------------------------
-  for(int i=0; i<Phi.size(); i++) {
+  for(int i=0; i<(int)Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i], time, dt); //compute Rn_ls (level set)
     lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
@@ -156,10 +165,12 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
 
+  fprintf(stderr,"[%d] I am here 3.\n", mpi_rank);
   // -------------------------------------------------------------------------------
   // End-of-step tasks
   // -------------------------------------------------------------------------------
   UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
+  fprintf(stderr,"[%d] I am here 4.\n", mpi_rank);
 }
 
 //----------------------------------------------------------------------------
@@ -178,7 +189,7 @@ TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers
                    R(comm_, &(dms_.ghosted1_5dof)),
                    Xi1(NULL), Rxi(NULL)
 {
-  for(int i=0; i<lso.size(); i++) {
+  for(int i=0; i<(int)lso.size(); i++) {
     Phi1.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
     Rls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
@@ -193,7 +204,7 @@ TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers
 
 TimeIntegratorRK2::~TimeIntegratorRK2()
 {
-  for(int i=0; i<Rls.size(); i++) {
+  for(int i=0; i<(int)Rls.size(); i++) {
     delete Phi1[i];
     delete Rls[i];
   }
@@ -211,7 +222,7 @@ void TimeIntegratorRK2::Destroy()
   V1.Destroy(); 
   R.Destroy();
 
-  for(int i=0; i<Rls.size(); i++) {
+  for(int i=0; i<(int)Rls.size(); i++) {
     Phi1[i]->Destroy(); 
     Rls[i]->Destroy(); 
   }
@@ -237,10 +248,10 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Make a copy of Phi for update of material ID. 
   if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
-    for(int i=0; i<Phi.size(); i++)
+    for(int i=0; i<(int)Phi.size(); i++)
       Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
   } else {
-    for(int i=0; i<Phi.size(); i++)
+    for(int i=0; i<(int)Phi.size(); i++)
       lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
   }
 
@@ -274,7 +285,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 1 FOR LS ****************** 
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
-  for(int i=0; i<Phi.size(); i++) {
+  for(int i=0; i<(int)Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
     lso[i]->AXPlusBY(0.0, *Phi1[i], 1.0, *Phi[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi1[i], dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
@@ -318,7 +329,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 2 FOR LS ******************
   // Step 2 for the level set equations: Phi(n+1) = 0.5*Phi(n) + 0.5*Phi1 + 0.5*dt*R(Phi1)
-  for(int i=0; i<Phi.size(); i++) {
+  for(int i=0; i<(int)Phi.size(); i++) {
     lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
     lso[i]->AXPlusBY(0.5, *Phi[i], 0.5, *Phi1[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi[i], 0.5*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
@@ -362,7 +373,7 @@ TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers
                    Xi1(NULL), Rxi(NULL)
                 
 {
-  for(int i=0; i<lso.size(); i++) {
+  for(int i=0; i<(int)lso.size(); i++) {
     Phi1.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
     Rls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
@@ -377,7 +388,7 @@ TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers
 
 TimeIntegratorRK3::~TimeIntegratorRK3()
 {
-  for(int i=0; i<Rls.size(); i++) {
+  for(int i=0; i<(int)Rls.size(); i++) {
     delete Phi1[i];
     delete Rls[i];
   }
@@ -396,7 +407,7 @@ void TimeIntegratorRK3::Destroy()
   V2.Destroy();
   R.Destroy();
 
-  for(int i=0; i<Rls.size(); i++) {
+  for(int i=0; i<(int)Rls.size(); i++) {
     Phi1[i]->Destroy();
     Rls[i]->Destroy();
   }
@@ -422,10 +433,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Make a copy of Phi for update of material ID. 
   if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
-    for(int i=0; i<Phi.size(); i++)
+    for(int i=0; i<(int)Phi.size(); i++)
       Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
   } else {
-    for(int i=0; i<Phi.size(); i++)
+    for(int i=0; i<(int)Phi.size(); i++)
       lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
   }
 
@@ -460,7 +471,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 1 FOR LS ******************
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
-  for(int i=0; i<Phi.size(); i++) {
+  for(int i=0; i<(int)Phi.size(); i++) {
     lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
     lso[i]->AXPlusBY(0.0, *Phi1[i], 1.0, *Phi[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi1[i], dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
@@ -510,7 +521,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 2 FOR LS ******************
   // Step 2: Phi2 = 0.75*Phi(n) + 0.25*Phi1 + 0.25*dt*R(Phi1)
-  for(int i=0; i<Phi.size(); i++) {
+  for(int i=0; i<(int)Phi.size(); i++) {
     lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
     lso[i]->AXPlusBY(0.25, *Phi1[i], 0.75, *Phi[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi1[i], 0.25*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
@@ -554,7 +565,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 3 FOR LS ******************
   // Step 3: Phi(n+1) = 1/3*Phi(n) + 2/3*Phi2 + 2/3*dt*R(Phi2)
-  for(int i=0; i<Phi.size(); i++) {
+  for(int i=0; i<(int)Phi.size(); i++) {
     lso[i]->ComputeResidual(V2, *Phi1[i], *Rls[i], time, dt);
     lso[i]->AXPlusBY(1.0/3.0, *Phi[i], 2.0/3.0, *Phi1[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi[i], 2.0/3.0*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
@@ -599,7 +610,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     // material boundaries. (2) is optional, and not done by default (frequency controlled by user).
     resolved_conflicts = mpo.ResolveConflictsInLevelSets(time_step, Phi);
     if(resolved_conflicts) { //enforce b.c. for Phi (only necessary when boundary is touched, can be improved later)
-      for(int i=0; i<Phi.size(); i++)
+      for(int i=0; i<(int)Phi.size(); i++)
         lso[i]->ApplyBoundaryConditions(*Phi[i]);
     }
 
@@ -617,11 +628,11 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
     // Reinitialize level set (also apply boundary conditions)
     if(resolved_conflicts>0) { //must reinitialize
-      for(int i=0; i<Phi.size(); i++) 
+      for(int i=0; i<(int)Phi.size(); i++) 
         lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0/*no-special-maxIts*/, true/*"must_do"*/);
     } else {
       if(subcycle==0) { //frequency specified by user
-        for(int i=0; i<Phi.size(); i++) 
+        for(int i=0; i<(int)Phi.size(); i++) 
           lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0/*no-special-maxIts*/, false/*"must_do"*/);
       }
     }
@@ -637,15 +648,15 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
         // Make a copy of Phi for update of material ID. 
         if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
-          for(int i=0; i<Phi.size(); i++)
+          for(int i=0; i<(int)Phi.size(); i++)
             Phi_tmp[i]->AXPlusBY(0.0, 1.0, *Phi[i], true); // setting Phi_tmp[i] = Phi[i], including external ghosts
         } else {
-          for(int i=0; i<Phi.size(); i++)
+          for(int i=0; i<(int)Phi.size(); i++)
             lso[i]->AXPlusBY(0.0, *Phi_tmp[i], 1.0, *Phi[i], true); //in case of narrow-band, go over only useful nodes
         }
 
         mpo.UpdateLevelSetsInUnresolvedCells(Phi, unresolved);
-        for(int i=0; i<Phi.size(); i++)
+        for(int i=0; i<(int)Phi.size(); i++)
           lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0, true); //will NOT change sign of phi
         mpo.UpdateMaterialIDByLevelSet(Phi_tmp, Phi, embed ? embed->GetPointerToIntersectors() : nullptr,
                                        ID); //should only update ID of unresolved cells      
@@ -668,7 +679,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     vector<int> phi_updated(lso.size(), 0); //0 or 1
     vector<Int3> new_useful_nodes[lso.size()];
     if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
-      for(int i=0; i<Phi.size(); i++) {
+      for(int i=0; i<(int)Phi.size(); i++) {
         if(phi_updated[i] != 0)
           lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);
       }

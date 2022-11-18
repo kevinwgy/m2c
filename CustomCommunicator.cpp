@@ -75,7 +75,7 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
 
     int* nodes = new int[3*local_size];
     if(proc == rank)
-      for(int i = 0; i < ghost_nodes.size(); i++) {
+      for(int i = 0; i < (int)ghost_nodes.size(); i++) {
         nodes[i*3]   = ghost_nodes[i][0];
         nodes[i*3+1] = ghost_nodes[i][1];
         nodes[i*3+2] = ghost_nodes[i][2];
@@ -179,13 +179,13 @@ CustomCommunicator::CustomCommunicator(const CustomCommunicator &cc, int dof_, i
 
   assert(ghost_width >= cc.ghost_width); //Violating this may (not always) lead to accessing memory out of range
 
-  for(int i=0; i<send_pack.size(); i++) {
+  for(int i=0; i<(int)send_pack.size(); i++) {
     send_pack.push_back(Package(cc.send_pack[i].type, cc.send_pack[i].rank));
     send_pack[i].index = cc.send_pack[i].index;
     send_pack[i].buffer.resize(dof*send_pack[i].index.size());
   }
 
-  for(int i=0; i<recv_pack.size(); i++) {
+  for(int i=0; i<(int)recv_pack.size(); i++) {
     recv_pack.push_back(Package(cc.recv_pack[i].type, cc.recv_pack[i].rank));
     recv_pack[i].index = cc.recv_pack[i].index;
     recv_pack[i].buffer.resize(dof*recv_pack[i].index.size());
@@ -232,7 +232,7 @@ CustomCommunicator::ExchangeAndInsert(double ***v)
     vector<Int3> &index(it->index);
 
     int i,j,k;
-    for(int n = 0; n < index.size(); n++) {
+    for(int n = 0; n < (int)index.size(); n++) {
       i = index[n][0];
       j = index[n][1];
       k = index[n][2];
@@ -267,7 +267,7 @@ CustomCommunicator::ExchangeAndInsert(double ***v)
     vector<Int3> &index(it->index);
 
     int i,j,k;
-    for(int n = 0; n < index.size(); n++) {
+    for(int n = 0; n < (int)index.size(); n++) {
       i = index[n][0];
       j = index[n][1];
       k = index[n][2];

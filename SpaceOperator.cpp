@@ -880,7 +880,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   if(EBDS != nullptr) {
 
     color.assign(EBDS->size(), NULL);
-    for(int i=0; i<EBDS->size(); i++) {
+    for(int i=0; i<(int)EBDS->size(); i++) {
       assert((*EBDS)[i]->Color_ptr);
       color[i] = (*EBDS)[i]->Color_ptr->GetDataPointer();
     }
@@ -889,7 +889,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++) {
 
-          for(int surf=0; surf<color.size(); surf++) {
+          for(int surf=0; surf<(int)color.size(); surf++) {
             if(color[surf][k][j][i] <= 0) {//occluded or enclosed
               v[k][j][i][0] = iod.eqs.dummy_state.density;
               v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
@@ -925,7 +925,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     // Verification (can be deleted): occluded nodes should have inactive_material_id
     int i,j,k;
-    for(int surf=0; surf<EBDS->size(); surf++) {
+    for(int surf=0; surf<(int)EBDS->size(); surf++) {
       set<Int3> *occluded = (*EBDS)[surf]->occluded_ptr;
       set<Int3> *imposed_occluded = (*EBDS)[surf]->imposed_occluded_ptr;
       for(auto it = occluded->begin(); it != occluded->end(); it++) {
@@ -949,7 +949,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
   if(EBDS != nullptr) {
-    for(int i=0; i<EBDS->size(); i++)
+    for(int i=0; i<(int)EBDS->size(); i++)
       (*EBDS)[i]->Color_ptr->RestoreDataPointerToLocalVector();
   }
 
@@ -1434,7 +1434,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
 
   //Step 2. Loop through embedded boundaries and determine the color at user-specified point from each boundary
   vector<int> mycolor(EBDS.size(), INT_MIN);
-  for(int surf = 0; surf < EBDS.size(); surf++) {
+  for(int surf = 0; surf < (int)EBDS.size(); surf++) {
 
     vector<int> max_color(vertices.size(), INT_MIN);
     vector<int> min_color(vertices.size(), INT_MAX);
@@ -1500,7 +1500,7 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
   //Step 3: Determine the "ruling surface" and color of this point.
   int ruling_surface = -1;
   int mycolor_final = INT_MIN;
-  for(i=0; i<mycolor.size(); i++) {
+  for(i=0; i<(int)mycolor.size(); i++) {
     assert(mycolor[i] != 0);
     if(mycolor[i]<0) { 
       if(ruling_surface == -1) {
@@ -1695,7 +1695,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
             if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii0,j,k))
               continue; //skip corner nodes
 
-            for(int p=0; p<mydisks.size(); p++) {
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][j][ii0][1], coords[k][j][ii0][2],
                                mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
                 v[k][j][ii0][0] = mydisks[p]->state.density;
@@ -1706,7 +1706,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][j][ii0][1], coords[k][j][ii0][2],
                                     myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
                 v[k][j][ii0][0] = myrects[p]->state.density;
@@ -1750,7 +1750,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
             if(coordinates.OutsidePhysicalDomainAndUnpopulated(iimax-1,j,k))
               continue; //skip corner nodes
 
-            for(int p=0; p<mydisks.size(); p++) {
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][j][iimax-1][1], coords[k][j][iimax-1][2],
                                mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
                 v[k][j][iimax-1][0] = mydisks[p]->state.density;
@@ -1761,7 +1761,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][j][iimax-1][1], coords[k][j][iimax-1][2],
                                     myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
                 v[k][j][iimax-1][0] = myrects[p]->state.density;
@@ -1805,7 +1805,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
             if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,jj0,k))
               continue; //skip corner nodes
 
-            for(int p=0; p<mydisks.size(); p++) {
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][jj0][i][2], coords[k][jj0][i][0],
                                mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
                 v[k][jj0][i][0] = mydisks[p]->state.density;
@@ -1816,7 +1816,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][jj0][i][2], coords[k][jj0][i][0],
                                     myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
                 v[k][jj0][i][0] = myrects[p]->state.density;
@@ -1860,7 +1860,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
             if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,jjmax-1,k))
               continue; //skip corner nodes
 
-            for(int p=0; p<mydisks.size(); p++) {
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][jjmax-1][i][2], coords[k][jjmax-1][i][0],
                                mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
                 v[k][jjmax-1][i][0] = mydisks[p]->state.density;
@@ -1871,7 +1871,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][jjmax-1][i][2], coords[k][jjmax-1][i][0],
                                     myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
                 v[k][jjmax-1][i][0] = myrects[p]->state.density;
@@ -1916,7 +1916,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
             if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,kk0))
               continue; //skip corner nodes
 
-            for(int p=0; p<mydisks.size(); p++) {
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[kk0][j][i][0], coords[kk0][j][i][1],
                                mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
                 v[kk0][j][i][0] = mydisks[p]->state.density;
@@ -1927,7 +1927,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[kk0][j][i][0], coords[kk0][j][i][1],
                                     myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
                 v[kk0][j][i][0] = myrects[p]->state.density;
@@ -1972,7 +1972,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
             if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,kkmax-1))
               continue; //skip corner nodes
 
-            for(int p=0; p<mydisks.size(); p++) {
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[kkmax-1][j][i][0], coords[kkmax-1][j][i][1],
                                mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
                 v[kkmax-1][j][i][0] = mydisks[p]->state.density;
@@ -1983,7 +1983,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[kkmax-1][j][i][0], coords[kkmax-1][j][i][1],
                                     myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
                 v[kkmax-1][j][i][0] = myrects[p]->state.density;
@@ -2149,7 +2149,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   vector<double***> phi;
   if(Phi && ls_mat_id) {
     phi.assign(Phi->size(), NULL);
-    for(int i=0; i<phi.size(); i++)
+    for(int i=0; i<(int)phi.size(); i++)
       phi[i] = (*Phi)[i]->GetDataPointer();
   }
  
@@ -2607,7 +2607,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
 
   if(Phi && ls_mat_id) {
-    for(int i=0; i<Phi->size(); i++)
+    for(int i=0; i<(int)Phi->size(); i++)
       (*Phi)[i]->RestoreDataPointerToLocalVector();
   }
 
@@ -2650,7 +2650,7 @@ SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
   for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
            it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
     if(it->second->conRec_depth>0) {
-      if(!EBDS || EBDS->size()<=it->first || (*EBDS)[it->first]->Phi_nLayer<1) {
+      if(!EBDS || (int)EBDS->size()<=it->first || (*EBDS)[it->first]->Phi_nLayer<1) {
         print_error(comm, "*** Error: Cannot impose constant reconstruction for cells near Embedded Surface %d.\n",
                     it->first);
         exit_mpi();
@@ -2719,7 +2719,7 @@ SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
         for(int i=i0; i<imax; i++) {
           if(tag[k][j][i] == 0)
             continue;
-          for(int ls=0; ls<phi.size(); ls++) {
+          for(int ls=0; ls<(int)phi.size(); ls++) {
             if(fabs(phi[ls][k][j][i])<depth[ls]) {
               tag[k][j][i] = 0;
               break;
@@ -2777,7 +2777,7 @@ SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int
   int my_ls    = (myid==0) ?       neighborid : myid;
   int neigh_ls = (neighborid==0) ? myid       : neighborid;
   bool found1(false), found2(false);
-  for(int s=0; s<ls_mat_id->size(); s++) {
+  for(int s=0; s<(int)ls_mat_id->size(); s++) {
     if(!found1 && (*ls_mat_id)[s] == my_ls) {
       my_ls = s;
       found1 = true;
@@ -3208,7 +3208,7 @@ SpaceOperator::FindEdgeSurfaceIntersections(int dir/*0~x,1~y,2~z*/, int i, int j
   tuple<int, int, double> fwd_intersection(std::make_tuple(-1,-1,DBL_MAX));
   tuple<int, int, double> bwd_intersection(std::make_tuple(-1,-1,-DBL_MAX));
   int xid;
-  for(int s=0; s<surfaces.size(); s++) {
+  for(int s=0; s<(int)surfaces.size(); s++) {
     xid = xf[s][k][j][i][dir];
     if(xid>=0) {
       double dist = (*intersections[s])[xid].dist;

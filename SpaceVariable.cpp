@@ -189,12 +189,10 @@ void SpaceVariable3D::Setup(MPI_Comm &comm_, DM *dm_)
   comm = &comm_;
   dm = dm_;
 
-  auto ierr = DMCreateGlobalVector(*dm, &globalVec); 
-  //CHKERRQ(ierr);
+  DMCreateGlobalVector(*dm, &globalVec); 
   VecSet(globalVec, 0.0);
 
-  ierr = DMCreateLocalVector(*dm, &localVec);
-  //CHKERRQ(ierr);
+  DMCreateLocalVector(*dm, &localVec);
   VecSet(localVec, 0.0);
 
   array = NULL;
@@ -252,8 +250,7 @@ double*** SpaceVariable3D::GetDataPointer()
 {
   if(!dm) return NULL;
 
-  auto ierr = DMDAVecGetArray(*dm, localVec, &array);
-  //CHKERRQ(ierr);
+  DMDAVecGetArray(*dm, localVec, &array);
   return array;
 }
 
@@ -265,8 +262,7 @@ void SpaceVariable3D::RestoreDataPointerAndInsert()
     return;
 
   RestoreDataPointerToLocalVector();
-  auto ierr = DMLocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
-  //CHKERRQ(ierr);
+  DMLocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
 
   // sync local to global
   DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
@@ -281,8 +277,7 @@ void SpaceVariable3D::RestoreDataPointerAndAdd()
     return;
 
   RestoreDataPointerToLocalVector();
-  auto ierr = DMLocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
-  //CHKERRQ(ierr);
+  DMLocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
 
   // sync local to global
   DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
@@ -296,8 +291,7 @@ void SpaceVariable3D::RestoreDataPointerToLocalVector()
   if(!dm)
     return;
 
-  auto ierr = DMDAVecRestoreArray(*dm, localVec, &array);  
-  //CHKERRQ(ierr);
+  DMDAVecRestoreArray(*dm, localVec, &array);  
 }
 
 //---------------------------------------------------------
@@ -318,10 +312,8 @@ void SpaceVariable3D::StoreMeshCoordinates(SpaceVariable3D &coordinates)
   if(!dm)
     return;
 
-  auto ierr = DMSetCoordinateDim(*dm, 3/*3D*/);
-  //CHKERRQ(ierr);
-  ierr = DMSetCoordinates(*dm, coordinates.globalVec);
-  //CHKERRQ(ierr);
+  DMSetCoordinateDim(*dm, 3/*3D*/);
+  DMSetCoordinates(*dm, coordinates.globalVec);
 }
 
 //---------------------------------------------------------
@@ -444,7 +436,7 @@ void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, std::vect
   for(int k=myk0; k<mykmax; k++)
     for(int j=myj0; j<myjmax; j++)
       for(int i=myi0; i<myimax; i++)
-        for(int id=0; id<Xindices.size(); id++) {
+        for(int id=0; id<(int)Xindices.size(); id++) {
           px = Xindices[id];
           py = Yindices[id];
           v[k][j][i*dof+px] = a*v[k][j][i*dof+px] + b*v2[k][j][i*dof+py];

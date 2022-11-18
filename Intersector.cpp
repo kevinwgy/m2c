@@ -147,7 +147,7 @@ void
 Intersector::GetElementsInScope1(std::vector<int> &elems_in_scope)
 {
   elems_in_scope.resize(scope_1.size());
-  for(int i=0; i<scope_1.size(); i++)
+  for(int i=0; i<(int)scope_1.size(); i++)
     elems_in_scope[i] = scope_1[i].trId();
 }
 
@@ -247,16 +247,16 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin,
       for(int i=ii0_in; i<iimax; i++) {
 
         delta = tol*dx_glob[i] + thicker;
-        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - tol;
-        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nL)] + tol;
+        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - delta;
+        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nL)] + delta;
 
         delta = tol*dy_glob[j] + thicker;
-        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nL)] - tol;
-        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nL)] + tol;
+        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nL)] - delta;
+        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nL)] + delta;
 
         delta = tol*dz_glob[k] + thicker;
-        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nL)] - tol;
-        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nL)] + tol;
+        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nL)] - delta;
+        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nL)] + delta;
       }
 
   //subD_bb includes the ghost boundary
@@ -904,10 +904,10 @@ Intersector::FloodFillColors()
 
   // Convert colors 
   std::map<int,int> old2new;
-  for(int i=0; i<in_colors.size(); i++)
+  for(int i=0; i<(int)in_colors.size(); i++)
     if(in_colors[i] == 1)
      old2new[i] = 1; //inlet_color;
-  for(int i=0; i<out_colors.size(); i++)
+  for(int i=0; i<(int)out_colors.size(); i++)
     if(out_colors[i] == 1) {
      assert(old2new.find(i) == old2new.end());
      old2new[i] = 2; //outlet_color;
@@ -1256,7 +1256,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
       ClosestPoint cp(-1,DBL_MAX,xi); //initialize to garbage
 
       int id;
-      for(int tri=0; tri<cands.size(); tri++) {
+      for(int tri=0; tri<(int)cands.size(); tri++) {
         id = cands[tri].trId();
         Int3 &nodes(Es[id]);
         Vec3D coords(x_glob[i], y_glob[j], z_glob[k]); //inside physical domain (safe)
@@ -1353,7 +1353,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
   vector<MyTriangle> global_scope;
   global_scope.reserve(Es.size());
 
-  for(int e=0; e<Es.size(); e++) {
+  for(int e=0; e<(int)Es.size(); e++) {
     MyTriangle tri(e, Xs[Es[e][0]], Xs[Es[e][1]], Xs[Es[e][2]]);
     global_scope.push_back(tri);
 
@@ -1385,7 +1385,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
     if(side==1) disp *= -1;
 
     // loop through triangles within the "local scope"
-    for(int i=0; i<local_scope.size(); i++) {
+    for(int i=0; i<(int)local_scope.size(); i++) {
 
       // find point "p" with lofting
       int triangle_id = local_scope[i];
@@ -1457,7 +1457,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
   
   // Step 4. Finalize output
   status.assign(Es.size(), 0);
-  for(int i=0; i<Es.size(); i++) {
+  for(int i=0; i<(int)Es.size(); i++) {
     if(positive_side[i]>0) {
       if(negative_side[i]>0)
         status[i] = 3;

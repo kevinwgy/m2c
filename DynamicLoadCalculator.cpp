@@ -284,7 +284,7 @@ DynamicLoadCalculator::ReadSnapshot(string filename, vector<vector<double> >& S)
     }
     if(done)
       break;
-    if(r>=S.size())
+    if(r>=(int)S.size())
       S.resize(S.size() + initial_size, vector<double>(nCol,0.0));
     for(int i=0; i<nCol; i++)
       S[r][i] = data[i];
@@ -529,7 +529,7 @@ DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D>
                   "(outside data interval [%e,%e]).\n", t, tmin, tmax);
   }
   else {
-    for(int k=1; k<stamp.size(); k++) {
+    for(int k=1; k<(int)stamp.size(); k++) {
       if(t<stamp[k].first) {
         k0 = k-1;
         k1 = k;

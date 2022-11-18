@@ -139,9 +139,9 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
   // Step 0. Find a mesh-specific length tolerance
   //----------------------------------------------------------
   double eps = DBL_MAX;
-  for(int i=0; i<x1.size()-1; i++)
+  for(int i=0; i<(int)x1.size()-1; i++)
     eps = std::min(eps, x1[i+1]-x1[i]);
-  for(int i=0; i<x2.size()-1; i++)
+  for(int i=0; i<(int)x2.size()-1; i++)
     eps = std::min(eps, x2[i+1]-x2[i]);
   eps *= 1.0e-6;
 
@@ -186,9 +186,9 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
     myxyz0[0] = myid0[0]<0 ? x1_minus[ghost_width_1+myid0[0]] : x1[myid0[0]];
     myxyz0[1] = myid0[1]<0 ? y1_minus[ghost_width_1+myid0[1]] : y1[myid0[1]];
     myxyz0[2] = myid0[2]<0 ? z1_minus[ghost_width_1+myid0[2]] : z1[myid0[2]];
-    myxyzmax[0] = (myidmax[0]-1)>=x1.size() ? x1_plus[myidmax[0]-1-x1.size()] : x1[myidmax[0]-1];
-    myxyzmax[1] = (myidmax[1]-1)>=y1.size() ? y1_plus[myidmax[1]-1-y1.size()] : y1[myidmax[1]-1];
-    myxyzmax[2] = (myidmax[2]-1)>=z1.size() ? z1_plus[myidmax[2]-1-z1.size()] : z1[myidmax[2]-1];
+    myxyzmax[0] = (myidmax[0]-1)>=(int)x1.size() ? x1_plus[myidmax[0]-1-x1.size()] : x1[myidmax[0]-1];
+    myxyzmax[1] = (myidmax[1]-1)>=(int)y1.size() ? y1_plus[myidmax[1]-1-y1.size()] : y1[myidmax[1]-1];
+    myxyzmax[2] = (myidmax[2]-1)>=(int)z1.size() ? z1_plus[myidmax[2]-1-z1.size()] : z1[myidmax[2]-1];
 
 //    fprintf(stderr,"[%d] Owner of mesh 1 [%d,%d,%d] (%e,%e,%e) -> [%d,%d,%d] (%e,%e,%e)\n", rank, ii0_1, jj0_1, kk0_1,
 //            myxyz0[0], myxyz0[1], myxyz0[2], iimax_1, jjmax_1, kkmax_1, myxyzmax[0], myxyzmax[1], myxyzmax[2]);
@@ -204,9 +204,9 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
       xyz0[0] = id0[0]<0 ? x2_minus[ghost_width_2+id0[0]] : x2[id0[0]];
       xyz0[1] = id0[1]<0 ? y2_minus[ghost_width_2+id0[1]] : y2[id0[1]];
       xyz0[2] = id0[2]<0 ? z2_minus[ghost_width_2+id0[2]] : z2[id0[2]];
-      xyzmax[0] = (idmax[0]-1)>=x2.size() ? x2_plus[idmax[0]-1-x2.size()] : x2[idmax[0]-1];
-      xyzmax[1] = (idmax[1]-1)>=y2.size() ? y2_plus[idmax[1]-1-y2.size()] : y2[idmax[1]-1];
-      xyzmax[2] = (idmax[2]-1)>=z2.size() ? z2_plus[idmax[2]-1-z2.size()] : z2[idmax[2]-1];
+      xyzmax[0] = (idmax[0]-1)>=(int)x2.size() ? x2_plus[idmax[0]-1-x2.size()] : x2[idmax[0]-1];
+      xyzmax[1] = (idmax[1]-1)>=(int)y2.size() ? y2_plus[idmax[1]-1-y2.size()] : y2[idmax[1]-1];
+      xyzmax[2] = (idmax[2]-1)>=(int)z2.size() ? z2_plus[idmax[2]-1-z2.size()] : z2[idmax[2]-1];
 
 //      fprintf(stderr,"[%d] is looking at [%d], owner of mesh 2: [%d,%d,%d] (%e,%e,%e) -> [%d,%d,%d] (%e,%e,%e)\n", rank, proc, id0[0], 
 //              id0[1], id0[2], xyz0[0], xyz0[1], xyz0[2], idmax[0], idmax[1], idmax[2], xyzmax[0], 
@@ -245,12 +245,12 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
         double s, sprime;
         for(int i=id0[dir]; i<idmax[dir]; i++) { 
           if(i<0)                s = s2_minus[ghost_width_2+i];
-          else if(i>=s2.size())  s = s2_plus[i-s2.size()];
+          else if(i>=(int)s2.size())  s = s2_plus[i-s2.size()];
           else                   s = s2[i];
 
           for(int i1=myid0[dir]; i1<myidmax[dir]; i1++) {
             if(i1<0)                sprime = s1_minus[ghost_width_1+i1];
-            else if(i1>=s1.size())  sprime = s1_plus[i1-s1.size()];
+            else if(i1>=(int)s1.size())  sprime = s1_plus[i1-s1.size()];
             else                    sprime = s1[i1]; 
 
             if(fabs(sprime-s)<eps) { //found an exact match
@@ -457,7 +457,7 @@ MeshMatcher::Transfer(SpaceVariable3D* V1, SpaceVariable3D* V2)
             buffer[counter] = v1[*it_k][*it_j][*it_i*dim+p];
             counter++; 
           }
-    assert(counter == buffer.size());
+    assert(counter == (int)buffer.size());
 
     // send package to "receiver" (if not self)
     if(receiver != rank) {
@@ -480,7 +480,7 @@ MeshMatcher::Transfer(SpaceVariable3D* V1, SpaceVariable3D* V2)
     } else { //sender is myself ==> direct copy
       vector<double>& my_send_buffer(send_buffer[rank]);
       assert(my_send_buffer.size() == buffer.size());
-      for(int i=0; i<my_send_buffer.size(); i++)
+      for(int i=0; i<(int)my_send_buffer.size(); i++)
         buffer[i] = my_send_buffer[i];
     }
   }
@@ -506,7 +506,7 @@ MeshMatcher::Transfer(SpaceVariable3D* V1, SpaceVariable3D* V2)
             v2[*it_k][*it_j][*it_i*dim+p] = buffer[counter];
             counter++; 
           }
-    assert(counter == buffer.size());
+    assert(counter == (int)buffer.size());
   }
   if(V2) V2->RestoreDataPointerAndInsert();
  

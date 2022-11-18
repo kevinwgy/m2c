@@ -128,14 +128,14 @@ private:
 
   //! Update rho_e_T
   inline void Update_rho_e_T(double rho, double e, double T) {
-    for(int i=0; i<rho_e_T.size()-1; i++)
+    for(int i=0; i<(int)rho_e_T.size()-1; i++)
       rho_e_T[i] = rho_e_T[i+1];
     rho_e_T.back() = std::make_tuple(rho,e,T);
   }
 
   //! Update rho_e_p_T
   inline void Update_rho_e_p_T(double rho, double e, double p, double T) {
-    for(int i=0; i<rho_e_p_T.size()-1; i++)
+    for(int i=0; i<(int)rho_e_p_T.size()-1; i++)
       rho_e_p_T[i] = rho_e_p_T[i+1];
     rho_e_p_T.back() = std::make_tuple(rho,e,p,T);
   } 
