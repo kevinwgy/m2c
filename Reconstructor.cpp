@@ -758,6 +758,7 @@ RETRY:
 
       case MeshData::INLET :
       case MeshData::OUTLET :
+      case MeshData::OVERSET :
         //constant reconstruction (Dirichlet b.c.)
       
         if     (i<0)   copyarray(&v[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF);
@@ -793,7 +794,7 @@ RETRY:
         break;
 
       default :
-        fprintf(stderr,"*** Error: Cannot perform reconstruction for b.c. %d.\n",
+        fprintf(stderr,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
                 gp->bcType);
     }
   }
@@ -976,6 +977,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
 
       case MeshData::INLET :
       case MeshData::OUTLET :
+      case MeshData::OVERSET :
         //constant reconstruction (Dirichlet b.c.)
       
         if(dir==0) {
@@ -1018,7 +1020,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
         break;
 
       default :
-        fprintf(stderr,"*** Error: Cannot perform reconstruction for b.c. %d.\n",
+        fprintf(stderr,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
                 gp->bcType);
     }
   }

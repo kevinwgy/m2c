@@ -2882,6 +2882,7 @@ ConcurrentProgramsData::ConcurrentProgramsData()
 void ConcurrentProgramsData::setup(const char *name, ClassAssigner *father)
 {
   //ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  new ClassAssigner(name, 3, father);
   aeros.setup("AeroS");
   aerof.setup("AeroF");
   m2c_twin.setup("M2CTwin");

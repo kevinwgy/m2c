@@ -107,9 +107,6 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
 
-  int mpi_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-  fprintf(stderr,"[%d] I am here.\n", mpi_rank);
 
   // Make a copy of Phi for update of material ID. 
   if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
@@ -127,15 +124,11 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
-  MPI_Barrier(MPI_COMM_WORLD);
-  fprintf(stderr,"[%d] I am here 0.5. use_grad_phi = %d\n", mpi_rank, use_grad_phi);
   if(use_grad_phi)
     spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute Rn
   else //using mesh normal at material interface
     spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute Rn
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  fprintf(stderr,"[%d] I am here 0.6.\n", mpi_rank);
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
   spo.PrimitiveToConservative(V, ID, Un); // get Un
@@ -144,7 +137,6 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
 
-  fprintf(stderr,"[%d] I am here 2.\n", mpi_rank);
   // -------------------------------------------------------------------------------
   // Forward Euler step for the level set equation(s): Phi(n+1) = Phi(n) + dt*R(Phi(n))
   // -------------------------------------------------------------------------------
@@ -165,12 +157,10 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
 
-  fprintf(stderr,"[%d] I am here 3.\n", mpi_rank);
   // -------------------------------------------------------------------------------
   // End-of-step tasks
   // -------------------------------------------------------------------------------
   UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
-  fprintf(stderr,"[%d] I am here 4.\n", mpi_rank);
 }
 
 //----------------------------------------------------------------------------

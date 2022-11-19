@@ -1756,7 +1756,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
     return false;
   } 
 
-  double c_1 = sqrt(c_1_square);
+  //double c_1 = sqrt(c_1_square); //unused.
                              
   double rho_2 = rho_0 + 3./40.*dp/c_0_square + 9./40.*dp/c_1_square;
   double p_2 = p_1 + 3./10.*dp;
