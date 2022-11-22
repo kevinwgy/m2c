@@ -590,6 +590,8 @@ int main(int argc, char* argv[])
   //! finalize 
   //! In general, "Destroy" should be called for classes that store Petsc DMDA data (which need to be "destroyed").
   
+  concurrent.Destroy();
+
   V.Destroy();
   ID.Destroy();
 
