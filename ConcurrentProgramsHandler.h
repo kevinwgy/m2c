@@ -82,13 +82,13 @@ public:
                                      std::set<Int3> *spo_frozen_nodes = NULL); 
 
 
-  void FirstExchange(SpaceVariable3D *V = NULL, double dt0 = -1.0, double tmax0 = -1.0,
-                     bool last_step = false); //!< called at the the 1st time step
+  void FirstExchange(SpaceVariable3D *V = NULL, double dt0 = -1.0,
+                     double tmax0 = -1.0); //!< called at the the 1st time step
 
-  void Exchange(SpaceVariable3D *V = NULL, double dt0 = -1.0, double tmax0 = -1.0,
-                bool last_step = false); //!< called every time step (except 1st and last)
+  void Exchange(SpaceVariable3D *V = NULL, double dt0 = -1.0,
+                double tmax0 = -1.0); //!< called every time step (except 1st and last)
 
-  void FinalExchange(); //!< at the last time step
+  void FinalExchange(SpaceVariable3D *V = NULL); //!< at the last time step
 
 private:
 

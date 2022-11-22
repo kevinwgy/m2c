@@ -57,14 +57,14 @@ public:
 
   //! Exchange data w/ M2C Twin (called at the end of the first time step)
   //! dt0 is the size of the last completed time-step
-  void FirstExchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step);
+  void FirstExchange(SpaceVariable3D &V, double dt0, double tmax0);
 
   //! Exchange data w/ M2C Twin (called at every time step except first and last)
   //! dt0 is the size of the last completed time-step
-  void Exchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step);
+  void Exchange(SpaceVariable3D &V, double dt0, double tmax0);
 
   //! Exchange data w/ M2C Twin (called at the last time step)
-  void FinalExchange();
+  void FinalExchange(SpaceVariable3D &V);
 
   //! Get time step size
   double GetTimeStepSize() {assert(twinning_status==FOLLOWER); return dt;}

@@ -183,6 +183,15 @@ ConcurrentProgramsHandler::SetupCommunicators()
 void
 ConcurrentProgramsHandler::Destroy()
 {
+  if(aeros)
+    aeros->Destroy();
+
+  if(aerof)
+    aerof->Destroy();
+
+  if(m2c_twin)
+    m2c_twin->Destroy();
+
   for(int i=0; i<(int)c.size(); i++)
     MPI_Comm_free(&c[i]);
 }
@@ -237,7 +246,7 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::FirstExchange(SpaceVariable3D *V, double dt0, double tmax0, bool last_step)
+ConcurrentProgramsHandler::FirstExchange(SpaceVariable3D *V, double dt0, double tmax0)
 {
   if(aeros) {
     aeros->FirstExchange();
@@ -258,7 +267,7 @@ ConcurrentProgramsHandler::FirstExchange(SpaceVariable3D *V, double dt0, double 
       assert(tmax0>=0.0);
     }
     assert(V);
-    m2c_twin->FirstExchange(*V, dt0, tmax0, last_step);
+    m2c_twin->FirstExchange(*V, dt0, tmax0);
     if(twinning_status==FOLLOWER) {
       dt = m2c_twin->GetTimeStepSize();
       tmax = m2c_twin->GetMaxTime();
@@ -270,7 +279,7 @@ ConcurrentProgramsHandler::FirstExchange(SpaceVariable3D *V, double dt0, double 
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::Exchange(SpaceVariable3D *V, double dt0, double tmax0, bool last_step)
+ConcurrentProgramsHandler::Exchange(SpaceVariable3D *V, double dt0, double tmax0)
 {
   if(aeros) {
     aeros->Exchange();
@@ -291,7 +300,7 @@ ConcurrentProgramsHandler::Exchange(SpaceVariable3D *V, double dt0, double tmax0
       assert(tmax0>=0.0);
     }
     assert(V);
-    m2c_twin->Exchange(*V, dt0, tmax0, last_step);
+    m2c_twin->Exchange(*V, dt0, tmax0);
     if(twinning_status==FOLLOWER) {
       dt = m2c_twin->GetTimeStepSize();
       tmax = m2c_twin->GetMaxTime();
@@ -303,7 +312,7 @@ ConcurrentProgramsHandler::Exchange(SpaceVariable3D *V, double dt0, double tmax0
 //---------------------------------------------------------
 
 void
-ConcurrentProgramsHandler::FinalExchange()
+ConcurrentProgramsHandler::FinalExchange(SpaceVariable3D *V)
 {
   if(aeros) {
     aeros->FinalExchange();
@@ -316,7 +325,8 @@ ConcurrentProgramsHandler::FinalExchange()
   }
 
   if(m2c_twin) {
-    m2c_twin->FinalExchange();
+    assert(V);
+    m2c_twin->FinalExchange(*V);
   }
 
 }

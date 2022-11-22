@@ -811,23 +811,21 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::FirstExchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step)
+M2CTwinMessenger::FirstExchange(SpaceVariable3D &V, double dt0, double tmax0)
 {
-  Exchange(V,dt0,tmax0,last_step); 
+  Exchange(V,dt0,tmax0); 
 }
 
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::Exchange(SpaceVariable3D &V, double dt0, double tmax0, bool last_step)
+M2CTwinMessenger::Exchange(SpaceVariable3D &V, double dt0, double tmax0)
 {
   ExchangeData(V);
 
   // leader sends dt and tmax to follower
   if(twinning_status == LEADER) {
     if(m2c_rank==0) {
-      if(last_step) //send a very small tmax to follower to trigger its termination
-        tmax0 = 1.0e-40;
       double buf[2] = {dt0, tmax0};
       MPI_Send(buf, 2, MPI_DOUBLE, 0, 0, joint_comm);
     }
@@ -846,9 +844,22 @@ M2CTwinMessenger::Exchange(SpaceVariable3D &V, double dt0, double tmax0, bool la
 //---------------------------------------------------------------
 
 void
-M2CTwinMessenger::FinalExchange()
+M2CTwinMessenger::FinalExchange(SpaceVariable3D &V)
 {
-  // Nothing needs to be done.
+  if(twinning_status == LEADER) {
+    //when LEADER is here, the follower is still executing "Exchange(...)"
+    
+    ExchangeData(V);
+
+    if(m2c_rank==0) {
+      double dt0   = 1.0e-40;
+      double tmax0 = 1.0e-40; //send a very small tmax to follower to trigger its termination
+      double buf[2] = {dt0, tmax0};
+      MPI_Send(buf, 2, MPI_DOUBLE, 0, 0, joint_comm);
+    }
+  }
+
+  //FOLLOWER: When follower reaches here, the leader has finished.
 }
 
 //---------------------------------------------------------------

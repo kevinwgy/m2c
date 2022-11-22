@@ -86,7 +86,7 @@ void TimeIntegratorFE::Destroy()
   Rn.Destroy();
 
   for(int i=0; i<(int)Rn_ls.size(); i++) {
-    Rn_ls[i]->Destroy(); delete Rn_ls[i];
+    Rn_ls[i]->Destroy();
   }
 
   if(Rn_xi)

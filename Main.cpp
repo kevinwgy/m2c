@@ -458,7 +458,12 @@ int main(int argc, char* argv[])
       tmax = tmaxs;
   }
 
-  while(t<tmax && time_step<iod.ts.maxIts) {
+  // set max time-step number to user input, or INF if it is a follower in Chimera
+  int maxIts = concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::FOLLOWER ?
+               INT_MAX : iod.ts.maxIts;
+
+  // time-stepping!
+  while(t<tmax && time_step<maxIts) {
 
     double dtleft = dts;
 
@@ -470,12 +475,6 @@ int main(int argc, char* argv[])
       // Compute time step size
       spo.ComputeTimeStepSize(V, ID, dt, cfl); 
 
-      if(concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::LEADER)
-        fprintf(stderr,"[Leader] dts = %e, Calculated dt = %e, cfl = %e.\n", dts, dt, cfl);
-      else
-        fprintf(stderr,"[Follower] dts = %e, Calculated dt = %e, cfl = %e.\n", dts, dt, cfl);
-
- 
       // Modify dt and cfl, dtleft if needed
       if(concurrent.GetTimeStepSize()>0) {//concurrent solver provides a "dts"
         if(dt>dtleft) { //dt should be reduced to dtleft
@@ -495,11 +494,12 @@ int main(int argc, char* argv[])
       if(concurrent.GetTimeStepSize()<=0.0)
         dts = dt;
 
+/*
       if(concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::LEADER)
         fprintf(stderr,"[Leader] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
       else
         fprintf(stderr,"[Follower] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
-
+*/
  
       if(dts<=dt)
         print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
@@ -513,23 +513,9 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-
-
-
-      MPI_Barrier(MPI_COMM_WORLD); 
-
-
-
       integrator->AdvanceOneTimeStep(V, ID, Phi, L, Xi, t, dt, time_step, subcycle, dts); 
-
-
-      MPI_Barrier(MPI_COMM_WORLD); 
-
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
-
-      fprintf(stderr,"Got here.\n");
-      MPI_Barrier(MPI_COMM_WORLD); exit(-1);
 
     } while (concurrent.Coupled() && dtleft != 0.0);
 
@@ -546,11 +532,11 @@ int main(int argc, char* argv[])
     double dts0 = dts; //the previous time step size
     if(concurrent.Coupled()) {
 
-      if(t<tmax && time_step<iod.ts.maxIts) {//not the last time-step
+      if(t<tmax && time_step<maxIts) {//not the last time-step
         if(time_step==1)
-          concurrent.FirstExchange(&V, dts, tmax, !(t<tmax && time_step<iod.ts.maxIts));
+          concurrent.FirstExchange(&V, dts, tmax);
         else
-          concurrent.Exchange(&V, dts, tmax, !(t<tmax && time_step<iod.ts.maxIts));
+          concurrent.Exchange(&V, dts, tmax);
       } 
 
       double dts_tmp = concurrent.GetTimeStepSize();
@@ -578,10 +564,11 @@ int main(int argc, char* argv[])
 
     out.OutputSolutions(t, dts0, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
 
+    
   }
 
   if(concurrent.Coupled())
-    concurrent.FinalExchange();
+    concurrent.FinalExchange(&V);
 
 
   // Final outputs
