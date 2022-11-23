@@ -352,11 +352,15 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     //find duplicates and remove them
     for(int proc=0; proc<numFollowerProcs; proc++) {
+      vector<int> local_dups;
       for(auto&& dup : dups[proc]) {
         auto it = std::find(found[proc].begin(), found[proc].end(), dup);
         assert(it != found[proc].end());
-        export_points[proc].erase(export_points[proc].begin() + (int)(it - found[proc].begin()));
+        local_dups.push_back(it - found[proc].begin()); //cannot directly erase!
       }
+      std::sort(local_dups.begin(), local_dups.end());
+      for(int n = local_dups.size()-1; n>=0; n--) //going backward to avoid wrong index 
+        export_points[proc].erase(export_points[proc].begin() + local_dups[n]);
     }
 
   }
@@ -464,11 +468,15 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     
     //find duplicates and remove them
     for(int proc = 0; proc < numLeaderProcs; proc++) {
+      vector<int> local_dups;
       for(auto&& dup : dups[proc]) {
         auto it = std::find(found[proc].begin(), found[proc].end(), dup);
         assert(it != found[proc].end());
-        export_points[proc].erase(export_points[proc].begin() + (int)(it - found[proc].begin()));
+        local_dups.push_back(it - found[proc].begin()); //can NOT directly erase (ordering!)
       }
+      std::sort(local_dups.begin(), local_dups.end());
+      for(int n = local_dups.size()-1; n>=0; n--) //going backward to avoid wrong index 
+        export_points[proc].erase(export_points[proc].begin() + local_dups[n]);
     }
     
     //Tag nodes involved in interpolations ("red boxes" in KW's notes)

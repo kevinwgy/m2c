@@ -72,6 +72,7 @@ int main(int argc, char* argv[])
   if(iod.special_tools.type != SpecialToolsData::NONE) {
     SpecialToolsDriver special_tools_driver(iod, comm, concurrent);
     special_tools_driver.Run();
+    concurrent.Destroy();
     return 0;
   }
   /*******************************************************/
@@ -95,13 +96,14 @@ int main(int argc, char* argv[])
 
 
   //! Initialize VarFcn (EOS, etc.) 
-
+  std::set<int> vf_tracker;
   std::vector<VarFcnBase *> vf;
   for(int i=0; i<(int)iod.eqs.materials.dataMap.size(); i++)
     vf.push_back(NULL); //allocate space for the VarFcn pointers
 
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
     int matid = it->first;
+    vf_tracker.insert(matid);
     if(matid < 0 || matid >= (int)vf.size()) {
       print_error("*** Error: Detected error in the specification of material indices (id = %d).\n", matid);
       exit_mpi();
@@ -121,6 +123,11 @@ int main(int argc, char* argv[])
       exit_mpi();
     }
   }
+  if(vf_tracker.size() != vf.size()) {
+    print_error("*** Error: Detected error in the specification of material IDs.\n");
+    exit_mpi();
+  }
+  vf_tracker.clear();   
 
   vf.push_back(new VarFcnDummy(iod.eqs.dummy_state)); //for "inactive" nodes, e.g., occluded or inside a solid body
   INACTIVE_MATERIAL_ID = vf.size() - 1;
