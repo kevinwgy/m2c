@@ -758,17 +758,29 @@ RETRY:
 
       case MeshData::INLET :
       case MeshData::OUTLET :
+        //constant reconstruction (Dirichlet b.c.)
+      
+        if     (i<0)   copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], nDOF);
+        else if(i>=NX) copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], nDOF);
+        else if(j<0)   copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], nDOF);
+        else if(j>=NY) copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], nDOF);
+        else if(k<0)   copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], nDOF);
+        else if(k>=NZ) copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], nDOF);
+
+        break;
+
       case MeshData::OVERSET :
         //constant reconstruction (Dirichlet b.c.)
       
-        if     (i<0)   copyarray(&v[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF);
-        else if(i>=NX) copyarray(&v[kk][jj][ii*nDOF], &vl[k][j][i*nDOF], nDOF);
-        else if(j<0)   copyarray(&v[kk][jj][ii*nDOF], &vt[k][j][i*nDOF], nDOF);
-        else if(j>=NY) copyarray(&v[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF);
-        else if(k<0)   copyarray(&v[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF);
-        else if(k>=NZ) copyarray(&v[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF);
+        if     (i<0)   copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], nDOF);
+        else if(i>=NX) copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], nDOF);
+        else if(j<0)   copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], nDOF);
+        else if(j>=NY) copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], nDOF);
+        else if(k<0)   copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], nDOF);
+        else if(k>=NZ) copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], nDOF);
 
         break;
+
 
       case MeshData::SYMMETRY :
       case MeshData::SLIPWALL :
@@ -977,23 +989,41 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
 
       case MeshData::INLET :
       case MeshData::OUTLET :
+        //constant reconstruction (Dirichlet b.c.)
+      
+        if(dir==0) {
+          if     (i<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(i>=NX) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        else if(dir==1) {
+          if     (j<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(j>=NY) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        else if(dir==2) {
+          if(k<0)        copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(k>=NZ) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        if(slope) setValue(&slope[k][j][i*nDOF], 0.0, nDOF);
+        break;
+
       case MeshData::OVERSET :
         //constant reconstruction (Dirichlet b.c.)
       
         if(dir==0) {
-          if     (i<0)   copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
-          else if(i>=NX) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+          if     (i<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(i>=NX) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
         }
         else if(dir==1) {
-          if     (j<0)   copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
-          else if(j>=NY) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+          if     (j<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(j>=NY) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
         }
         else if(dir==2) {
-          if(k<0)        copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
-          else if(k>=NZ) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+          if(k<0)        copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(k>=NZ) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
         }
         if(slope) setValue(&slope[k][j][i*nDOF], 0.0, nDOF);
         break;
+
 
       case MeshData::SYMMETRY :
       case MeshData::SLIPWALL :

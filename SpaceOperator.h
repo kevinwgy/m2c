@@ -77,6 +77,10 @@ class SpaceOperator
   //! internal variable for temporary use (1D)
   SpaceVariable3D Tag;
 
+  //! State variables at overset ghost/boundary nodes (only type == FACE)
+  bool domain_has_overset; //!< whether the entire domain has overset boundaries
+  vector<std::pair<Int3, Vec5D> > ghost_overset; //!< overset ghost nodes outside the physical domain
+
 
 public:
   SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -136,9 +140,13 @@ public:
 
   void SetPointerToFrozenNodes(std::set<Int3>* fnodes_) {frozen_nodes_ptr = fnodes_;}
 
+  void UpdateOversetGhostNodes(SpaceVariable3D &V);
+
   void Destroy();
 
+
 private:
+
   void SetupMesh(vector<double> &x, vector<double> &y, vector<double> &z,
                  vector<double> &dx, vector<double> &dy, vector<double> &dz);
   void SetupMeshUniformRectangularDomain();
@@ -181,7 +189,7 @@ private:
                                         int myid, int neighborid, vector<int> *ls_mat_id,
                                         vector<double***> *phi);
 
-  // Calculate the gradient of any variable phi at cell interface. 
+  //! Calculate the gradient of any variable phi at cell interface. 
   Vec3D CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
                                          Vec3D*** dxyz, double*** phi);
 
@@ -189,14 +197,14 @@ private:
                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                   SpaceVariable3D &Tag0);
 
-  // Find intersections (forward and backward) between an edge and embedded surface(s)
+  //! Find intersections (forward and backward) between an edge and embedded surface(s)
   bool FindEdgeSurfaceIntersections(int dir/*0~x,1~y,2~z*/, int i, int j, int k,
                                     vector<TriangulatedSurface*>& surfaces,
                                     vector<vector<IntersectionPoint>*>& intersections,
                                     vector<Vec3D***>& xf, vector<Vec3D***>& xb,
                                     Vec3D& vwallf, Vec3D& vwallb, Vec3D& nwallf, Vec3D& nwallb);
 
-  // Utility
+  //! Utility
   inline double CentralDifferenceLocal(double phi0, double phi1, double phi2, double x0, double x1, double x2) {
     double c0 = -(x2-x1)/((x1-x0)*(x2-x0));
     double c1 = 1.0/(x1-x0) - 1.0/(x2-x1);

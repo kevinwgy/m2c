@@ -407,9 +407,10 @@ int main(int argc, char* argv[])
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
                                              spo.GetPointerToInnerGhostNodes(),
                                              spo.GetPointerToOuterGhostNodes(),
-                                             &global_mesh, 
+                                             &global_mesh, &V,
                                              &ID, //updated in inactive regions (overset grids)
                                              &spo_frozen_nodes); //updated w/ "green boxes" (overset grids)
+    spo.UpdateOversetGhostNodes(V);
     
 /*
     SpaceVariable3D Test(comm, &(dms.ghosted1_1dof));

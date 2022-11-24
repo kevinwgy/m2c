@@ -65,7 +65,7 @@ void
 M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, DataManagers3D &dms_,
                                                 vector<GhostPoint> &ghost_nodes_inner_,
                                                 vector<GhostPoint> &ghost_nodes_outer_,
-                                                GlobalMeshInfo &global_mesh_,
+                                                GlobalMeshInfo &global_mesh_, SpaceVariable3D &V,
                                                 SpaceVariable3D &ID, set<Int3> &spo_frozen_nodes)
 {
 
@@ -808,6 +808,8 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     }
 
   }
+
+  ExchangeData(V);
 
   if(twinning_status == FOLLOWER) {
     // in terms of time-stepping, the follower is one-step behind the leader --> O(dt) error

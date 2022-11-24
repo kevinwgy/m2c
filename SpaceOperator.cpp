@@ -491,6 +491,10 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
             ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::VERTEX,
                                         proj, out_normal, 0));
 
+          // collect ghost nodes along overset boundaries if any (FACE only)
+          if(bcType==MeshData::OVERSET && counter==1)
+            ghost_overset.push_back(std::make_pair(Int3(i,j,k), Vec5D(0.0)));
+
         } 
         else //inside physical domain
           ghost_nodes_inner.push_back(GhostPoint(i,j,k));
@@ -528,6 +532,12 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
   for(int i=0; i<ghost_nodes_outer.size(); i++)
     fprintf(stderr,"Ghost %d: (%d, %d, %d) | Image: (%d, %d, %d) | ProjType = %d | BcType = %d | Proj: (%e, %e, %e), (%e, %e, %e)\n", i, ghost_nodes_outer[i].ijk[0], ghost_nodes_outer[i].ijk[1], ghost_nodes_outer[i].ijk[2], ghost_nodes_outer[i].image_ijk[0], ghost_nodes_outer[i].image_ijk[1], ghost_nodes_outer[i].image_ijk[2], ghost_nodes_outer[i].type_projection, ghost_nodes_outer[i].bcType, ghost_nodes_outer[i].boundary_projection[0], ghost_nodes_outer[i].boundary_projection[1], ghost_nodes_outer[i].boundary_projection[2], ghost_nodes_outer[i].outward_normal[0], ghost_nodes_outer[i].outward_normal[1], ghost_nodes_outer[i].outward_normal[2]);
 */
+
+  // figure out whether the entire domain has overset ghosts...
+  int overset_count = ghost_overset.size();
+  MPI_Allreduce(MPI_IN_PLACE, &overset_count, 1, MPI_INT, MPI_SUM, comm);
+  domain_has_overset = overset_count>0;
+
 
   coordinates.RestoreDataPointerToLocalVector();
 }
@@ -1616,7 +1626,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
     } 
     else if(it->bcType == MeshData::OVERSET) {
 
-      // nothing to be done here. ghost nodes will be populated elsewhere
+      // nothing to be done here. ghost nodes will be populated below
       
     } else {
       fprintf(stderr,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
@@ -1624,6 +1634,10 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
     }
 
   }
+
+  // update overset ghosts (if any)
+  for(auto&& g : ghost_overset)
+    v[g.first[2]][g.first[1]][g.first[0]] = g.second;
 
 
   ApplyBoundaryConditionsGeometricEntities(v);
@@ -3197,6 +3211,26 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   
 
   volume.RestoreDataPointerToLocalVector();
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::UpdateOversetGhostNodes(SpaceVariable3D &V)
+{
+
+  if(!domain_has_overset)
+    return; //nothing to be done
+
+  assert(V.NumDOF()==5);
+
+  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+
+  for(auto&& g : ghost_overset)
+    g.second = v[g.first[2]][g.first[1]][g.first[0]];
+
+  V.RestoreDataPointerToLocalVector();
+
 }
 
 

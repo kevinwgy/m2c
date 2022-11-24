@@ -107,6 +107,8 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
 
+  // Store a copy of V at OVERSET ghost nodes (for boundary condition update)
+  spo.UpdateOversetGhostNodes(V);
 
   // Make a copy of Phi for update of material ID. 
   if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
@@ -235,6 +237,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
+  // Store a copy of V at OVERSET ghost nodes (for boundary condition update)
+  spo.UpdateOversetGhostNodes(V);
 
   // Make a copy of Phi for update of material ID. 
   if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS
@@ -420,6 +425,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
+
+  // Store a copy of V at OVERSET ghost nodes (for boundary condition update)
+  spo.UpdateOversetGhostNodes(V);
 
   // Make a copy of Phi for update of material ID. 
   if(time_step == 1) { // Copy entire domain, even in the case of narrow-band LS

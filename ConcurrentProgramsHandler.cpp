@@ -204,7 +204,7 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
                                DataManagers3D *dms_,
                                std::vector<GhostPoint> *ghost_nodes_inner_,
                                std::vector<GhostPoint> *ghost_nodes_outer_,
-                               GlobalMeshInfo *global_mesh_, 
+                               GlobalMeshInfo *global_mesh_, SpaceVariable3D *V,
                                SpaceVariable3D *ID, std::set<Int3> *spo_frozen_nodes)
 {
   if(aeros) {
@@ -230,11 +230,12 @@ ConcurrentProgramsHandler::CommunicateBeforeTimeStepping(SpaceVariable3D *coordi
     assert(ghost_nodes_inner_);
     assert(ghost_nodes_outer_);
     assert(global_mesh_);
+    assert(V);
     assert(ID);
     assert(spo_frozen_nodes);
     m2c_twin->CommunicateBeforeTimeStepping(*coordinates_, *dms_, *ghost_nodes_inner_,
                                             *ghost_nodes_outer_, *global_mesh_, 
-                                            *ID, *spo_frozen_nodes);
+                                            *V, *ID, *spo_frozen_nodes);
     if(twinning_status==FOLLOWER) { 
       // in terms of time-stepping, the follower is one-step behind the leader --> O(dt) error
       dt = m2c_twin->GetTimeStepSize();

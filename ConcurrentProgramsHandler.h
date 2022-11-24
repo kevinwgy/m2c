@@ -78,7 +78,8 @@ public:
   void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_ = NULL, DataManagers3D *dms_ = NULL,
                                      std::vector<GhostPoint> *ghost_nodes_inner_ = NULL,
                                      std::vector<GhostPoint> *ghost_nodes_outer_ = NULL,
-                                     GlobalMeshInfo *global_mesh_ = NULL, SpaceVariable3D *ID = NULL,
+                                     GlobalMeshInfo *global_mesh_ = NULL,
+                                     SpaceVariable3D *V = NULL, SpaceVariable3D *ID = NULL,
                                      std::set<Int3> *spo_frozen_nodes = NULL); 
 
 
