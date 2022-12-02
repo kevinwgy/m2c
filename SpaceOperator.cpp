@@ -3245,7 +3245,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                     vector<SpaceVariable3D*> *Phi,
-                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS, bool run_heat)
+                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
 
 #ifdef LEVELSET_TEST
@@ -3260,10 +3260,8 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   if(visco)
     visco->AddDiffusionFluxes(V, ID, EBDS, R);
 
-  if(heat_diffusion && run_heat)
+  if(heat_diffusion)
     heat_diffusion->AddDiffusionFluxes(V, ID, EBDS, R);
-  else if(heat_diffusion)
-    print("Skipping heat diffusion.\n");
 
   if(symm) {//cylindrical or spherical symmetry
     if(visco) {

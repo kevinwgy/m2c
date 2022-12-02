@@ -111,7 +111,7 @@ public:
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,
                        vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
-                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr, bool run_heat = true);
+                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}

@@ -248,13 +248,12 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
-  bool run_heat = time_step< 110000000;
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), run_heat); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get()); // compute R(V(n))
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get(), run_heat); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get()); // compute R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -300,9 +299,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get(), run_heat);//compute R(V1) using prev.Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get());//compute R(V1) using prev.Phi, "loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get(), run_heat); // compute R(V1)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get()); // compute R(V1)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
