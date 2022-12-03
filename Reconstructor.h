@@ -19,6 +19,7 @@ using std::max;
  ****************************************************************************/
 class Reconstructor
 {
+
   MPI_Comm& comm; //!< may not contain all the processors (e.g., see LaserAbsorptionSolver::SetupLoadBalancing)
 
   ReconstructionData& iod_rec;

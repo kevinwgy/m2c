@@ -677,7 +677,7 @@ void SpaceOperator::SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, 
   if(needit) {
     assert(interpolator_); //make sure it is not NULL
     assert(grad_);
-    heat_diffusion = new HeatDiffusionOperator(comm, dm_all, iod.eqs, varFcn, coordinates, delta_xyz,
+    heat_diffusion = new HeatDiffusionOperator(comm, dm_all, iod.mesh, iod.eqs, varFcn, coordinates, delta_xyz, volume,
                                                *interpolator_, *grad_);
   }
 }
@@ -3177,7 +3177,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   }
 
   if(symm) {//cylindrical or spherical symmetry
-    if(visco || heat_diffusion) {
+    if(visco) {
       print_error(comm, "*** Error: SymmetryOperator must be extended to account for diffusion fluxes.\n");
       exit_mpi();
     }

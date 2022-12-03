@@ -233,6 +233,7 @@ struct StiffenedGasModelData {
 
   double specificHeatRatio;
   double pressureConstant;
+  double enthalpyConstant;
 
   //! parameters related to temperature
   //! Method 1: Assume constant cv or cp, and T as a function of only e.

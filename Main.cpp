@@ -19,16 +19,15 @@
 #include <HyperelasticityOperator.h>
 #include <SpecialToolsDriver.h>
 #include <set>
+#include <string>
+using std::to_string;
 #include <limits>
 
-using std::cout;
-using std::endl;
 // for timing
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
-using std::chrono::duration;
-using std::chrono::milliseconds;
-
+//using std::chrono::high_resolution_clock;
+//using std::chrono::duration_cast;
+//using std::chrono::duration;
+//using std::chrono::milliseconds;
 
 
 
@@ -572,7 +571,6 @@ int main(int argc, char* argv[])
 
     out.OutputSolutions(t, dts0, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
 
-    
   }
 
   if(concurrent.Coupled())
