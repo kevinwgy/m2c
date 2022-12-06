@@ -6,7 +6,7 @@
 #include <GradientCalculatorBase.h>
 #include <VarFcnBase.h>
 #include <Interpolator.h>
-#include <HeatDiffuFcn.h>
+#include <HeatDiffusionFcn.h>
 #include <memory>
 
 class EmbeddedBoundaryDataSet;
@@ -28,7 +28,7 @@ class HeatDiffusionOperator
   vector<VarFcnBase*>& varFcn; //!< each material has a varFcn
    
   //! Heat diffusion function (one for each material)
-  vector<HeatDiffuFcnBase*> heatdiffFcn;
+  vector<HeatDiffusionFcnBase*> heatdiffFcn;
 
   //! Mesh info
   SpaceVariable3D &coordinates;
