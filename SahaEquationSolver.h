@@ -43,7 +43,8 @@ public:
 
   virtual ~SahaEquationSolver();
 
-  virtual void Solve(double* v, double& zav, double& nh, double& ne, std::map<int, std::vector<double> >& alpha_rj);
+  virtual void Solve(double* v, double& zav, double& nh, double& ne, std::map<int, std::vector<double> >& alpha_rj,
+                     double* lambD = NULL);
 
   int GetNumberOfElements() {return elem.size();}
 

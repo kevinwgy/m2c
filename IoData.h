@@ -940,7 +940,9 @@ struct MaterialIonizationModel{
 
   enum Type {NONE = 0, SAHA_IDEAL = 1, SAHA_NONIDEAL = 2} type;
 
-  enum DepressionModel {NO_DEPRESSION = 0, GRIEM = 1, EBELING = 2} depression;
+  enum DepressionModel {NO_DEPRESSION = 0, GRIEM = 1, EBELING = 2, GRIEM_FLETCHER = 3} depression;
+
+  double depression_max; //!< delta_I is capped at dpression_max*I (default: 1.0)
 
   int maxIts;
   double convergence_tol;

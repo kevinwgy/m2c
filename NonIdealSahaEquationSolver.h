@@ -28,12 +28,13 @@ public:
 
   ~NonIdealSahaEquationSolver();
 
-  void Solve(double* v, double& zav, double& nh, double& ne, std::map<int, std::vector<double> >& alpha_rj);
+  void Solve(double* v, double& zav, double& nh, double& ne, std::map<int, std::vector<double> >& alpha_rj,
+             double* lambD = NULL);
 
 protected:
 
   // computes the depression of ionization energy, for a given Debye length lambD and temperature T
-  double ComputeDeltaI(int r, int j, double T, double one_over_lambD);
+  double ComputeDeltaI(int r, int j, double T, double nh, double zav, double one_over_lambD);
 
   // returns Zej (for a given j), fills "f" if zav!=0. Also fills "alpha" if compute_alpha == true
   double ComputeStateForElement(int j, double T, double nh, double zav, 

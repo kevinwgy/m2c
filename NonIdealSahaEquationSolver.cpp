@@ -35,7 +35,8 @@ NonIdealSahaEquationSolver::~NonIdealSahaEquationSolver()
 //--------------------------------------------------------------------------
 
 double 
-NonIdealSahaEquationSolver::ComputeDeltaI(int r, int j, double T, double one_over_lambD)
+NonIdealSahaEquationSolver::ComputeDeltaI(int r, int j, double T, double nh, double zav,
+                                          double one_over_lambD)
 {
 
   if(iod_ion_mat->depression == MaterialIonizationModel::NO_DEPRESSION)
@@ -44,12 +45,22 @@ NonIdealSahaEquationSolver::ComputeDeltaI(int r, int j, double T, double one_ove
   double dI(0.0);
   if(iod_ion_mat->depression == MaterialIonizationModel::GRIEM) {
     dI = (r+1.0)*factor_deltaI*one_over_lambD;
-  } else {//Ebeling
+  } 
+  else if(iod_ion_mat->depression == MaterialIonizationModel::EBELING) {//Ebeling
     if(one_over_lambD==0.0)
       dI = 0.0;
     else 
       dI = (r+1.0)*factor_deltaI/(1.0/one_over_lambD + 0.125*factor_LambB/sqrt(T));
   }
+  else if(iod_ion_mat->depression == MaterialIonizationModel::GRIEM_FLETCHER) {
+    if(one_over_lambD==0.0)
+      dI = 0.0;
+    else {
+      double Rr = 2.0/3.0*pow((3.0*(r+1)/(4.0*pi*nh*(1+zav))), 1.0/3.0);
+      dI = (r+1.0)*factor_deltaI/sqrt(1.0/(one_over_lambD*one_over_lambD) + Rr*Rr);
+    }
+  }
+
   assert(std::isfinite(dI));
   return dI;
 }
@@ -83,9 +94,18 @@ NonIdealSahaEquationSolver::ComputeStateForElement(int j, double T, double nh, d
   // compute f_{r,j}, r = 1, ..., rmax
   double Ur0(0.0), Ur1(0.0), deltaI0(0.0), deltaI1(0.0);
   for(int r=0; r<=rmax; r++) {
+
     deltaI0 = deltaI1;
     Ur0     = Ur1;
-    deltaI1 = ComputeDeltaI(r,j,T,one_over_lambD);
+
+    deltaI1 = ComputeDeltaI(r,j,T,nh,zav,one_over_lambD);
+    if(r<rmax && deltaI1>iod_ion_mat->depression_max*elem[j].I[r]) {
+      fprintf(stderr,"\033[0;35mWarning: Depression energy (deltaI) is truncated at %e: [j, r] = [%d, %d], "
+                     "deltaI before truncation = %e, I = %e.\033[0m\n", iod_ion_mat->depression_max*elem[j].I[r],
+                     j, r, deltaI1, elem[j].I[r]);
+      deltaI1 = iod_ion_mat->depression_max*elem[j].I[r];
+    }
+
     Ur1     = elem[j].CalculatePartitionFunction(r, T, deltaI1);
 
     f[j][r] = r==0 ? 0.0 //f[j][0] is not used anyway
@@ -174,7 +194,7 @@ NonIdealSahaEquationSolver::ComputeStateForElement(int j, double T, double nh, d
 
 void
 NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne, 
-                                  map<int, vector<double> >& alpha_rj)
+                                  map<int, vector<double> >& alpha_rj, double* lambD)
 {
 
   if(!iod_ion_mat) { //dummy solver 
@@ -337,6 +357,13 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
       my_alpha[r] = 0.0;
   }
 
+  if(lambD) {
+    if(one_over_lambD==0 || !std::isfinite(one_over_lambD))
+      *lambD = 0.0;
+    else
+      *lambD = 1.0/one_over_lambD;
+  }
+ 
 }
 
 //--------------------------------------------------------------------------
