@@ -1382,6 +1382,9 @@ TsData::TsData()
   cfl = 0.5;
   maxTime = 1e6;
 
+  convergence_tolerance = -1.0; //!< activated only for steady-state computations
+  local_dt = NO;
+
 }
 
 //------------------------------------------------------------------------------
@@ -1389,7 +1392,7 @@ TsData::TsData()
 void TsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  ClassAssigner *ca = new ClassAssigner(name, 8, father);
 
   new ClassToken<TsData>(ca, "Type", this,
                          reinterpret_cast<int TsData::*>(&TsData::type), 2,
@@ -1398,6 +1401,12 @@ void TsData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<TsData>(ca, "TimeStep", this, &TsData::timestep);
   new ClassDouble<TsData>(ca, "CFL", this, &TsData::cfl);
   new ClassDouble<TsData>(ca, "MaxTime", this, &TsData::maxTime);
+
+  new ClassDouble<TsData>(ca, "ConvergenceTolerance", this, &TsData::convergence_tolerance);
+  new ClassToken<TsData>(ca, "LocalTimeStepping", this,
+                         reinterpret_cast<int TsData::*>(&TsData::local_dt), 2,
+                         "Off", 0, "On", 1);
+
 
   expl.setup("Explicit", ca);
 }

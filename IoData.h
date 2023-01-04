@@ -729,6 +729,11 @@ struct TsData {
   double timestep;
   double cfl;
   double maxTime;
+
+  //! Parameters for steady-state computations
+  double convergence_tolerance; //!< tolerance for residual.
+  enum YesNo {NO = 0, YES = 1} local_dt; //!< each control volume applies its own time step size
+
   ExplicitData expl;
 
   TsData();
