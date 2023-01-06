@@ -1380,7 +1380,7 @@ TsData::TsData()
   maxIts = INT_MAX;
   timestep = -1.0;
   cfl = 0.5;
-  maxTime = 1e6;
+  maxTime = 1e10;
 
   convergence_tolerance = -1.0; //!< activated only for steady-state computations
   local_dt = NO;

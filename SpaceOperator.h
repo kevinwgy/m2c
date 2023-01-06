@@ -120,7 +120,11 @@ public:
                                         double &cmax, double &Machmax, double &char_speed_max,
                                         double &dx_over_char_speed_min);
 
-  void ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl);
+  void ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                           SpaceVariable3D *LocalDt = NULL);
+
+  void ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                 SpaceVariable3D &LocalDt);
 
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 

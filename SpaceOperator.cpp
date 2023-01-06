@@ -2100,8 +2100,16 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl)
+void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                        SpaceVariable3D *LocalDt)
 {
+
+  if(LocalDt) { //local time-stepping, dealt with separately.
+    assert(iod.ts.timestep<=0.0); //shouldn't have constant time-step size.
+    ComputeLocalTimeStepSizes(V,ID,dt,cfl,*LocalDt);
+    return;
+  }
+
   double Vmin[5], Vmax[5], cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min; 
   FindExtremeValuesOfFlowVariables(V, ID, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
 
@@ -2116,6 +2124,98 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
     cfl = iod.ts.cfl;      
     dt = cfl*dx_over_char_speed_min;
   }
+
+}
+
+//-----------------------------------------------------
+
+void SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                              SpaceVariable3D &LocalDt)
+{
+
+  cfl = iod.ts.cfl;
+
+  Vec5D*** v    = (Vec5D***)V.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  double*** id  = ID.GetDataPointer();
+  double*** dtl = LocalDt.GetDataPointer(); 
+
+  double cmin(DBL_MAX), dx_over_char_speed_min(DBL_MAX);
+  double cmax(-DBL_MAX), Machmax(-DBL_MAX), char_speed_max(-DBL_MAX);
+  double Vmin[5], Vmax[5];
+  for(int i=0; i<5; i++) {
+    Vmin[i] = DBL_MAX; //max. double precision number
+    Vmax[i] = -DBL_MAX;
+  }
+
+  // Loop through the real domain (excluding the ghost layer)
+  double c, mach, lam_f, lam_g, lam_h, dx_over_char_speed_local;
+  int myid;
+  for(int k=k0; k<kmax; k++) {
+    for(int j=j0; j<jmax; j++) {
+      for(int i=i0; i<imax; i++) {
+
+        myid = id[k][j][i];
+
+        if(myid == INACTIVE_MATERIAL_ID)
+          continue;
+
+        for(int p=0; p<5; p++) {
+          Vmin[p] = min(Vmin[p], v[k][j][i][p]);
+          Vmax[p] = max(Vmax[p], v[k][j][i][p]);
+        }
+
+        c = varFcn[myid]->ComputeSoundSpeedSquare(v[k][j][i][0]/*rho*/,
+                            varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
+
+        if(c<0) {
+          fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. "
+                         "V = %e, %e, %e, %e, %e, ID = %d.\n",
+                  c, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], myid);
+          exit_mpi();
+        } else
+          c = sqrt(c);  
+
+
+        cmin = min(cmin, c);
+        cmax = max(cmax, c);
+        mach = varFcn[myid]->ComputeMachNumber(v[k][j][i]);
+        Machmax = max(Machmax, mach);
+
+        fluxFcn.EvaluateMaxEigenvalues(v[k][j][i], myid, lam_f, lam_g, lam_h);
+        char_speed_max = max(max(max(char_speed_max, lam_f), lam_g), lam_h);
+
+        dx_over_char_speed_local = min(dxyz[k][j][i][0]/lam_f,
+                                       min(dxyz[k][j][i][1]/lam_g, dxyz[k][j][i][2]/lam_h) );
+        dx_over_char_speed_min = min(dx_over_char_speed_min, dx_over_char_speed_local);
+
+        // calculates local time-step size
+        dtl[k][j][i] = cfl*dx_over_char_speed_local;
+
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, Vmin, 5, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, Vmax, 5, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &cmin, 1, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &cmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &Machmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &char_speed_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &dx_over_char_speed_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  // global min dt
+  dt = cfl*dx_over_char_speed_min; 
+
+  if(verbose>1)
+    print(comm, "- Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n",
+          Vmax[0], Vmax[4], cmax, Machmax, char_speed_max);
+
+  V.RestoreDataPointerToLocalVector();
+  delta_xyz.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();  
+
+  LocalDt.RestoreDataPointerAndInsert();
 
 }
 

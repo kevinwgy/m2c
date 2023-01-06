@@ -14,13 +14,17 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
                         LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                         HyperelasticityOperator* heo_)
                   : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_), embed(embed_),
-                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)) 
+                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)),
+                    local_time_stepping(iod.ts.local_dt == TsData::YES), NS_converged(false)
 {
   for(int i=0; i<(int)lso.size(); i++) {
     ls_mat_id.push_back(lso[i]->GetMaterialID());
 
     Phi_tmp.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
+
+  if(local_time_stepping)
+    assert(lso.size()==0);
 }
 
 //----------------------------------------------------------------------------
@@ -43,6 +47,38 @@ TimeIntegratorBase::Destroy()
 }
 
 //----------------------------------------------------------------------------
+
+void
+TimeIntegratorBase::AddFluxWithLocalTimeStep(SpaceVariable3D &U, double alpha,
+                                             SpaceVariable3D *Dt, SpaceVariable3D &R)
+{
+  int dof = U.NumDOF();
+  assert(dof == R.NumDOF());
+  assert(Dt);
+  assert(Dt->NumDOF()==1);
+
+  //add flux within domain interior
+  int i0, j0, k0, imax, jmax, kmax;
+  U.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
+  double*** u  = U.GetDataPointer();
+  double*** dt = Dt->GetDataPointer();
+  double*** r  = R.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        for(int p=0; p<dof; p++)
+          u[k][j][i*dof+p] += alpha*dt[k][j][i]*r[k][j][i*dof+p];        
+
+  R.RestoreDataPointerToLocalVector();
+  Dt->RestoreDataPointerToLocalVector();
+
+  U.RestoreDataPointerAndInsert();
+}
+
+//----------------------------------------------------------------------------
+
 
 
 //----------------------------------------------------------------------------
@@ -100,7 +136,7 @@ void TimeIntegratorFE::Destroy()
 void
 TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                      vector<SpaceVariable3D*>& Phi,
-                                     SpaceVariable3D *L, SpaceVariable3D *Xi,
+                                     SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Dt,
                                      double time, double dt, int time_step, int subcycle, double dts)
 {
 
@@ -134,7 +170,10 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
   spo.PrimitiveToConservative(V, ID, Un); // get Un
-  Un.AXPlusBY(1.0, dt, Rn);
+  if(local_time_stepping)
+    AddFluxWithLocalTimeStep(Un, 1.0, Dt, Rn);
+  else
+    Un.AXPlusBY(1.0, dt, Rn);
   spo.ConservativeToPrimitive(Un, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
@@ -154,7 +193,10 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   if(Xi) {
     assert(heo);
     heo->ComputeReferenceMapResidual(V, *Xi, *Rn_xi);
-    Xi->AXPlusBY(1.0, dt, *Rn_xi); 
+    if(local_time_stepping)
+      AddFluxWithLocalTimeStep(*Xi, 1.0, Dt, *Rn_xi);
+    else
+      Xi->AXPlusBY(1.0, dt, *Rn_xi); 
     heo->ApplyBoundaryConditionsToReferenceMap(*Xi);
   }
 
@@ -231,6 +273,7 @@ void
 TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                       vector<SpaceVariable3D*>& Phi,
                                       SpaceVariable3D* L, SpaceVariable3D *Xi,
+                                      SpaceVariable3D *Dt,
                                       double time, double dt, 
                                       int time_step, int subcycle, double dts)
 {
@@ -265,7 +308,10 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
-  U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
+  if(local_time_stepping)
+    AddFluxWithLocalTimeStep(U1, 1.0, Dt, R);
+  else
+    U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
 
   // Check & clip the intermediate state (U1/V1)
   spo.ConservativeToPrimitive(U1, ID, V1); //get V1
@@ -295,7 +341,10 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     assert(heo);
     heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
-    Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
+    if(local_time_stepping)
+      AddFluxWithLocalTimeStep(*Xi1, 1.0, Dt, *Rxi);
+    else
+      Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
     heo->ApplyBoundaryConditionsToReferenceMap(*Xi1);
   }
   //***************************************************
@@ -314,7 +363,10 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
   U1.AXPlusBY(0.5, 0.5, Un); //U(n+1) = 0.5*U(n) + 0.5*U1;
-  U1.AXPlusBY(1.0, 0.5*dt, R); //U(n+1) = U(n+1) + 0.5*dt*R(V1)
+  if(local_time_stepping)
+    AddFluxWithLocalTimeStep(U1, 0.5, Dt, R);
+  else
+    U1.AXPlusBY(1.0, 0.5*dt, R); //U(n+1) = U(n+1) + 0.5*dt*R(V1)
   
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
@@ -339,7 +391,10 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     assert(heo);
     heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
     Xi->AXPlusBY(0.5, 0.5, *Xi1); 
-    Xi->AXPlusBY(1.0, 0.5*dt, *Rxi); 
+    if(local_time_stepping)
+      AddFluxWithLocalTimeStep(*Xi, 0.5, Dt, *Rxi);
+    else
+      Xi->AXPlusBY(1.0, 0.5*dt, *Rxi); 
     heo->ApplyBoundaryConditionsToReferenceMap(*Xi); //pass t(n+1)
   }
   //***************************************************
@@ -419,6 +474,7 @@ void
 TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                       vector<SpaceVariable3D*>& Phi, 
                                       SpaceVariable3D* L, SpaceVariable3D* Xi,
+                                      SpaceVariable3D *Dt,
                                       double time, double dt,
                                       int time_step, int subcycle, double dts)
 { 
@@ -454,7 +510,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
-  U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
+  if(local_time_stepping)
+    AddFluxWithLocalTimeStep(U1, 1.0, Dt, R);
+  else
+    U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
 
   // Check & clip the intermediate state (U1/V1)
   spo.ConservativeToPrimitive(U1, ID, V1); //get V1
@@ -484,7 +543,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     assert(heo);
     heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
-    Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
+    if(local_time_stepping)
+      AddFluxWithLocalTimeStep(*Xi1, 1.0, Dt, *Rxi);
+    else
+      Xi1->AXPlusBY(1.0, dt, *Rxi); //Xi1 = Xi(n) + dt*R(Xi(n))
     heo->ApplyBoundaryConditionsToReferenceMap(*Xi1);
   }
   //***************************************************
@@ -504,7 +566,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
   U1.AXPlusBY(0.25, 0.75, Un); //U2 = 0.75*U(n) + 0.25*U1;
-  U1.AXPlusBY(1.0, 0.25*dt, R); //U2 = U2 + 0.25*dt*R(V1)
+  if(local_time_stepping)
+    AddFluxWithLocalTimeStep(U1, 0.25, Dt, R);
+  else
+    U1.AXPlusBY(1.0, 0.25*dt, R); //U2 = U2 + 0.25*dt*R(V1)
   
   // Check & clip the intermediate state (U2/V2)
   spo.ConservativeToPrimitive(U1, ID, V2); //get V2
@@ -534,7 +599,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     assert(heo);
     heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
     Xi1->AXPlusBY(0.25, 0.75, *Xi);  //re-use Xi1 to store Xi2
-    Xi1->AXPlusBY(1.0, 0.25*dt, *Rxi); 
+    if(local_time_stepping)
+      AddFluxWithLocalTimeStep(*Xi1, 0.25, Dt, *Rxi);
+    else
+      Xi1->AXPlusBY(1.0, 0.25*dt, *Rxi); 
     heo->ApplyBoundaryConditionsToReferenceMap(*Xi1); //t(n+1)
   }
   //***************************************************
@@ -553,7 +621,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
   U1.AXPlusBY(2.0/3.0, 1.0/3.0, Un); //U2 = 1/3*U(n) + 2/3*U2;
-  U1.AXPlusBY(1.0, 2.0/3.0*dt, R); //U2 = U2 + 2/3*dt*R(V2)
+  if(local_time_stepping)
+    AddFluxWithLocalTimeStep(U1, 2.0/3.0, Dt, R);
+  else
+    U1.AXPlusBY(1.0, 2.0/3.0*dt, R); //U2 = U2 + 2/3*dt*R(V2)
 
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
@@ -578,7 +649,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     assert(heo);
     heo->ComputeReferenceMapResidual(V2, *Xi1, *Rxi);
     Xi->AXPlusBY(1.0/3.0, 2.0/3.0, *Xi1); 
-    Xi->AXPlusBY(1.0, 2.0/3.0*dt, *Rxi); 
+    if(local_time_stepping)
+      AddFluxWithLocalTimeStep(*Xi, 2.0/3.0, Dt, *Rxi);
+    else
+      Xi->AXPlusBY(1.0, 2.0/3.0*dt, *Rxi); 
     heo->ApplyBoundaryConditionsToReferenceMap(*Xi); //t(n+1)
   }
   //***************************************************

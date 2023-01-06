@@ -32,17 +32,21 @@ protected:
   //! Hyperelaticity operator (NULL if not activated)
   HyperelasticityOperator* heo;
 
-  //!< Internal variable to temporarily store old ID
+  //! Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
-  //!< Internal variable to temporarily store Phi (e.g., for material ID updates)
+  //! Internal variable to temporarily store Phi (e.g., for material ID updates)
   vector<SpaceVariable3D*> Phi_tmp;
 
-  //!< Internal variable to store the mat. ID tracked by each level set
+  //! Internal variable to store the mat. ID tracked by each level set
   vector<int> ls_mat_id;
 
-  //!< Solutions of exact Riemann problems
+  //! Solutions of exact Riemann problems
   RiemannSolutions riemann_solutions;
+
+  //! Variables for steady-state analysis
+  bool local_time_stepping;
+  bool NS_converged;
 
 public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
@@ -55,8 +59,8 @@ public:
   // Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                   vector<SpaceVariable3D*> &Phi,
-                                  SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                                  double dt, int time_step, int subcycle, double dts) {
+                                  SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                                  double time, double dt, int time_step, int subcycle, double dts) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
 
@@ -70,6 +74,13 @@ public:
                                        SpaceVariable3D *L,
                                        double time, int time_step, int subcycle, double dts);
                                         
+  bool Converged() {return NS_converged;} //only for steady-state simulations
+
+protected:
+
+  //! compute U += a*dt*R, where dt can be different for different cells (for steady-state computation)
+  void AddFluxWithLocalTimeStep(SpaceVariable3D &U, double a, SpaceVariable3D *Dt, SpaceVariable3D &R);
+
 };
 
 /********************************************************************
@@ -94,8 +105,8 @@ public:
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                           vector<SpaceVariable3D*>& Phi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                          double dt, int time_step, int subcycle, double dts);
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
 
@@ -131,8 +142,8 @@ public:
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                          double dt, int time_step, int subcycle, double dts);
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 
 
@@ -169,8 +180,8 @@ public:
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                          double dt, int time_step, int subcycle, double dts);
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 
 

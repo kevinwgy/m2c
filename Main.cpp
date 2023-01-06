@@ -373,6 +373,33 @@ int main(int argc, char* argv[])
   }
 
 
+  //! Setup for steady-state computations
+  SpaceVariable3D *LocalDt = NULL;
+  if(iod.ts.local_dt == TsData::YES) {//local time-stepping
+    if(iod.ts.convergence_tolerance <= 0.0) {
+      print_error("*** Error: Local time-stepping can be used only for steady-state computations.\n");
+      exit_mpi();
+    }
+    if(iod.ts.timestep > 0.0) {
+      print_error("*** Error: Local time-stepping conflicts with a constant user-specified time step.\n");
+      exit_mpi();
+    }
+    LocalDt = new SpaceVariable3D(comm, &(dms.ghosted1_1dof)); //!< local dt for steady-state
+  }
+  if(iod.ts.convergence_tolerance>0.0) { //steady-state analysis
+    if(concurrent.Coupled()) {
+      print_error("*** Error: Unable to perform steady-state analysis with concurrent programs.\n");
+      exit_mpi();
+    }
+    if(lso.size()>0) {
+      print_error("*** Error: Unable to perform steady-state analysis with level set(s).\n");
+      exit_mpi();
+    }
+
+    print("- Performing a steady-state analysis. Tolerance (rel. residual): %e.\n\n",
+          iod.ts.convergence_tolerance);
+  }
+
 
 
   /*************************************
@@ -386,6 +413,9 @@ int main(int argc, char* argv[])
   double dt = 0.0;
   double cfl = 0.0;
   int time_step = 0;
+
+  // In the case of steady-state simulation with local time-stepping, the constant "dt" is not
+  // actually used. It represents the smallest dt in all the cells.
 
   if(laser) //initialize L (otherwise the initial output will only have 0s)
     laser->ComputeLaserRadiance(V, ID, *L, t);
@@ -466,11 +496,11 @@ int main(int argc, char* argv[])
   }
 
   // set max time-step number to user input, or INF if it is a follower in Chimera
-  int maxIts = concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::FOLLOWER ?
-               INT_MAX : iod.ts.maxIts;
+  int maxIts = concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::FOLLOWER ? INT_MAX 
+             : iod.ts.maxIts;
 
-  // time-stepping!
-  while(t<tmax && time_step<maxIts) {
+  // Time-Stepping
+  while(t<tmax && time_step<maxIts && !integrator->Converged()) {// the last one is for steady-state
 
     double dtleft = dts;
 
@@ -480,7 +510,7 @@ int main(int argc, char* argv[])
     do { //subcycling w.r.t. concurrent programs
 
       // Compute time step size
-      spo.ComputeTimeStepSize(V, ID, dt, cfl); 
+      spo.ComputeTimeStepSize(V, ID, dt, cfl, LocalDt); 
 
       // Modify dt and cfl, dtleft if needed
       if(concurrent.GetTimeStepSize()>0) {//concurrent solver provides a "dts"
@@ -520,7 +550,7 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      integrator->AdvanceOneTimeStep(V, ID, Phi, L, Xi, t, dt, time_step, subcycle, dts); 
+      integrator->AdvanceOneTimeStep(V, ID, Phi, L, Xi, LocalDt, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 
@@ -600,6 +630,8 @@ int main(int argc, char* argv[])
 
   V.Destroy();
   ID.Destroy();
+
+  if(LocalDt) {LocalDt->Destroy(); delete LocalDt;}
 
   if(laser) {laser->Destroy(); delete laser;}
   if(L)     {L->Destroy(); delete L;}
