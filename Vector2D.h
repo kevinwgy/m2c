@@ -55,6 +55,10 @@ struct Vec2D {
   void print(const char *msg = "") { fprintf(stdout, "%s(%e %e)\n", msg, v[0], v[1]); }
 
   double norm() { return(sqrt(v[0]*v[0]+v[1]*v[1])); }
+
+  double norm1() { return fabs(v[0])+fabs(v[1]); }
+  double norm2() { return norm(); }
+  double norminf() { return std::max(fabs(v[0]), fabs(v[1])); }
 };
 
 //------------------------------------------------------------------------------

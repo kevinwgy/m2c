@@ -113,8 +113,9 @@ SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
 LagrangianOutput.cpp
 TerminalVisualization.cpp
-Utils.cpp
 ClosestTriangle.cpp
+SteadyStateOperator.cpp
+Utils.cpp
 MathTools/r8lib.cpp
 MathTools/rbf_interp.cpp
 MathTools/polynomial_equations.cpp

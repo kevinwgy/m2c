@@ -8,6 +8,7 @@
 #include <RiemannSolutions.h>
 #include <EmbeddedBoundaryOperator.h>
 #include <HyperelasticityOperator.h>
+#include <SteadyStateOperator.h>
 using std::vector;
 
 /********************************************************************
@@ -45,8 +46,8 @@ protected:
   RiemannSolutions riemann_solutions;
 
   //! Variables for steady-state analysis
+  SteadyStateOperator *sso;
   bool local_time_stepping;
-  bool NS_converged;
 
 public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
@@ -56,7 +57,7 @@ public:
 
   virtual ~TimeIntegratorBase();
 
-  // Integrate the ODE system for one time-step. Implemented in derived classes
+  //! Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                   vector<SpaceVariable3D*> &Phi,
                                   SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
@@ -66,15 +67,18 @@ public:
 
   virtual void Destroy();
 
-  // all the tasks that are done at the end of a time-step, independent of 
-  // time integrator
+  //! All the tasks that are done at the end of a time-step, independent of time integrator
   void UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
                                        vector<SpaceVariable3D*> &Phi,
                                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                        SpaceVariable3D *L,
                                        double time, int time_step, int subcycle, double dts);
                                         
-  bool Converged() {return NS_converged;} //only for steady-state simulations
+  //! Functions pertaining to steady-state computation
+  bool Converged() {return sso ? sso->Converged() : false;} //only for steady-state simulations
+  double GetResidual1Norm() {assert(sso); return sso->GetResidual1Norm();}
+  double GetResidual2Norm() {assert(sso); return sso->GetResidual2Norm();}
+  double GetResidualInfNorm() {assert(sso); return sso->GetResidualInfNorm();}
 
 protected:
 

@@ -375,8 +375,9 @@ int main(int argc, char* argv[])
 
   //! Setup for steady-state computations
   SpaceVariable3D *LocalDt = NULL;
+  bool steady_state = iod.ts.convergence_tolerance>0.0;
   if(iod.ts.local_dt == TsData::YES) {//local time-stepping
-    if(iod.ts.convergence_tolerance <= 0.0) {
+    if(!steady_state) {
       print_error("*** Error: Local time-stepping can be used only for steady-state computations.\n");
       exit_mpi();
     }
@@ -386,7 +387,7 @@ int main(int argc, char* argv[])
     }
     LocalDt = new SpaceVariable3D(comm, &(dms.ghosted1_1dof)); //!< local dt for steady-state
   }
-  if(iod.ts.convergence_tolerance>0.0) { //steady-state analysis
+  if(steady_state) { //steady-state analysis
     if(concurrent.Coupled()) {
       print_error("*** Error: Unable to perform steady-state analysis with concurrent programs.\n");
       exit_mpi();
@@ -538,12 +539,18 @@ int main(int argc, char* argv[])
         fprintf(stderr,"[Follower] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
 */
  
-      if(dts<=dt)
-        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
-              time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
-      else
-        print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
-              time_step, subcycle+1, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+      if(steady_state) 
+        print("Step %d: t = %e, dt = %.4e, cfl = %.4e, Res (2 & inf norm): %.4e | %.4e. "
+              "Computation time: %.4e s.\n", time_step, t, dt, cfl, 
+              integrator->GetResidual2Norm(), integrator->GetResidualInfNorm());
+      else { //unsteady
+        if(dts<=dt)
+          print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
+                time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+        else
+          print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
+                time_step, subcycle+1, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+      }
 
       //----------------------------------------------------
       // Move forward by one time-step: Update V, Phi, and ID

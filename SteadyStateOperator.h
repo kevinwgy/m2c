@@ -1,0 +1,52 @@
+#ifndef _STEADY_STATE_OPERATOR_H_
+#define _STEADY_STATE_OPERATOR_H_
+#include<SpaceVariable.h>
+
+struct TsData;
+
+/*********************************************************
+ * class SteadyStateOperator handles some operations that
+ * are only used in steady-state simulations. In general,
+ * it is a "tools class", which does not own a lot of
+ * data. This class itself is owned by TimeIntegrator.
+ *********************************************************/ 
+
+class SteadyStateOperator
+{
+  MPI_Comm& comm;
+
+  /** Currently, only monitors the N-S residual for convergence. Can be easily extended
+   *  to consider state variable perturbation or some QoI. */   
+  double Rref[5]; //!< ref. residual (mass, momentum and energy fluxes) for non-dimensionalization
+  double Rtol; //!< residual tol. (user input)
+  bool ref_calculated; //!< whether references has been computed.
+
+  double R1_init, R2_init, Rinf_init; //! initial residual in 1-, 2-, and inf-norm.
+  double R1, R2, Rinf;
+  bool converged;
+  
+
+public:
+
+  SteadyStateOperator(MPI_Comm &comm_, TsData &iod_ts_);
+  ~SteadyStateOperator();
+
+  void Destroy();
+
+  bool Converged() {return converged;} 
+
+  void MonitorConvergence(SpaceVariable3D &R, SpaceVariable3D &ID); //!< calculates R1, R2, and Rinf
+
+  double GetResidual1Norm() {return R1;}
+ 
+  double GetResidual2Norm() {return R2;}
+ 
+  double GetResidualInfNorm() {return Rinf;}
+ 
+protected:
+
+  void CalculateReferenceResidual(SpaceVariable3D &R, SpaceVariable3D &ID);
+
+};
+
+#endif

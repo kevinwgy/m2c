@@ -14,8 +14,8 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
                         LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                         HyperelasticityOperator* heo_)
                   : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_), embed(embed_),
-                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)),
-                    local_time_stepping(iod.ts.local_dt == TsData::YES), NS_converged(false)
+                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)), sso(NULL),
+                    local_time_stepping(iod.ts.local_dt == TsData::YES)
 {
   for(int i=0; i<(int)lso.size(); i++) {
     ls_mat_id.push_back(lso[i]->GetMaterialID());
@@ -25,12 +25,17 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
 
   if(local_time_stepping)
     assert(lso.size()==0);
+
+  if(iod.ts.convergence_tolerance>0.0) //steady-state analysis
+    sso = new SteadyStateOperator(comm_, iod.ts);
 }
 
 //----------------------------------------------------------------------------
 
 TimeIntegratorBase::~TimeIntegratorBase()
 {
+  if(sso)
+    delete sso;
 } 
 
 //----------------------------------------------------------------------------
@@ -44,6 +49,9 @@ TimeIntegratorBase::Destroy()
     Phi_tmp[i]->Destroy(); 
     delete Phi_tmp[i];
   }
+
+  if(sso)
+    sso->Destroy();
 }
 
 //----------------------------------------------------------------------------
@@ -199,6 +207,11 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
       Xi->AXPlusBY(1.0, dt, *Rn_xi); 
     heo->ApplyBoundaryConditionsToReferenceMap(*Xi);
   }
+
+
+  // Check of convergence (for steady-state computations)
+  if(sso)
+    sso->MonitorConvergence(Rn,ID); //Strictly speaking, should recompute R using updated V. But this is OK.
 
 
   // -------------------------------------------------------------------------------
@@ -399,6 +412,10 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
   //***************************************************
 
+
+  // Check of convergence (for steady-state computations)
+  if(sso)
+    sso->MonitorConvergence(R,ID); //Strictly speaking, should recompute R using updated V. But this is OK.
 
 
   // End-of-step tasks
@@ -657,6 +674,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
   //***************************************************
 
+
+  // Check of convergence (for steady-state computations)
+  if(sso)
+    sso->MonitorConvergence(R,ID); //Strictly speaking, should recompute R using updated V. But this is OK.
 
 
   // End-of-step tasks
