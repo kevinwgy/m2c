@@ -2732,6 +2732,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   filename = "";
   type = None;
   thermal  = Adiabatic;
+  wall_temperature = 300.0; //!< Kelvin
   heat_source = 0.0;
   dynamics_calculator = "";
 
@@ -2745,7 +2746,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
@@ -2775,6 +2776,8 @@ Assigner *EmbeddedSurfaceData::getAssigner()
   new ClassToken<EmbeddedSurfaceData> (ca, "ThermalBoundaryCondition", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::thermal), 3,
      "Adiabatic", 0, "Isothermal", 1, "Source", 2);
+
+  new ClassDouble<EmbeddedSurfaceData>(ca, "Temperature", this, &EmbeddedSurfaceData::wall_temperature);
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "HeatSource", this, &EmbeddedSurfaceData::heat_source);
 

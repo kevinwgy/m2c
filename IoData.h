@@ -1237,6 +1237,7 @@ struct EmbeddedSurfaceData {
   enum YesNo {NO = 0, YES = 1} provided_by_another_solver;
   const char *filename; //!< file for nodal coordinates and elements
   enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
+  double wall_temperature; //!< used only in the case of isothermal wall 
   double heat_source;
 
   const char *wetting_output_filename; //!< optional output file that shows the detected wetted side(s)
