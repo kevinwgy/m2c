@@ -5,8 +5,11 @@
 #include <VarFcnBase.h>
 
 /*****************************************************************************
- * Class SymmetryOperator handles the sink terms in the Navier-Stokes equations
- * associated with spherical or cylindrical symmetry.
+ * Class SymmetryOperator handles the sink terms produced by the advective
+ * fluxes in the Navier-Stokes equations associated with spherical or 
+ * cylindrical symmetry.
+ * Note: Other terms caused by viscosity, heat diffusion etc. are implemented
+ *       elsewhere!
  ****************************************************************************/
 
 class SymmetryOperator

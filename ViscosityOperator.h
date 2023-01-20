@@ -52,6 +52,8 @@ class ViscosityOperator
   SpaceVariable3D dVdz_j_minus_half;  //!< du/dz, dv/dz, dw/dz at j +/- 1/2 (dim = 3)
   SpaceVariable3D dVdz_k_minus_half;  //!< du/dz, dv/dz, dw/dz at k +/- 1/2 (dim = 3)
 
+  //! internal variables for cylindrical symmetry
+  SpaceVariable3D *dlamdx, *dlamdy;
 
 public:
 
@@ -73,6 +75,11 @@ public:
     dVdx_i_minus_half.Destroy();  dVdx_j_minus_half.Destroy();  dVdx_k_minus_half.Destroy();
     dVdy_i_minus_half.Destroy();  dVdy_j_minus_half.Destroy();  dVdy_k_minus_half.Destroy();
     dVdz_i_minus_half.Destroy();  dVdz_j_minus_half.Destroy();  dVdz_k_minus_half.Destroy();}
+
+private:
+
+  void PopulateGhostNodes(SpaceVariable3D &V, SpaceVariable3D &ID,
+                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
 
 };
 
