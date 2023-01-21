@@ -3266,7 +3266,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, EBDS);
 
   if(visco)
-    visco->AddDiffusionFluxes(V, ID, EBDS, R);
+    visco->AddDiffusionFluxes(V, ID, EBDS, R); //including extra terms from cylindrical symmetry
 
   if(heat_diffusion)
     heat_diffusion->AddDiffusionFluxes(V, ID, EBDS, R);
@@ -3276,11 +3276,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
     heo->AddHyperelasticityFluxes(V, ID, *Xi, EBDS, R);
   }
 
-  if(symm) {//cylindrical or spherical symmetry
-    if(visco) {
-      print_error(comm, "*** Error: SymmetryOperator must be extended to account for diffusion fluxes.\n");
-      exit_mpi();
-    }
+  if(symm) {//cylindrical or spherical symmetry (symm only handles the sink terms from advective fluxes)
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
   }
 

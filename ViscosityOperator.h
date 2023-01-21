@@ -52,8 +52,10 @@ class ViscosityOperator
   SpaceVariable3D dVdz_j_minus_half;  //!< du/dz, dv/dz, dw/dz at j +/- 1/2 (dim = 3)
   SpaceVariable3D dVdz_k_minus_half;  //!< du/dz, dv/dz, dw/dz at k +/- 1/2 (dim = 3)
 
-  //! internal variables for cylindrical symmetry
-  SpaceVariable3D *dlamdx, *dlamdy;
+  //! internal variables for cylindrical symmetry (x~axial, y~radial)
+  bool cylindrical_symmetry;
+  SpaceVariable3D *dudx, *dvdx, *dudy, *dvdy; //!< at nodes
+  SpaceVariable3D *Lam, *Mu, *dLamdx, *dLamdy;
 
 public:
 
@@ -70,11 +72,7 @@ public:
                           SpaceVariable3D &R);
 
   //! destroy internal variables
-  void Destroy() {
-    V_i_minus_half.Destroy();  V_j_minus_half.Destroy();  V_k_minus_half.Destroy();
-    dVdx_i_minus_half.Destroy();  dVdx_j_minus_half.Destroy();  dVdx_k_minus_half.Destroy();
-    dVdy_i_minus_half.Destroy();  dVdy_j_minus_half.Destroy();  dVdy_k_minus_half.Destroy();
-    dVdz_i_minus_half.Destroy();  dVdz_j_minus_half.Destroy();  dVdz_k_minus_half.Destroy();}
+  void Destroy();
 
 private:
 

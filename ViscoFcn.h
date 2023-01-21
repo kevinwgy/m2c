@@ -26,6 +26,10 @@ public:
   ViscoFcnBase(VarFcnBase &vf_) : vf(vf_), type(NONE) {}
   virtual ~ViscoFcnBase() {}
 
+  //! Get viscosity coefficients (may depend on state variable and even local mesh resolution)
+  virtual double GetMu(double* V = NULL, double div = 0.0, double h = 0.0) {return 0.0;}
+  virtual double GetLambda(double* V = NULL, double div = 0.0, double h = 0.0) {return 0.0;}
+
   //! Compute the stress tensor components
 
   virtual double GetTauXX(double* dVdx, double* dVdy, double* dVdz, double* V = NULL, double* h = NULL) {
@@ -119,6 +123,10 @@ public:
   }
   ~ViscoFcnConstant() {}
 
+  inline double GetMu(double* V = NULL, double div = 0.0, double h = 0.0) {return dyna;}
+
+  inline double GetLambda(double* V = NULL, double div = 0.0, double h = 0.0) {return bulk-2.0/3.0*dyna;}
+
   //! Compute the stress tensor components
 
   inline double GetTauXX(double* dVdx, double* dVdy, double* dVdz, double* V = NULL, double* h = NULL) {
@@ -147,6 +155,7 @@ public:
     double div = dVdx[0]+dVdy[1]+dVdz[2];
     return bulk*div + dyna*(2.0*dVdz[2] - 2.0/3.0*div);
   }
+
 };
 
 //---------------------------------------------------------------------------------
@@ -204,13 +213,17 @@ public:
   }
 
 
-private:
 
-  inline double GetMu(double* V) {
+  inline double GetMu(double* V, double div = 0.0, double h = 0.0) {
+    assert(V);
     double T = vf.GetTemperature(V[0]/*rho*/,V[4]/*p*/);
     return mu0*pow(T/T0,1.5)*(T0+Smu)/(T+Smu);
   }
   
+  inline double GetLambda(double* V, double div = 0.0, double h = 0.0) {
+    return bulk - 2.0/3.0*GetMu(V,div,h);
+  }
+
 };
 
 //---------------------------------------------------------------------------------
@@ -271,9 +284,11 @@ public:
   }
 
 
-private:
+
 
   inline double GetMu(double* V, double div, double h) {
+    assert(V);
+    assert(h>0.0);
     double e = vf.GetInternalEnergyPerUnitMass(V[0]/*rho*/, V[4]/*p*/);
     double c = vf.ComputeSoundSpeed(V[0], e);
     double p = Cth*c/h;
@@ -282,7 +297,11 @@ private:
     else
       return 0.0;
   }
-  
+ 
+  inline double GetLambda(double* V, double div, double h) {
+    return bulk - 2.0/3.0*GetMu(V,div,h);
+  }
+ 
 };
 
 

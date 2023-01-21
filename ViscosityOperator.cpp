@@ -23,7 +23,10 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                     dVdz_i_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_j_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_k_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
-                    interpolator(interpolator), grad(grad_)
+                    interpolator(interpolator), grad(grad_),
+                    cylindrical_symmetry(false),
+                    dudx(NULL), dvdx(NULL), dudy(NULL), dvdy(NULL), 
+                    Lam(NULL), Mu(NULL), dLamdx(NULL), dLamdy(NULL)
 {
 
   // Get i0, j0, etc.
@@ -74,6 +77,33 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
         break;
     }
   }
+
+
+  // Initialize variables for cylindrical symmetry
+  if(iod.mesh.type == MeshData::CYLINDRICAL) {
+
+    cylindrical_symmetry = true;
+
+    dudx = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+    dvdx = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+    dudy = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+    dvdy = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+    Lam = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+    Mu  = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+    dLamdx = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+    dLamdy = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_1dof));
+
+    double NX,NY,NZ;
+    dudx->GetGlobalSize(&NX,&NY,&NZ);
+    if(NZ != 1)
+      print_warning("Warning: Enforcing cylindrical symmetry, but mesh has %d layers "
+                    "in z-direction.\n", NZ); 
+  }
+  else if(iod.mesh.type == MeshData::SPHERICAL) {
+    print_error("*** Error: Currently, ViscosityOperator does not support spherical symmetry.\n");
+    exit(-1);
+  }
+
 }
 
 //--------------------------------------------------------------------------
@@ -82,6 +112,47 @@ ViscosityOperator::~ViscosityOperator()
 {
   for(int i=0; i<(int)visFcn.size(); i++)
     delete visFcn[i];
+
+  if(dudx) delete dudx;
+  if(dvdx) delete dvdx;
+  if(dudy) delete dudy;
+  if(dvdy) delete dvdy;
+  if(Lam)  delete Lam;
+  if(Mu)   delete Mu;
+  if(dLamdx) delete dLamdx;
+  if(dLamdy) delete dLamdy;
+}
+
+//--------------------------------------------------------------------------
+
+void
+ViscosityOperator::Destroy()
+{
+
+  V_i_minus_half.Destroy();
+  V_j_minus_half.Destroy();
+  V_k_minus_half.Destroy();
+
+  dVdx_i_minus_half.Destroy();
+  dVdx_j_minus_half.Destroy();
+  dVdx_k_minus_half.Destroy();
+  dVdy_i_minus_half.Destroy();
+  dVdy_j_minus_half.Destroy();
+  dVdy_k_minus_half.Destroy();
+  dVdz_i_minus_half.Destroy();
+  dVdz_j_minus_half.Destroy();
+  dVdz_k_minus_half.Destroy();
+
+  if(dudx) dudx->Destroy();
+  if(dvdx) dvdx->Destroy();
+  if(dudy) dudy->Destroy();
+  if(dvdy) dvdy->Destroy();
+
+  if(Lam) Lam->Destroy();
+  if(Mu)  Mu->Destroy();
+  if(dLamdx) dLamdx->Destroy();
+  if(dLamdy) dLamdy->Destroy();
+
 }
 
 //--------------------------------------------------------------------------
@@ -176,6 +247,8 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
         }
 
       }
+
+  XXX TODO I AM HERE XXX
 
   V_i_minus_half.RestoreDataPointerToLocalVector();
   V_j_minus_half.RestoreDataPointerToLocalVector();
