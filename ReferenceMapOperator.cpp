@@ -12,7 +12,7 @@ ReferenceMapOperator::ReferenceMapOperator(MPI_Comm &comm_, DataManagers3D &dm_a
                                            std::vector<GhostPoint> &ghost_nodes_outer_)
                     : comm(comm_), iod(iod_), coordinates(coordinates_), global_mesh(global_mesh_),
                       ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
-                      scalarG2(comm_, &(dm_all_.ghosted2_3dof)),    
+                      vectorG2(comm_, &(dm_all_.ghosted2_3dof)),    
                       Xil(comm_, &(dm_all_.ghosted1_3dof)),
                       Xir(comm_, &(dm_all_.ghosted1_3dof)),
                       Xib(comm_, &(dm_all_.ghosted1_3dof)),
@@ -46,7 +46,7 @@ ReferenceMapOperator::~ReferenceMapOperator()
 void
 ReferenceMapOperator::Destroy()
 {
-  scalarG2.Destroy();
+  vectorG2.Destroy();
   Xil.Destroy();
   Xir.Destroy();
   Xib.Destroy();
@@ -303,19 +303,19 @@ ReferenceMapOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, S
   //***************************************************************
   vector<int> ind0{0,1,2};
 
-  Vec3D*** s = (Vec3D***)scalarG2.GetDataPointer();
+  Vec3D*** s = (Vec3D***)vectorG2.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
         s[k][j][i] = xi[k][j][i];
-  scalarG2.RestoreDataPointerAndInsert(); //need to exchange
+  vectorG2.RestoreDataPointerAndInsert(); //need to exchange
 
-  grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, Xil, ind0);
-  grad_plus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, Xir, ind0);
-  grad_minus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, Xib, ind0);
-  grad_plus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, Xit, ind0);
-  grad_minus->CalculateFirstDerivativeAtNodes(2/*z*/, scalarG2, ind0, Xik, ind0);
-  grad_plus->CalculateFirstDerivativeAtNodes(2/*z*/, scalarG2, ind0, Xif, ind0); 
+  grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, vectorG2, ind0, Xil, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(0/*x*/, vectorG2, ind0, Xir, ind0);
+  grad_minus->CalculateFirstDerivativeAtNodes(1/*y*/, vectorG2, ind0, Xib, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(1/*y*/, vectorG2, ind0, Xit, ind0);
+  grad_minus->CalculateFirstDerivativeAtNodes(2/*z*/, vectorG2, ind0, Xik, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(2/*z*/, vectorG2, ind0, Xif, ind0); 
 
 
   //***************************************************************

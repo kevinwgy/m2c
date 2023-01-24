@@ -1,8 +1,14 @@
 #include <ViscosityOperator.h>
+#include <GradientCalculatorFD3.h>
 #include <Vector5D.h>
 #include <Utils.h>
 #include <bits/stdc++.h>
 using std::unique_ptr;
+
+extern int verbose;
+extern int INACTIVE_MATERIAL_ID;
+
+
 //--------------------------------------------------------------------------
 
 ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, 
@@ -26,7 +32,8 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                     interpolator(interpolator), grad(grad_),
                     cylindrical_symmetry(false),
                     dudx(NULL), dvdx(NULL), dudy(NULL), dvdy(NULL), 
-                    Lam(NULL), Mu(NULL), dLamdx(NULL), dLamdy(NULL)
+                    Lam(NULL), Mu(NULL), dLamdx(NULL), dLamdy(NULL),
+                    grad_minus(NULL), grad_plus(NULL)
 {
 
   // Get i0, j0, etc.
@@ -98,6 +105,10 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
     if(NZ != 1)
       print_warning("Warning: Enforcing cylindrical symmetry, but mesh has %d layers "
                     "in z-direction.\n", NZ); 
+
+    grad_minus = new GradientCalculatorFD3(comm_, dm_all_, coordinates, delta_xyz, -1);
+    grad_plus  = new GradientCalculatorFD3(comm_, dm_all_, coordinates, delta_xyz,  1);
+
   }
   else if(iod.mesh.type == MeshData::SPHERICAL) {
     print_error("*** Error: Currently, ViscosityOperator does not support spherical symmetry.\n");
@@ -121,6 +132,9 @@ ViscosityOperator::~ViscosityOperator()
   if(Mu)   delete Mu;
   if(dLamdx) delete dLamdx;
   if(dLamdy) delete dLamdy;
+
+  if(grad_minus) delete grad_minus;
+  if(grad_plus) delete grad_plus;
 }
 
 //--------------------------------------------------------------------------
@@ -143,6 +157,9 @@ ViscosityOperator::Destroy()
   dVdz_j_minus_half.Destroy();
   dVdz_k_minus_half.Destroy();
 
+
+  // members for cylindrical symmetry
+
   if(dudx) dudx->Destroy();
   if(dvdx) dvdx->Destroy();
   if(dudy) dudy->Destroy();
@@ -152,6 +169,9 @@ ViscosityOperator::Destroy()
   if(Mu)  Mu->Destroy();
   if(dLamdx) dLamdx->Destroy();
   if(dLamdy) dLamdy->Destroy();
+
+  if(grad_minus)  grad_minus->Destroy();
+  if(grad_plus)   grad_plus->Destroy();
 
 }
 
@@ -248,7 +268,10 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
       }
 
-  XXX TODO I AM HERE XXX
+
+  if(cylindrical_symmetry) //Directly use id, dxyz, and res (local vars) 
+    AddCylindricalSymmetryTerms(V, id, dxyz, EBDS, res);
+
 
   V_i_minus_half.RestoreDataPointerToLocalVector();
   V_j_minus_half.RestoreDataPointerToLocalVector();
@@ -272,8 +295,126 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
 //--------------------------------------------------------------------------
 
+void
+ViscosityOperator::AddCylindricalSymmetryTerms(SpaceVariable3D &V, double*** id, Vec3D*** dxyz,
+                       vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                       Vec5D*** res)
+{
+
+  assert(kmax-k0==1); //should be single layer in z-direction
+
+  Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
 
+  // Step 1: Calculate lambda and mu (only in domain interior)
+  double*** lam = Lam.GetDataPointer();
+  double*** mu  = Lam.GetDataPointer();
+  int myid;
+  for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
 
+        myid = id[k][j][i];
+
+        if(myid == INACTIVE_MATERIAL_ID) {
+          mu[k][j][i]  = 0.0;
+          lam[k][j][i] = 0.0;
+          continue;
+        } 
+
+        switch(visFcn[myid]->type) {
+          case ViscoFcnBase::NONE :
+            mu[k][j][i]  = 0.0;
+            lam[k][j][i] = 0.0;
+            break;
+          case ViscoFcnBase::CONSTANT :
+          case ViscoFcnBase::SUTHERLAND :
+            mu[k][j][i]  = visFcn[myid]->GetMu(V);
+            lam[k][j][i] = visFcn[myid]->GetLambda(V);
+            break;
+          case ViscoFcnBase::ARTIFICIAL_RODIONOV :
+            double div = CalculateLocalDiv2D(v, id, coords, i, j, k);
+            double h   = 0.5*(dxyz[k][j][i][0] + dxyz[k][j][i][1]);
+            mu[k][j][i]  = visFcn[myid]->GetMu(V);
+            lam[k][j][i] = visFcn[myid]->GetLambda(V);
+            break;
+          default:
+            fprintf(stderr,"\033[0;31m*** Error: ViscosityOperator detected unsupported viscosity model.\033[0m\n");
+            exit(-1);
+            break;
+        }
+
+      }
+
+
+ 
+  // Step 2: Calculate dudx (i.e. dw/dz in KW notes) and dudy (i.e. dw/dr in KW notes)
+  vector<int> ind0{0};
+  double*** s = scalarG2.GetDataPointer();
+  for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+        s[k][j][i] = v[k][j][i][1]; //extracting the axial velocity
+  scalarG2.RestoreDataPointerAndInsert(); //need to exchange
+
+  grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, dudxl, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, dudxr, ind0);
+  grad_minus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, dudyl, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, dudyr, ind0);
+
+  // dudx --> dw/dz in KW's notes
+  double*** uxl = dudxl.GetDataPointer();
+  double*** uxr = dudxr.GetDataPointer();
+  // dudy --> dw/dr in KW's notes
+  double*** uyl = dudyl.GetDataPointer();
+  double*** uyr = dudyr.GetDataPointer();
+  
+  double a,b,c,d;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        double r = coords[k][j][i][1];
+        assert(r>0);
+
+        a = (i-2>=-1) ? phil[k][j][i] : (phi[k][j][i]-phi[k][j][i-1])/(coords[k][j][i][0]-coords[k][j][i-1][0]);
+        b = (i+2<=NX) ? phir[k][j][i] : (phi[k][j][i+1]-phi[k][j][i])/(coords[k][j][i+1][0]-coords[k][j][i][0]);
+        c = (j-2>=-1) ? phib[k][j][i] : (phi[k][j][i]-phi[k][j-1][i])/(coords[k][j][i][1]-coords[k][j-1][i][1]);
+        d = (j+2<=NY) ? phit[k][j][i] : (phi[k][j+1][i]-phi[k][j][i])/(coords[k][j+1][i][1]-coords[k][j][i][1]);
+
+I AM HERE
+        res[k][j][i] = (v[k][j][i][1]>=0 ? a*v[k][j][i][1] : b*v[k][j][i][1])
+                     + (v[k][j][i][2]>=0 ? c*v[k][j][i][2] : d*v[k][j][i][2])
+                     + (v[k][j][i][3]>=0 ? e*v[k][j][i][3] : f*v[k][j][i][3]);
+
+        res[k][j][i] *= -1.0; //moves the residual to the RHS
+
+      }
+
+}
+
+//--------------------------------------------------------------------------
+// calculates dudx + dvdy using a first order method.
+double
+ViscosityOperator::CalculateLocalDiv2D(Vec5D*** v, double*** id, Vec3D*** coords, int i, int j, int k)
+{
+  assert(id[k][j][i] != INACTIVE_MATERIAL_ID);
+
+  double div(0.0);
+
+  int il = (i-1>=ii0  && id[k][j][i-1] != INACTIVE_MATERIAL_ID) ? i-1 : i;
+  int ir = (i+1<iimax && id[k][j][i+1] != INACTIVE_MATERIAL_ID) ? i+1 : i;
+  if(il!=ir) //otherwise, i-1 and i+1 are both unavailable ==> set dudx = 0
+    div += (v[k][j][ir][1] - v[k][j][il][1])/(coords[k][j][ir][0] - coords[k][j][il][0]);
+    
+  int jb = (j-1>=jj0  && id[k][j-1][i] != INACTIVE_MATERIAL_ID) ? j-1 : j;
+  int jt = (j+1<jjmax && id[k][j+1][i] != INACTIVE_MATERIAL_ID) ? j+1 : j;
+  if(jb!=jt)
+    div += (v[k][jt][i][2] - v[k][jb][i][2])/(coords[k][jt][i][1] - coords[k][jb][i][1]);
+
+  return div;
+}
+
+//--------------------------------------------------------------------------
 
 

@@ -52,10 +52,17 @@ class ViscosityOperator
   SpaceVariable3D dVdz_j_minus_half;  //!< du/dz, dv/dz, dw/dz at j +/- 1/2 (dim = 3)
   SpaceVariable3D dVdz_k_minus_half;  //!< du/dz, dv/dz, dw/dz at k +/- 1/2 (dim = 3)
 
+  // ---------------------------------------------------------------------
   //! internal variables for cylindrical symmetry (x~axial, y~radial)
   bool cylindrical_symmetry;
   SpaceVariable3D *dudx, *dvdx, *dudy, *dvdy; //!< at nodes
   SpaceVariable3D *Lam, *Mu, *dLamdx, *dLamdy;
+
+  //! Class for calculating spatial gradient (FDM)
+  GradientCalculatorBase *grad_minus; //left-biased FD
+  GradientCalculatorBase *grad_plus;  //right-biased FD
+  // ---------------------------------------------------------------------
+
 
 public:
 
@@ -76,8 +83,15 @@ public:
 
 private:
 
-  void PopulateGhostNodes(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
+  //! enforce cylindrical symmetry (on the left-hand-side of the N-S equations; added to res)
+  void AddCylindricalSymmetryTerms(SpaceVariable3D &V, double*** id, Vec3D*** dxyz, 
+                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                   Vec5D*** res);
+
+  double CalculateLocalDiv2D(Vec5D*** v, double*** id, Vec3D*** coords, int i, int j, int k);
+
+//  void PopulateGhostNodes(SpaceVariable3D &V, SpaceVariable3D &ID,
+//                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
 
 };
 

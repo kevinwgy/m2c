@@ -37,7 +37,7 @@ class ReferenceMapOperator
 
   //! Internal variables
   SpaceVariable3D Xil, Xir, Xib, Xit, Xik, Xif;
-  SpaceVariable3D scalarG2; //2 ghost layers
+  SpaceVariable3D vectorG2; //2 ghost layers
 
 public:
 
