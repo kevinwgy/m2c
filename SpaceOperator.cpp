@@ -657,8 +657,8 @@ void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, Grad
   if(hasViscosity) {
     assert(interpolator_); //make sure it is not NULL
     assert(grad_);
-    visco = new ViscosityOperator(comm, dm_all, iod.eqs, varFcn, coordinates, delta_xyz,
-                                  *interpolator_, *grad_);
+    visco = new ViscosityOperator(comm, dm_all, iod, varFcn, coordinates, delta_xyz,
+                                  volume, *interpolator_, *grad_);
   }
 }
 

@@ -7,6 +7,7 @@
 #include <memory>
 
 class EmbeddedBoundaryDataSet;
+struct Vec5D;
 
 /***************************************************
  * class ViscosityOperator calculates the viscous
@@ -28,9 +29,11 @@ class ViscosityOperator
   //! Mesh info
   SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;
+  SpaceVariable3D &volume;
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
+  int NX, NY, NZ;
 
   //! interpolator
   InterpolatorBase &interpolator;
@@ -55,8 +58,9 @@ class ViscosityOperator
   // ---------------------------------------------------------------------
   //! internal variables for cylindrical symmetry (x~axial, y~radial)
   bool cylindrical_symmetry;
-  SpaceVariable3D *dudx, *dvdx, *dudy, *dvdy; //!< at nodes
-  SpaceVariable3D *Lam, *Mu, *dLamdx, *dLamdy;
+  SpaceVariable3D *DDXm, *DDXp, *DDYm, *DDYp; //!< biased 3rd order FD at nodes
+  SpaceVariable3D *Lam, *Mu;
+  SpaceVariable3D *scalarG2; //!< with 2 ghost layers
 
   //! Class for calculating spatial gradient (FDM)
   GradientCalculatorBase *grad_minus; //left-biased FD
@@ -66,9 +70,10 @@ class ViscosityOperator
 
 public:
 
-  ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, EquationsData &iod_eqs_,
+  ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                     vector<VarFcnBase*> &varFcn_,
                     SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
+                    SpaceVariable3D &volume_,
                     InterpolatorBase &interpolator_, GradientCalculatorBase &grad_);
 
   ~ViscosityOperator();
