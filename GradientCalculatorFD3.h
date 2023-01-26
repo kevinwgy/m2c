@@ -31,12 +31,12 @@ public:
 
   ~GradientCalculatorFD3() {}
 
-  //! calculates x-, y-, or j-derivative at nodes 
+  //! calculates x-, y-, or j-derivative at nodes (domain inteior)
   void CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,1~d/dy,2~d/dz*/, 
                                        SpaceVariable3D &V, std::vector<int> &input_dof,
                                        SpaceVariable3D &DV, std::vector<int> &output_dof);
 
-  //! calculates x-, y-, or j-derivative at selected nodes 
+  //! calculates x-, y-, or j-derivative at selected nodes (domain interior)
   void CalculateFirstDerivativeAtSelectedNodes(int dir/*0~d/dx,1~d/dy,2~d/dz*/, std::vector<Int3> &nodes,
                                        SpaceVariable3D &V, std::vector<int> &input_dof,
                                        SpaceVariable3D &DV, std::vector<int> &output_dof);
