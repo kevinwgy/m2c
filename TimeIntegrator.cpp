@@ -5,6 +5,8 @@ using std::cout;
 using std::endl;
 using std::unique_ptr;
 
+extern std::ofstream lam_file;
+
 //----------------------------------------------------------------------------
 // BASE
 //----------------------------------------------------------------------------
@@ -248,7 +250,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
-  bool run_heat = time_step< 110000000;
+  bool run_heat = time < 41e-6;
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
@@ -665,6 +667,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
 
   // Check for phase transitions
+  lam_file << std::setw(8) << std::scientific << time << "    " << std::setw(8);
   if(lso.size()) {
     vector<int> phi_updated(lso.size(), 0); //0 or 1
     vector<Int3> new_useful_nodes[lso.size()];

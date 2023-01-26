@@ -14,6 +14,9 @@ using std::get;
 using std::unique_ptr;
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
+
+extern std::ofstream lam_file;
+
 //-----------------------------------------------------
 
 MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -25,7 +28,8 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                     ghost_nodes_inner(spo.GetPointerToInnerGhostNodes()), 
                     ghost_nodes_outer(spo.GetPointerToOuterGhostNodes()),
                     Tag(comm_, &(dm_all_.ghosted1_1dof)),
-                    Lambda(comm_, &(dm_all_.ghosted1_1dof))
+                    Lambda(comm_, &(dm_all_.ghosted1_1dof)),
+                    volume(spo.GetMeshCellVolumes())
 {
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -1448,6 +1452,12 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 */
 
   int myid;
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  double*** vol = volume.GetDataPointer();
+  double lam_sum = 0.0;  
+  double PI = acos(0.0)*2.0;
+
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
@@ -1520,11 +1530,25 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             break;
           }
         }
+
+        
+        if(lam[k][j][i]>0){
+          lam_sum += lam[k][j][i]*v[k][j][i][0]*vol[k][j][i]/dxyz[k][j][i][2]*PI*2.0*coords[k][j][i][1];
+        }
+        
       }
 
   MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
 
+  MPI_Allreduce(MPI_IN_PLACE, &lam_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+  lam_file << lam_sum << std::endl;
+  //print("- Total latent heat stored in this step: %e.\n", lam_sum);
+
   Lambda.RestoreDataPointerAndInsert();
+
+  coordinates.RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+  delta_xyz.RestoreDataPointerToLocalVector();
 
   if(counter>0) {
     ID.RestoreDataPointerAndInsert();

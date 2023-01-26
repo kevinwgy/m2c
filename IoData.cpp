@@ -2414,6 +2414,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   probes.setup("Probes", ca);
 
+  energy_integration.setup("EnergyIntegration", ca);
+
   linePlots.setup("LinePlot", ca);
 
   materialVolumes.setup("MaterialVolumes", ca);
@@ -2490,6 +2492,53 @@ void Probes::setup(const char *name, ClassAssigner *father)
   new ClassStr<Probes>(ca, "IonizationResult", this, &Probes::ionization_result);
 
   myNodes.setup("Node", ca);
+
+}
+
+//------------------------------------------------------------------------------
+EnergyIntegrationData::EnergyIntegrationData()
+{
+  frequency = -100;
+  frequency_dt = -1;
+
+  volume = "";
+  mass = "";
+  total_energy = "";
+  total_enthalpy = "";
+  kinetic_energy = "";
+  internal_energy = "";
+  potential_energy = "";
+
+  x_min = -5;
+  x_max = 5;
+  y_min = 5;
+  y_max = 0;
+  z_min = -2;
+  z_max = 2;
+
+}
+
+//------------------------------------------------------------------------------
+void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 15, father);
+
+  new ClassInt<EnergyIntegrationData>(ca, "Frequency", this, &EnergyIntegrationData::frequency);
+  new ClassDouble<EnergyIntegrationData>(ca, "TimeInterval", this, &EnergyIntegrationData::frequency_dt);
+  new ClassStr<EnergyIntegrationData>(ca, "Volume", this, &EnergyIntegrationData::volume);
+  new ClassStr<EnergyIntegrationData>(ca, "Mass", this, &EnergyIntegrationData::mass);
+  new ClassStr<EnergyIntegrationData>(ca, "TotalEnergy", this, &EnergyIntegrationData::total_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "TotalEnthalpy", this, &EnergyIntegrationData::total_enthalpy);
+  new ClassStr<EnergyIntegrationData>(ca, "KineticEnergy", this, &EnergyIntegrationData::kinetic_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "InternalEnergy", this, &EnergyIntegrationData::internal_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "PotentialEnergy", this, &EnergyIntegrationData::potential_energy);
+  
+  new ClassDouble<EnergyIntegrationData>(ca, "Xmin", this, &EnergyIntegrationData::x_min);
+  new ClassDouble<EnergyIntegrationData>(ca, "Xmax", this, &EnergyIntegrationData::x_max);
+  new ClassDouble<EnergyIntegrationData>(ca, "Ymin", this, &EnergyIntegrationData::y_min);
+  new ClassDouble<EnergyIntegrationData>(ca, "Ymax", this, &EnergyIntegrationData::y_max);
+  new ClassDouble<EnergyIntegrationData>(ca, "Zmin", this, &EnergyIntegrationData::z_min);
+  new ClassDouble<EnergyIntegrationData>(ca, "Zmax", this, &EnergyIntegrationData::z_max);
 
 }
 

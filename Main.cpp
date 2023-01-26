@@ -28,7 +28,7 @@ using std::to_string;
 //using std::chrono::duration;
 //using std::chrono::milliseconds;
 
-
+std::ofstream lam_file;
 
 int verbose;
 double domain_diagonal;
@@ -42,6 +42,9 @@ int INACTIVE_MATERIAL_ID;
  ************************************/
 int main(int argc, char* argv[])
 {
+  lam_file.open("Lambda.txt");
+  lam_file << "Time     |        Stored latent heat \n";
+
   start_time = clock(); //for timing purpose only
 
   //! Initialize MPI 
@@ -303,7 +306,7 @@ int main(int argc, char* argv[])
 */
 
   //! Initialize output
-  Output out(comm, dms, iod, global_mesh, vf, spo.GetMeshCellVolumes(), ion); 
+  Output out(comm, dms, iod, global_mesh, vf, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), ion); 
   out.InitializeOutput(spo.GetMeshCoordinates());
 
 
@@ -458,6 +461,9 @@ int main(int argc, char* argv[])
       }
     }
 
+    // Integrate the required energy within the specified box
+    
+
     out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
 
     //For debug
@@ -540,6 +546,8 @@ int main(int argc, char* argv[])
 
   PetscFinalize();
   MPI_Finalize();
+
+  lam_file.close();
 
   return 0;
 }

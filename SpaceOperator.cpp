@@ -3270,6 +3270,8 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
       print_error(comm, "*** Error: SymmetryOperator must be extended to account for diffusion fluxes.\n");
       exit_mpi();
     }
+    if(heat_diffusion && run_heat)
+      heat_diffusion->AddSymmetryDiffusionTerms(V, ID, R);
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
   }
 

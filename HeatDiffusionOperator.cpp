@@ -315,9 +315,6 @@ void HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &
 
 void HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
 {
-  //Get mesh data
-  double***    vol = (double***)volume.GetDataPointer();
-  Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
 
   //Get data
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
@@ -325,6 +322,7 @@ void HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D
   Vec5D***   r = (Vec5D***) R.GetDataPointer();
   double*** Te  = (double***)T.GetDataPointer();
 
+  
   int myid = 0;
   double e;
   for(int k=kk0; k<kkmax; k++)
@@ -335,30 +333,48 @@ void HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D
         e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
         Te[k][j][i] = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
   }
-
-  T.RestoreDataPointerToLocalVector();
+  T.RestoreDataPointerAndInsert();
 
   //Get \partial(T)/partial(r)
   std::vector<int> Ti0{0};
   grad.CalculateFirstDerivativeAtNodes(1, T, Ti0, dTdr, Ti0);
+
+  //Get mesh data
+  double***    vol = (double***)volume.GetDataPointer();
+  Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
 
   //Loop through the interior of the subdomain
   double*** dTdy = (double***)dTdr.GetDataPointer();
   double radial; //radial coord.
   double coeff;
   double myk = 0.0;
+  
+  //fprintf(stderr,"i0-imax: %d->%d, j0-jmax: %d->%d, k0-kmax: %d->%d", i0, imax, j0, jmax, k0, kmax);
+  //fprintf(stderr,"ii0-iimax: %d->%d, jj0-jjmax: %d->%d, kk0-kkmax: %d->%d", ii0, iimax, jj0, jjmax, kk0, kkmax);
+
+  
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
 
-        radial = coords[k][j][i][0];
+        
+        radial = coords[k][j][i][1];
         assert(radial>0);
+        
         coeff = vol[k][j][i]/radial;
+
+        //fprintf(stderr,"Check at (%d,%d,%d) coeff = %e\n", i,j,k,coeff);
 
         myid = id[k][j][i];
         myk = heatdiffFcn[myid]->conduct;
+        //fprintf(stderr,"Check at (%d,%d,%d) myk = %e\n", i,j,k,myk);
 
         r[k][j][i][4] -= coeff*myk*dTdy[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
+        //fprintf(stderr,"Check at (%d,%d,%d) R[4] = %e\n", i,j,k,r[k][j][i][4]);
+        
+
+//        if((imax-i == 1 && jmax-jmax==1)&& (kmax-k == 1))
+//          fprintf(stderr,"Get the end point of subdomain!\n");
       }
 
   //Restore data

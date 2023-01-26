@@ -30,6 +30,7 @@ class MultiPhaseOperator
   //! Mesh info
   SpaceVariable3D& coordinates;
   SpaceVariable3D& delta_xyz;
+  SpaceVariable3D& volume;
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain

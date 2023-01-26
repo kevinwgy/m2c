@@ -1036,6 +1036,37 @@ struct TerminalVisualizationData {
 };
 
 //------------------------------------------------------------------------------
+struct EnergyIntegrationData {
+
+  int frequency;
+  double frequency_dt;
+
+  enum Vars  {VOLUME = 0, MASS = 1, TOTAL_ENERGY = 2, TOTAL_ENTHALPY = 3, KINETIC_ENERGY = 4, INTERNAL_ENERGY = 5, POTENTIAL_ENERGY = 6, SIZE = 7};
+
+  const char *volume;
+  const char *mass;
+  const char *total_energy;
+  const char *total_enthalpy;
+  const char *kinetic_energy;
+  const char *internal_energy;
+  const char *potential_energy;
+
+  // specify the region
+  double x_min;
+  double x_max;
+  double y_min;
+  double y_max;
+  double z_min;
+  double z_max;
+
+  EnergyIntegrationData();
+  ~EnergyIntegrationData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+ 
+};
+
+//------------------------------------------------------------------------------
 
 struct OutputData {
 
@@ -1077,6 +1108,8 @@ struct OutputData {
 
 
   Probes probes;
+
+  EnergyIntegrationData energy_integration;
 
   ObjectMap<LinePlot> linePlots;
 

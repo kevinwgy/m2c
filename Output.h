@@ -1,6 +1,7 @@
 #ifndef _OUTPUT_H_
 #define _OUTPUT_H_
 #include <ProbeOutput.h>
+#include <EnergyIntegrationOutput.h>
 #include <MaterialVolumeOutput.h>
 #include <TerminalVisualization.h>
 #include <stdio.h>
@@ -34,6 +35,8 @@ class Output
   ProbeOutput probe_output;
   std::vector<ProbeOutput*> line_outputs;
 
+  EnergyIntegrationOutput energy_output;
+
   MaterialVolumeOutput matvol_output;
 
   TerminalVisualization terminal;
@@ -41,7 +44,7 @@ class Output
 public:
 
   Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-         vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
+         vector<VarFcnBase*> &vf_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
          IonizationOperator* ion_ = NULL);
   ~Output();
 
