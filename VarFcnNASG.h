@@ -1,0 +1,113 @@
+#ifndef _VAR_FCN_NASG_H
+#define _VAR_FCN_NASG_H
+
+#include <VarFcnBase.h>
+#include <fstream>
+
+/********************************************************************************
+ * This class is the VarFcn class for the Noble-Abel Stiffened Gas EOS in Euler
+ * Equations. Only elementary functions are declared and/or defined here.
+ * All arguments must be pertinent to only a single grid node or a single
+ * state.
+ *
+ * EOS: Pressure = (gam - 1)*(e - q)/(1/rho - b) - gam*Pc
+ * where
+ *   e  : internal energy per unit mass.
+ *   Pc : pressure constant. 
+ *   gam: specific heat ratio
+ *   b  : specific volume constant
+ *   q  : specific internal energy constant
+ *   q' : specific entropy constant
+ *
+ *   cv : specific heat at constant volume
+ *   cp = gam*cv
+ *
+ *   Temperature law: T = (e - q - Pc*(1/rho - b))/cv;
+ *                    Equivalently, T = (h - q - b*p)/cp
+ *   In general, de =/= cv*dT, and dh =/= cp*dT.
+ ********************************************************************************/
+class VarFcnNASG : public VarFcnBase {
+
+private:
+  double gam;
+  double pc;
+  double b; 
+  double q; 
+  double qprime;
+  double cv; //!< specific heat at constant volume
+
+  double gam1;    //!< gamma-1
+  double invgam1; //!< 1/(gamma-1)
+  double gam_pc; //!< gam*pc
+  double invcv; //!< 1/cv
+
+
+public:
+  VarFcnNASG(MaterialModelData &data);
+  ~VarFcnNASG() {}
+
+  //! ----- EOS-Specific Functions -----
+  inline double GetPressure(double rho, double e) const {return gam1*(e-q)/(1.0/rho - b) - gam_pc;}
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {return invgam1*(p+gam_pc)*(1.0/rho-b) + q;}
+  inline double GetDensity(double p, double e) const {return 1.0/(gam1*(e-q)/(p+gam_pc) + b);}
+  inline double GetDpdrho(double rho, double e) const {double V = 1.0/rho; return gam1*V*V*(e-q)/((V-b)*(V-b));}
+  inline double GetBigGamma(double rho, double e) const {return gam1/(1.0 - b*rho);}
+
+  inline double GetTemperature(double rho, double e) const {return invcv*(e - q - pc*(1.0/rho - b));}
+
+  inline double GetReferenceTemperature() const {return 0.0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() const {return 0.0;}
+
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {return cv*T+pc*(1.0/rho-b)+q;}
+  
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {
+    double V = 1.0/rho;  return ((h+gam_pc*V)*(V-b)+V*gam1*q)/(gam*V-b);}
+
+
+  //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + pc < 0 (Not p + gamma*pc). 
+  inline bool CheckState(double rho, double p, bool silence = false) const {
+    if(!std::isfinite(rho) || !std::isfinite(p)) {
+      if(!silence)
+        fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);
+      return true;
+    }
+    if(rho <= 0.0 || p+pc <= 0.0){ //if p+pc<=0, c^2<=0
+      if(!silence && verbose>1)
+        fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
+      return true;
+    }
+    return false;
+  }
+
+};
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+inline
+VarFcnNASG::VarFcnNASG(MaterialModelData &data) : VarFcnBase(data) {
+
+  if(data.eos != MaterialModelData::NOBLE_ABEL_STIFFENED_GAS){
+    fprintf(stderr, "*** Error: MaterialModelData is not of type NOBLE_ABEL_STIFFENED_GAS.\n");
+    exit(-1);
+  }
+
+  type = NOBLE_ABEL_STIFFENED_GAS;
+
+  gam    = data.nasgModel.specificHeatRatio;
+  pc     = data.nasgModel.pressureConstant;
+  q      = data.nasgModel.energyConstant;
+  qprime = data.nasgModel.entropyConstant;
+  b      = data.nasgModel.volumeConstant;
+
+  cv     = data.nasgModel.cv;
+
+  gam1 = gam -1.0;
+  invgam1 = 1.0/gam1;
+  gam_pc = gam*pc;
+  invcv = cv==0.0 ? 0.0 : 1.0/cv;
+
+}
+
+//------------------------------------------------------------------------------
+
+#endif
