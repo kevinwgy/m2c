@@ -115,7 +115,7 @@ LagrangianOutput.cpp
 TerminalVisualization.cpp
 ClosestTriangle.cpp
 SteadyStateOperator.cpp
-#GhostFluidOperator.cpp
+GhostFluidOperator.cpp
 Utils.cpp
 MathTools/r8lib.cpp
 MathTools/rbf_interp.cpp
