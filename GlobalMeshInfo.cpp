@@ -1,6 +1,149 @@
 #include<GlobalMeshInfo.h>
-#include<Vector3D.h>
+#include<SpaceVariable.h>
 #include<algorithm> //std::upper_bound
+
+//------------------------------------------------------------------
+
+GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_,
+                               std::vector<double> &z_glob_, std::vector<double> &dx_glob_,
+                               std::vector<double> &dy_glob_, std::vector<double> &dz_glob_);
+{
+  x_glob = x_glob_;   y_glob = y_glob_;   z_glob = z_glob_;
+  dx_glob = dx_glob_; dy_glob = dy_glob_; dz_glob = dz_glob_;
+  assert(x_glob.size() == dx_glob.size());
+  assert(y_glob.size() == dy_glob.size());
+  assert(z_glob.size() == dz_glob.size());
+}
+
+//------------------------------------------------------------------
+
+GlobalMeshInfo::~GlobalMeshInfo()
+{ }
+
+//------------------------------------------------------------------
+
+void
+GlobalMeshInfo::GetSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms)
+{
+  // Create a space variable only for use in this function. Destroyed at the end.
+  SpaceVariable3D S(comm, &(dms.ghosted1_1dof));
+
+  // Step 1: Construct subD_ijk_min/max
+  int rank, size;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
+  assert(rank>=0 && rank<size);
+
+  int i0, j0, k0, imax, jmax, kmax;
+  S.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
+  subD_ijk_min.resize(size);
+  subD_ijk_min[rank] = Int3(i0,j0,k0);
+  subD_ijk_max.resize(size);
+  subD_ijk_max[rank] = Int3(imax,jmax,kmax);
+
+  MPI_Allgather(MPI_IN_PLACE, 3, MPI_INT, (int*)subD_ijk_min.data(), 3, MPI_INT, comm); 
+  MPI_Allgather(MPI_IN_PLACE, 3, MPI_INT, (int*)subD_ijk_max.data(), 3, MPI_INT, comm); 
+  
+  // Step 2: Construct subD_xyz_min/max
+  subD_xyz_min.resize(size);
+  subD_xyz_min[rank] = Vec3D(x_glob[i0]-0.5*dx_glob[i0], y_glob[j0]-0.5*dy_glob[j0],
+                             z_glob[k0]-0.5*dz_glob[k0]);
+  subD_xyz_max.resize(size);
+  subD_xyz_max[rank] = Vec3D(x_glob[imax-1]+0.5*dx_glob[imax-1],
+                             y_glob[jmax-1]+0.5*dy_glob[jmax-1],
+                             z_glob[kmax-1]+0.5*dz_glob[kmax-1]);
+
+  MPI_Allgather(MPI_IN_PLACE, 3, MPI_DOUBLE, (double*)subD_xyz_min.data(), 3, MPI_DOUBLE, comm); 
+  MPI_Allgather(MPI_IN_PLACE, 3, MPI_DOUBLE, (double*)subD_xyz_max.data(), 3, MPI_DOUBLE, comm); 
+
+  // Step 3: Find neighbours
+  int none = -1;
+  S.SetConstantValue(none, true); //ghosts outside physical domain will get 'none'
+
+  double*** s = S.GetDataPointer();
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        s[k][j][i] = rank;
+
+  S.RestoreDataPointerAndInsert();
+
+  s = S.GetDataPointer();
+  std::vector<int> neighbors_all(size*27, none);
+
+  int myi, myj, myk;
+  for(int k=0; k<3; k++)
+    for(int j=0; j<3; j++)
+      for(int i=0; i<3; i++) {
+
+        if(i==0)      myi = i0-1;
+        else if(i==2) myi = imax;
+        else          myi = i0; //doesn't have to be i0
+
+        if(j==0)      myj = j0-1;
+        else if(j==2) myj = jmax;
+        else          myj = j0;
+
+        if(k==0)      myk = k0-1;
+        else if(k==2) myk = kmax;
+        else          myk = k0;
+
+        neighbors_all[27*rank + 9*k + 3*j + i] = (int)s[myk][myj][myi];
+      }
+
+  MPI_Allgather(MPI_IN_PLACE, size*27, MPI_INT, neighbors_all.data(), size*27, MPI_INT, comm); 
+  S.RestoreDataPointerToLocalVector();
+
+  // Step 4: Setup all the neighbour vectors
+  subD_neighbors_27.resize(size);
+  subD_neighbors_all.resize(size);
+  subD_neighbors_19.resize(size);
+  subD_neighbors_face_edge.resize(size);
+  subD_neighbors_7.resize(size);
+  subD_neighbors_face.resize(size);
+
+  int neigh, neigh_type;
+  for(int proc=0; proc<size; proc++) {
+    for(int k=0; k<3; k++)
+      for(int j=0; j<3; j++)
+        for(int i=0; i<3; i++) {
+
+          neigh = neighbors_all[27*proc+9*k+3*j+i];
+
+          neigh_type = 0;
+          if(k==0 || k==2) neigh_type++;
+          if(j==0 || j==2) neigh_type++;
+          if(i==0 || i==2) neigh_type++;
+
+          subD_neighbors_27[proc].push_back(neigh);
+          if(neigh_type!=0 && neigh!=none)
+            subD_neighbors_all[proc].push_back(neigh);
+
+          if(neigh_type!=3) {
+            subD_neighbors_19[proc].push_back(neigh);
+            if(neigh_type!=0 && neigh!=none)
+              subD_neighbors_face_edge[proc].push_back(neigh);
+          }
+
+          if(neigh_type!=3 && neigh_type!=2) {
+            subD_neighbors_7[proc].push_back(neigh);
+            if(neigh_type!=0 && neigh!=none)
+              subD_neighbors_face[proc].push_back(neigh);
+          } 
+        }
+
+    assert(subD_neighbors_27[proc].size()==27);
+    assert(subD_neighbors_all[proc].size()<=26);
+    assert(subD_neighbors_19[proc].size()==19);
+    assert(subD_neighbors_face_edge[proc].size()<=18);
+    assert(subD_neighbors_7[proc].size()==7);
+    assert(subD_neighbors_face[proc].size()<=6);
+  }
+
+  S.Destroy();
+
+}
 
 //------------------------------------------------------------------
 
@@ -311,9 +454,138 @@ GlobalMeshInfo::FindElementCoveringPoint(Vec3D &p, Int3 &ijk0, Vec3D *xi, bool i
 
 //------------------------------------------------------------------
 
+int
+GlobalMeshInfo::GetOwnerOfCell(int i, int j, int k, bool include_ghost_layer)
+{
+
+  if(include_ghost_layer) { //"pull" the node into the domain interior
+    if(i==-1)                  i = 0;
+    if(i==(int)x_glob.size())  i = x_glob.size()-1;
+    if(j==-1)                  j = 0;
+    if(j==(int)y_glob.size())  j = y_glob.size()-1;
+    if(k==-1)                  k = 0;
+    if(k==(int)z_glob.size())  k = z_glob.size()-1;
+  }
+
+  for(int proc=0; proc<subD_ijk_min.sinze(); proc++) {
+    if(k >= subD_ijk_min[proc][2] && k < subD_ijk_max[proc][2] &&
+       j >= subD_ijk_min[proc][1] && j < subD_ijk_max[proc][1] &&
+       i >= subD_ijk_min[proc][0] && i < subD_ijk_max[proc][0])
+      return proc; //got you!
+  }
+
+  return -1; //not found!
+
+}
 
 //------------------------------------------------------------------
 
+int
+GlobalMeshInfo::GetOwnerOfPoint(Vec3D &p, bool include_ghost_layer)
+{
+  Int3 ijk;
+  bool found = FindCellCoveringPoint(p, ijk, include_ghost_layer);
+  if(!found)
+    return -1; //not found!
+
+  return GetOwnerOfCell(ijk[0], ijk[1], ijk[2], include_ghost_layer);
+}
+
+//------------------------------------------------------------------
+
+bool
+GlobalMeshInfo::IsCellInSubdomain(int i, int j, int k, int sub, 
+                                  bool include_ext_ghost_layer)
+{
+  if(sub<0 || sub>=(int)subD_ijk_min.size()){
+    fprintf(stderr,"\033[0;31m*** Error: Calling IsCellInSubdomain with incorrect "
+                   "subdomain id (%d).\033[0m\n", sub);
+    exit(-1);
+  }
+    
+  if(include_ext_ghost_layer) {
+    if(i==-1)                  i = 0;
+    if(i==(int)x_glob.size())  i = x_glob.size()-1;
+    if(j==-1)                  j = 0;
+    if(j==(int)y_glob.size())  j = y_glob.size()-1;
+    if(k==-1)                  k = 0;
+    if(k==(int)z_glob.size())  k = z_glob.size()-1;
+  }
+
+  if(k >= subD_ijk_min[sub][2] && k < subD_ijk_max[sub][2] &&
+     j >= subD_ijk_min[sub][1] && j < subD_ijk_max[sub][1] &&
+     i >= subD_ijk_min[sub][0] && i < subD_ijk_max[sub][0])
+    return true;
+  }
+
+  return false;
+}
+
+//------------------------------------------------------------------
+
+bool
+GlobalMeshInfo::IsPointInSubdomain(Vec3D &p, int sub, bool include_ext_ghost_layer)
+{
+  Int3 ijk;
+  bool found = FindCellCoveringPoint(p, ijk, include_ext_ghost_layer);
+  if(!found)
+    return false;
+
+  return IsCellInSubdomain(ijk[0], ijk[1], ijk[2], sub, include_ext_ghost_layer);
+}
+
+//------------------------------------------------------------------
+
+std::vector<int> &
+GlobalMeshInfo::GetAllNeighborsOfSub(int sub) {
+  assert(sub>=0 && sub<(int)subD_neighbors_all.size());
+  return subD_neighbors_all[sub];
+}
+
+//------------------------------------------------------------------
+
+std::vector<int> &
+GlobalMeshInfo::GetFaceEdgeNeighborsOfSub(int sub) {
+  assert(sub>=0 && sub<(int)subD_neighbors_face_edge.size());
+  return subD_neighbors_face_edge[sub];
+}
+
+//------------------------------------------------------------------
+
+std::vector<int> &
+GlobalMeshInfo::GetFaceNeighborsOfSub(int sub) {
+  assert(sub>=0 && sub<(int)subD_neighbors_face.size());
+  return subD_neighbors_face[sub];
+}
+
+//------------------------------------------------------------------
+
+std::vector<int> &
+GlobalMeshInfo::Get27NeighborhoodOfSub(int sub) {
+  assert(sub>=0 && sub<(int)subD_neighbors_27.size());
+  return subD_neighbors_27[sub];
+}
+
+//------------------------------------------------------------------
+
+std::vector<int> &
+GlobalMeshInfo::Get19NeighborhoodOfSub(int sub) {
+  assert(sub>=0 && sub<(int)subD_neighbors_19.size());
+  return subD_neighbors_19[sub];
+}
+
+//------------------------------------------------------------------
+
+std::vector<int> &
+GlobalMeshInfo::Get7NeighborhoodOfSub(int sub) {
+  assert(sub>=0 && sub<(int)subD_neighbors_7.size());
+  return subD_neighbors_7[sub];
+}
+
+//------------------------------------------------------------------
+
+
+//------------------------------------------------------------------
 
 
 

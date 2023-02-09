@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
                          pow(iod.mesh.zmax - iod.mesh.z0, 2));
   
   //! Setup global mesh info
-  GlobalMeshInfo global_mesh(xcoords, ycoords, zcoords, dx, dy, dz);
+  GlobalMeshInfo global_mesh(ycoords, zcoords, dx, dy, dz);
 
   //! Initialize PETSc
   PETSC_COMM_WORLD = comm;
@@ -168,6 +168,9 @@ int main(int argc, char* argv[])
 
   //! Setup PETSc data array (da) structure for nodal variables
   DataManagers3D dms(comm, xcoords.size(), ycoords.size(), zcoords.size());
+
+  //! Let global_mesh find subdomain boundaries and neighbors
+  global_mesh.GetSubdomainInfo(comm, dms);
 
   //! Initialize space operator
   SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, global_mesh);

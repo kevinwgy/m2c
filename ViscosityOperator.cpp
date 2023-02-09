@@ -15,7 +15,8 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
                                      vector<VarFcnBase*>& varFcn_,
                                      SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
                                      SpaceVariable3D &volume_,
-                                     InterpolatorBase &interpolator, GradientCalculatorBase &grad_)
+                                     InterpolatorBase &interpolator, GradientCalculatorBase &grad_,
+                                     GhostFluidOperator *gfo_)
                   : iod_eqs(iod_.eqs), coordinates(coordinates_), delta_xyz(delta_xyz_),
                     volume(volume_), varFcn(varFcn_),
                     V_i_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
@@ -30,7 +31,7 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
                     dVdz_i_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_j_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_k_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
-                    interpolator(interpolator), grad(grad_),
+                    interpolator(interpolator), grad(grad_), gfo(gfo_),
                     cylindrical_symmetry(false),
                     DDXm(NULL), DDXp(NULL), DDYm(NULL), DDYp(NULL), 
                     Lam(NULL), Mu(NULL), scalarG2(NULL),
@@ -87,6 +88,9 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
     }
   }
 
+  // Initialize Vebo if ebo is not null.
+  Vebo = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_5dof));
+
 
   // Initialize variables for cylindrical symmetry
   if(iod_.mesh.type == MeshData::CYLINDRICAL) {
@@ -127,6 +131,7 @@ ViscosityOperator::~ViscosityOperator()
   for(int i=0; i<(int)visFcn.size(); i++)
     delete visFcn[i];
 
+  if(Vgf) delete Vgf;
   if(DDXm) delete DDXm;
   if(DDXp) delete DDXp;
   if(DDYm) delete DDYm;
@@ -163,6 +168,7 @@ ViscosityOperator::Destroy()
 
   // members for cylindrical symmetry
 
+  if(Vgf) Vgf->Destroy();
   if(DDXm) DDXm->Destroy();
   if(DDXp) DDXp->Destroy();
   if(DDYm) DDYm->Destroy();
@@ -185,26 +191,34 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                                            SpaceVariable3D &R)
 {
 
-  if(EBDS) 
-    print_warning("Warning: ViscosityOperator::AddDiffusionFluxes: Not able to account for embedded surfaces.\n");
+  SpaceVariable3D *VV = &V;
+
+  if(EBDS && EBDS->size()>0) {
+    assert(gfo); 
+    int numGhostPopulated = gfo->PopulateGhostNodesForViscosityOperator(V, ID, EBDS, Vgf);
+    if(numGhostPopulated>0) // In this case, Vgf should have been filled, and it is the one to use below.
+      VV = *Vgf;
+
+    //print_warning("Warning: ViscosityOperator::AddDiffusionFluxes: Not able to account for embedded surfaces.\n");
+  }
 
 
   std::vector<int> i123{1,2,3}, i012{0,1,2}; 
   //1. Calculate the x, y, and z velocities at cell interfaces by interpolation 
-  interpolator.InterpolateAtCellInterfaces(0/*x-dir*/, V, i123, V_i_minus_half, i012);
-  interpolator.InterpolateAtCellInterfaces(1/*y-dir*/, V, i123, V_j_minus_half, i012);
-  interpolator.InterpolateAtCellInterfaces(2/*z-dir*/, V, i123, V_k_minus_half, i012);
+  interpolator.InterpolateAtCellInterfaces(0/*x-dir*/, *VV, i123, V_i_minus_half, i012);
+  interpolator.InterpolateAtCellInterfaces(1/*y-dir*/, *VV, i123, V_j_minus_half, i012);
+  interpolator.InterpolateAtCellInterfaces(2/*z-dir*/, *VV, i123, V_k_minus_half, i012);
 
   //2. Calculate velocity derivatives at cell interfaces
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 0, V, i123, dVdx_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 1, V, i123, dVdx_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 2, V, i123, dVdx_k_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 0, V, i123, dVdy_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 1, V, i123, dVdy_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 2, V, i123, dVdy_k_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 0, V, i123, dVdz_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 1, V, i123, dVdz_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 2, V, i123, dVdz_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 0, *VV, i123, dVdx_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 1, *VV, i123, dVdx_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 2, *VV, i123, dVdx_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 0, *VV, i123, dVdy_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 1, *VV, i123, dVdy_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 2, *VV, i123, dVdy_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 0, *VV, i123, dVdz_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 1, *VV, i123, dVdz_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 2, *VV, i123, dVdz_k_minus_half, i012);
 
   //3. Loop through cell interfaces and calculate viscous fluxes
   Vec3D*** vi = (Vec3D***)V_i_minus_half.GetDataPointer();
@@ -288,7 +302,7 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
 
   if(cylindrical_symmetry) //Directly use id, dxyz, and res (local vars) 
-    AddCylindricalSymmetryTerms(V, id, dxyz, EBDS, res);
+    AddCylindricalSymmetryTerms(*VV, id, dxyz, EBDS, res);
 
 
   delta_xyz.RestoreDataPointerToLocalVector();

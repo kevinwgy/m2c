@@ -2,6 +2,7 @@
 #define _VISCOSITY_OPERATOR_H_
 
 #include <GradientCalculatorBase.h>
+#include <GhostFluidOperator.h>
 #include <Interpolator.h>
 #include <ViscoFcn.h>
 #include <memory>
@@ -55,6 +56,11 @@ class ViscosityOperator
   SpaceVariable3D dVdz_j_minus_half;  //!< du/dz, dv/dz, dw/dz at j +/- 1/2 (dim = 3)
   SpaceVariable3D dVdz_k_minus_half;  //!< du/dz, dv/dz, dw/dz at k +/- 1/2 (dim = 3)
 
+
+  //! Ghost fluid method
+  GhostFluidOperator *gfo;
+  SpaceVariable3D *Vgf; //!< a copy of "V" with ghost nodes populated
+  
   // ---------------------------------------------------------------------
   //! internal variables for cylindrical symmetry (x~axial, y~radial)
   bool cylindrical_symmetry;
@@ -74,7 +80,8 @@ public:
                     vector<VarFcnBase*> &varFcn_,
                     SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
                     SpaceVariable3D &volume_,
-                    InterpolatorBase &interpolator_, GradientCalculatorBase &grad_);
+                    InterpolatorBase &interpolator_, GradientCalculatorBase &grad_,
+                    EmbeddedBoundaryOperator *ebo_ = NULL);
 
   ~ViscosityOperator();
 

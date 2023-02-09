@@ -3,9 +3,10 @@
 
 #include<vector>
 #include<cassert>
+#include<Vector3D.h>
 
-struct Int3;
-struct Vec3D;
+class DataManagers3D;
+class MPI_Comm;
 
 /************************************************
  * class GlobalMeshInfo stores information about
@@ -24,23 +25,34 @@ struct Vec3D;
 
 class GlobalMeshInfo {
 
+prviate:
+
+  /** Neighbors of all processor cores/subdomains, indexed w/ proc id.
+      The neighbors of each subdomain follow a certain order. See GetSubdomainInfo(...) in the .cpp file. **/
+  std::vector<std::vector<int> > subD_neighbors_27; //!< all 27 neighbors, including self and non-exist ones
+  std::vector<std::vector<int> > subD_neighbors_all; //!< all real neighbors, w/o self and non-exist ones
+  std::vector<std::vector<int> > subD_neighbors_19; //!< 27 - 8 corners
+  std::vector<std::vector<int> > subD_neighbors_face_edge; //!< real neighbors, excluding corners (at most 19)
+  std::vector<std::vector<int> > subD_neighbors_7; //!< 19 - 12 edges 
+  std::vector<std::vector<int> > subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)
+
 public:
 
   std::vector<double> x_glob, y_glob, z_glob;
   std::vector<double> dx_glob, dy_glob, dz_glob;
 
+  std::vector<Vec3D> subD_xyz_min, subD_xyz_max; //!< actual boundaries of subs, up to cell boundaries
+  std::vector<Int3D> subD_ijk_min, subD_ijk_max; //!< Note: "max" is max index + 1 
+
 public:
 
-  GlobalMeshInfo() {}
   GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_, std::vector<double> &z_glob_,
-                 std::vector<double> &dx_glob_, std::vector<double> &dy_glob_, std::vector<double> &dz_glob_) {
-    x_glob = x_glob_;   y_glob = y_glob_;   z_glob = z_glob_;
-    dx_glob = dx_glob_; dy_glob = dy_glob_; dz_glob = dz_glob_;
-    assert(x_glob.size() == dx_glob.size());
-    assert(y_glob.size() == dy_glob.size());
-    assert(z_glob.size() == dz_glob.size());}
+                 std::vector<double> &dx_glob_, std::vector<double> &dy_glob_, std::vector<double> &dz_glob_);
 
-  ~GlobalMeshInfo() {}
+  ~GlobalMeshInfo();
+
+  //! Setup the subD_xxx vectors
+  void GetSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms);
 
   //! Get specific info 
   double GetX(int i);
@@ -77,6 +89,30 @@ public:
                                 Vec3D *xi = NULL, //optional output: local coords of "point" within element
                                 bool include_ghost_layer = false);
 
+  //! Find the subdomain/processor core that owns a node (or equiv. cell)
+  int GetOwnerOfCell(int i, int j, int k, 
+                     bool include_ghost_layer = false); //!< Not optimally fast. Shouldn't call it too frequently.
+  int GetOwnerOfNode(int i, int j, int k,
+                     bool include_ghost_layer = false) {return GetOwnerOfCell(i,j,k,include_ghost_layer);}
+
+  //! Find the subdomain/processor core that owns a point
+  int GetOwnerOfPoint(Vec3D &p, bool include_ghost_layer = false);
+
+  //! Check if a node/cell (i,j,k) is inside a certain subdomain
+  bool IsCellInSubdomain(int i, int j, int k, int sub, bool include_ext_ghost_layer = false);
+  bool IsNodeInSubdomain(int i, int j, int k, int sub, bool include_ext_ghost_layer = false) 
+           {return IsCellInSubdomain(i,j,k,sub,include_ext_ghost_layer);}
+
+  //! Check if a point (x,y,z) is inside a certain subdomain
+  bool IsPointInSubdomain(Vec3D &p, int sub, bool include_ext_ghost_layer = false);
+
+  //! Get neighbors
+  std::vector<int> &GetAllNeighborsOfSub(int sub); 
+  std::vector<int> &GetFaceEdgeNeighborsOfSub(int sub);
+  std::vector<int> &GetFaceNeighborsOfSub(int sub);
+  std::vector<int> &Get27NeighborhoodOfSub(int sub);
+  std::vector<int> &Get19NeighborhoodOfSub(int sub);
+  std::vector<int> &Get7NeighborhoodOfSub(int sub);
 
 };
 

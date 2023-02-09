@@ -3,6 +3,7 @@
 
 #include<mpi.h>
 #include<Vector3D.h>
+#include<vector>
 
 /*******************************************************
  * Class CustomCommunicator sets up a communication
@@ -19,6 +20,12 @@ class NeighborCommunicator {
   int rank;
   int size;
 
+  std::vector<int>& subD_neighbors_all; //!< all real neighbors, w/o self and non-exist ones
+  std::vector<int>& subD_neighbors_face_edge; //!< real neighbors, excluding corners (at most 19)
+  std::vector<int>& subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)  
+
+  std::vector<double> buffer;
+  std::vector<int> buffer_int;
 
   //! A nested structure that stores the package to/from a neighbor. Everything except data is fixed.
   struct Package {
