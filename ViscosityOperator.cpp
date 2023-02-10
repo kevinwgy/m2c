@@ -12,13 +12,13 @@ extern int INACTIVE_MATERIAL_ID;
 //--------------------------------------------------------------------------
 
 ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                                     vector<VarFcnBase*>& varFcn_,
+                                     vector<VarFcnBase*>& varFcn_, GlobalMeshInfo &global_mesh_,
                                      SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
                                      SpaceVariable3D &volume_,
                                      InterpolatorBase &interpolator, GradientCalculatorBase &grad_,
-                                     GhostFluidOperator *gfo_)
+                                     bool with_embedded_boundary)
                   : iod_eqs(iod_.eqs), coordinates(coordinates_), delta_xyz(delta_xyz_),
-                    volume(volume_), varFcn(varFcn_),
+                    volume(volume_), varFcn(varFcn_), global_mesh(global_mesh_),
                     V_i_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     V_j_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     V_k_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
@@ -31,7 +31,7 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
                     dVdz_i_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_j_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_k_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
-                    interpolator(interpolator), grad(grad_), gfo(gfo_),
+                    interpolator(interpolator), grad(grad_), gfo(NULL), Vgf(NULL),
                     cylindrical_symmetry(false),
                     DDXm(NULL), DDXp(NULL), DDYm(NULL), DDYp(NULL), 
                     Lam(NULL), Mu(NULL), scalarG2(NULL),
@@ -88,9 +88,11 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
     }
   }
 
-  // Initialize Vebo if ebo is not null.
-  Vebo = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_5dof));
-
+  // Initialize Vgf if ebo is not null.
+  if(with_embedded_boundary) {
+    gfo = new GhostFluidOperator(comm_, global_mesh);
+    Vgf = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_5dof));
+  }
 
   // Initialize variables for cylindrical symmetry
   if(iod_.mesh.type == MeshData::CYLINDRICAL) {
@@ -131,7 +133,9 @@ ViscosityOperator::~ViscosityOperator()
   for(int i=0; i<(int)visFcn.size(); i++)
     delete visFcn[i];
 
+  if(gfo) delete gfo;
   if(Vgf) delete Vgf;
+
   if(DDXm) delete DDXm;
   if(DDXp) delete DDXp;
   if(DDYm) delete DDYm;
@@ -168,7 +172,9 @@ ViscosityOperator::Destroy()
 
   // members for cylindrical symmetry
 
+  if(gfo) gfo->Destroy();
   if(Vgf) Vgf->Destroy();
+
   if(DDXm) DDXm->Destroy();
   if(DDXp) DDXp->Destroy();
   if(DDYm) DDYm->Destroy();
@@ -195,9 +201,9 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   if(EBDS && EBDS->size()>0) {
     assert(gfo); 
-    int numGhostPopulated = gfo->PopulateGhostNodesForViscosityOperator(V, ID, EBDS, Vgf);
+    int numGhostPopulated = gfo->PopulateGhostNodesForViscosityOperator(V, ID, EBDS, *Vgf);
     if(numGhostPopulated>0) // In this case, Vgf should have been filled, and it is the one to use below.
-      VV = *Vgf;
+      VV = Vgf;
 
     //print_warning("Warning: ViscosityOperator::AddDiffusionFluxes: Not able to account for embedded surfaces.\n");
   }

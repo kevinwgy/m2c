@@ -6,7 +6,7 @@
 
 GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_,
                                std::vector<double> &z_glob_, std::vector<double> &dx_glob_,
-                               std::vector<double> &dy_glob_, std::vector<double> &dz_glob_);
+                               std::vector<double> &dy_glob_, std::vector<double> &dz_glob_)
 {
   x_glob = x_glob_;   y_glob = y_glob_;   z_glob = z_glob_;
   dx_glob = dx_glob_; dy_glob = dy_glob_; dz_glob = dz_glob_;
@@ -458,6 +458,8 @@ int
 GlobalMeshInfo::GetOwnerOfCell(int i, int j, int k, bool include_ghost_layer)
 {
 
+  assert(!subD_ijk_min.empty()); //otherwise, this vector has not been created!
+
   if(include_ghost_layer) { //"pull" the node into the domain interior
     if(i==-1)                  i = 0;
     if(i==(int)x_glob.size())  i = x_glob.size()-1;
@@ -467,7 +469,7 @@ GlobalMeshInfo::GetOwnerOfCell(int i, int j, int k, bool include_ghost_layer)
     if(k==(int)z_glob.size())  k = z_glob.size()-1;
   }
 
-  for(int proc=0; proc<subD_ijk_min.sinze(); proc++) {
+  for(int proc=0; proc<(int)subD_ijk_min.size(); proc++) {
     if(k >= subD_ijk_min[proc][2] && k < subD_ijk_max[proc][2] &&
        j >= subD_ijk_min[proc][1] && j < subD_ijk_max[proc][1] &&
        i >= subD_ijk_min[proc][0] && i < subD_ijk_max[proc][0])
@@ -497,6 +499,8 @@ bool
 GlobalMeshInfo::IsCellInSubdomain(int i, int j, int k, int sub, 
                                   bool include_ext_ghost_layer)
 {
+  assert(!subD_ijk_min.empty()); //otherwise, this vector has not been created!
+
   if(sub<0 || sub>=(int)subD_ijk_min.size()){
     fprintf(stderr,"\033[0;31m*** Error: Calling IsCellInSubdomain with incorrect "
                    "subdomain id (%d).\033[0m\n", sub);
@@ -516,7 +520,6 @@ GlobalMeshInfo::IsCellInSubdomain(int i, int j, int k, int sub,
      j >= subD_ijk_min[sub][1] && j < subD_ijk_max[sub][1] &&
      i >= subD_ijk_min[sub][0] && i < subD_ijk_max[sub][0])
     return true;
-  }
 
   return false;
 }
@@ -538,6 +541,7 @@ GlobalMeshInfo::IsPointInSubdomain(Vec3D &p, int sub, bool include_ext_ghost_lay
 
 std::vector<int> &
 GlobalMeshInfo::GetAllNeighborsOfSub(int sub) {
+  assert(!subD_neighbors_all.empty()); //otherwise, it has not been created!
   assert(sub>=0 && sub<(int)subD_neighbors_all.size());
   return subD_neighbors_all[sub];
 }
@@ -546,6 +550,7 @@ GlobalMeshInfo::GetAllNeighborsOfSub(int sub) {
 
 std::vector<int> &
 GlobalMeshInfo::GetFaceEdgeNeighborsOfSub(int sub) {
+  assert(!subD_neighbors_face_edge.empty()); //otherwise, it has not been created!
   assert(sub>=0 && sub<(int)subD_neighbors_face_edge.size());
   return subD_neighbors_face_edge[sub];
 }
@@ -554,6 +559,7 @@ GlobalMeshInfo::GetFaceEdgeNeighborsOfSub(int sub) {
 
 std::vector<int> &
 GlobalMeshInfo::GetFaceNeighborsOfSub(int sub) {
+  assert(!subD_neighbors_face.empty()); //otherwise, it has not been created!
   assert(sub>=0 && sub<(int)subD_neighbors_face.size());
   return subD_neighbors_face[sub];
 }
@@ -562,6 +568,7 @@ GlobalMeshInfo::GetFaceNeighborsOfSub(int sub) {
 
 std::vector<int> &
 GlobalMeshInfo::Get27NeighborhoodOfSub(int sub) {
+  assert(!subD_neighbors_27.empty()); //otherwise, it has not been created!
   assert(sub>=0 && sub<(int)subD_neighbors_27.size());
   return subD_neighbors_27[sub];
 }
@@ -570,6 +577,7 @@ GlobalMeshInfo::Get27NeighborhoodOfSub(int sub) {
 
 std::vector<int> &
 GlobalMeshInfo::Get19NeighborhoodOfSub(int sub) {
+  assert(!subD_neighbors_19.empty()); //otherwise, it has not been created!
   assert(sub>=0 && sub<(int)subD_neighbors_19.size());
   return subD_neighbors_19[sub];
 }
@@ -578,6 +586,7 @@ GlobalMeshInfo::Get19NeighborhoodOfSub(int sub) {
 
 std::vector<int> &
 GlobalMeshInfo::Get7NeighborhoodOfSub(int sub) {
+  assert(!subD_neighbors_7.empty()); //otherwise, it has not been created!
   assert(sub>=0 && sub<(int)subD_neighbors_7.size());
   return subD_neighbors_7[sub];
 }

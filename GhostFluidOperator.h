@@ -2,9 +2,12 @@
 #define _GHOST_FLUID_OPERATOR_H_
 
 #include<NeighborCommunicator.h>
+#include<GlobalMeshInfo.h>
 #include<GhostPoint.h>
 #include<EmbeddedBoundaryFormula.h>
+#include<vector>
 
+class SpaceVariable3D;
 class EmbeddedBoundaryDataSet;
 
 /**************************************************************
@@ -18,19 +21,23 @@ class EmbeddedBoundaryDataSet;
 class GhostFluidOperator {
 
   MPI_Comm &comm;
-  NeighborCommunicator neighbor_comm;
+  int rank, size;
+
+  NeighborCommunicator *neicomm_ptr;
+
+  GlobalMeshInfo &global_mesh;
 
 public:
 
-  GhostFluidOperator(xxx)
+  GhostFluidOperator(MPI_Comm &comm_, GlobalMeshInfo &global_mesh_);
 
+  ~GhostFluidOperator();
 
+  void Destroy();
 
-
-
-
-
-
+  int PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                             std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                             SpaceVariable3D &Vgf);
 
 
 };

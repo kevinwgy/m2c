@@ -644,7 +644,8 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
 //-----------------------------------------------------
 //assign interpolator and gradien calculator (pointers) to the viscosity operator
-void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_)
+void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_,
+                                           bool with_embedded_boundary)
 {
   bool hasViscosity = false;
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
@@ -657,8 +658,8 @@ void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, Grad
   if(hasViscosity) {
     assert(interpolator_); //make sure it is not NULL
     assert(grad_);
-    visco = new ViscosityOperator(comm, dm_all, iod, varFcn, coordinates, delta_xyz,
-                                  volume, *interpolator_, *grad_);
+    visco = new ViscosityOperator(comm, dm_all, iod, varFcn, global_mesh, coordinates, delta_xyz,
+                                  volume, *interpolator_, *grad_, with_embedded_boundary);
   }
 }
 

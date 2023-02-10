@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
                          pow(iod.mesh.zmax - iod.mesh.z0, 2));
   
   //! Setup global mesh info
-  GlobalMeshInfo global_mesh(ycoords, zcoords, dx, dy, dz);
+  GlobalMeshInfo global_mesh(xcoords, ycoords, zcoords, dx, dy, dz);
 
   //! Initialize PETSc
   PETSC_COMM_WORLD = comm;
@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
     grad = new GradientCalculatorCentral(comm, dms, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), *interp);
   
   //! Setup viscosity operator in spo (if viscosity model is not NONE)
-  spo.SetupViscosityOperator(interp, grad);
+  spo.SetupViscosityOperator(interp, grad, embed!=NULL);
 
   //! Setup heat diffusion operator in spo (if heat diffusion model is not NONE)
   spo.SetupHeatDiffusionOperator(interp, grad);

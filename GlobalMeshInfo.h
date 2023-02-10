@@ -4,9 +4,9 @@
 #include<vector>
 #include<cassert>
 #include<Vector3D.h>
+#include<mpi.h>
 
 class DataManagers3D;
-class MPI_Comm;
 
 /************************************************
  * class GlobalMeshInfo stores information about
@@ -25,7 +25,7 @@ class MPI_Comm;
 
 class GlobalMeshInfo {
 
-prviate:
+private:
 
   /** Neighbors of all processor cores/subdomains, indexed w/ proc id.
       The neighbors of each subdomain follow a certain order. See GetSubdomainInfo(...) in the .cpp file. **/
@@ -42,10 +42,11 @@ public:
   std::vector<double> dx_glob, dy_glob, dz_glob;
 
   std::vector<Vec3D> subD_xyz_min, subD_xyz_max; //!< actual boundaries of subs, up to cell boundaries
-  std::vector<Int3D> subD_ijk_min, subD_ijk_max; //!< Note: "max" is max index + 1 
+  std::vector<Int3> subD_ijk_min, subD_ijk_max; //!< Note: "max" is max index + 1 
 
 public:
 
+  GlobalMeshInfo() {} //needed by M2CTwinMessenger (and maybe others)
   GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_, std::vector<double> &z_glob_,
                  std::vector<double> &dx_glob_, std::vector<double> &dy_glob_, std::vector<double> &dz_glob_);
 

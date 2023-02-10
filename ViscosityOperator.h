@@ -3,6 +3,7 @@
 
 #include <GradientCalculatorBase.h>
 #include <GhostFluidOperator.h>
+#include <GlobalMeshInfo.h>
 #include <Interpolator.h>
 #include <ViscoFcn.h>
 #include <memory>
@@ -31,6 +32,8 @@ class ViscosityOperator
   SpaceVariable3D &coordinates;
   SpaceVariable3D &delta_xyz;
   SpaceVariable3D &volume;
+
+  GlobalMeshInfo& global_mesh;
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
@@ -77,11 +80,11 @@ class ViscosityOperator
 public:
 
   ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                    vector<VarFcnBase*> &varFcn_,
+                    vector<VarFcnBase*> &varFcn_, GlobalMeshInfo &global_mesh_,
                     SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
                     SpaceVariable3D &volume_,
                     InterpolatorBase &interpolator_, GradientCalculatorBase &grad_,
-                    EmbeddedBoundaryOperator *ebo_ = NULL);
+                    bool with_embedded_boundary);
 
   ~ViscosityOperator();
 

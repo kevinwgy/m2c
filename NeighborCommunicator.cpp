@@ -1,4 +1,5 @@
 #include <NeighborCommunicator.h>
+#include <cassert>
 
 using std::vector;
 
@@ -42,8 +43,8 @@ NeighborCommunicator::Exchange(int exchange_type, // 0~all, 1~face_edge, 2~face
 
   int Nneigh = neighbors_ptr->size();
   
-  assert(Export.size()==Nneigh);
-  assert(Import.size()==Nneigh);
+  assert((int)Export.size()==Nneigh);
+  assert((int)Import.size()==Nneigh);
 
 
   //Step 1: Get the size of each package

@@ -102,7 +102,8 @@ public:
   int  ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &ID, 
                               bool workOnGhost = false, bool checkState = true);
 
-  void SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
+  void SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_,
+                              bool with_embedded_boundary = false);
 
   void SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
