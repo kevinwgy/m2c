@@ -6,11 +6,11 @@
 #include<vector>
 
 /*******************************************************
- * Class CustomCommunicator sets up a communication
+ * Class NeighborCommunicator sets up a communication
  * channel between adjacent subdomains. It allows them
  * to exchange data of arbitrary size
  * Note: The data type is assumed to be "double". Integers
- * will be represented as doubles.
+ * will have to be represented as doubles.
  ******************************************************/
 
 class NeighborCommunicator {
@@ -23,10 +23,6 @@ class NeighborCommunicator {
   std::vector<int>& subD_neighbors_all; //!< all real neighbors, w/o self and non-exist ones
   std::vector<int>& subD_neighbors_face_edge; //!< real neighbors, excluding corners (at most 19)
   std::vector<int>& subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)  
-
-  std::vector<std::vector<double> > buf_all;
-  std::vecotr<std::vector<double> > buf_face_edge;
-  std::vector<std::vector<double> > buf_face;
 
 public:
 
@@ -42,10 +38,9 @@ public:
   std::vector<int> &GetFaceEdgeNeighbors() {return subD_neighbors_face_edge;}
   std::vector<int> &GetFaceNeighbors() {return subD_neighbors_face;}
 
-  //! Data exchange 
-  void ExchangeAll(std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
-  void ExchangeFaceEdge(std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
-  void ExchangeFace(std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
+  //! Data exchange (Import[p] will be resized to exactly the size of data passed to it)
+  void Exchange(int exchange_type, //!< 0~all, 1~face_edge, 2~face
+                std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
    
 
 };

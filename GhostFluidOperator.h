@@ -1,7 +1,7 @@
 #ifndef _GHOST_FLUID_OPERATOR_H_
 #define _GHOST_FLUID_OPERATOR_H_
 
-#include<CustomCommunicator.h>
+#include<NeighborCommunicator.h>
 #include<GhostPoint.h>
 #include<EmbeddedBoundaryFormula.h>
 
@@ -18,24 +18,11 @@ class EmbeddedBoundaryDataSet;
 class GhostFluidOperator {
 
   MPI_Comm &comm;
-
-  std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > ghostNodes1; //ghost nodes whose image is inside this subdomain
-
-  std::vector<std::vector<Int3> > ghostNodes2; //ghost nodes whose image is inside another subdomain
-  std::vector<int> ghostNodes2_sender;
-
-  std::vector<std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > > friendsGhostNodes;
-  std::vector<int> friendsGhostNodes_receiver;
-
-  // laser radiance at ghost nodes
-  // std::vector<double> l1; //ghostNodes1
-  // std::vector<std::vector<double> > l2; //ghostNodes2
-
+  NeighborCommunicator neighbor_comm;
 
 public:
 
-  GhostFluidOperator(MPI_Comm &comm_);
-
+  GhostFluidOperator(xxx)
 
 
 
