@@ -24,41 +24,29 @@ class NeighborCommunicator {
   std::vector<int>& subD_neighbors_face_edge; //!< real neighbors, excluding corners (at most 19)
   std::vector<int>& subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)  
 
-  std::vector<double> buffer;
-  std::vector<int> buffer_int;
-
-  //! A nested structure that stores the package to/from a neighbor. Everything except data is fixed.
-  struct Package {
-    enum Type {SEND = 0, RECEIVE = 1} type;
-    int rank; //rank of the package sender/receiver
-    std::vector<double> buffer;
-    Package(Type type_, int rank_ = -1) : type(type_), rank(rank_) {}
-    ~Package() {}
-  };
-
-  std::vector<Package> send_pack;
-  std::vector<Package> recv_pack;
+  std::vector<std::vector<double> > buf_all;
+  std::vecotr<std::vector<double> > buf_face_edge;
+  std::vector<std::vector<double> > buf_face;
 
 public:
 
-  //! Create the communicator. ghost_nodes: list of ghost nodes that participate in the communication
-  CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V, std::vector<Int3> &ghost_nodes);
+  //! Create the communicator. Setup the buffers
+  NeighborCommunicator(MPI_Comm& comm_, std::vector<int> &subD_neighbors_all_,
+                       std::vector<int> &subD_neighbors_face_edge_,
+                       std::vector<int> &subD_neighbors_face_);
 
-  //! Create a new communicator that is the same as the one given, except different "dof" and "ghost_width"
-  //! For safety, it is required that the new ghost_width is equal to or larger than that of the given comm.
-  CustomCommunicator(const CustomCommunicator &cc, int dof_, int ghost_width_);
+  ~NeighborCommunicator();
 
-  ~CustomCommunicator();
+  //! Get neighbor lists
+  std::vector<int> &GetAllNeighbors() {return subD_neighbors_all;}
+  std::vector<int> &GetFaceEdgeNeighbors() {return subD_neighbors_face_edge;}
+  std::vector<int> &GetFaceNeighbors() {return subD_neighbors_face;}
 
-  //! Data exchange (Passing "v" reduces the cost by <20% (i.e. not much) compared to passing "V")
-  void ExchangeAndInsert(SpaceVariable3D &V);
-  void ExchangeAndInsert(double*** v); //note: this function does not verify compatibility
-
-  //! Can easily add other types of communication (e.g., add, max, etc.)
-
-  //! Get info
-  int NumDOF() {return dof;}
-  int NumGhostLayers() {return ghost_width;}
+  //! Data exchange 
+  void ExchangeAll(std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
+  void ExchangeFaceEdge(std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
+  void ExchangeFace(std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
+   
 
 };
 

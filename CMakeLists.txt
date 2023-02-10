@@ -85,6 +85,7 @@ SymmetryOperator.cpp
 SmoothingOperator.cpp
 Interpolator.cpp
 GlobalMeshInfo.cpp
+NeighborCommunicator.cpp
 GradientCalculatorCentral.cpp
 GradientCalculatorFD3.cpp
 ViscosityOperator.cpp
