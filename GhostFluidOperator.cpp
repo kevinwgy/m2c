@@ -1,4 +1,9 @@
 #include<GhostFluidOperator.h>
+#include<SpaceVariable.h>
+
+using std::vector;
+extern int verbose;
+extern int INACTIVE_MATERIAL_ID;
 
 //-------------------------------------------------------------
 
@@ -36,12 +41,31 @@ GhostFluidOperator::Destroy()
 int
 GhostFluidOperator::PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V, 
                         SpaceVariable3D &ID,
-                        std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                         SpaceVariable3D &Vgf)
 {
   assert(EBDS && EBDS->size()>0);
+
+  // Step 1: Tag ghost nodes that need to be populated
+  vector<Int3> ghosts;
+
+/*
+  double*** id = (double***) ID.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(
+  
+      }
+  
+  ID.RestoreDataPointerToLocalVector();
+*/
   return 0;
 }
+
+//-------------------------------------------------------------
+
 
 //-------------------------------------------------------------
 
