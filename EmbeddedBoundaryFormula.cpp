@@ -35,10 +35,10 @@ EmbeddedBoundaryFormula::SpecifyFormula(Operation op, ImageScenario sc, std::vec
 //-----------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryFormula::BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& xi0)
+EmbeddedBoundaryFormula::BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& xi0, double constant_)
 {
   operation = MIRRORING;
-  constant = 0.0;
+  constant = constant_;
 
   //---------------------------------------------------------------------
   // Step 1: Check xi0 to identify degenerate cases (node, edge, face)
@@ -111,6 +111,20 @@ EmbeddedBoundaryFormula::BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& 
       break;
   }
 }
+
+//-----------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryFormula::BuildLinearExtrapolationFormula(Int3& ghost, Int3& image, Vec3D& xi0,
+                                                         double constant_)
+{
+  //everything is the same as BuildMirroringFormula, except the "operation" type;
+  BuildMirroringFormula(ghost, image, xi0, constant_); 
+  operation = LINEAR_EXTRAPOLATION;
+}
+
+//-----------------------------------------------------------------------------
+
 
 //-----------------------------------------------------------------------------
 
@@ -220,11 +234,22 @@ EmbeddedBoundaryFormula::FinalizeMirroringFormulaElem(Int3 &ghost, std::vector<I
 //-----------------------------------------------------------------------------
 
 double
-EmbeddedBoundaryFormula::Evaluate(double*** v)
+EmbeddedBoundaryFormula::Evaluate(double*** v, double vin)
 {
-  double res = constant;
-  for(int i=0; i<(int)node.size(); i++)   
-    res += coeff[i]*v[node[i][2]/*k*/][node[i][1]/*j*/][node[i][0]/*i*/];
+
+  double res = 0.0;
+
+  if(operation==MIRRORING) {
+    assert(vin==0.0); //should be specified as "constant"
+    res = constant;
+    for(int i=0; i<(int)node.size(); i++)   
+      res += coeff[i]*v[node[i][2]/*k*/][node[i][1]/*j*/][node[i][0]/*i*/];
+  }
+  else if(operation==LINEAR_EXTRAPOLATION) {
+    for(int i=0; i<(int)node.size(); i++)   
+      res += coeff[i]*v[node[i][2]/*k*/][node[i][1]/*j*/][node[i][0]/*i*/];
+    res = (vin - constant*res)/(1.0-constant); //constant should be at most 0.5.
+  }
 
   return res;
 }
@@ -232,12 +257,22 @@ EmbeddedBoundaryFormula::Evaluate(double*** v)
 //-----------------------------------------------------------------------------
 
 double
-EmbeddedBoundaryFormula::Evaluate(std::vector<double>& v)
+EmbeddedBoundaryFormula::Evaluate(std::vector<double>& v, double vin)
 {
   assert(v.size() == node.size());
-  double res = constant;
-  for(int i=0; i<(int)v.size(); i++)   
-    res += coeff[i]*v[i];
+  double res = 0.0; 
+
+  if(operation==MIRRORING) {
+    assert(vin==0.0); //should be specified as "constant"
+    res = constant;
+    for(int i=0; i<(int)v.size(); i++)   
+      res += coeff[i]*v[i];
+  }
+  else if(operation==LINEAR_EXTRAPOLATION) {
+    for(int i=0; i<(int)v.size(); i++)   
+      res += coeff[i]*v[i];
+    res = (vin - constant*res)/(1.0-constant); //constant should be at most 0.5.
+  }
 
   return res;
 }

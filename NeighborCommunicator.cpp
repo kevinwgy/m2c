@@ -105,7 +105,7 @@ NeighborCommunicator::Request(int exchange_type, // 0~all, 1~face_edge, 2~face
                               vector<vector<Int3> > &Request, vector<vector<double> > &Received)
 {
 
-  int dim = V.NumDOF();
+  int dof = V.NumDOF();
   
   //Sanity check
   assert(exchange_type==2 || exchange_type==1 || exchange_type==0);
@@ -126,7 +126,7 @@ NeighborCommunicator::Request(int exchange_type, // 0~all, 1~face_edge, 2~face
 
   //Step 1: Resize Received to have the correct sizes
   for(int p=0; p<Nneigh; p++)
-    Received[p].resize(dim*Request[p].size());
+    Received[p].resize(dof*Request[p].size());
 
   //Step 2: Get the size of each package
   vector<int> counter(Nneigh, 0);
@@ -176,12 +176,12 @@ NeighborCommunicator::Request(int exchange_type, // 0~all, 1~face_edge, 2~face
   double*** v = V.GetDataPointer();
   std::map<int, vector<double> > Export;
   for(auto&& ex : ExportInds) {
-    Export[ex.first] = vector<double>(dim*ex.second.size());
+    Export[ex.first] = vector<double>(dof*ex.second.size());
     for(int n=0; n<(int)ex.second.size(); n++) {
       Int3 &ijk(ex.second[n]);
       assert(V.IsHere(ijk[0],ijk[1],ijk[2],false));
-      for(int d=0; d<dim; d++)
-        Export[ex.first][dim*n+d] = v[ijk[2]][ijk[1]][dim*ijk[0]+d];
+      for(int d=0; d<dof; d++)
+        Export[ex.first][dof*n+d] = v[ijk[2]][ijk[1]][dof*ijk[0]+d];
     }
   }
   V.RestoreDataPointerToLocalVector();

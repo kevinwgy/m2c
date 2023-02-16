@@ -90,7 +90,7 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
 
   // Initialize Vgf if ebo is not null.
   if(with_embedded_boundary) {
-    gfo = new GhostFluidOperator(comm_, global_mesh);
+    gfo = new GhostFluidOperator(comm_, dm_all_, global_mesh);
     Vgf = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_5dof));
   }
 

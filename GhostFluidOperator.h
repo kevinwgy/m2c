@@ -1,13 +1,12 @@
 #ifndef _GHOST_FLUID_OPERATOR_H_
 #define _GHOST_FLUID_OPERATOR_H_
 
+#include<SpaceVariable.h>
 #include<NeighborCommunicator.h>
 #include<GlobalMeshInfo.h>
-#include<GhostPoint.h>
-#include<EmbeddedBoundaryFormula.h>
 #include<vector>
+#include<memory> //unique_ptr
 
-class SpaceVariable3D;
 class EmbeddedBoundaryDataSet;
 
 /**************************************************************
@@ -27,9 +26,16 @@ class GhostFluidOperator {
 
   GlobalMeshInfo &global_mesh;
 
+  SpaceVariable3D Tag;
+
+  int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
+  int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
+  int NX, NY, NZ;
+
+
 public:
 
-  GhostFluidOperator(MPI_Comm &comm_, GlobalMeshInfo &global_mesh_);
+  GhostFluidOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, GlobalMeshInfo &global_mesh_);
 
   ~GhostFluidOperator();
 

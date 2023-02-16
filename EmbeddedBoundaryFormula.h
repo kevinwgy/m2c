@@ -22,7 +22,7 @@ class EmbeddedBoundaryFormula {
 
 public:
 
-  enum Operation {MIRRORING = 0};
+  enum Operation {MIRRORING = 0, LINEAR_EXTRAPOLATION = 1};
 
   enum ImageScenario {NODE = 0, EDGE_SHARED = 1, EDGE_REMOTE = 2,
                       FACE_SHARED = 3, FACE_REMOTE = 4, 
@@ -48,8 +48,11 @@ public:
   void SpecifyFormula(Operation op, ImageScenario sc, std::vector<Int3> &node_, std::vector<double> &coeff_,
                       double constant_ = 0.0);
 
-  //! Build the formula
-  void BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& xi);
+  //! Build the mirroring formula
+  void BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& xi, double constant_ = 0.0);
+
+  //! Build the linear extrapolation formula
+  void BuildLinearExtrapolationFormula(Int3& ghost, Int3& image, Vec3D& xi, double constant_); 
 
   //! Get Info
   Operation            GetOperationType() {return operation;}
@@ -60,10 +63,10 @@ public:
   double               GetConstant()      {return constant;}
 
   //! Apply the formula
-  double Evaluate(double*** v); //!< the 3D data structure (stored in SpaceVariable3D)
+  double Evaluate(double*** v, double vin=0.0); //!< the 3D data structure (stored in SpaceVariable3D)
 
   //! Apply the formula
-  double Evaluate(std::vector<double>& v); //!< v must have the same size as "node", and the correct order.
+  double Evaluate(std::vector<double>& v, double vin=0.0); //!< v must have the same size as "node", and the correct order.
 
 private:
 
