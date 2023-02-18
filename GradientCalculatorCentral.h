@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _GRADIENT_CALCULATOR_CENTRAL_H_
 #define _GRADIENT_CALCULATOR_CENTRAL_H_
 

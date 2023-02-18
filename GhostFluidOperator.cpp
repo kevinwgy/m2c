@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<GhostFluidOperator.h>
 #include<EmbeddedBoundaryFormula.h>
 #include<EmbeddedBoundaryDataSet.h>
@@ -186,6 +191,12 @@ found_layer_2_node: { }
   // ----------------------------------------------------------------------------
   // Step 3: Apply linear extrapolation to populate ghost nodes
   // ----------------------------------------------------------------------------
+/*  for(int n=0; n<(int)ghosts_ijk.size(); n++) {
+
+    
+
+  }
+*/
 
 
   return 0;
