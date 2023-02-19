@@ -115,7 +115,6 @@ found_layer_2_node: { }
       }
 
   
-  ID.RestoreDataPointerToLocalVector();
   Tag.RestoreDataPointerAndInsert();
 
 
@@ -137,6 +136,8 @@ found_layer_2_node: { }
   vector<Int3> ghosts_ijk(ghost_set.begin(), ghost_set.end());
   vector<Int3> images_ijk;
   vector<Vec3D> images_xi;
+  vector<Vec3D> images_xyz;
+  vector<bool> images_out(ghosts_ijk,size(), false); //tracks images outside physical domain
   vector<Vec3D> vp; //velocity at projection points on the interface
   for(auto&& g : ghosts_ijk) {
     double min_dist = DBL_MAX;
@@ -169,6 +170,7 @@ found_layer_2_node: { }
                                           + cp.xi[2]*Udot[tnodes[2]]);
 
     Vec3D xim = 2.0*xp - global_mesh.GetXYZ(g); //image point
+    images_xyz.push_back(xim);
 
     // get image point location w.r.t. mesh
     images_ijk.push_back(Int3());
@@ -176,9 +178,9 @@ found_layer_2_node: { }
     bool found = global_mesh.FindElementCoveringPoint(xim, images_ijk.back(), &images_xi.back(),
                                                       true); //include ghost layer outside domain
     if(!found) {
-      fprintf(stderr,"\033[0;31m***Error: Detected a ghost node (%d,%d,%d) whose image is outside "
+      fprintf(stderr,"\033[0;35mWarning: Detected a ghost node (%d,%d,%d) whose image is outside "
                      "physical domain.\033[0m\n", g[0], g[1], g[2]);
-      exit(-1);
+      images_out[images_xyz.size()-1] = true;
     }
 
   }
@@ -188,16 +190,57 @@ found_layer_2_node: { }
 
 
 
+//  vector<Int3> ghosts_ijk(ghost_set.begin(), ghost_set.end());
+//  vector<Int3> images_ijk;
+//  vector<Vec3D> images_xi;
   // ----------------------------------------------------------------------------
   // Step 3: Apply linear extrapolation to populate ghost nodes
   // ----------------------------------------------------------------------------
-/*  for(int n=0; n<(int)ghosts_ijk.size(); n++) {
+  for(int n=0; n<(int)ghosts_ijk.size(); n++) {
 
-    
+    bool valid_image = false;
 
+    // if image is outside physical domain, apply constant extrapolation
+    if(images_out[n])
+      goto apply_const_extrapolation;
+
+    Vec3D dir = images_xyz[n] - global_mesh.GetXYZ(ghost_ijk[n]);
+    double dist = dir.norm();
+    dir /= dist;
+
+    // if dist from ghost to interface is less than 15% of element size, just apply
+    // constant extrapolation
+    if(dist<0.3*global_mesh.GetMinDXYZ(ghost_ijk[n]))
+      goto apply_const_extrapolation;
+
+
+    for(int iter=0; iter<5; iter++) {
+      valid_image = CheckFeasibilityOfInterpolation(ghosts_ijk[n], images_ijk[n], images_xi[n], id);
+      if(valid_image)
+        break;
+      // move a bit further into the domain 
+      images_xyz[n] = global_mesh.GetXYZ(ghost_ijk[n]) + 1.2*dist*dir;
+      bool found = global_mesh.FindElementCoveringPoint(images_xyz[n], images_ijk[n], &images_xi[n],
+                                                        true); //include ghost layer outside domain
+      if(!found)
+        break; //apply const. extrapolation
+    }
+
+     
+apply_const_extrapolation: 
+
+    if(!valid_image) {
+
+
+      continue; //done with this one!
+    }
+
+    // I AM HERE
   }
-*/
 
+
+
+  ID.RestoreDataPointerToLocalVector();
 
   return 0;
 }

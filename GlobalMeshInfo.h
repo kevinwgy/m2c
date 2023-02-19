@@ -41,6 +41,8 @@ private:
   std::vector<std::vector<int> > subD_neighbors_7; //!< 19 - 12 edges 
   std::vector<std::vector<int> > subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)
 
+  bool two_dimensional; //!< set to true if z has only one element
+
 public:
 
   std::vector<double> x_glob, y_glob, z_glob;
@@ -77,6 +79,12 @@ public:
 
   Vec3D GetXYZ(Int3 ijk);
   Vec3D GetDXYZ(Int3 ijk);
+
+  bool Is2D() {return two_dimensional;}
+
+  //! If mesh is 2D, only consider dx and dy
+  double GetMinDXYZ(Int3 ijk);
+  double GetMaxDXYZ(Int3 ijk);
 
   //! Determine is a point is inside the domain (formed by control volumes / cells)
   bool IsPointInDomain(Vec3D &p, bool include_ghost_layer = false);
