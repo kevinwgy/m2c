@@ -97,7 +97,7 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
   }
 
   if (iod_output.probes.laser_radiance[0] != 0) {
-    char *filename = new char[spn + strlen(iod_output.probes.materialid)];
+    char *filename = new char[spn + strlen(iod_output.probes.laser_radiance)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.laser_radiance);
     file[Probes::LASERRADIANCE] = fopen(filename, "w");
     delete [] filename;
