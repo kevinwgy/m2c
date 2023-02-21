@@ -148,6 +148,7 @@ GlobalMeshInfo::GetSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms)
     assert(subD_neighbors_face[proc].size()<=6);
   }
 
+
   S.Destroy();
 
 }

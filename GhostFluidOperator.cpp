@@ -6,9 +6,11 @@
 #include<GhostFluidOperator.h>
 #include<EmbeddedBoundaryFormula.h>
 #include<EmbeddedBoundaryDataSet.h>
-#include <cfloat> //DBL_MAX
+#include<cfloat> //DBL_MAX
+#include<map>
 
 using std::vector;
+using std::map;
 
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
@@ -18,17 +20,13 @@ extern int INACTIVE_MATERIAL_ID;
 GhostFluidOperator::GhostFluidOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                                        GlobalMeshInfo &global_mesh_)
                   : comm(comm_), global_mesh(global_mesh_),
-                    neicomm_ptr(NULL),
+                    neicomm(comm, global_mesh_),
                     Tag(comm_, &(dm_all_.ghosted1_1dof))
 {
 
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &size);
-  assert(rank>=0 && rank<size);
-
-  neicomm_ptr = new NeighborCommunicator(comm, global_mesh.GetAllNeighborsOfSub(rank),
-                                         global_mesh.GetFaceEdgeNeighborsOfSub(rank),
-                                         global_mesh.GetFaceNeighborsOfSub(rank));
+  MPI_Comm_rank(comm, &mpi_rank);
+  MPI_Comm_size(comm, &mpi_size);
+  assert(mpi_rank>=0 && mpi_rank<mpi_size);
 
   Tag.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   Tag.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
@@ -40,8 +38,6 @@ GhostFluidOperator::GhostFluidOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
 
 GhostFluidOperator::~GhostFluidOperator()
 {
-  if(neicomm_ptr)
-    delete neicomm_ptr;
 }
 
 //-------------------------------------------------------------
@@ -137,7 +133,7 @@ found_layer_2_node: { }
   vector<Int3> images_ijk;
   vector<Vec3D> images_xi;
   vector<Vec3D> images_xyz;
-  vector<bool> images_out(ghosts_ijk,size(), false); //tracks images outside physical domain
+  vector<bool> const_extrap(ghosts_ijk.size(), false); //apply constant extrapolation
   vector<Vec3D> vp; //velocity at projection points on the interface
   for(auto&& g : ghosts_ijk) {
     double min_dist = DBL_MAX;
@@ -180,7 +176,7 @@ found_layer_2_node: { }
     if(!found) {
       fprintf(stderr,"\033[0;35mWarning: Detected a ghost node (%d,%d,%d) whose image is outside "
                      "physical domain.\033[0m\n", g[0], g[1], g[2]);
-      images_out[images_xyz.size()-1] = true;
+      const_extrap[images_xyz.size()-1] = true;
     }
 
   }
@@ -194,8 +190,82 @@ found_layer_2_node: { }
 //  vector<Int3> images_ijk;
 //  vector<Vec3D> images_xi;
   // ----------------------------------------------------------------------------
-  // Step 3: Apply linear extrapolation to populate ghost nodes
+  // Step 3: Find a usable image for each ghost node, starting w/ the one found above
   // ----------------------------------------------------------------------------
+  vector<Int3> neighbor_requests;
+  map<int, vector<int> > outside_images;
+  for(int iter=0; iter<5; iter++) {
+
+    neighbor_requests.clear();
+    outside_images.clear();
+
+    // Figure out the need of information ("id") from neighbors
+    for(int n=0; n<(int)ghosts_ijk.size(); n++) {
+
+      if(const_extrap[n])
+        continue; //this ghost node will be populated by constant extrapolation
+
+      int i,j,k;
+      for(int dk=0; dk<=1; dk++) {
+        k = images_ijk[n][2]+dk;
+        for(int dj=0; dj<=1; dj++) {
+          j = images_ijk[n][1]+dj;
+          for(int di=0; di<=1; di++) {
+            i = images_ijk[n][0]+di;
+            if(!Tag.IsHere(i,j,k,true)) {
+              neighbor_requests.push_back(Int3(i,j,k));
+              if(outside_images.find(n)==outside_images.end())
+                outside_images[n] = vector<int>();
+              outside_images[n].push_back(neighbor_requests.size()-1);
+            }
+          }
+        }
+      }
+
+    }
+
+    vector<double> neighbor_received; //will be fixed by neicomm
+    neicomm.Request(id, 1, neighbor_requests, neighbor_received, 0);
+
+  }
+ 
+/*
+  for(int n=0; n<(int)ghosts_ijk.size(); n++) {
+
+    bool valid_image = false;
+
+    if(const_extrap[n])
+      continue;
+
+
+      goto apply_const_extrapolation;
+
+    Vec3D dir = images_xyz[n] - global_mesh.GetXYZ(ghost_ijk[n]);
+    double dist = dir.norm();
+    dir /= dist;
+
+    // if dist from ghost to interface is less than 15% of element size, just apply
+    // constant extrapolation
+    if(dist<0.3*global_mesh.GetMinDXYZ(ghost_ijk[n]))
+      goto apply_const_extrapolation;
+
+
+    for(int iter=0; iter<5; iter++) {
+      valid_image = CheckFeasibilityOfInterpolation(ghosts_ijk[n], images_ijk[n], images_xi[n], id);
+      if(valid_image)
+        break;
+      // move a bit further into the domain 
+      images_xyz[n] = global_mesh.GetXYZ(ghost_ijk[n]) + 1.2*dist*dir;
+      bool found = global_mesh.FindElementCoveringPoint(images_xyz[n], images_ijk[n], &images_xi[n],
+                                                        true); //include ghost layer outside domain
+      if(!found)
+        break; //apply const. extrapolation
+    }
+
+
+
+
+
   for(int n=0; n<(int)ghosts_ijk.size(); n++) {
 
     bool valid_image = false;
@@ -231,13 +301,15 @@ apply_const_extrapolation:
 
     if(!valid_image) {
 
+      for(int p=0; p<3; p++)
+        v[ghost_ijk[n][2]][ghost_ijk[n][1]][ghost_ijk[n][0]][1+p] = vp[n][p];
 
       continue; //done with this one!
     }
 
     // I AM HERE
   }
-
+*/
 
 
   ID.RestoreDataPointerToLocalVector();
@@ -246,6 +318,25 @@ apply_const_extrapolation:
 }
 
 //-------------------------------------------------------------
+/*
+bool
+GhostFluidOperator::CheckFeasibilityOfInterpolation(Int3& ghost, Int3& image, Vec3D& image_xi, double*** id, *** REQUEST ***)
+{
+  for(int k=0; k<=1; k++)
+    for(int j=0; j<=1; j++)
+      for(int i=0; i<=1; i++) {
+
+        if(global_mesh.Find
+        image[2]+k
+
+      }
+
+}
+*/
+//-------------------------------------------------------------
+
+
+
 
 
 //-------------------------------------------------------------

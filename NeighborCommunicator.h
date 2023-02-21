@@ -6,9 +6,7 @@
 #ifndef _NEIGHBOR_COMMUNICATOR_H_
 #define _NEIGHBOR_COMMUNICATOR_H_
 
-#include<mpi.h>
-#include<Vector3D.h>
-#include<vector>
+#include<GlobalMeshInfo.h>
 
 class SpaceVariable3D;
 
@@ -35,31 +33,36 @@ class NeighborCommunicator {
   int rank;
   int size;
 
-  std::vector<int>& subD_neighbors_all; //!< all real neighbors, w/o self and non-exist ones
-  std::vector<int>& subD_neighbors_face_edge; //!< real neighbors, excluding corners (at most 19)
-  std::vector<int>& subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)  
+  //! Global mesh info
+  GlobalMeshInfo& global_mesh;
+
+  //! Neighbor info pertaining to the current subdomain
+  std::vector<int>* subD_neighbors_all; //!< all real neighbors, w/o self and non-exist ones
+  std::vector<int>* subD_neighbors_face_edge; //!< real neighbors, excluding corners (at most 19)
+  std::vector<int>* subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)  
 
 public:
 
   //! Create the communicator. Setup the buffers
-  NeighborCommunicator(MPI_Comm& comm_, std::vector<int> &subD_neighbors_all_,
-                       std::vector<int> &subD_neighbors_face_edge_,
-                       std::vector<int> &subD_neighbors_face_);
+  NeighborCommunicator(MPI_Comm& comm_, GlobalMeshInfo& global_mesh_);
 
   ~NeighborCommunicator();
 
   //! Get neighbor lists
-  std::vector<int> &GetAllNeighbors() {return subD_neighbors_all;}
-  std::vector<int> &GetFaceEdgeNeighbors() {return subD_neighbors_face_edge;}
-  std::vector<int> &GetFaceNeighbors() {return subD_neighbors_face;}
+  std::vector<int> &GetAllNeighbors() {return *subD_neighbors_all;}
+  std::vector<int> &GetFaceEdgeNeighbors() {return *subD_neighbors_face_edge;}
+  std::vector<int> &GetFaceNeighbors() {return *subD_neighbors_face;}
 
   //! Data exchange (Import[p] will be resized to exactly the size of data passed to it)
   void Send(int exchange_type, //!< 0~all, 1~face_edge, 2~face
             std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
    
-  void Request(int exchange_type, //!< 0~all, 1~face_edge, 2~face
-               SpaceVariable3D &V, std::vector<std::vector<Int3> > &Request,
-               std::vector<std::vector<double> > &Received);
+  void Request(SpaceVariable3D &V, std::vector<Int3> &Request, std::vector<double> &Received,
+               int exchange_type = 0); //!< 0~all, 1~face_edge, 2~face);
+
+  void Request(double*** v, int dof,
+               std::vector<Int3> &Request, std::vector<double> &Received,
+               int exchange_type = 0); //!< 0~all, 1~face_edge, 2~face); //!< V --> v
    
 };
 

@@ -8,8 +8,6 @@
 
 #include<SpaceVariable.h>
 #include<NeighborCommunicator.h>
-#include<GlobalMeshInfo.h>
-#include<vector>
 #include<memory> //unique_ptr
 
 class EmbeddedBoundaryDataSet;
@@ -25,9 +23,9 @@ class EmbeddedBoundaryDataSet;
 class GhostFluidOperator {
 
   MPI_Comm &comm;
-  int rank, size;
+  int mpi_rank, mpi_size;
 
-  NeighborCommunicator *neicomm_ptr;
+  NeighborCommunicator neicomm;
 
   GlobalMeshInfo &global_mesh;
 
@@ -50,6 +48,9 @@ public:
                                              std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                              SpaceVariable3D &Vgf);
 
+private:
+
+  bool CheckFeasibilityOfInterpolation(Int3& ghost, Int3& image, Vec3D& image_xi, double*** id);
 
 };
 
