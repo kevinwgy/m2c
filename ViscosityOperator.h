@@ -67,7 +67,7 @@ class ViscosityOperator
 
   //! Ghost fluid method
   GhostFluidOperator *gfo;
-  SpaceVariable3D *Vgf; //!< a copy of "V" with ghost nodes populated
+  SpaceVariable3D *Velog; //!< a copy of velocity with ghost nodes populated
   
   // ---------------------------------------------------------------------
   //! internal variables for cylindrical symmetry (x~axial, y~radial)

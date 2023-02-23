@@ -11,8 +11,8 @@
 
 //-----------------------------------------------------------------------------
 
-EmbeddedBoundaryFormula::EmbeddedBoundaryFormula(double eps_)
-                       : operation(MIRRORING), scenario(NODE), constant(0.0),
+EmbeddedBoundaryFormula::EmbeddedBoundaryFormula(Operation operation_, double eps_)
+                       : operation(operation_), scenario(NODE), constant(0.0),
                          eps(eps_)
 { }
 
@@ -44,6 +44,9 @@ EmbeddedBoundaryFormula::BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& 
 {
   operation = MIRRORING;
   constant = constant_;
+
+  node.clear();
+  coeff.clear();
 
   //---------------------------------------------------------------------
   // Step 1: Check xi0 to identify degenerate cases (node, edge, face)
@@ -261,6 +264,29 @@ EmbeddedBoundaryFormula::Evaluate(double*** v, double vin)
 
 //-----------------------------------------------------------------------------
 
+Vec3D
+EmbeddedBoundaryFormula::Evaluate3D(Vec3D*** v, Vec3D vin)
+{
+
+  Vec3D res(0.0);
+
+  if(operation==MIRRORING) {
+    assert(vin[0]==vin[1] && vin[1]==vin[2] && vin[2]==0.0); //should be specified as "constant"
+    res = constant;
+    for(int i=0; i<(int)node.size(); i++)   
+      res += coeff[i]*v[node[i][2]/*k*/][node[i][1]/*j*/][node[i][0]/*i*/];
+  }
+  else if(operation==LINEAR_EXTRAPOLATION) {
+    for(int i=0; i<(int)node.size(); i++)   
+      res += coeff[i]*v[node[i][2]/*k*/][node[i][1]/*j*/][node[i][0]/*i*/];
+    res = (vin - constant*res)/(1.0-constant); //constant should be at most 0.5.
+  }
+
+  return res;
+}
+
+//-----------------------------------------------------------------------------
+
 double
 EmbeddedBoundaryFormula::Evaluate(std::vector<double>& v, double vin)
 {
@@ -283,6 +309,35 @@ EmbeddedBoundaryFormula::Evaluate(std::vector<double>& v, double vin)
 }
 
 //-----------------------------------------------------------------------------
+
+Vec3D
+EmbeddedBoundaryFormula::Evaluate3D(std::vector<Vec3D>& v, Vec3D vin)
+{
+  assert(v.size() == node.size());
+  Vec3D res(0.0);
+
+  if(operation==MIRRORING) {
+    assert(vin[0]==vin[1] && vin[1]==vin[2] && vin[2]==0.0); //should be specified as "constant"
+    res = constant;
+    for(int i=0; i<(int)v.size(); i++)   
+      res += coeff[i]*v[i];
+  }
+  else if(operation==LINEAR_EXTRAPOLATION) {
+    for(int i=0; i<(int)v.size(); i++)   
+      res += coeff[i]*v[i];
+    res = (vin - constant*res)/(1.0-constant); //constant should be at most 0.5.
+  }
+
+  return res;
+}
+
+//-----------------------------------------------------------------------------
+
+
+
+
+//-----------------------------------------------------------------------------
+
 
 
 

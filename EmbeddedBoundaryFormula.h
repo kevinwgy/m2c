@@ -42,11 +42,11 @@ private:
 
   std::vector<Int3> node;
   std::vector<double> coeff; //!< Note: sizes of node and coeff are the same
-  double constant; //!< constant term in the affine function (often 0).
+  double constant; //!< MIRRORING: constant in affine function; EXTRAP: abs((ghost-interface)/(ghost-image))
   
 public:
 
-  EmbeddedBoundaryFormula(double eps_ = 1.0e-12);
+  EmbeddedBoundaryFormula(Operation operation_ = MIRRORING, double eps_ = 1.0e-12);
   ~EmbeddedBoundaryFormula();
 
   //! Explicitly specify the formula
@@ -69,9 +69,11 @@ public:
 
   //! Apply the formula
   double Evaluate(double*** v, double vin=0.0); //!< the 3D data structure (stored in SpaceVariable3D)
+  Vec3D Evaluate3D(Vec3D*** v, Vec3D vin=0.0);
 
   //! Apply the formula
   double Evaluate(std::vector<double>& v, double vin=0.0); //!< v must have the same size as "node", and the correct order.
+  Vec3D Evaluate3D(std::vector<Vec3D>& v, Vec3D vin=0.0);
 
 private:
 

@@ -36,7 +36,7 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
                     dVdz_i_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_j_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
                     dVdz_k_minus_half(comm_, &(dm_all_.ghosted1_3dof)),
-                    interpolator(interpolator), grad(grad_), gfo(NULL), Vgf(NULL),
+                    interpolator(interpolator), grad(grad_), gfo(NULL), Velog(NULL),
                     cylindrical_symmetry(false),
                     DDXm(NULL), DDXp(NULL), DDYm(NULL), DDYp(NULL), 
                     Lam(NULL), Mu(NULL), scalarG2(NULL),
@@ -93,10 +93,10 @@ ViscosityOperator::ViscosityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, I
     }
   }
 
-  // Initialize Vgf if ebo is not null.
+  // Initialize Velog if ebo is not null.
   if(with_embedded_boundary) {
     gfo = new GhostFluidOperator(comm_, dm_all_, global_mesh);
-    Vgf = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_5dof));
+    Velog = new SpaceVariable3D(comm_, &(dm_all_.ghosted1_3dof));
   }
 
   // Initialize variables for cylindrical symmetry
@@ -139,7 +139,7 @@ ViscosityOperator::~ViscosityOperator()
     delete visFcn[i];
 
   if(gfo) delete gfo;
-  if(Vgf) delete Vgf;
+  if(Velog) delete Velog;
 
   if(DDXm) delete DDXm;
   if(DDXp) delete DDXp;
@@ -178,7 +178,7 @@ ViscosityOperator::Destroy()
   // members for cylindrical symmetry
 
   if(gfo) gfo->Destroy();
-  if(Vgf) Vgf->Destroy();
+  if(Velog) Velog->Destroy();
 
   if(DDXm) DDXm->Destroy();
   if(DDXp) DDXp->Destroy();
@@ -206,13 +206,14 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   if(EBDS && EBDS->size()>0) {
     assert(gfo); 
-    int numGhostPopulated = gfo->PopulateGhostNodesForViscosityOperator(V, ID, EBDS, *Vgf);
-    if(numGhostPopulated>0) // In this case, Vgf should have been filled, and it is the one to use below.
-      VV = Vgf;
+    int numGhostPopulated = gfo->PopulateGhostNodesForViscosityOperator(V, ID, EBDS, *Velog);
+    if(numGhostPopulated>0) // In this case, Velog should have been filled, and it is the one to use below.
+      VV = Velog; //TODO: Velog is only velocity, not the 5-dim vector!
 
     //print_warning("Warning: ViscosityOperator::AddDiffusionFluxes: Not able to account for embedded surfaces.\n");
   }
 
+  //TODO! BUG FOUND BUT NOT FIXED YET. GetMu Requires the full "v", yet somewhere else v is supposed to be velocity
 
   std::vector<int> i123{1,2,3}, i012{0,1,2}; 
   //1. Calculate the x, y, and z velocities at cell interfaces by interpolation 

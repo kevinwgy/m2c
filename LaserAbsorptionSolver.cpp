@@ -1270,7 +1270,8 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
               id = ebm.friendsGhostNodes.size() - 1;
             }
             Int3 nod_int3(nod[3*n],nod[3*n+1],nod[3*n+2]);
-            ebm.friendsGhostNodes[id].push_back(std::make_pair(nod_int3, EmbeddedBoundaryFormula(eps)));
+            ebm.friendsGhostNodes[id].push_back(std::make_pair(nod_int3, 
+                    EmbeddedBoundaryFormula(EmbeddedBoundaryFormula::MIRRORING, eps)));
             Vec3D xi;
             int ihere = far_nodes_image_ijk[n][0];
             int jhere = far_nodes_image_ijk[n][1];
@@ -1428,7 +1429,8 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
               id = iter - ebm.friendsGhostNodes_receiver.begin();
 
             Int3 nod_int3(nod[3*n],nod[3*n+1],nod[3*n+2]);
-            ebm.friendsGhostNodes[id].push_back(std::make_pair(nod_int3, EmbeddedBoundaryFormula(eps)));
+            ebm.friendsGhostNodes[id].push_back(std::make_pair(nod_int3,
+                    EmbeddedBoundaryFormula(EmbeddedBoundaryFormula::MIRRORING, eps)));
             vector<Int3> node(1, nearest_node[n]);
             vector<double> coeff(1, 1.0);
             ebm.friendsGhostNodes[id].back().second.SpecifyFormula(EmbeddedBoundaryFormula::MIRRORING, 
@@ -1459,7 +1461,8 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
   // Step 5: Figure out formula for ghost node update
   //----------------------------------------------------------------
   ebm.ghostNodes1.assign(ordered.size()-far_nodes.size()-prob_nodes.size()+prob_nodes_owned_by_myself.size(), 
-                         std::make_pair(Int3(0), EmbeddedBoundaryFormula(eps)));
+                         std::make_pair(Int3(0), EmbeddedBoundaryFormula(EmbeddedBoundaryFormula::MIRRORING, 
+                                                                         eps)));
   int counter = 0;
   for(int o = 0; o < (int)ordered.size(); o++) {
     int n = ordered[o]; 
