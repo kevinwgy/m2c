@@ -10,6 +10,7 @@
 #include<Utils.h>
 #include<cfloat> //DBL_MAX
 #include<map>
+#include<memory>
 
 using std::vector;
 using std::map;
@@ -66,6 +67,7 @@ GhostFluidOperator::PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V,
   // Step 1: Identify ghost nodes inside the subdomain that need to be populated
   // ----------------------------------------------------------------------------
   int number_of_ghosts = TagGhostNodes(id, 2); //2 layers; Tag and ghosts_ijk get computed 
+
   if(number_of_ghosts==0) {
     ID.RestoreDataPointerToLocalVector();
     return 0;
@@ -150,8 +152,8 @@ GhostFluidOperator::PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V,
     }
     else {//linear extrapolation
 
-      double alpha = (ghosts_xyz[n]-ghosts_xp[n]).norm() / 
-                     (ghosts_xyz[n]-images_xyz[n]).norm();
+      double alpha = (ghosts_xyz[n]-ghosts_xp[n]).norm()
+                   / (ghosts_xyz[n]-images_xyz[n]).norm();
       formula.BuildLinearExtrapolationFormula(ghosts_ijk[n], images_ijk[n], 
                                               images_xi[n], alpha); 
 
@@ -212,6 +214,7 @@ GhostFluidOperator::TagGhostNodes(double*** id, int nLayers)
   double*** tag = Tag.GetDataPointer();
 
   // round 1
+  auto current_layer = std::make_unique<std::set<Int3> >();
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
@@ -224,6 +227,7 @@ GhostFluidOperator::TagGhostNodes(double*** id, int nLayers)
                 if(id[kk][jj][ii] != INACTIVE_MATERIAL_ID) {
                   ghosts_ijk.push_back(Int3(i,j,k)); //first-layer ghost
                   tag[k][j][i] = 1;
+                  current_layer->insert(Int3(i,j,k));
                   goto found_layer_1_node;
                 }
               }
@@ -242,36 +246,36 @@ found_layer_1_node: { } //needs { } to avoid compilation error
   // round 2, 3, ... 
   for(int layer=1; layer<nLayers; layer++) {
 
-    int this_layer_ghosts = 0;
-
+    auto previous_layer = std::move(current_layer);
+    current_layer.reset(new std::set<Int3>());
+    
     tag = Tag.GetDataPointer();
   
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          if(tag[k][j][i]>0)
-            continue;
-          if(id[k][j][i]==INACTIVE_MATERIAL_ID) {
-            for(int kk=k-1; kk<=k+1; kk++)
-              for(int jj=j-1; jj<=j+1; jj++)
-                for(int ii=i-1; ii<=i+1; ii++) {
-                  if(tag[kk][jj][ii]==layer) {
-                    ghosts_ijk.push_back(Int3(i,j,k)); //second-layer ghost
-                    tag[k][j][i] = layer+1;
-                    this_layer_ghosts++;
-                    goto found_layer_n_node;
-                  }
-                }
+    int i,j,k;
+    for(auto&& g : *previous_layer) {
+      i = g[0];
+      j = g[1];
+      k = g[2];
+      for(int kk=k-1; kk<=k+1; kk++)
+        for(int jj=j-1; jj<=j+1; jj++)
+          for(int ii=i-1; ii<=i+1; ii++) {
+            if(!Tag.IsHere(ii,jj,kk,false))
+              continue; //does not beyong to this subdomain
+            if(id[kk][jj][ii]==INACTIVE_MATERIAL_ID && tag[kk][jj][ii]==0) {
+              ghosts_ijk.push_back(Int3(ii,jj,kk)); //next-layer ghost
+              tag[kk][jj][ii] = layer+1;
+              current_layer->insert(Int3(ii,jj,kk));
+            }
           }
-found_layer_n_node: { } 
-        }
+    }
 
     Tag.RestoreDataPointerAndInsert();
 
-    MPI_Allreduce(MPI_IN_PLACE, &this_layer_ghosts, 1, MPI_INT, MPI_SUM, comm);
-    total_ghosts += this_layer_ghosts;
+    int this_layer_size = current_layer->size();
+    MPI_Allreduce(MPI_IN_PLACE, &this_layer_size, 1, MPI_INT, MPI_SUM, comm);
+    total_ghosts += this_layer_size;
 
-    if(this_layer_ghosts==0) {//no need to go to the next layer
+    if(this_layer_size==0) {//no need to go to the next layer
       return total_ghosts;
     }
   }
@@ -306,8 +310,9 @@ GhostFluidOperator::ProjectGhostsToInterface(vector<std::unique_ptr<EmbeddedBoun
   images_ijk.resize(nGhosts);
   images_xi.resize(nGhosts);
   images_xyz.resize(nGhosts);
-  ghosts_tag.assign(nGhosts, -1); //-1: undetermined, 0: const extrap, 
-                                  // 1: interpolation is valid 
+  ghosts_tag.assign(nGhosts, -1);  //-1: undetermined, 0: const extrap should be performed
+                                   // 1: linear extrap should be performed, within this subdomain
+                                   // 2: linear extrap should be performed; requires neighbor info
 
   Int3 g;
   for(int n=0; n<nGhosts; n++) {

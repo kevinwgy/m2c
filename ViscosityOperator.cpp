@@ -202,35 +202,36 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                                            SpaceVariable3D &R)
 {
 
-  SpaceVariable3D *VV = &V;
+  SpaceVariable3D *VV = &V; //5-dim vector
+  std::vector<int> index_in{1,2,3};
 
   if(EBDS && EBDS->size()>0) {
     assert(gfo); 
     int numGhostPopulated = gfo->PopulateGhostNodesForViscosityOperator(V, ID, EBDS, *Velog);
-    if(numGhostPopulated>0) // In this case, Velog should have been filled, and it is the one to use below.
-      VV = Velog; //TODO: Velog is only velocity, not the 5-dim vector!
-
-    //print_warning("Warning: ViscosityOperator::AddDiffusionFluxes: Not able to account for embedded surfaces.\n");
+    if(numGhostPopulated>0) {// In this case, Velog should have been filled, and it is the one to use below.
+      VV = Velog; //Note: Velog is only velocity, not the 5-dim vector!
+      index_in[0] = 0;
+      index_in[1] = 1;
+      index_in[2] = 2;
+    }
   }
 
-  //TODO! BUG FOUND BUT NOT FIXED YET. GetMu Requires the full "v", yet somewhere else v is supposed to be velocity
-
-  std::vector<int> i123{1,2,3}, i012{0,1,2}; 
+  std::vector<int> i012{0,1,2}; 
   //1. Calculate the x, y, and z velocities at cell interfaces by interpolation 
-  interpolator.InterpolateAtCellInterfaces(0/*x-dir*/, *VV, i123, V_i_minus_half, i012);
-  interpolator.InterpolateAtCellInterfaces(1/*y-dir*/, *VV, i123, V_j_minus_half, i012);
-  interpolator.InterpolateAtCellInterfaces(2/*z-dir*/, *VV, i123, V_k_minus_half, i012);
+  interpolator.InterpolateAtCellInterfaces(0/*x-dir*/, *VV, index_in, V_i_minus_half, i012);
+  interpolator.InterpolateAtCellInterfaces(1/*y-dir*/, *VV, index_in, V_j_minus_half, i012);
+  interpolator.InterpolateAtCellInterfaces(2/*z-dir*/, *VV, index_in, V_k_minus_half, i012);
 
   //2. Calculate velocity derivatives at cell interfaces
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 0, *VV, i123, dVdx_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 1, *VV, i123, dVdx_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 2, *VV, i123, dVdx_k_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 0, *VV, i123, dVdy_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 1, *VV, i123, dVdy_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 2, *VV, i123, dVdy_k_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 0, *VV, i123, dVdz_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 1, *VV, i123, dVdz_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 2, *VV, i123, dVdz_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 0, *VV, index_in, dVdx_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 1, *VV, index_in, dVdx_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 2, *VV, index_in, dVdx_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 0, *VV, index_in, dVdy_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 1, *VV, index_in, dVdy_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 2, *VV, index_in, dVdy_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 0, *VV, index_in, dVdz_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 1, *VV, index_in, dVdz_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 2, *VV, index_in, dVdz_k_minus_half, i012);
 
   //3. Loop through cell interfaces and calculate viscous fluxes
   Vec3D*** vi = (Vec3D***)V_i_minus_half.GetDataPointer();
@@ -247,52 +248,130 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   Vec3D*** dvdz_k = (Vec3D***)dVdz_k_minus_half.GetDataPointer();
 
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  Vec5D*** v5 = (Vec5D***)V.GetDataPointer();
   Vec5D*** res  = (Vec5D***)R.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
 
-  int myid = 0;
+  int myid = 0, id2 = 0;
   double dx = 0.0, dy = 0.0, dz = 0.0;
+  double rho, p;
   Vec5D flux;
   for(int k=k0; k<kkmax; k++)
     for(int j=j0; j<jjmax; j++)
       for(int i=i0; i<iimax; i++) {
 
         myid = id[k][j][i];
+
+        if(myid==INACTIVE_MATERIAL_ID)
+          continue;
+
         dx   = dxyz[k][j][i][0];
         dy   = dxyz[k][j][i][1];
         dz   = dxyz[k][j][i][2];
-         
+        rho  = v5[k][j][i][0];
+        p    = v5[k][j][i][4];
+ 
         //*****************************************
         //calculate flux function F_{i-1/2,j,k}
         //*****************************************
         if(k!=kkmax-1 && j!=jjmax-1) {        
-          visFcn[myid]->EvaluateViscousFluxFunction_F(flux, dvdx_i[k][j][i], dvdy_i[k][j][i],
-                                                        dvdz_i[k][j][i], vi[k][j][i], &dx);
-          flux *= dy*dz;
-          res[k][j][i]   += flux;
-          res[k][j][i-1] -= flux;
+
+          id2 = id[k][j][i-1];
+
+          // Case 1: Both are active, and the same material --> compute one flux
+          if(myid!=INACTIVE_MATERIAL_ID && id2==myid) {
+            visFcn[myid]->EvaluateViscousFluxFunction_F(flux, dvdx_i[k][j][i], dvdy_i[k][j][i],
+                                                        dvdz_i[k][j][i], vi[k][j][i],
+                                                        0.5*(rho + v5[k][j][i-1][0]),
+                                                        0.5*(p   + v5[k][j][i-1][4]), &dx);
+            flux *= dy*dz;
+            res[k][j][i]   += flux;
+            res[k][j][i-1] -= flux;
+          }
+          // Case 2: Compute flux separately, for active cell(s)
+          else {
+            if(myid!=INACTIVE_MATERIAL_ID) {
+              visFcn[myid]->EvaluateViscousFluxFunction_F(flux, dvdx_i[k][j][i], dvdy_i[k][j][i],
+                                                          dvdz_i[k][j][i], vi[k][j][i],
+                                                          rho, p, &dx);
+              res[k][j][i] += dy*dz*flux;
+            }
+            if(id2!=INACTIVE_MATERIAL_ID) {
+              visFcn[id2]->EvaluateViscousFluxFunction_F(flux, dvdx_i[k][j][i], dvdy_i[k][j][i],
+                                                         dvdz_i[k][j][i], vi[k][j][i],
+                                                         v5[k][j][i-1][0], v5[k][j][i-1][4], &dx);
+              res[k][j][i-1] -= dy*dz*flux;
+            }
+          }
         }
+
 
         //*****************************************
         //calculate flux function G_{i,j-1/2,k}
         //*****************************************
         if(i!=iimax-1 && k!=kkmax-1) {        
-          visFcn[myid]->EvaluateViscousFluxFunction_G(flux, dvdx_j[k][j][i], dvdy_j[k][j][i],
-                                                        dvdz_j[k][j][i], vj[k][j][i], &dy);
-          flux *= dx*dz;
-          res[k][j][i]   += flux;
-          res[k][j-1][i] -= flux;
+
+          id2 = id[k][j-1][i];
+
+          // Case 1: Both are active, and the same material --> compute one flux
+          if(myid!=INACTIVE_MATERIAL_ID && id2==myid) {
+            visFcn[myid]->EvaluateViscousFluxFunction_G(flux, dvdx_j[k][j][i], dvdy_j[k][j][i],
+                                                        dvdz_j[k][j][i], vj[k][j][i],
+                                                        0.5*(rho + v5[k][j-1][i][0]),
+                                                        0.5*(p   + v5[k][j-1][i][4]), &dy);
+            flux *= dx*dz;
+            res[k][j][i]   += flux;
+            res[k][j-1][i] -= flux;
+          }
+          // Case 2: Compute flux separately, for active cell(s)
+          else {
+            if(myid!=INACTIVE_MATERIAL_ID) {
+              visFcn[myid]->EvaluateViscousFluxFunction_G(flux, dvdx_j[k][j][i], dvdy_j[k][j][i],
+                                                          dvdz_j[k][j][i], vj[k][j][i],
+                                                          rho, p, &dy);
+              res[k][j][i] += dx*dz*flux;
+            }
+            if(id2!=INACTIVE_MATERIAL_ID) {
+              visFcn[id2]->EvaluateViscousFluxFunction_G(flux, dvdx_j[k][j][i], dvdy_j[k][j][i],
+                                                         dvdz_j[k][j][i], vj[k][j][i],
+                                                         v5[k][j-1][i][0], v5[k][j-1][i][4], &dy);
+              res[k][j-1][i] -= dx*dz*flux;
+            }
+          }
         }
+
 
         //*****************************************
         //calculate flux function H_{i,j,k-1/2}
         //*****************************************
         if(i!=iimax-1 && j!=jjmax-1) {        
-          visFcn[myid]->EvaluateViscousFluxFunction_H(flux, dvdx_k[k][j][i], dvdy_k[k][j][i],
-                                                        dvdz_k[k][j][i], vk[k][j][i], &dz);
-          flux *= dx*dy;
-          res[k][j][i]   += flux;
-          res[k-1][j][i] -= flux;
+
+          id2 = id[k-1][j][i];
+
+          // Case 1: Both are active, and the same material --> compute one flux
+          if(myid!=INACTIVE_MATERIAL_ID && id2==myid) {
+            visFcn[myid]->EvaluateViscousFluxFunction_H(flux, dvdx_k[k][j][i], dvdy_k[k][j][i],
+                                                        dvdz_k[k][j][i], vk[k][j][i],
+                                                        0.5*(rho + v5[k-1][j][i][0]),
+                                                        0.5*(p   + v5[k-1][j][i][4]), &dz);
+            flux *= dx*dy;
+            res[k][j][i]   += flux;
+            res[k-1][j][i] -= flux;
+          }
+          else {
+            if(myid!=INACTIVE_MATERIAL_ID) {
+              visFcn[myid]->EvaluateViscousFluxFunction_H(flux, dvdx_k[k][j][i], dvdy_k[k][j][i],
+                                                          dvdz_k[k][j][i], vk[k][j][i],
+                                                          rho, p, &dz);
+              res[k][j][i] += dx*dy*flux;
+            }
+            if(id2!=INACTIVE_MATERIAL_ID) {
+              visFcn[myid]->EvaluateViscousFluxFunction_H(flux, dvdx_k[k][j][i], dvdy_k[k][j][i],
+                                                          dvdz_k[k][j][i], vk[k][j][i],
+                                                          v5[k-1][j][i][0], v5[k-1][j][i][4], &dz);
+              res[k-1][j][i] -= dx*dy*flux;
+            }
+          }
         }
 
       }
@@ -314,11 +393,12 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
 
   if(cylindrical_symmetry) //Directly use id, dxyz, and res (local vars) 
-    AddCylindricalSymmetryTerms(*VV, id, dxyz, EBDS, res);
+    AddCylindricalSymmetryTerms(v5, id, dxyz, EBDS, res);
 
 
   delta_xyz.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerToLocalVector();
 
   R.RestoreDataPointerToLocalVector(); //NOTE: although R has been updated, there is no need of
                                        //      cross-subdomain communications. So, no need to
@@ -326,9 +406,9 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 }
 
 //--------------------------------------------------------------------------
-
+I AM HERE
 void
-ViscosityOperator::AddCylindricalSymmetryTerms(SpaceVariable3D &V, double*** id, Vec3D*** dxyz,
+ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*** dxyz,
                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                        Vec5D*** res)
 {
@@ -338,8 +418,6 @@ ViscosityOperator::AddCylindricalSymmetryTerms(SpaceVariable3D &V, double*** id,
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   double*** vol   = volume.GetDataPointer();
-
-  Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
   // Step 1: Calculate lambda and mu (for z-direction, only in domain interior)
   double*** lam = Lam->GetDataPointer();
