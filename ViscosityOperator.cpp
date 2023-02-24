@@ -406,9 +406,9 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 }
 
 //--------------------------------------------------------------------------
-I AM HERE
+
 void
-ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*** dxyz,
+ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v, double*** id, Vec3D*** dxyz,
                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                        Vec5D*** res)
 {
@@ -446,17 +446,18 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
             lam[k][j][i] = visFcn[myid]->GetLambda();
             break;
           case ViscoFcnBase::SUTHERLAND :
-            mu[k][j][i]  = visFcn[myid]->GetMu(v[k][j][i]);
-            lam[k][j][i] = visFcn[myid]->GetLambda(v[k][j][i]);
+            mu[k][j][i]  = visFcn[myid]->GetMu(NULL, v[k][j][i][0], v[k][j][i][4]);
+            lam[k][j][i] = visFcn[myid]->GetLambda(NULL, v[k][j][i][0], v[k][j][i][4]);
             break;
           case ViscoFcnBase::ARTIFICIAL_RODIONOV :
             div = CalculateLocalDiv2D(v, id, coords, i, j, k);
             h   = 0.5*(dxyz[k][j][i][0] + dxyz[k][j][i][1]);
-            mu[k][j][i]  = visFcn[myid]->GetMu(v[k][j][i], div, h);
-            lam[k][j][i] = visFcn[myid]->GetLambda(v[k][j][i], div, h);
+            mu[k][j][i]  = visFcn[myid]->GetMu(NULL, v[k][j][i][0], v[k][j][i][4], div, h);
+            lam[k][j][i] = visFcn[myid]->GetLambda(NULL, v[k][j][i][0], v[k][j][i][4], div, h);
             break;
           default:
-            fprintf(stderr,"\033[0;31m*** Error: ViscosityOperator detected unsupported viscosity model.\033[0m\n");
+            fprintf(stderr,"\033[0;31m*** Error: ViscosityOperator detected unsupported "
+                    "viscosity model.\033[0m\n");
             exit(-1);
             break;
         }
@@ -472,15 +473,24 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
   // Step 2: Add the terms that involve dudx (i.e. dw/dz in KW notes), dudy (i.e. dw/dr);
   //         Apply an upwinding 3rd order FD.
 
+  Vec3D*** vel = (Velog && EBDS) ? (Vec3D***)Velog->GetDataPointer() : NULL;
+
   lam = Lam->GetDataPointer();
   mu  = Mu->GetDataPointer();
 
   vector<int> ind0{0};
   double*** s = scalarG2->GetDataPointer();
-  for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++)
-        s[k][j][i] = v[k][j][i][1]; //extracting the axial velocity
+  if(vel) {
+    for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++)
+          s[k][j][i] = vel[k][j][i][0]; //extracting the axial velocity
+  } else {
+    for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++)
+          s[k][j][i] = v[k][j][i][1]; //extracting the axial velocity
+  }
   scalarG2->RestoreDataPointerAndInsert(); //need to exchange
 
   grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, *scalarG2, ind0, *DDXm, ind0); //dudxl
@@ -510,9 +520,6 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
         r = coords[k][j][i][1]; // radial coord
         assert(r>0);
 
-        //TODO: double-check! I think grad_minus/plus already takes care of i=0/NX-1
-        //      So, no need of a,b,c,d (cf. LevelSetOperator)
-
         // (mu/r)*dw/dr ~ axial momentum eq
         mu_over_r = mu[k][j][i]/r;
         res[k][j][i][1] -= mu_over_r>0 ?
@@ -538,10 +545,17 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
   //         Apply an upwinding 3rd order FD.
 
   s = scalarG2->GetDataPointer();
-  for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++)
-        s[k][j][i] = v[k][j][i][2]; //extracting the radial velocity
+  if(vel) {
+    for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++)
+          s[k][j][i] = vel[k][j][i][1]; //extracting the radial velocity
+  } else {
+    for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++)
+          s[k][j][i] = v[k][j][i][2]; //extracting the radial velocity
+  }
   scalarG2->RestoreDataPointerAndInsert(); //need to exchange
 
   grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, *scalarG2, ind0, *DDXm, ind0); //dvdxl
@@ -600,6 +614,8 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
   // Step 4: Add the terms that involve dlamdx (i.e. dlam/dz in KW notes), dlamdy (dlam/dr);
   //         Apply an upwinding 3rd order FD.
   //         Also add the source term (on the LHS of the N-S equations)
+  // Note: In the presence of EBDS, lambda is not populated in ghost nodes (using the ghost fluid method).
+  //       Here, we just set the corresponding derivative to 0.
 
   s = scalarG2->GetDataPointer();
   for(int k=k0; k<kmax; k++) //NOTE: not going to calculate d/dz. No need to copy ghosts!
@@ -607,6 +623,8 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
       for(int i=ii0; i<iimax; i++)
         s[k][j][i] = lam[k][j][i]; 
   scalarG2->RestoreDataPointerAndInsert(); //need to exchange
+
+  double*** lam2 = scalarG2->GetDataPointer(); //same as lam, with two ghost layers
 
   grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, *scalarG2, ind0, *DDXm, ind0); //dlamdxl
   grad_plus->CalculateFirstDerivativeAtNodes(0/*x*/, *scalarG2, ind0, *DDXp, ind0); //dlamdxr
@@ -633,6 +651,18 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
         cv = vol[k][j][i]; // cell volume
         r = coords[k][j][i][1]; // radial coord
         assert(r>0);
+
+        if(id[k][j][i-1]==INACTIVE_MATERIAL_ID || lam2[k][j][i-2]==0.0)//ideally, should check id at i-2
+          dlamdzl[k][j][i] = 0.0;
+
+        if(id[k][j][i+1]==INACTIVE_MATERIAL_ID || lam2[k][j][i+2]==0.0)//ideally, should check id at i+2
+          dlamdzr[k][j][i] = 0.0;
+
+        if(id[k][j-1][i]==INACTIVE_MATERIAL_ID || lam2[k][j-2][i]==0.0)
+          dlamdrb[k][j][i] = 0.0;
+
+        if(id[k][j+1][i]==INACTIVE_MATERIAL_ID || lam2[k][j+2][i]==0.0)
+          dlamdrt[k][j][i] = 0.0;
 
         // ur/r*dlam/dz ~ axial momentum eq
         ur_over_r = ur/r;
@@ -663,7 +693,9 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v5, double*** id, Vec3D*
   Lam->RestoreDataPointerToLocalVector();
   Mu->RestoreDataPointerToLocalVector();
 
-  V.RestoreDataPointerToLocalVector();
+  if(vel)
+    Velog->RestoreDataPointerToLocalVector();
+
   volume.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
 
