@@ -19,7 +19,7 @@ GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double>
   assert(y_glob.size() == dy_glob.size());
   assert(z_glob.size() == dz_glob.size());
 
-  two_dimensional = (z_glob.size()==1);
+  two_dimensional_mesh = (z_glob.size()==1);
 }
 
 //------------------------------------------------------------------
@@ -294,9 +294,9 @@ GlobalMeshInfo::GetDXYZ(Int3 ijk)
 double
 GlobalMeshInfo::GetMinDXYZ(Int3 ijk)
 {
-  return two_dimensional ? std::min(GetDx(ijk[0]), GetDy(ijk[1]))
-                         : std::min(std::min(GetDx(ijk[0]), GetDy(ijk[1])), 
-                                    GetDz(ijk[2]));
+  return two_dimensional_mesh ? std::min(GetDx(ijk[0]), GetDy(ijk[1]))
+                              : std::min(std::min(GetDx(ijk[0]), GetDy(ijk[1])), 
+                                         GetDz(ijk[2]));
 }
 
 //------------------------------------------------------------------
@@ -304,9 +304,9 @@ GlobalMeshInfo::GetMinDXYZ(Int3 ijk)
 double
 GlobalMeshInfo::GetMaxDXYZ(Int3 ijk)
 {
-  return two_dimensional ? std::max(GetDx(ijk[0]), GetDy(ijk[1]))
-                         : std::max(std::max(GetDx(ijk[0]), GetDy(ijk[1])),
-                                    GetDz(ijk[2]) );
+  return two_dimensional_mesh ? std::max(GetDx(ijk[0]), GetDy(ijk[1]))
+                              : std::max(std::max(GetDx(ijk[0]), GetDy(ijk[1])),
+                                         GetDz(ijk[2]) );
 }
 
 //------------------------------------------------------------------

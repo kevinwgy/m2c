@@ -58,6 +58,10 @@ class EmbeddedBoundaryOperator {
   std::vector<GhostPoint>* ghost_nodes_outer_ptr;
   GlobalMeshInfo *global_mesh_ptr;
 
+  //! Enable 2D and 2D-cylindrical fluid w/ a 3D structural mesh. Only affects SendForce
+  vector<bool> 2d_to_3d; //!< one bool for each embedded surface
+
+
 public:
    
   //! Constructor: Without intersector (pointers are set to NULL) or M2C mesh info
@@ -106,6 +110,9 @@ public:
 
   //! Output displacements and nodal forces on embedded surfaces
   void OutputResults(double time, double dt, int time_step, bool force_write=false);
+
+  //! Check if an embedded surface is likely a surface in 3D
+  bool IsEmbeddedSurfaceIn3D(int surf);
 
 private:
 

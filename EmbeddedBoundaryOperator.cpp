@@ -106,6 +106,10 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 
   // setup dynamics_calculator
   SetupUserDefinedDynamicsCalculator();
+
+  // initialize 2d_to_3d to false
+  2d_to_3d.assign(counter, false);
+
 }
 
 //------------------------------------------------------------------------------------------------
@@ -195,6 +199,24 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
   ghost_nodes_inner_ptr = &ghost_nodes_inner_; 
   ghost_nodes_outer_ptr = &ghost_nodes_outer_; 
   global_mesh_ptr       = &global_mesh_;
+
+
+  // determine 2d_to_3d (in the constructor, it is set to false by default)
+  assert(global_mesh_ptr);
+  if(global_mesh_ptr->IsMesh2D()) {
+    for(int surf=0; surf<(int)2d_to_3d.size(); surf++)
+      2d_to_3d[surf] = IsEmbeddedSurfaceIn3D(surf);
+  }
+  
+}
+
+//------------------------------------------------------------------------------------------------
+
+bool
+EmbeddedBoundaryOperator::IsEmbeddedSurfaceIn3D(int surf)
+{
+//I AM HERE!!!
+  return true;
 }
 
 //------------------------------------------------------------------------------------------------

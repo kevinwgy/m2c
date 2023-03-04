@@ -41,7 +41,7 @@ private:
   std::vector<std::vector<int> > subD_neighbors_7; //!< 19 - 12 edges 
   std::vector<std::vector<int> > subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)
 
-  bool two_dimensional; //!< set to true if z has only one element
+  bool two_dimensional_mesh; //!< set to true if z has only one element
 
 public:
 
@@ -80,7 +80,7 @@ public:
   Vec3D GetXYZ(Int3 ijk);
   Vec3D GetDXYZ(Int3 ijk);
 
-  bool Is2D() {return two_dimensional;}
+  bool IsMesh2D() {return two_dimensional_mesh;}
 
   //! If mesh is 2D, only consider dx and dy
   double GetMinDXYZ(Int3 ijk);

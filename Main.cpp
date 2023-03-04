@@ -182,6 +182,7 @@ int main(int argc, char* argv[])
 
   //! Track the embedded boundaries
   if(embed) {
+    // determine whether force should be "spread out" to a 3D structure
     embed->SetCommAndMeshInfo(dms, spo.GetMeshCoordinates(), 
                               *(spo.GetPointerToInnerGhostNodes()), *(spo.GetPointerToOuterGhostNodes()),
                               global_mesh);
