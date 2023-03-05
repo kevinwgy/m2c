@@ -28,7 +28,8 @@ extern int verbose;
 EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver) 
                         : comm(comm_), hasSurfFromOtherSolver(surface_from_other_solver),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
-                          ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL)
+                          ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL),
+                          cylindrical_symmetry(false) 
 {
   // count surfaces from files
   int counter = iod_.ebm.embed_surfaces.surfaces.dataMap.size();
@@ -107,8 +108,11 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // setup dynamics_calculator
   SetupUserDefinedDynamicsCalculator();
 
+  // set cylindrical_symmetry
+  cylindrical_symmetry = (iod_.mesh.type == MeshData::CYLINDRICAL);
+
   // initialize 2d_to_3d to false
-  2d_to_3d.assign(counter, false);
+  twoD_to_threeD.assign(counter, false);
 
 }
 
@@ -201,11 +205,11 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
   global_mesh_ptr       = &global_mesh_;
 
 
-  // determine 2d_to_3d (in the constructor, it is set to false by default)
+  // determine twoD_to_threeD (in the constructor, it is set to false by default)
   assert(global_mesh_ptr);
   if(global_mesh_ptr->IsMesh2D()) {
-    for(int surf=0; surf<(int)2d_to_3d.size(); surf++)
-      2d_to_3d[surf] = IsEmbeddedSurfaceIn3D(surf);
+    for(int surf=0; surf<(int)twoD_to_threeD.size(); surf++)
+      twoD_to_threeD[surf] = IsEmbeddedSurfaceIn3D(surf);
   }
   
 }
@@ -215,9 +219,36 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
 bool
 EmbeddedBoundaryOperator::IsEmbeddedSurfaceIn3D(int surf)
 {
-//I AM HERE!!!
-  return true;
-}
+
+  bool is3D = false;
+
+  assert(surf<(int)surfaces.size());
+  vector<Vec3D> &X(surfaces[surf].X);
+  assert(X.size()>0);
+
+  bool nontrivial[3] = {false,false,false};
+  std::set<float> xyz[3]; //double->float (ignore tiny differences)
+
+  for(auto&& x : X) {
+    for(int d=0; d<3; d++) {
+
+      if(nontrivial[d])
+        continue;    
+
+      xyz[d].insert((float)x[d]);
+      if(xyz[d].size()>=3)
+        nontrivial[d] = true;
+    }
+
+    if(nontrivial[0] && nontrivial[1] && nontrivial[2]) {
+      is3D = true;
+      break;
+    }
+  }
+
+  return is3D;
+
+} 
 
 //------------------------------------------------------------------------------------------------
 

@@ -59,7 +59,8 @@ class EmbeddedBoundaryOperator {
   GlobalMeshInfo *global_mesh_ptr;
 
   //! Enable 2D and 2D-cylindrical fluid w/ a 3D structural mesh. Only affects SendForce
-  vector<bool> 2d_to_3d; //!< one bool for each embedded surface
+  bool cylindrical_symmetry;
+  vector<bool> twoD_to_threeD; //!< one bool for each embedded surface
 
 
 public:
