@@ -740,9 +740,6 @@ void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
 
-  int mpi_rank;
-  MPI_Comm_rank(comm, &mpi_rank);
-
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id = ID.GetDataPointer();
   
@@ -782,81 +779,10 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
       continue;
     // ------------------------------------
 
-    // Collect info about the surface and intersection results
-    vector<Vec3D>&  Xs(surfaces[surf].X);
-    vector<Int3>&   Es(surfaces[surf].elems);
-    vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
-    vector<double>& As(surfaces[surf].elemArea);
-    vector<int>&    status(inactive_elem_status[surf]);
-
-    vector<double> gweight(np, 0.0);
-    vector<Vec3D>  gbary(np, 0.0); //barycentric coords of Gauss points (symmetric) 
-    MathTools::GaussQuadraturesTriangle::GetParameters(np, gweight.data(), gbary.data());
- 
-    
-    vector<int> scope;
-    intersector[surf]->GetElementsInScope1(scope);
-
-    //Note that different subdomain scopes overlap. We need to avoid repetition!
-    for(auto it = scope.begin(); it != scope.end(); it++) {
-
-      int tid = *it; //triangle id
-      Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
-
-      vector<Vec3D> tg(np, 0.0); //traction at each Gauss point, (-pI + tau)n --> a Vec3D
-
-      assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
-
-      for(int side=0; side<2; side++) { //loop through the two sides
-
-        Vec3D normal = Ns[tid];
-        if(side==1)
-          normal *= -1.0;
-
-        for(int p=0; p<np; p++) { //loop through Gauss points
-
-          Vec3D xg = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
-
-          // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
-          double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
-          xg += loft*normal;
-          
-          // Check if this Gauss point is in this subdomain.
-          Int3 ijk;
-          bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
-          if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
-            continue;
-
-//          fprintf(stderr,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
-          // Calculate traction at Gauss point on this "side"
-          if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
-            tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
-          else 
-            tg[p] += CalculateTractionAtPoint(xg, side, As[tid], normal, n, Xs, v, id); 
-
-        }
-
-      }
-
-//      fprintf(stderr,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
-//              tg[0].norm());
-
-      // Now, tg carries traction from both sides of the triangle
-
-      // Integrate (See KW's notes for the formula)
-      for(int p=0; p<np; p++) {
-        tg[p] *= As[tid];
-        // each node of the triangle gets some load from this Gauss point
-        for(int node=0; node<3; node++)
-          Fs[n[node]] += gweight[p]*gbary[p][node]*tg[p];
-      }
-    }
-
-    // Processor 0 assembles the loads on the entire surface
-    if(mpi_rank==0)
-      MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+    if(!twoD_to_threeD[surf]) 
+      ComputeForcesOnSurfaceDirectly(surf, np, v, id, Fs);
     else
-      MPI_Reduce((double*)Fs.data(), NULL, 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+      ComputeForcesOnSurface2DTo3D(surf, np, v, id, Fs);
 
 /*
     Vec3D sum(0.0);
@@ -1043,6 +969,359 @@ EmbeddedBoundaryOperator::OutputResults(double time, double dt, int time_step, b
 
 //------------------------------------------------------------------------------------------------
 
+void
+EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id,
+                                                         vector<Vec3D> &Fs)
+{
+
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+
+  // Collect info about the surface and intersection results
+  vector<Vec3D>&  Xs(surfaces[surf].X);
+  vector<Int3>&   Es(surfaces[surf].elems);
+  vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
+  vector<double>& As(surfaces[surf].elemArea);
+  vector<int>&    status(inactive_elem_status[surf]);
+
+  vector<double> gweight(np, 0.0);
+  vector<Vec3D>  gbary(np, 0.0); //barycentric coords of Gauss points (symmetric) 
+  MathTools::GaussQuadraturesTriangle::GetParameters(np, gweight.data(), gbary.data());
+ 
+  vector<Vec3D> xgs(np, 0.0); //internal var.
+    
+  vector<int> scope;
+  intersector[surf]->GetElementsInScope1(scope);
+
+  //Note that different subdomain scopes overlap. We need to avoid repetition!
+  for(auto it = scope.begin(); it != scope.end(); it++) {
+
+    int tid = *it; //triangle id
+    Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
+
+    // Get Gauss points (before lofting)
+    for(int p=0; p<np; p++) 
+      xgs[p] = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
+
+    // traction at each Gauss point, (-pI + tau)n --> a Vec3D
+    vector<Vec3D> tg(np, 0.0); 
+
+    assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
+
+    for(int side=0; side<2; side++) { //loop through the two sides
+
+      Vec3D normal = Ns[tid];
+      if(side==1)
+        normal *= -1.0;
+
+      for(int p=0; p<np; p++) { //loop through Gauss points
+
+        Vec3D xg = xgs[p];
+
+        // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
+        double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
+        xg += loft*normal;
+          
+        // Check if this Gauss point is in this subdomain.
+        Int3 ijk;
+        bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
+        if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
+          continue;
+
+//        fprintf(stderr,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
+        // Calculate traction at Gauss point on this "side"
+        if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
+          tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
+        else 
+          tg[p] += CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
+
+      }
+
+    }
+
+//    fprintf(stderr,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
+//            tg[0].norm());
+
+    // Now, tg carries traction from both sides of the triangle
+
+    // Integrate (See KW's notes for the formula)
+    for(int p=0; p<np; p++) {
+      tg[p] *= As[tid];
+      // each node of the triangle gets some load from this Gauss point
+      for(int node=0; node<3; node++)
+        Fs[n[node]] += gweight[p]*gbary[p][node]*tg[p];
+    }
+  }
+
+  // Processor 0 assembles the loads on the entire surface
+  if(mpi_rank==0)
+    MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+  else
+    MPI_Reduce((double*)Fs.data(), NULL, 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+
+}
+
+//------------------------------------------------------------------------------------------------
+// Similar to ComputeForcesOnSurfaceDirectly. However, here we let each processor evaluate the
+// traction. Only proc. 0 calculates force.
+void
+EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id,
+                                                       vector<Vec3D> &Fs)
+{
+  assert(twoD_to_threeD[surf]);
+
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+
+  // Collect info about the surface and intersection results
+  vector<Vec3D>&  Xs(surfaces[surf].X);
+  vector<Int3>&   Es(surfaces[surf].elems);
+  vector<Vec3D>&  Ns(surfaces[surf].elemNorm);
+  vector<double>& As(surfaces[surf].elemArea);
+  vector<int>&    status(inactive_elem_status[surf]);
+
+  vector<double> gweight(np, 0.0);
+  vector<Vec3D>  gbary(np, 0.0); //barycentric coords of Gauss points (symmetric) 
+  MathTools::GaussQuadraturesTriangle::GetParameters(np, gweight.data(), gbary.data());
+ 
+  vector<Vec3D> xgs(np, 0.0); //internal var.
+    
+  vector<int> scope;
+  intersector[surf]->GetElementsInScope1(scope);
+
+
+  // -----------------------------------------------------------
+  // Step 1: Loop through subdomain scope & collect "my_data"
+  //         Note that different subdomain scopes overlap. We need to avoid repetition!
+  // -----------------------------------------------------------
+  vector<double> my_data[2]; //(xcoords, rcoords, tg_x, tg_r) separately for each "side"
+  for(auto it = scope.begin(); it != scope.end(); it++) {
+    int tid = *it; //triangle id
+    if(status[tid]==3)
+      continue;
+
+    assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
+    Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
+
+    // Get Gauss points (before lofting)
+    for(int p=0; p<np; p++) 
+      xgs[p] = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
+
+    for(int side=0; side<2; side++) { //loop through the two sides
+
+      if(status[tid]==side+1) //this side faces the interior of a solid body 
+        continue;
+
+      Vec3D normal = Ns[tid];
+      if(side==1)
+        normal *= -1.0;
+
+      for(int p=0; p<np; p++) { //loop through Gauss points
+        Vec3D xg = xgs[p];
+        // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
+        double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
+        xg += loft*normal;
+          
+        // Check if this Gauss point is in this subdomain.
+        Int3 ijk;
+        bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
+        if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
+          continue;
+
+        //traction at each Gauss point, (-pI + tau)n --> a Vec3D
+        Vec3D tg = CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
+        double xg_r = cylindrical_symmetry ? sqrt(xg[1]*xg[1]+xg[2]*xg[2])
+                                           : xg[1];
+        my_data[side].push_back(xg[0], xg_r, tg[0], tg[1]); //dropping tg[2]
+      }
+    }
+  }
+
+
+  // -----------------------------------------------------------
+  // Step 2: Proc 0 gets all the data
+  // -----------------------------------------------------------
+  int worker = 0;
+  vector<double> all_data[2];
+  gather_array(comm, worker, my_data[0], all_data[0]);
+  gather_array(comm, worker, my_data[1], all_data[1]);
+
+
+  if(mpi_rank != worker)
+    return;
+
+
+  // -----------------------------------------------------------
+  // Step 3: Proc 0 builds a KDTree (K=2) for each side
+  // -----------------------------------------------------------
+  for(int side=0; side<2; side++) { //loop through the two sides
+
+    int Nsamples = all_data[side].size()/4;
+    vector<PointIn2D> samples;
+    samples.reserve(N);
+    for(int i=0; i<Nsamples; i++)
+      samples.push_back(PointIn2D(i, Vec2D(all_data[side][4*i], all_data[side][4*i+1])));
+
+    KDTree<PointIn2D, 2> tree(Nsamples, samples.data());
+
+    int numPoints = 3; //number of points for interpolation
+    int maxCand = numPoints*20;
+    PointIn2D candidates[maxCand*20];
+
+    
+    for(int tid=0; tid<(int)Es.size(); tid++) {
+
+      if(status[tid]==3)
+        continue;
+
+      assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
+
+      Int3& n(Es[tid]); 
+      Vec3D normal = Ns[tid];
+      if(side==1)
+        normal *= -1.0;
+
+      Vec3D tg;
+      if(status[tid]==side+1) {
+        tg = -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
+      }
+      else {
+        for(int p=0; p<np; p++) {
+
+          Vec3D xg = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
+          // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
+          double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
+          xg += loft*normal;
+
+          double xg_r = cylindrical_symmetry ? sqrt(xg[1]*xg[1]+xg[2]*xg[2])
+                                             : xg[1];
+          Vec2D xg2d(xg[0], xg_r); 
+
+          // gets candidates from tree         
+          double search_radius = sqrt(2.0*As[tid])*4.0;
+          int nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
+          int counter = 0;
+          while(nFound<numPoints || nFound>maxCand) {
+            if(counter>5) {
+              fprintf(stderr,"\033[0;31m*** Error: Cannot find candidates for interpolation "
+                             "(ComputeForces, 2D->3D).\033[0m\n");
+              exit(-1);
+            }
+            if(nFound<numPoints) 
+              search_radius *= 2.0;
+            else
+              search_radius /= 2.0;
+            nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
+            counter++;
+          }
+
+          // figure out the actual points for interpolation (numPoints);
+          vector<pair<double,int> > dist2xg;
+          for(int i=0; i<nFound; i++)
+            dist2xg.push_back(std::make_pair((candidates[i].x-xg2d).norm(), candidates[i].id));
+
+          if(nFound>numPoints)
+            sort(dist2xg.begin(), dist2xg.end());
+          dist2node.resize(numPoints); 
+
+          //prepare to interpolation
+          double xd[2*numPoints];
+          for(int i=0; i<numPoints; i++) {
+            xd[2*i]   = all_data[4*dist2node[i].second];
+            xd[2*i+1] = all_data[4*dist2node[i].second + 1];
+          }
+          double r0; //smaller than maximum separation, larger than typical separation
+          r0 = dist2xg.front().first + dist2xg.back().first;
+          double fd[numPoints];
+          double *rbf_weight, *interp;
+
+          // interpolation
+          I AM HERE
+
+       }
+
+
+      Vec3D normal = Ns[tid];
+      if(side==1)
+        normal *= -1.0;
+
+      for(int p=0; p<np; p++) { //loop through Gauss points
+
+        Vec3D xg = xgs[p];
+
+        // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
+        double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
+        xg += loft*normal;
+          
+        // Check if this Gauss point is in this subdomain.
+        Int3 ijk;
+        bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
+        if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
+          continue;
+
+//        fprintf(stderr,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
+        // Calculate traction at Gauss point on this "side"
+        if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
+          tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
+        else 
+          tg[p] += CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
+
+      }
+
+    }
+
+//    fprintf(stderr,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
+//            tg[0].norm());
+
+    // Now, tg carries traction from both sides of the triangle
+
+    // Integrate (See KW's notes for the formula)
+    for(int p=0; p<np; p++) {
+      tg[p] *= As[tid];
+      // each node of the triangle gets some load from this Gauss point
+      for(int node=0; node<3; node++)
+        Fs[n[node]] += gweight[p]*gbary[p][node]*tg[p];
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  } 
+
+//    fprintf(stderr,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
+//            tg[0].norm());
+
+    // Now, tg carries traction from both sides of the triangle
+
+    // Integrate (See KW's notes for the formula)
+    for(int p=0; p<np; p++) {
+      tg[p] *= As[tid];
+      // each node of the triangle gets some load from this Gauss point
+      for(int node=0; node<3; node++)
+        Fs[n[node]] += gweight[p]*gbary[p][node]*tg[p];
+    }
+  }
+
+  // Processor 0 assembles the loads on the entire surface
+  if(mpi_rank==0)
+    MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+  else
+    MPI_Reduce((double*)Fs.data(), NULL, 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+
+}
+
+//------------------------------------------------------------------------------------------------
+
 double
 EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
 {
@@ -1056,8 +1335,7 @@ EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
   if(!foundit)
     return 0.0; //no lofting applied to triangles outside. They will not (and should not) get a force.
 
-  double size = std::min(global_mesh_ptr->dx_glob[ijk[0]],
-                         std::min(global_mesh_ptr->dy_glob[ijk[1]], global_mesh_ptr->dz_glob[ijk[2]]));
+  double size = global_mesh_ptr->GetMinDXYZ(ijk);
 
   return factor*size;
 }
@@ -1065,7 +1343,7 @@ EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
 //------------------------------------------------------------------------------------------------
 
 Vec3D
-EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, double area,
+EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, 
                                                    Vec3D &normal, Int3 &tnodes, vector<Vec3D> &Xs, 
                                                    Vec5D*** v, double*** id)
 {

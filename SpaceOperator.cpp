@@ -1219,13 +1219,13 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
                 nFound = tree.findCandidatesWithin(pnode, candidates, 10*maxCand, high_cut);
                 if(nFound>10*maxCand) {
                   fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points at any"
-                                 " cutoff distance.\n\033[0m");
+                                 " cutoff distance.\033[0m\n");
                   exit(-1);
                 }
 
                 assert(nFound>=numPoints);
                 fprintf(stderr,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
-                               "(node: %e %e).\n\033[0m", nFound, high_cut, pnode[0], pnode[1]);
+                               "(node: %e %e).\033[0m\n", nFound, high_cut, pnode[0], pnode[1]);
                 break;
               }
             }
@@ -1246,7 +1246,7 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
               xd[2*i+1] = xy[dist2node[i].second][1];
             }
             double r0; //smaller than maximum separation, larger than typical separation
-            r0 = dist2node.front().first + dist2node.back().first;
+            r0 = 0.5*(dist2node.front().first + dist2node.back().first);
             double fd[numPoints];
             double *rbf_weight, *interp;
 
