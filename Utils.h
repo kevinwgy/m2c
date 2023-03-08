@@ -52,9 +52,6 @@ void exit_mpi();
 bool isTimeToWrite(double time, double dt, int time_step, double frequency_dt, int frequency,
                    double last_snapshot_time, bool force_write);
 //--------------------------------------------------
-void gather_array(MPI_Comm& comm, int gatherer, std::vector<double>& my_data,
-                  std::vector<double>& all_data);
-//--------------------------------------------------
 //! case-insensitive string compare (true: equal;  false: unequal)
 inline bool same_strings_insensitive(std::string str1, std::string str2)
 {

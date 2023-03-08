@@ -314,44 +314,5 @@ bool isTimeToWrite(double time, double dt, int time_step, double frequency_dt, i
 
 //--------------------------------------------------
 
-void gather_array(MPI_Comm& comm, int gatherer, vector<double>& my_data,
-                  vector<double>& all_data)
-{
-  int mpi_rank, mpi_size;
-  MPI_Comm_rank(comm, &mpi_rank);
-  MPI_Comm_size(comm, &mpi_size);
-
-  // talk to get package size 
-  vector<int> counts;
-  int my_data_count = my_data.size();
-  if(mpi_rank == gatherer) { //I am the receiver
-    counts.resize(mpi_size,-1);
-    MPI_Gather(&my_data_count, 1, MPI_INT, counts.data(), 1, MPI_INT, gatherer, comm);
-  } else //I am a sender
-    MPI_Gather(&my_data_count, 1, MPI_INT, NULL, 1, MPI_INT, gatherer, comm);
-
-  // work
-  vector<int> displacements;
-  int counter = 0;
-  if(mpi_rank == gatherer) {
-    displacements.resize(mpi_size,-1);
-    for(int i=0; i<(int)displacements.size(); i++) {
-      displacements[i] = counter;
-      counter += counts[i];
-    }
-  }
-
-  // talk again
-  if(mpi_rank == gatherer) { //receiver
-    all_data.resize(counter);
-    MPI_Gatherv(my_data.data(), my_data_count, MPI_DOUBLE, all_data.data(), counts.data(),
-                displacements.data(), MPI_DOUBLE, gatherer, comm);
-  } else {//sender
-    all_data.clear();
-    MPI_Gatherv(my_data.data(), my_data_count, MPI_DOUBLE, NULL, NULL,
-                NULL, MPI_DOUBLE, gatherer, comm);
-  }
-}
-
 //--------------------------------------------------
 

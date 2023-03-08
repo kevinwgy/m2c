@@ -122,10 +122,10 @@ private:
 
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
 
-  //! Compute "Fs". It should be set to 0 before calling this function.
+  //! Compute "Fs".
   void ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs);
 
-  //! Compute "Fs". It should be set to 0 before calling this function.
+  //! Compute "Fs".
   void ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs);
 
   double CalculateLoftingHeight(Vec3D &p, double factor);

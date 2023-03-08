@@ -70,6 +70,7 @@ Main.cpp
 IoData.cpp
 SpaceVariable.cpp
 ConcurrentProgramsHandler.cpp
+CommunicationTools.cpp
 AerosMessenger.cpp
 AerofMessenger.cpp
 M2CTwinMessenger.cpp
