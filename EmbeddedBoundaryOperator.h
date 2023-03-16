@@ -117,8 +117,7 @@ public:
 
 private:
 
-  void ReadMeshFile(const char *filename, EmbeddedSurfaceData::Type& surface_type,
-                    vector<Vec3D> &Xs, vector<Int3> &Es);
+  void ReadMeshFile(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
 
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
 

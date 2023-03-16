@@ -81,7 +81,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 
     surface_type[index] = it->second->type;
 
-    ReadMeshFile(it->second->filename, surface_type[index], surfaces[index].X, surfaces[index].elems);
+    ReadMeshFile(it->second->filename, surfaces[index].X, surfaces[index].elems);
 
     surfaces[index].X0 = surfaces[index].X;
 
@@ -137,7 +137,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurf
   iod_embedded_surfaces.assign(1, &iod_surface);
   surface_type.assign(1, iod_surface.type);
 
-  ReadMeshFile(iod_surface.filename, surface_type[0], surfaces[0].X, surfaces[0].elems);
+  ReadMeshFile(iod_surface.filename, surfaces[0].X, surfaces[0].elems);
 
   surfaces[0].X0 = surfaces[0].X;
   surfaces[0].Udot.assign(surfaces[0].X.size(), 0.0);
@@ -414,8 +414,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 //------------------------------------------------------------------------------------------------
 
 void
-EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData::Type& surface_type, 
-                                       vector<Vec3D> &Xs, vector<Int3> &Es)
+EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es)
 {
 
   // read data from the surface input file.
@@ -470,30 +469,6 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, EmbeddedSurfaceData
       type_reading = 2;
       found_elems = true;
 
-/*    Skipping this part. The user should specify surface type in the input file, not in the mesh
-
-      // now we look for keywords for the type of structure
-      sscanf(line, "%*s %s", key2);
-      strcpy(copyForType, key2);
-      int l = 0;
-      while((copyForType[l] != '\0') && (l < MAXLINE)) {
-        copyForType[l] = (char)std::tolower(static_cast<unsigned char>(copyForType[l]));
-        l++;
-      }
-      // read the name of the file and detects keyword for type
-      if(strstr(copyForType, "symmetry") != NULL)
-        surface_type = EmbeddedSurfaceData::Symmetry;
-      else if(strstr(copyForType, "porouswall") != NULL)
-        surface_type = EmbeddedSurfaceData::PorousWall;
-      else if(strstr(copyForType, "wall") != NULL) //this check has to be placed after "porouswall"
-        surface_type = EmbeddedSurfaceData::Wall;
-      else if(strstr(copyForType, "none") != NULL) 
-        surface_type = EmbeddedSurfaceData::None;
-      else {
-        print_error("*** Error: Detected unsupported surface type in %s (%s).\n", filename, key2);
-        exit_mpi();
-      } 
-*/
     }
     else if(type_reading == 1) { //reading a node (following "Nodes Blabla")
       int count = sscanf(line, "%d %lf %lf %lf", &num1, &x1, &x2, &x3);
