@@ -437,6 +437,9 @@ int main(int argc, char* argv[])
 
     embed->OutputSurfaces(); //!< write the mesh(es) to file
     embed->OutputResults(t, dt, time_step, true/*force_write*/); //!< write displacement and nodal loads to file
+
+    fprintf(stderr,"Done.\n");
+    exit(-1);
   }
 
   //! write initial condition to file

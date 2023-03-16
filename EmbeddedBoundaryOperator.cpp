@@ -212,7 +212,7 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
     for(int surf=0; surf<(int)twoD_to_threeD.size(); surf++)
       twoD_to_threeD[surf] = IsEmbeddedSurfaceIn3D(surf);
   }
-  
+
 }
 
 //------------------------------------------------------------------------------------------------
@@ -716,6 +716,9 @@ void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
 
+  V.StoreMeshCoordinates(*coordinates_ptr);
+  V.WriteToVTRFile("V.vtr","sol");
+
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id = ID.GetDataPointer();
   
@@ -1053,6 +1056,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
 
+  fprintf(stderr,"[%d] Inside ComputeForcesOnSurface2DTo3D.\n", mpi_rank);
+
   // Collect info about the surface and intersection results
   vector<Vec3D>&  Xs(surfaces[surf].X);
   vector<Int3>&   Es(surfaces[surf].elems);
@@ -1112,10 +1117,20 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
 
         //traction at each Gauss point, (-pI + tau)n --> a Vec3D
         Vec3D tg = CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
-        my_data[side].push_back(xg[0]);
-        my_data[side].push_back(cylindrical_symmetry ? fabs(xg[1]) : xg[1]);
-        my_data[side].push_back(tg[0]);
-        my_data[side].push_back(tg[1]); //dropping tg[2]
+        if(cylindrical_symmetry) {
+          Vec2D xcut(xg[1],xg[2]), tcut(tg[1],tg[2]);
+          double radial_dist = xcut.norm();
+          my_data[side].push_back(xg[0]);
+          my_data[side].push_back(radial_dist);
+          my_data[side].push_back(tg[0]);
+          my_data[side].push_back(radial_dist==0 ? 0.0 : tcut*xcut/radial_dist);
+        }
+        else { //truly 2D
+          my_data[side].push_back(xg[0]);
+          my_data[side].push_back(xg[1]);
+          my_data[side].push_back(tg[0]);
+          my_data[side].push_back(tg[1]); //dropping tg[2]
+        }
       }
     }
   }
@@ -1179,14 +1194,14 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
           double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
           xg += loft*normal;
 
-          Vec2D xg2d(xg[0], cylindrical_symmetry ? fabs(xg[1]) : xg[1]); 
+          Vec2D xg2d(xg[0], cylindrical_symmetry ? sqrt(xg[1]*xg[1]+xg[2]*xg[2]) : xg[1]); 
 
           // gets candidates from tree         
           double search_radius = sqrt(As[tid])*2.0;
           int nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
-          int counter = 0;
+          int trial_counter = 0;
           while(nFound<numPoints || nFound>maxCand) {
-            if(counter>5) {
+            if(trial_counter>5) {
               fprintf(stderr,"\033[0;31m*** Error: Cannot find candidates for interpolation "
                              "(ComputeForces, 2D->3D).\033[0m\n");
               exit(-1);
@@ -1196,7 +1211,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
             else //nFound>maxCand
               search_radius /= 2.0;
             nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
-            counter++;
+            trial_counter++;
           }
 
           // figure out the actual points for interpolation (numPoints);
@@ -1220,14 +1235,27 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
 
           // interpolation (inverse multiquadric function)
           for(int comp=0; comp<2; comp++) {
-            for(int i=0; i<numPoints; i++) {
+
+            for(int i=0; i<numPoints; i++)
               fd[i] = all_data[side][4*dist2xg[i].second+2+comp];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, MathTools::phi2, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0, MathTools::phi2, rbf_weight, 1, xg2d);
-              tg[p][comp] = interp[0];
-            }
+
+            rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, MathTools::phi2, fd);
+            interp = MathTools::rbf_interp(2, numPoints, xd, r0, MathTools::phi2, rbf_weight, 1, xg2d);
+            tg[p][comp] = interp[0];
           } 
-          tg[p][2] = 0.0;
+
+          if(cylindrical_symmetry) { //update tg[p][1] and tg[p][2] to account for dir.
+            double xcut_norm = sqrt(xg[1]*xg[1]+xg[2]*xg[2]);
+            if(xcut_norm==0) 
+              tg[p][1] = tg[p][2] = 0.0;
+            else {
+              tg[p][2] = tg[p][1]*xg[2]/xcut_norm; //here, tg[p][1] is directly obtained from the interpolation
+              tg[p][1] = tg[p][1]*xg[1]/xcut_norm;
+            }
+          }
+          else 
+            tg[p][2] = 0.0;
+
 
           delete [] rbf_weight;
           delete [] interp;
@@ -1244,6 +1272,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       }
     }
   }
+
+  fprintf(stderr,"[%d] Completed ComputeForcesOnSurface2DTo3D.\n", mpi_rank);
 
 }
 
