@@ -127,6 +127,8 @@ private:
   //! Compute "Fs".
   void ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs);
 
+  int CombineSharedGaussPointData(vector<double>& data4d, vector<double>& shared_data2d);
+
   double CalculateLoftingHeight(Vec3D &p, double factor);
 
   Vec3D CalculateTractionAtPoint(Vec3D &p, int side/*0 or 1*/, Vec3D &normal/*towards the "side"*/, 

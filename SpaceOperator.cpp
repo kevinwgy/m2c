@@ -1246,7 +1246,7 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
               xd[2*i+1] = xy[dist2node[i].second][1];
             }
             double r0; //smaller than maximum separation, larger than typical separation
-            r0 = 0.5*(dist2node.front().first + dist2node.back().first);
+            r0 = dist2node.front().first + dist2node.back().first;
             double fd[numPoints];
             double *rbf_weight, *interp;
 
