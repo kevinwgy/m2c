@@ -1071,7 +1071,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
  
   vector<Vec3D> xgs(np, 0.0); //internal var.
   vector<Vec3D> tgs(np, 0.0); //internal var.
-  vector<int> special_tag(np,0); //internal var.  
+  vector<int> special_tag(np, 0); //internal var.  
+
 
   // -----------------------------------------------------------
   // Step 1: Loop through subdomain scope & collect "my_data"
@@ -1105,7 +1106,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         normal *= -1.0;
 
       for(int p=0; p<np; p++) { //loop through Gauss points
-        Vec3D xg = xgs[p];
+        Vec3D xg = xgs[p]; //has to be a new var because it will be lofted
         // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
         double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
         xg += loft*normal;
@@ -1121,12 +1122,17 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         else 
           tgs[p] += CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
 
+        //fprintf(stderr,"tid = %d tgs[%d] = %e %e %e (%e).\n", tid, p, tgs[p][0], tgs[p][1], tgs[p][2], tgs[p].norm());
+
         special_tag[p]++;
       }
     }
 
     if(cylindrical_symmetry) {
       for(int p=0; p<np; p++) {
+        if(special_tag[p]==0)
+          continue;
+
         Vec2D xcut(xgs[p][1],xgs[p][2]), tcut(tgs[p][1],tgs[p][2]);
         double radial_dist = xcut.norm();
         my_data.push_back(xgs[p][0]);
@@ -1139,12 +1145,16 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
           my_shared_data.push_back(radial_dist);
         }
       }
-    } else { //truly 2D
+    } 
+    else { //truly 2D
       for(int p=0; p<np; p++) {
+        if(special_tag[p]==0)
+          continue;
+
         my_data.push_back(xgs[p][0]);
         my_data.push_back(xgs[p][1]);
         my_data.push_back(tgs[p][0]);
-        my_data.push_back(tgs[p][1]); //dropping tg[2]
+        my_data.push_back(tgs[p][1]); //dropping tgs[p][2]
 
         if(special_tag[p]==1) {//only one side of this ghost point belongs to this subdomain
           my_shared_data.push_back(xgs[p][0]);
@@ -1152,7 +1162,6 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         }
       }
     }
-
   }
 
 
@@ -1203,10 +1212,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
     if(status[tid]==3)
       continue;
 
-    assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
-
     Int3& n(Es[tid]); 
-    Vec3D normal = Ns[tid];
 
     for(int p=0; p<np; p++) {
 
@@ -1240,31 +1246,48 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       if(nFound>numPoints)
         dist2xg.resize(numPoints); 
 
-      //prepare to interpolate 
-      double xd[2*numPoints];
-      for(int i=0; i<numPoints; i++) {
-        xd[2*i]   = all_data[4*dist2xg[i].second];
-        xd[2*i+1] = all_data[4*dist2xg[i].second + 1];
+
+      // populate tgs[p][0], tgs[p][1] from closest sample point(s)
+
+      if(iod_embedded_surfaces[surf]->twoD_to_threeD==EmbeddedSurfaceData::NEAREST_NEIGHBOR) {
+        //if user requested nearest-neighbor, skip interpolation
+        tgs[p][0] = all_data[4*dist2xg[0].second + 2];
+        tgs[p][1] = all_data[4*dist2xg[0].second + 3];
+        tgs[p][2] = 0.0;
       }
-      double r0; //smaller than maximum separation, larger than typical separation
-      r0 = 2.0*(dist2xg.front().first + dist2xg.back().first);
-      double fd[numPoints];
-      double *rbf_weight, *interp;
+      else {
+        //prepare to interpolate 
+        double xd[2*numPoints];
+        for(int i=0; i<numPoints; i++) {
+          xd[2*i]   = all_data[4*dist2xg[i].second];
+          xd[2*i+1] = all_data[4*dist2xg[i].second + 1];
+        }
+        double r0; //smaller than maximum separation, larger than typical separation
+        r0 = 5.0*(dist2xg.front().first + dist2xg.back().first);
+        double fd[numPoints];
+        double *rbf_weight, *interp;
 
-      // interpolation (inverse multiquadric function)
-      tgs[p] = 0.0;
-      for(int comp=0; comp<2; comp++) {
+        // interpolation (inverse multiquadric function)
+        tgs[p] = 0.0;
+        for(int comp=0; comp<2; comp++) {
 
-        for(int i=0; i<numPoints; i++)
-          fd[i] = all_data[4*dist2xg[i].second+2+comp];
+          for(int i=0; i<numPoints; i++)
+            fd[i] = all_data[4*dist2xg[i].second+2+comp];
 
-        rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, MathTools::phi2, fd);
-        interp = MathTools::rbf_interp(2, numPoints, xd, r0, MathTools::phi2, rbf_weight, 1, xg2d);
-        tgs[p][comp] = interp[0];
-      } 
+          rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, MathTools::phi2, fd);
+          interp = MathTools::rbf_interp(2, numPoints, xd, r0, MathTools::phi2, rbf_weight, 1, xg2d);
+          tgs[p][comp] = interp[0];
+
+          delete [] rbf_weight; //rbf_weight(...) and rbf_interp(...) allocates memory... 
+          delete [] interp;
+        } 
+      }
 
       fprintf(stderr,"Tri %d: tg = %e %e, norm = %e.\n", tid, tgs[p][0], tgs[p][1], 
               sqrt(tgs[p][0]*tgs[p][0]+tgs[p][1]*tgs[p][1]));
+
+
+      // go from 2D->3D
 
       if(cylindrical_symmetry) { //update tgs[p][1] and tgs[p][2] to account for dir.
         double xcut_norm = sqrt(xg[1]*xg[1]+xg[2]*xg[2]);
@@ -1277,10 +1300,6 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       }
       else 
         tgs[p][2] = 0.0;
-
-
-      delete [] rbf_weight;
-      delete [] interp;
           
     }
 
@@ -1463,10 +1482,10 @@ EmbeddedBoundaryOperator::CombineSharedGaussPointData(vector<double>& data, vect
   if(shared_data.empty())
     return 0;
 
+  assert(shared_data.size()%2==0);
   int Nshared = shared_data.size()/2;
-  assert(Nshared>0);
 
-  double tolerance = std::max(1.0e-12, 1.0e-6*std::max(fabs(shared_data[0]), fabs(shared_data[1])));
+  double tolerance = std::max(1.0e-12, 1.0e-12*std::min(fabs(shared_data[0]), fabs(shared_data[1])));
 
   int counter = 0;
 
@@ -1484,6 +1503,7 @@ EmbeddedBoundaryOperator::CombineSharedGaussPointData(vector<double>& data, vect
       continue;
 
 
+    assert(data.size()%4==0);
     int N = data.size()/4;
     int first_index = -1;
     int dup_index = -1;

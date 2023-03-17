@@ -2733,6 +2733,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   gauss_points_lofting = 0.0;
   internal_pressure = 0.0;
   quadrature = ONE_POINT;
+  twoD_to_threeD = RADIAL_BASIS;
 
   filename = "";
   type = None;
@@ -2773,6 +2774,10 @@ Assigner *EmbeddedSurfaceData::getAssigner()
   new ClassDouble<EmbeddedSurfaceData>(ca, "GaussPointsLofting", this, &EmbeddedSurfaceData::gauss_points_lofting);
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "InternalPressure", this, &EmbeddedSurfaceData::internal_pressure);
+
+  new ClassToken<EmbeddedSurfaceData> (ca, "TwoDimensionalToThreeDimensionalMapping", this,
+      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::twoD_to_threeD), 2,
+      "RadialBasisInterpolation", 0, "NearestNeighbor", 1);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "BoundaryCondition", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::type), 6,

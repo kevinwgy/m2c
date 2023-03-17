@@ -1258,6 +1258,10 @@ struct EmbeddedSurfaceData {
   double gauss_points_lofting; //!< non-dimensional, relative to local element size
   double internal_pressure; //!< pressure applied on the inactive side (i.e. inside solid body)
 
+  enum TwoDimensionalToThreeDimensionalMapping {RADIAL_BASIS = 0, 
+                                                NEAREST_NEIGHBOR = 1} twoD_to_threeD; //!< only for 2->3D
+  
+
   //! flux calculation
   double conRec_depth; //!< depth (dimensional) where constant reconstruction is applied (default: 0)
 
