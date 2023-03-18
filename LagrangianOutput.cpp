@@ -16,7 +16,8 @@ using std::endl;
 //------------------------------------------------------------------------------
 
 LagrangianOutput::LagrangianOutput(MPI_Comm &comm_, LagrangianMeshOutputData &iod_lag_)
-                : iod_lag(iod_lag_), comm(comm_), disp_file(NULL), sol_file(NULL)
+                : iod_lag(iod_lag_), comm(comm_), disp_file(NULL), sol_file(NULL),
+                  sol2_file(NULL)
 {
   iFrame = 0;
   last_snapshot_time = -1.0;
@@ -82,7 +83,7 @@ LagrangianOutput::OutputTriangulatedMesh(vector<Vec3D>& X0, vector<Int3>& elems)
 
 void
 LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<Vec3D>& X0, std::vector<Vec3D>& X,
-                                std::vector<Vec3D>& F, bool force_write)
+                                std::vector<Vec3D>& F, std::vector<Vec3D>* F2_ptr, bool force_write)
 {
 
   if(iod_lag.frequency_dt<=0.0 && iod_lag.frequency<=0)
@@ -135,6 +136,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
     fclose(disp_file);
   } 
 
+
   if(strcmp(iod_lag.sol,"")) {
 
     char outname[512];
@@ -157,6 +159,37 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
       exit(-1);
     }
     AppendResultToFile(sol_file, t, F.size(), 3, (double*)F.data());
+
+
+    // write second solution vector is provided
+    if(F2_ptr) {
+      // insert "_2" to file name
+      string f2_name = iod_lag.sol;
+      int loc;
+      for(loc=0; loc<(int)f2_name.size(); loc++)
+        if(f2_name[loc] == '.')
+          break; 
+      f2_name.insert(loc,"_2");
+      f2_name = string(iod_lag.prefix) + f2_name;
+
+      if(sol2_file == NULL) { //create new file and write header
+        sol2_file = fopen(f2_name.c_str(), "w");
+        if(sol2_file == NULL) {//unable to open file
+          fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", f2_name.c_str());
+          exit(-1);
+        }
+        fprintf(sol2_file, "Vector SOLUTION2 under NLDynamic for MyNodes\n");
+        fprintf(sol2_file, "%d\n", (int)F2_ptr->size());
+        fclose(sol2_file);
+      }
+
+      sol2_file = fopen(f2_name.c_str(),"a");
+      if(sol2_file == NULL) {//unable to open file
+        fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", f2_name.c_str());
+        exit(-1);
+      }
+      AppendResultToFile(sol2_file, t, F2_ptr->size(), 3, (double*)F2_ptr->data());
+    }
 
   } 
 
@@ -184,7 +217,7 @@ LagrangianOutput::AppendResultToFile(FILE* file, double time, int N, int dim, do
     fprintf(file,"\n");
   }
 
-  fclose(sol_file);
+  fclose(file);
 }
 
 //------------------------------------------------------------------------------

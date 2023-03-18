@@ -38,9 +38,12 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // get the correct size of surfaces and F
   surfaces.resize(counter);
   F.resize(counter);
+  F_over_A.resize(counter);
+  Anodal.resize(counter);
 
   surfaces_prev.resize(surfaces.size());
   F_prev.resize(F.size());
+  F_over_A_prev.resize(F_over_A.size());
  
   // set default boundary type to "None"
   surface_type.assign(surfaces.size(), EmbeddedSurfaceData::None);
@@ -129,9 +132,12 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurf
   // get the correct size of surfaces and F
   surfaces.resize(1);
   F.resize(1);
+  F_over_A.resize(1);
+  Anodal.resize(1);
 
   surfaces_prev.resize(1);
   F_prev.resize(1);
+  F_over_A_prev.resize(1);
  
   // set default boundary type to "None"
   iod_embedded_surfaces.assign(1, &iod_surface);
@@ -688,18 +694,24 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
   assert(F.size() == surfaces.size());
   assert(surfaces.size() == F.size());
   assert(F.size() == F_prev.size());
+  assert(F_over_A.size() == F_over_A_prev.size());
 
   // loop through all the surfaces
   for(int i = 0; i < (int)F.size(); i++) {
 
-    if(F_prev[i].size()>0) //not the first time
+    if(F_prev[i].size()>0) {//not the first time
       assert(F[i].size() == F_prev[i].size());
-    else
+      assert(F_over_A[i].size() == F_over_A_prev[i].size());
+    } else {
       F_prev[i].assign(F[i].size(),Vec3D(0.0));
+      F_over_A_prev[i].assign(F_over_A[i].size(),Vec3D(0.0));
+    }
 
-    // copy force
-    for(int j=0; j<(int)F[i].size(); j++)
+    // copy force & nodal area
+    for(int j=0; j<(int)F[i].size(); j++) {
       F_prev[i][j] = F[i][j];
+      F_over_A_prev[i][j] = F_over_A[i][j];
+    }
 
     if(surfaces_prev[i].X.size()>0) //not the first time
       assert(surfaces[i].X.size() == surfaces_prev[i].X.size());
@@ -713,6 +725,10 @@ EmbeddedBoundaryOperator::UpdateSurfacesPrevAndFPrev(bool partial_copy)
 }
 
 //------------------------------------------------------------------------------------------------
+
+//----------------------------------------------------------------
+// NOTE: ONLY PROC 0 HAS THE CORRECT FORCES FOR THE ENTIRE SURFACE
+//----------------------------------------------------------------
 
 void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
@@ -730,8 +746,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
   // loop through all the embedded surfaces
   for(int surf=0; surf<(int)surfaces.size(); surf++) {
 
-    // Clear force vector
+    // Get force vector
     vector<Vec3D>&  Fs(F[surf]); //Nodal loads (TO BE COMPUTED)
+    vector<Vec3D>&  FAs(F_over_A[surf]); //Nodal loads divided by nodal area (TO BE COMPUTED)
 
     // Get quadrature info
     int np = 0; //number of Gauss points
@@ -763,9 +780,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
     // ------------------------------------
 
     if(!twoD_to_threeD[surf]) 
-      ComputeForcesOnSurfaceDirectly(surf, np, v, id, Fs);
+      ComputeForcesOnSurfaceDirectly(surf, np, v, id, Fs, FAs);
     else
-      ComputeForcesOnSurface2DTo3D(surf, np, v, id, Fs);
+      ComputeForcesOnSurface2DTo3D(surf, np, v, id, Fs, FAs);
 
 /*
     Vec3D sum(0.0);
@@ -947,17 +964,23 @@ void
 EmbeddedBoundaryOperator::OutputResults(double time, double dt, int time_step, bool force_write)
 {
   for(int i=0; i<(int)lagout.size(); i++)
-    lagout[i].OutputResults(time, dt, time_step, surfaces[i].X0, surfaces[i].X, F[i], force_write);
+    lagout[i].OutputResults(time, dt, time_step, surfaces[i].X0, surfaces[i].X, F[i], &F_over_A[i], force_write);
 }
 
 //------------------------------------------------------------------------------------------------
 
 void
 EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id,
-                                                         vector<Vec3D> &Fs)
+                                                         vector<Vec3D> &Fs, vector<Vec3D> &FAs)
 {
 
   Fs.assign(surfaces[surf].X.size(), 0.0);
+
+  if(FAs.size()!=surfaces[surf].X.size())
+    FAs.assign(surfaces[surf].X.size(), 0.0);
+
+  vector<double>& An(Anodal[surf]);
+  An.assign(surfaces[surf].X.size(), 0.0);
 
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
@@ -1015,8 +1038,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
         // Check if this Gauss point is in this subdomain.
         Int3 ijk;
         bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
-        if(!foundit) { // two possibilities: either the Gauss point itself is outside, or "loft" is too big.
-                       // in the second case, we will bring it back.
+        if(!foundit) { //pull it back to the domain (not necessarily the current subdomain)
           Vec3D xg0 = xg - loft*normal;
           double pull_back = 0.5*loft;
           for(int step=0; step<5; step++) {
@@ -1056,17 +1078,29 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
     for(int p=0; p<np; p++) {
       tg[p] *= As[tid];
       // each node of the triangle gets some load from this Gauss point
-      for(int node=0; node<3; node++)
-        Fs[n[node]] += gweight[p]*gbary[p][node]*tg[p];
+      for(int node=0; node<3; node++) {
+        double coeff = gweight[p]*gbary[p][node];
+        Fs[n[node]] += coeff*tg[p];
+        An[n[node]] += coeff*As[tid];
+      } 
     }
   }
 
   // Processor 0 assembles the loads on the entire surface
-  if(mpi_rank==0)
+  if(mpi_rank==0) {
     MPI_Reduce(MPI_IN_PLACE, (double*)Fs.data(), 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
-  else
+    MPI_Reduce(MPI_IN_PLACE, An.data(), An.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+  } else {
     MPI_Reduce((double*)Fs.data(), NULL, 3*Fs.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+    MPI_Reduce(An.data(), NULL, An.size(), MPI_DOUBLE, MPI_SUM, 0, comm);
+  }
 
+  if(mpi_rank==0) {
+    for(int i=0; i<(int)Fs.size(); i++)
+      FAs[i] = An[i]==0.0 ? 0.0 : Fs[i]/An[i];
+  }
+
+  MPI_Barrier(comm);
 }
 
 //------------------------------------------------------------------------------------------------
@@ -1074,12 +1108,18 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
 // traction. Only proc. 0 calculates force.
 void
 EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id,
-                                                       vector<Vec3D> &Fs)
+                                                       vector<Vec3D> &Fs, vector<Vec3D> &FAs)
 {
 
   assert(twoD_to_threeD[surf]);
 
   Fs.assign(surfaces[surf].X.size(), 0.0);
+
+  if(FAs.size()!=surfaces[surf].X.size())
+    FAs.assign(surfaces[surf].X.size(), 0.0);
+
+  vector<double>& An(Anodal[surf]);
+  An.assign(surfaces[surf].X.size(), 0.0);
 
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
@@ -1148,8 +1188,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         // Check if this Gauss point is in this subdomain.
         Int3 ijk;
         bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
-        if(!foundit) { // two possibilities: either the Gauss point itself is outside, or "loft" is too big.
-                       // in the second case, we will bring it back.
+        if(!foundit) { //pull it back to the domain (not necessarily the current subdomain)
           Vec3D xg0 = xg - loft*normal; 
           double pull_back = 0.5*loft;
           for(int step=0; step<5; step++) {
@@ -1227,8 +1266,10 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   CommunicationTools::GatherArray<double>(comm, worker, my_shared_data, all_shared_data);
  
 
-  if(mpi_rank != worker)
+  if(mpi_rank != worker) {
+    MPI_Barrier(comm); //not necessary
     return;
+  }
 
   //Proc 0 deals with duplicates. (In the case of lofting, it is possible that the
   //two sides of a Gauss point are computed by two different processors!)
@@ -1365,13 +1406,21 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
     for(int p=0; p<np; p++) {
       tgs[p] *= As[tid];
       // each node of the triangle gets some load from this Gauss point
-      for(int node=0; node<3; node++)
-        Fs[n[node]] += gweight[p]*gbary[p][node]*tgs[p];
+      for(int node=0; node<3; node++) {
+        double coeff = gweight[p]*gbary[p][node];
+        Fs[n[node]] += coeff*tgs[p];
+        An[n[node]] += coeff*As[tid];
+      }
     }
   }
 
+  for(int i=0; i<(int)Fs.size(); i++)
+    FAs[i] = An[i]==0.0 ? 0.0 : Fs[i]/An[i];
+ 
+
   print("Completed ComputeForcesOnSurface2DTo3D.\n");
 
+  MPI_Barrier(comm);
 }
 
 //------------------------------------------------------------------------------------------------

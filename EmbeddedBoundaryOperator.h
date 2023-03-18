@@ -34,7 +34,10 @@ class EmbeddedBoundaryOperator {
   vector<TriangulatedSurface> surfaces; //!< embedded surfaces, usually updated at each time step
   vector<TriangulatedSurface> surfaces_prev; //!< saves the topology and coords in the previous time step
   vector<vector<Vec3D> > F; //!< forces
+  vector<vector<Vec3D> > F_over_A; //!< forces divided by nodal area (calculated when force is calculated)
+  vector<vector<double> > Anodal; //!< nodal area
   vector<vector<Vec3D> > F_prev; //!< forces at the previous time step
+  vector<vector<Vec3D> > F_over_A_prev; 
   vector<EmbeddedSurfaceData::Type> surface_type;
   vector<Intersector*> intersector; //!< one intersector for each embedded surface (initialized to NULL)
  
@@ -121,11 +124,13 @@ private:
 
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
 
-  //! Compute "Fs".
-  void ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs);
+  //! Compute "Fs" and "FAs".
+  void ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs,
+                                      vector<Vec3D> &FAs);
 
-  //! Compute "Fs".
-  void ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs);
+  //! Compute "Fs" and "FAs".
+  void ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs,
+                                    vector<Vec3D> &FAs);
 
   int CombineSharedGaussPointData(vector<double>& data4d, vector<double>& shared_data2d);
 

@@ -88,7 +88,7 @@ DynamicLoadCalculator::RunForAeroS()
   ComputeForces(surface, force, t);
 
   lagout.OutputTriangulatedMesh(surface->X0, surface->elems);
-  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, true);
+  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, NULL, true);
 
   concurrent.CommunicateBeforeTimeStepping(); 
   dt   = concurrent.GetTimeStepSize();
@@ -120,12 +120,12 @@ DynamicLoadCalculator::RunForAeroS()
     dt   = concurrent.GetTimeStepSize();
     tmax = concurrent.GetMaxTime(); //set to a small number at final time-step
 
-    lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, false);
+    lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, NULL, false);
   }
 
   concurrent.FinalExchange();
 
-  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, true);
+  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, NULL, true);
 
   if(embed)
     delete embed;
