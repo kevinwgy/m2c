@@ -77,7 +77,7 @@ void TriangulatedSurface::CalculateNormalsAndAreas()
       elemNorm[i] /= nrm;
       elemArea[i] = 0.5*nrm;
     } else {
-      fprintf(stderr, "*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
+      fprintf(stdout, "*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
       exit(-1);
     }
   }
@@ -86,12 +86,12 @@ void TriangulatedSurface::CalculateNormalsAndAreas()
   if(degenerate) {
     for(int i=0; i<nElems; i++)
       if(n2!=n3) {
-        fprintf(stderr, "*** Error: Cannot handle a mix of triangles and line segments.\n");
+        fprintf(stdout, "*** Error: Cannot handle a mix of triangles and line segments.\n");
         exit(-1);
       }
     for(int i=0; i<(int)X.size(); i++)
       if(X[i][2] != 0) {
-        fprintf(stderr, "*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
+        fprintf(stdout, "*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
                      X[i][2]);
         exit(-1);
       }

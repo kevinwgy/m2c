@@ -171,7 +171,7 @@ ReferenceMapOperator::TagExternalGhostNodes()
 
     }
     else {
-      fprintf(stderr,"\033[0;31m*** Error: Detected unknown boundary type (%d).\033[0m\n",(int)it->bcType);
+      fprintf(stdout,"\033[0;31m*** Error: Detected unknown boundary type (%d).\033[0m\n",(int)it->bcType);
       exit(-1);
     }
 
@@ -284,7 +284,7 @@ ReferenceMapOperator::ApplyBoundaryConditions(SpaceVariable3D &Xi)
         break;
       
       default:
-        fprintf(stderr,"\033[0;31m*** Error: Unable to impose boundary conditions "
+        fprintf(stdout,"\033[0;31m*** Error: Unable to impose boundary conditions "
                        "for reference map.\033[0m\n");
         exit(-1);
     }

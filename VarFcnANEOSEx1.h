@@ -230,7 +230,7 @@ VarFcnANEOSEx1::VarFcnANEOSEx1(MaterialModelData &data) : VarFcnANEOSBase(data)
 {
 
   if(data.eos != MaterialModelData::ANEOS_BIRCH_MURNAGHAN_DEBYE) {
-    fprintf(stderr, "*** Error: MaterialModelData is not of type ANEOS_BIRCH_MURNAGHAN_DEBYE.\n");
+    fprintf(stdout, "*** Error: MaterialModelData is not of type ANEOS_BIRCH_MURNAGHAN_DEBYE.\n");
     exit(-1);
   }
 
@@ -302,7 +302,7 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMass(double rho, double p)
   assert(rho>0.0);
   double e_cold_prime = ComputeColdSpecificEnergyDerivative(rho);
   double dFl_drho = p/(rho*rho) - e_cold_prime;
-  //fprintf(stderr,"e_cold_prime = %e, dFl_drho = %e.\n", e_cold_prime, dFl_drho);
+  //fprintf(stdout,"e_cold_prime = %e, dFl_drho = %e.\n", e_cold_prime, dFl_drho);
   ThermalHelmholtzDerivativeRhoEquation equation(rho, dFl_drho, this);
 
   // find bracketing interval
@@ -311,7 +311,7 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMass(double rho, double p)
   double f_high = equation(T_high);
   int iter = 0;
   while(f_low*f_high>0.0) {
-    //fprintf(stderr,"f(%e) = %e, f(%e) = %e.\n", T_low, f_low, T_high, f_high);
+    //fprintf(stdout,"f(%e) = %e, f(%e) = %e.\n", T_low, f_low, T_high, f_high);
     if(++iter>10)
       break;
     T_low  /= 2.0;
@@ -320,7 +320,7 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMass(double rho, double p)
     f_high = equation(T_high);
   }
   if(iter>10) {
-    fprintf(stderr,"\033[0;31m*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
+    fprintf(stdout,"\033[0;31m*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
                    " (rho = %e, p = %e).\033[0m\n", T_low, T_high, rho, p);
     exit(-1);
   }
@@ -354,7 +354,7 @@ VarFcnANEOSEx1::GetDensity(double p, double e)
 
   //TODO: This function is not really needed... (KW)
   
-  fprintf(stderr,"\033[0;31m*** Error: Implementation of VarFcnANEOSEx1::GetDensity is incomplete.\n\033[0m");
+  fprintf(stdout,"\033[0;31m*** Error: Implementation of VarFcnANEOSEx1::GetDensity is incomplete.\n\033[0m");
   exit(-1); 
   return 0.0;
 }
@@ -393,7 +393,7 @@ VarFcnANEOSEx1::GetTemperature(double rho, double e)
   if(!found) {
     T_low *= 4.0;
     if(verbose>=1)
-      fprintf(stderr,"\033[0;35mWarning: In VarFcnANEOSEx1::GetTemperature, setting temperature to %e,"
+      fprintf(stdout,"\033[0;35mWarning: In VarFcnANEOSEx1::GetTemperature, setting temperature to %e,"
                      " for rho = %e, e = %e (fun = %e).\033[0m\n", T_low, rho, e, f_low);
     return T_low;
   } 
@@ -412,7 +412,7 @@ VarFcnANEOSEx1::GetTemperature(double rho, double e)
   if(!found) {
     T_high /= 4.0;
     if(verbose>=1)
-      fprintf(stderr,"\033[0;35mWarning: In VarFcnANEOSEx1::GetTemperature, setting temperature to %e,"
+      fprintf(stdout,"\033[0;35mWarning: In VarFcnANEOSEx1::GetTemperature, setting temperature to %e,"
                      " for rho = %e, e = %e (fun = %e).\033[0m\n", T_high, rho, e, f_high);
     return T_high;
   } 
@@ -476,7 +476,7 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
     f_high = equation(T_high);
   }
   if(iter>10) {
-    fprintf(stderr,"\033[0;31m*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
+    fprintf(stdout,"\033[0;31m*** Error: In VarFcnANEOSEx1, unable to locate temperature between %e and %e."
                    " (rho = %e, h = %e).\033[0m\n", T_low, T_high, rho, h);
     exit(-1);
   }

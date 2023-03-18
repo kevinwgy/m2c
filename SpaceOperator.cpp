@@ -170,7 +170,7 @@ void SpaceOperator::SetupMesh(vector<double> &x, vector<double> &y, vector<doubl
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
         vol[k][j][i] /*volume of cv*/ = dxyz[k][j][i][0]*dxyz[k][j][i][1]*dxyz[k][j][i][2];
-//        fprintf(stderr,"(%d,%d,%d), dx = %e, dy = %e, dz = %e, vol = %e.\n", i,j,k, dxyz[k][j][i][0], dxyz[k][j][i][1], dxyz[k][j][i][2], vol[k][j][i]);
+//        fprintf(stdout,"(%d,%d,%d), dx = %e, dy = %e, dz = %e, vol = %e.\n", i,j,k, dxyz[k][j][i][0], dxyz[k][j][i][1], dxyz[k][j][i][2], vol[k][j][i]);
       }
 
 
@@ -535,7 +535,7 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
 
 /*
   for(int i=0; i<ghost_nodes_outer.size(); i++)
-    fprintf(stderr,"Ghost %d: (%d, %d, %d) | Image: (%d, %d, %d) | ProjType = %d | BcType = %d | Proj: (%e, %e, %e), (%e, %e, %e)\n", i, ghost_nodes_outer[i].ijk[0], ghost_nodes_outer[i].ijk[1], ghost_nodes_outer[i].ijk[2], ghost_nodes_outer[i].image_ijk[0], ghost_nodes_outer[i].image_ijk[1], ghost_nodes_outer[i].image_ijk[2], ghost_nodes_outer[i].type_projection, ghost_nodes_outer[i].bcType, ghost_nodes_outer[i].boundary_projection[0], ghost_nodes_outer[i].boundary_projection[1], ghost_nodes_outer[i].boundary_projection[2], ghost_nodes_outer[i].outward_normal[0], ghost_nodes_outer[i].outward_normal[1], ghost_nodes_outer[i].outward_normal[2]);
+    fprintf(stdout,"Ghost %d: (%d, %d, %d) | Image: (%d, %d, %d) | ProjType = %d | BcType = %d | Proj: (%e, %e, %e), (%e, %e, %e)\n", i, ghost_nodes_outer[i].ijk[0], ghost_nodes_outer[i].ijk[1], ghost_nodes_outer[i].ijk[2], ghost_nodes_outer[i].image_ijk[0], ghost_nodes_outer[i].image_ijk[1], ghost_nodes_outer[i].image_ijk[2], ghost_nodes_outer[i].type_projection, ghost_nodes_outer[i].bcType, ghost_nodes_outer[i].boundary_projection[0], ghost_nodes_outer[i].boundary_projection[1], ghost_nodes_outer[i].boundary_projection[2], ghost_nodes_outer[i].outward_normal[0], ghost_nodes_outer[i].outward_normal[1], ghost_nodes_outer[i].outward_normal[2]);
 */
 
   // figure out whether the entire domain has overset ghosts...
@@ -622,9 +622,9 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
         if(checkState) {
           if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {
-            fprintf(stderr, "\033[0;31m*** Error: State variables at (%e,%e,%e) violate hyperbolicity." 
+            fprintf(stdout, "\033[0;31m*** Error: State variables at (%e,%e,%e) violate hyperbolicity." 
                     " matid = %d.\n\033[0m", coords[k][j][i][0],coords[k][j][i][1],coords[k][j][i][2], (int)id[k][j][i]);
-            fprintf(stderr, "\033[0;31mv[%d(i),%d(j),%d(k)] = [%e, %e, %e, %e, %e]\n\033[0m", 
+            fprintf(stdout, "\033[0;31mv[%d(i),%d(j),%d(k)] = [%e, %e, %e, %e, %e]\n\033[0m", 
                     i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
             exit(-1);
           }
@@ -1193,7 +1193,7 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
             double low_cut = 0.0, high_cut = DBL_MAX;
             while(nFound<numPoints || nFound>maxCand) {
               if(++counter>2000) {
-                fprintf(stderr,"*** Error: Cannot find required number of sample points for "
+                fprintf(stdout,"*** Error: Cannot find required number of sample points for "
                                "interpolation (by RBF) after %d iterations. "
                                "Coord(3D):%e %e %e  | Coord(2D):%e %e. "
                                "Candidates: %d, cutoff = %e.\n", 
@@ -1218,13 +1218,13 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
               if((high_cut - low_cut)/high_cut<1e-6) { //fail-safe
                 nFound = tree.findCandidatesWithin(pnode, candidates, 10*maxCand, high_cut);
                 if(nFound>10*maxCand) {
-                  fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points at any"
+                  fprintf(stdout,"\033[0;31m*** Error: Cannot find required number of sample points at any"
                                  " cutoff distance.\033[0m\n");
                   exit(-1);
                 }
 
                 assert(nFound>=numPoints);
-                fprintf(stderr,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
+                fprintf(stdout,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
                                "(node: %e %e).\033[0m\n", nFound, high_cut, pnode[0], pnode[1]);
                 break;
               }
@@ -1618,7 +1618,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
           v[k][j][i][3] *= -1.0;
           break;
         default :
-          fprintf(stderr,"*** Error: Unknown 'side' tag for GhostPoint (%d).\n", (int)it->side); 
+          fprintf(stdout,"*** Error: Unknown 'side' tag for GhostPoint (%d).\n", (int)it->side); 
           exit(-1);
       }
     } 
@@ -1635,7 +1635,7 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       // nothing to be done here. ghost nodes will be populated below
       
     } else {
-      fprintf(stderr,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
+      fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
       exit(-1);
     }
 
@@ -2070,7 +2070,7 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
                             varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
 
         if(c<0) {
-          fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. V = %e, %e, %e, %e, %e, ID = %d.\n",
+          fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. V = %e, %e, %e, %e, %e, ID = %d.\n",
                   c, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], myid);
           exit_mpi();
         } else
@@ -2175,7 +2175,7 @@ void SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3
                             varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
 
         if(c<0) {
-          fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. "
+          fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. "
                          "V = %e, %e, %e, %e, %e, ID = %d.\n",
                   c, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], myid);
           exit_mpi();
@@ -2363,7 +2363,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                 varFcn[neighborid]->CheckState(Vsm);
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
               }
-              //fprintf(stderr,"Vsm = %e %e %e %e %e.\n", Vsm[0], Vsm[1], Vsm[2], Vsm[3], Vsm[4]);
+              //fprintf(stdout,"Vsm = %e %e %e %e %e.\n", Vsm[0], Vsm[1], Vsm[2], Vsm[3], Vsm[4]);
             } else
               localflux1 = 0.0;
 
@@ -2385,7 +2385,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                 varFcn[myid]->CheckState(Vsp);
                 fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux2);
               }
-              //fprintf(stderr,"Vsp = %e %e %e %e %e.\n", Vsp[0], Vsp[1], Vsp[2], Vsp[3], Vsp[4]);
+              //fprintf(stdout,"Vsp = %e %e %e %e %e.\n", Vsp[0], Vsp[1], Vsp[2], Vsp[3], Vsp[4]);
             } else
               localflux2 = 0.0;
           }
@@ -2945,7 +2945,7 @@ SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int
 
   if(dir[d]<0.0) {
     if(verbose>=1)  //if dir[d] is very close to zero (but negative), it might be fine 
-      fprintf(stderr,"Warning: (%d,%d,%d)(%d): dir = %e %e %e, myid = %d, neighid = %d.\n", 
+      fprintf(stdout,"Warning: (%d,%d,%d)(%d): dir = %e %e %e, myid = %d, neighid = %d.\n", 
               i,j,k, d, dir[0], dir[1], dir[2], myid, neighborid);  
     dir[d] *= -1.0; //make sure it is aligned with the positive grid axis
   }
@@ -3226,14 +3226,14 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
         }
 
         if(error) {
-          fprintf(stderr, "\033[0;31m*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\033[0m\n", i,j,k, myid);
-          fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
-          fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
-          fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
-          fprintf(stderr, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
-          fprintf(stderr, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
-          fprintf(stderr, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
-          fprintf(stderr, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
+          fprintf(stdout, "\033[0;31m*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\033[0m\n", i,j,k, myid);
+          fprintf(stdout, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+          fprintf(stdout, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
+          fprintf(stdout, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
+          fprintf(stdout, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
+          fprintf(stdout, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
+          fprintf(stdout, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
+          fprintf(stdout, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
           exit(-1);
         } 
       }
@@ -3431,7 +3431,7 @@ SpaceOperator::GetNormalForOneSidedRiemann(int d, int forward_or_backward, Vec3D
       dir /= dir.norm(); 
       break;
     default :
-      fprintf(stderr, "\033[0;31m*** Error: Undefined Riemann normal code: %d.\n\033[0m", 
+      fprintf(stdout, "\033[0;31m*** Error: Undefined Riemann normal code: %d.\n\033[0m", 
               (int)iod.ebm.riemann_normal);
       exit(-1);
   }

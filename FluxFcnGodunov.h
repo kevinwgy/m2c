@@ -53,7 +53,7 @@ void FluxFcnGodunov::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, do
   else if(dir == 2)
     EvaluateFluxFunction_H(Vmid, id, flux);
   else {
-    fprintf(stderr, "*** Error: Dir. (%d) not recognized.\n", dir);
+    fprintf(stdout, "*** Error: Dir. (%d) not recognized.\n", dir);
     exit(-1);
   }
 

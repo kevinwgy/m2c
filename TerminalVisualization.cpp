@@ -187,7 +187,7 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
   if(strcmp(iod_terminal.filename, "")) {
     outfile.open(iod_terminal.filename, std::ofstream::out);
     if(!outfile.is_open()) {
-      fprintf(stderr,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
+      fprintf(stdout,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
       exit(-1);
     }
     buf = outfile.rdbuf();
@@ -746,7 +746,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
         outfile.open(iod_terminal.filename, std::ofstream::app);
 
       if(!outfile.is_open()) {
-        fprintf(stderr,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
+        fprintf(stdout,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
         exit(-1);
       }
       buf = outfile.rdbuf();

@@ -184,13 +184,13 @@ HyperelasticityOperator::ComputeDeformationGradientAtNodes(SpaceVariable3D &Xi)
         invertible = MathTools::LinearAlgebra::
                      CalculateMatrixInverseAndDeterminant3x3(gradxi, &f[k][j][i], &detf[k][j][i]);
         if(!invertible)
-          fprintf(stderr,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d) is not invertible."
+          fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d) is not invertible."
                          " determinant = %e.\033[0m\n", i,j,k, detf[k][j][i]);
 
         detf[k][j][i] = 1.0/detf[k][j][i]; // we want the determinant of F, not grad-xi!
 
         if(detf[k][j][i]<=0.0)
-          fprintf(stderr,"\033[0;35mWarning: Determinant of deformation gradient at (%d,%d,%d)"
+          fprintf(stdout,"\033[0;35mWarning: Determinant of deformation gradient at (%d,%d,%d)"
                          " is negative (%e).\033[0m\n", i,j,k, detf[k][j][i]);
       }
 
@@ -275,7 +275,7 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
           invertible = MathTools::LinearAlgebra::
                        CalculateMatrixInverseAndDeterminant3x3(gradxi, f, &detf);
           if(!invertible)
-            fprintf(stderr,"\033[0;35mWarning: Jacobian of ref. map at (%d-1/2,%d,%d) is not invertible."
+            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d-1/2,%d,%d) is not invertible."
                            " determinant = %e.\033[0m\n", i,j,k, detf);
 
           hyperFcn[myid]->EvaluateHyperelasticFluxFunction_F(flux, f, v[k][j][i], true);//TODO: multi-material
@@ -300,7 +300,7 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
           invertible = MathTools::LinearAlgebra::
                        CalculateMatrixInverseAndDeterminant3x3(gradxi, f, &detf);
           if(!invertible)
-            fprintf(stderr,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d-1/2,%d) is not invertible."
+            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d-1/2,%d) is not invertible."
                            " determinant = %e.\033[0m\n", i,j,k, detf);
 
           hyperFcn[myid]->EvaluateHyperelasticFluxFunction_G(flux, f, v[k][j][i], true);//TODO: multi-material
@@ -324,7 +324,7 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
           invertible = MathTools::LinearAlgebra::
                        CalculateMatrixInverseAndDeterminant3x3(gradxi, f, &detf);
           if(!invertible)
-            fprintf(stderr,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d-1/2) is not invertible."
+            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d-1/2) is not invertible."
                            " determinant = %e.\033[0m\n", i,j,k, detf);
 
           hyperFcn[myid]->EvaluateHyperelasticFluxFunction_H(flux, f, v[k][j][i], true);//TODO: multi-material!

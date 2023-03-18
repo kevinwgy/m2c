@@ -61,7 +61,7 @@ public:
         }
         break;
       default:
-        fprintf(stderr,"*** Error: The %d-point Gauss quadrature rule has not been implemented.\n", nPoint);
+        fprintf(stdout,"*** Error: The %d-point Gauss quadrature rule has not been implemented.\n", nPoint);
         exit(-1);
     }
   }

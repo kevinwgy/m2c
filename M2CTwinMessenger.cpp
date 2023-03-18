@@ -115,7 +115,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<MPI_Request> send_requests;
     for(int proc = 0; proc < numFollowerProcs; proc++) {
       send_requests.push_back(MPI_Request());
-      //fprintf(stderr,"Leader proc %d sends nNodes_all = %d to Follower %d.\n", m2c_rank, nNodes_all, proc);
+      //fprintf(stdout,"Leader proc %d sends nNodes_all = %d to Follower %d.\n", m2c_rank, nNodes_all, proc);
       MPI_Isend(&nNodes_all, 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, 
                 &send_requests.back());
     }
@@ -181,7 +181,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     // make sure there are no orphans
     for(int i=0; i<(int)owner.size(); i++) {
       if(owner[i] == -1) {
-        fprintf(stderr,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
+        fprintf(stdout,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
                        " up by any follower processor.\033[0m\n", import_all[i][0], 
                        import_all[i][1], import_all[i][2], import_all_coords[i][0],
                        import_all_coords[i][1], import_all_coords[i][2]);
@@ -433,7 +433,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
 
     for(int proc = 0; proc < numLeaderProcs; proc++) {
       // It is legit to have size = 0 in MPI. It still transfers "metadata", which is unnecessary
-      //fprintf(stderr,"Follower %d adopts %ld black points from Leader %d.\n", m2c_rank, found[proc].size(), proc); 
+      //fprintf(stdout,"Follower %d adopts %ld black points from Leader %d.\n", m2c_rank, found[proc].size(), proc); 
       if(found[proc].size()>0) {
         send_requests.push_back(MPI_Request());
         MPI_Isend(found[proc].data(), found[proc].size(), MPI_INT, proc, m2c_rank/*tag*/, joint_comm,
@@ -775,7 +775,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     // make sure there are no orphans
     for(int i=0; i<(int)owner.size(); i++) {
       if(owner[i] == -1) {
-        fprintf(stderr,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
+        fprintf(stdout,"\033[0;31m*** Error: [M2C-M2C] Node (%d,%d,%d) (%e,%e,%e) is not picked"
                        " up by any leader processor.\033[0m\n", import_all[i][0],
                        import_all[i][1], import_all[i][2], import_all_coords[i][0],
                        import_all_coords[i][1], import_all_coords[i][2]);

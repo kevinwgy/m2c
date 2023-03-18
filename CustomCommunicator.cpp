@@ -34,7 +34,7 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
     if(V.IsHere(i,j,k,true) && !V.IsHere(i,j,k,false) && !V.OutsidePhysicalDomain(i,j,k)) {
       continue; //good
     } else {
-      fprintf(stderr,"*** Error: [Proc %d] Passing an interior or invalid node (%d,%d,%d) to CustomCommunicator.\n",
+      fprintf(stdout,"*** Error: [Proc %d] Passing an interior or invalid node (%d,%d,%d) to CustomCommunicator.\n",
               rank, i,j,k);
       exit(-1);
     }
@@ -84,7 +84,7 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
         nodes[i*3]   = ghost_nodes[i][0];
         nodes[i*3+1] = ghost_nodes[i][1];
         nodes[i*3+2] = ghost_nodes[i][2];
-        //fprintf(stderr,"rank %d(%d)(%d->%d, %d->%d): nodes[%d] = %d, nodes[%d] = %d, nodes[%d] = %d.\n", rank, size, ii0+1, iimax-1, jj0+1, jjmax-1, i*3, nodes[i*3], i*3+1, nodes[i*3+1], i*3+2, nodes[i*3+2]);
+        //fprintf(stdout,"rank %d(%d)(%d->%d, %d->%d): nodes[%d] = %d, nodes[%d] = %d, nodes[%d] = %d.\n", rank, size, ii0+1, iimax-1, jj0+1, jjmax-1, i*3, nodes[i*3], i*3+1, nodes[i*3+1], i*3+2, nodes[i*3+2]);
       }
     MPI_Bcast(nodes, 3*local_size, MPI_INT, proc, comm);
 
@@ -93,11 +93,11 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
     v = V.GetDataPointer();
     int package_id = -1;
     if(proc != rank) {
-      //fprintf(stderr,"rank %d(%d), local size = %d\n", rank, size, local_size);
+      //fprintf(stdout,"rank %d(%d), local size = %d\n", rank, size, local_size);
       for(int n = 0; n < local_size; n++) {
         int i(nodes[n*3]), j(nodes[n*3+1]), k(nodes[n*3+2]);
 
-   //     fprintf(stderr,"rank %d(%d): (%d,%d,%d), IsHere = %d.\n", rank,size,i,j,k, (int)V.IsHere(i,j,k,false));
+   //     fprintf(stdout,"rank %d(%d): (%d,%d,%d), IsHere = %d.\n", rank,size,i,j,k, (int)V.IsHere(i,j,k,false));
 
         if(V.IsHere(i,j,k,false)) {
           if(package_id==-1) {
@@ -123,7 +123,7 @@ CustomCommunicator::CustomCommunicator(MPI_Comm& comm_, SpaceVariable3D &V,
         int i((*it)[0]), j((*it)[1]), k((*it)[2]);
 /*
         if(v[k][j][dof*i]<=0 || v[k][j][dof*i]>size) {
-          fprintf(stderr,"rank %d(%d): (%d,%d,%d), dof(%d), v = %e.\n", rank, size, i,j,k, dof, v[k][j][dof*i]);
+          fprintf(stdout,"rank %d(%d): (%d,%d,%d), dof(%d), v = %e.\n", rank, size, i,j,k, dof, v[k][j][dof*i]);
         }
 */
         assert(v[k][j][dof*i]>0 && v[k][j][dof*i]<=size); //each ghost node must have one (and only one) owner

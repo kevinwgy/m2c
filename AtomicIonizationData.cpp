@@ -284,7 +284,7 @@ AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T, double
   int nsize = std::min(int(std::upper_bound(E[r].begin(), E[r].end(), I[r]-deltaI) - E[r].begin()),
                        (int)g[r].size());
 
-  //fprintf(stderr,"I[%d] = %e, nsize = %d, E[%d][%d] = %e, Ieff-E = %e | %e.\n", r, I[r], nsize, r, 
+  //fprintf(stdout,"I[%d] = %e, nsize = %d, E[%d][%d] = %e, Ieff-E = %e | %e.\n", r, I[r], nsize, r, 
   //        nsize-1, E[r][nsize-1],
   //        I[r]-deltaI-E[r][nsize-1], I[r]-deltaI-E[r][std::min(nsize, (int)E[r].size()-1)]);
 
@@ -353,7 +353,7 @@ AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T,
     return (1.0-d)*Us[r][k][i] + d*Us[r][k][i+1];
 
   } else {
-    fprintf(stderr,"\033[0;31m*** Error: Encountered unknown interpolation code (%d).\n\033[0m", 
+    fprintf(stdout,"\033[0;31m*** Error: Encountered unknown interpolation code (%d).\n\033[0m", 
             interpolation);
     exit(-1);
   }

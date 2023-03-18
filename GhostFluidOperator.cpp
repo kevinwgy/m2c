@@ -332,7 +332,7 @@ GhostFluidOperator::ProjectGhostsToInterface(vector<std::unique_ptr<EmbeddedBoun
     }
 
     if(mysurf<0) {
-      fprintf(stderr,"\033[0;31m*** Error: Projection of node (%d,%d,%d) on embedded "
+      fprintf(stdout,"\033[0;31m*** Error: Projection of node (%d,%d,%d) on embedded "
                      "surface not calculated.\033[0m\n", g[0], g[1], g[2]);
       exit(-1);
     }
@@ -361,7 +361,7 @@ GhostFluidOperator::ProjectGhostsToInterface(vector<std::unique_ptr<EmbeddedBoun
     bool found = global_mesh.FindElementCoveringPoint(images_xyz[n], images_ijk[n], &images_xi[n],
                                                       true); //include ghost layer outside domain
     if(!found) {
-      fprintf(stderr,"\033[0;35mWarning: Detected ghost node (%d,%d,%d) whose image is outside "
+      fprintf(stdout,"\033[0;35mWarning: Detected ghost node (%d,%d,%d) whose image is outside "
                      "physical domain.\033[0m\n", g[0], g[1], g[2]);
       ghosts_tag[n] = 0;
     }

@@ -100,7 +100,7 @@ MaterialVolumeOutput::ComputeMaterialVolumes(SpaceVariable3D& ID, double* vol)
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i]; 
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n", 
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n", 
                   myid);
           exit(-1);
         }

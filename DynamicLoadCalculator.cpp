@@ -366,7 +366,7 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
   int my_block_size = counts[mpi_rank];  
 
 
-  //fprintf(stderr,"[%d] my_start_id = %d, my_block_size = %d.\n", mpi_rank, my_start_id, my_block_size);
+  //fprintf(stdout,"[%d] my_start_id = %d, my_block_size = %d.\n", mpi_rank, my_start_id, my_block_size);
   //MPI_Barrier(comm);
  
 
@@ -401,17 +401,17 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
     double low_cut = 0.0, high_cut = DBL_MAX;
     while(nFound<numPoints || nFound>maxCand) {
       if(++counter>maxIt) {
-        fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points for "
+        fprintf(stdout,"\033[0;31m*** Error: Cannot find required number of sample points for "
                        "interpolation (by RBF) after %d iterations. "
                        "Coord(3D):%e %e %e, Candidates: %d, cutoff = %e.\n\033[0m",
                         counter, pnode[0], pnode[1], pnode[2], nFound, cutoff);
         for(int i=0; i<std::min(nFound,maxCand); i++)
-          fprintf(stderr,"%d  %d  %e  %e  %e  d = %e.\n", i, candidates[i].id, candidates[i].x[0],
+          fprintf(stdout,"%d  %d  %e  %e  %e  d = %e.\n", i, candidates[i].id, candidates[i].x[0],
                   candidates[i].x[1], candidates[i].x[2], (candidates[i].x-pnode).norm());
 
-        fprintf(stderr,"low_cut = %e, high_cut = %e.\n", low_cut, high_cut);
+        fprintf(stdout,"low_cut = %e, high_cut = %e.\n", low_cut, high_cut);
 //        for(int i=0; i<counter-1; i++)
-//          fprintf(stderr,"%d  %d  %e.\n", i, founds[i], cutoffs[i]);
+//          fprintf(stdout,"%d  %d  %e.\n", i, founds[i], cutoffs[i]);
 
         exit(-1);
       }
@@ -436,13 +436,13 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
       if((high_cut - low_cut)/high_cut<1e-6) { //fail-safe
         nFound = tree->findCandidatesWithin(pnode, candidates, 10*maxCand, high_cut);
         if(nFound>10*maxCand) {
-          fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points at any"
+          fprintf(stdout,"\033[0;31m*** Error: Cannot find required number of sample points at any"
                          " cutoff distance.\n\033[0m");
           exit(-1); 
         } 
 
         assert(nFound>=numPoints);
-        fprintf(stderr,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
+        fprintf(stdout,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
                        "(node: %e %e %e).\n\033[0m", nFound, high_cut, pnode[0], pnode[1], pnode[2]);
         break; 
       }

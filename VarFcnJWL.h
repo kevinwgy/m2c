@@ -83,7 +83,7 @@ inline
 VarFcnJWL::VarFcnJWL(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::JWL){
-    fprintf(stderr, "*** Error: MaterialModelData is not of type JWL\n");
+    fprintf(stdout, "*** Error: MaterialModelData is not of type JWL\n");
     exit(-1);
   }
 

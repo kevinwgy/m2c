@@ -124,8 +124,8 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
 
   double c_hat_square = dpdrho_hat + Gamma_hat*p_over_rho_hat;
   if(c_hat_square <= 0) {
-    fprintf(stderr,"Warning: The artificial state in the generalized Roe flux function loses hyperbolicity (c_hat_square = %e). Setting c_hat = %e.\n", c_hat_square, eps);
-    fprintf(stderr,"Vm = %e %e %e %e %e, Vp = %e %e %e %e %e, dir = %d, id = %d \n",
+    fprintf(stdout,"Warning: The artificial state in the generalized Roe flux function loses hyperbolicity (c_hat_square = %e). Setting c_hat = %e.\n", c_hat_square, eps);
+    fprintf(stdout,"Vm = %e %e %e %e %e, Vp = %e %e %e %e %e, dir = %d, id = %d \n",
             Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], dir, id);
     c_hat = eps;
     c_hat_square = c_hat*c_hat;
@@ -164,7 +164,7 @@ void FluxFcnGenRoe::ComputeLambdaAlphaR(int dir /*0~x, 1~y, 2~z*/, double *Vm, d
       a5 = (dp + rho_hat*c_hat*dw)/(2*c_hat_square);
       break;
     default:
-      fprintf(stderr,"*** Error: Incorrect use of function FluxFcnGenRoe::ComputeLambdaAlphaR.\n");
+      fprintf(stdout,"*** Error: Incorrect use of function FluxFcnGenRoe::ComputeLambdaAlphaR.\n");
       exit_mpi();
   }
 }

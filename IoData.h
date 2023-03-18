@@ -1140,7 +1140,7 @@ struct TerminalVisualizationData {
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
   double frequency_clocktime; //!< clock time, in seconds
-  double pause; //!< pause after printing each snapshot, relevant only if filename is stdout or stderr 
+  double pause; //!< pause after printing each snapshot, relevant only if filename is stdout or stdout 
 
   TerminalVisualizationData();
   ~TerminalVisualizationData() {}

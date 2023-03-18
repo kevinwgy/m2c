@@ -529,7 +529,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
   Vec2D x3(x0[0]+0.5*wid, x0[1]+(len-r)); //upperright corner of slot
   Vec2D x4(x0[0]+0.5*wid, x0[1]-sqrt(r*r - pow(0.5*wid ,2))); //lowerright corner of slot
   double alpha = atan((x4[0]-x0[0])/(x0[1]-x4[1])); //half of the `opening angle'
-  //fprintf(stderr,"alpha = %e.\n",alpha);
+  //fprintf(stdout,"alpha = %e.\n",alpha);
 
   double dist;
   for(int k=k0; k<kmax; k++)
@@ -1696,12 +1696,12 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVari
           normal[k][j][i] /= mynorm; 
 /*
         if(i==548 && j==6 && k==0) {
-          fprintf(stderr,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
+          fprintf(stdout,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
                   normal[k][j][i][2]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j-2][i-1], phi[k][j-2][i], phi[k][j-2][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j-2][i-1], phi[k][j-2][i], phi[k][j-2][i+1]);
         }
 */
       }
@@ -1767,11 +1767,11 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
 
 /*
     if(i==259 && j==0 && k==0) {
-      fprintf(stderr,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
+      fprintf(stdout,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
               normal[k][j][i][2]);
-      fprintf(stderr,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
-      fprintf(stderr,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
-      fprintf(stderr,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
+      fprintf(stdout,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
+      fprintf(stdout,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
+      fprintf(stdout,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
     }
 */
 

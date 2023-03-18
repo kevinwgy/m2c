@@ -3112,7 +3112,7 @@ IoData::IoData(int argc, char** argv)
 void IoData::readCmdLine(int argc, char** argv)
 {
   if(argc==1) {
-    fprintf(stderr,"\033[0;31m*** Error: Input file not provided!\n\033[0m");
+    fprintf(stdout,"\033[0;31m*** Error: Input file not provided!\n\033[0m");
     exit(-1);
   }
   cmdFileName = argv[1];
@@ -3130,13 +3130,13 @@ void IoData::readCmdFile()
   yyCmdfin = cmdFilePtr = fopen(cmdFileName, "r");
 
   if (!cmdFilePtr) {
-    fprintf(stderr,"\033[0;31m*** Error: could not open \'%s\'\n\033[0m", cmdFileName);
+    fprintf(stdout,"\033[0;31m*** Error: could not open \'%s\'\n\033[0m", cmdFileName);
     exit(-1);
   }
 
   int error = yyCmdfparse();
   if (error) {
-    fprintf(stderr,"\033[0;31m*** Error: command file contained parsing errors.\n\033[0m");
+    fprintf(stdout,"\033[0;31m*** Error: command file contained parsing errors.\n\033[0m");
     exit(error);
   }
   fclose(cmdFilePtr);

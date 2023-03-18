@@ -44,7 +44,7 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
     //A follower to another M2C instantiation cannot be coupled with others
     if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE ||
        iod.concurrent.aerof.type     != AerofCouplingData::NONE) {
-      fprintf(stderr,"\033[0;31m*** Error: A follower M2C instantiation cannot be coupled with "
+      fprintf(stdout,"\033[0;31m*** Error: A follower M2C instantiation cannot be coupled with "
                      "other software.\033[0m\n");
       exit(-1);
     }
@@ -70,7 +70,7 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
 
     if(iod.concurrent.m2c_twin.type != M2CTwinningData::NONE &&
        iod.concurrent.aerof.type    != AerofCouplingData::NONE) {
-      fprintf(stderr,"\033[0;31m*** Error: Cannot be coupled with AERO-F and another instantiation of M2C"
+      fprintf(stdout,"\033[0;31m*** Error: Cannot be coupled with AERO-F and another instantiation of M2C"
                      "at the same time.\033[0m\n");
       exit(-1);
     }

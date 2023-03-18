@@ -99,7 +99,7 @@ GlobalMeshInfo::GetSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms)
         neighbors_all[27*rank + 9*k + 3*j + i] = (int)s[myk][myj][myi];
       }
 
-  MPI_Allgather(MPI_IN_PLACE, size*27, MPI_INT, neighbors_all.data(), size*27, MPI_INT, comm); 
+  MPI_Allgather(MPI_IN_PLACE, 27, MPI_INT, neighbors_all.data(), 27, MPI_INT, comm); 
   S.RestoreDataPointerToLocalVector();
 
   // Step 4: Setup all the neighbour vectors
@@ -530,7 +530,7 @@ GlobalMeshInfo::IsCellInSubdomain(int i, int j, int k, int sub,
   assert(!subD_ijk_min.empty()); //otherwise, this vector has not been created!
 
   if(sub<0 || sub>=(int)subD_ijk_min.size()){
-    fprintf(stderr,"\033[0;31m*** Error: Calling IsCellInSubdomain with incorrect "
+    fprintf(stdout,"\033[0;31m*** Error: Calling IsCellInSubdomain with incorrect "
                    "subdomain id (%d).\033[0m\n", sub);
     exit(-1);
   }

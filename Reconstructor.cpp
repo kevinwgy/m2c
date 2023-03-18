@@ -81,7 +81,7 @@ void Reconstructor::Setup(vector<GhostPoint> *inner, vector<GhostPoint> *outer)
         K[k][j][i][1] = CalculateSlopeLimiterCoefficientK(A[k][j][i][1],B[k][j][i][1]);    
         K[k][j][i][2] = CalculateSlopeLimiterCoefficientK(A[k][j][i][2],B[k][j][i][2]);    
 
-        //fprintf(stderr,"(%d,%d,%d): A = %e %e %e, B = %e %e %e, k = %e %e %e\n", i,j,k, A[k][j][i][0], A[k][j][i][1], A[k][j][i][2], B[k][j][i][0], B[k][j][i][1], B[k][j][i][2], K[k][j][i][0], K[k][j][i][1], K[k][j][i][2]);
+        //fprintf(stdout,"(%d,%d,%d): A = %e %e %e, B = %e %e %e, k = %e %e %e\n", i,j,k, A[k][j][i][0], A[k][j][i][1], A[k][j][i][2], B[k][j][i][0], B[k][j][i][1], B[k][j][i][2], K[k][j][i][0], K[k][j][i][1], K[k][j][i][2]);
       }
     }
   }
@@ -661,7 +661,7 @@ RETRY:
         if(ID && nDOF==5) { //reconstructing the fluid state variables
           int myid = (int)id[k][j][i];
           if((*varFcn)[myid]->CheckState(&vl[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], 5);
             else {
@@ -670,7 +670,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vr[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], 5);
             else {
@@ -679,7 +679,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vb[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], 5);
             else {
@@ -688,7 +688,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vt[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], 5);
             else {
@@ -697,7 +697,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vk[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], 5);
             else {
@@ -706,7 +706,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vf[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], 5);
             else {
@@ -811,7 +811,7 @@ RETRY:
         break;
 
       default :
-        fprintf(stderr,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
+        fprintf(stdout,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
                 gp->bcType);
     }
   }
@@ -1055,7 +1055,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
         break;
 
       default :
-        fprintf(stderr,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
+        fprintf(stdout,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
                 gp->bcType);
     }
   }

@@ -701,7 +701,7 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
     
 
     if(gradphi_norm == 0) {
-      fprintf(stderr,"Warning: (%d,%d,%d)(%e,%e,%e): Updating first layer node led to zero gradient.\n",
+      fprintf(stdout,"Warning: (%d,%d,%d)(%e,%e,%e): Updating first layer node led to zero gradient.\n",
               i,j,k,coords[k][j][i][0],coords[k][j][i][1],coords[k][j][i][2]);
       phi[k][j][i] = phig[k][j][i];
     } else
@@ -1504,7 +1504,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
           continue;
 /*
         if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
-          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
+          fprintf(stdout,"(%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
 
 */
 
@@ -1524,7 +1524,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
 
 /*
           if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
-            fprintf(stderr,"adding ... (%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
+            fprintf(stdout,"adding ... (%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
 */
           level[k][j][i] = 1;
           useful[k][j][i] = 1;
@@ -1874,11 +1874,11 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
       for(int i=ii0; i<iimax; i++) {
         Int3 ijk(i,j,k);
         if(useful[k][j][i] && std::find(useful_nodes.begin(), useful_nodes.end(), ijk) == useful_nodes.end())
-          fprintf(stderr,"HORROR!\n");
+          fprintf(stdout,"HORROR!\n");
       }
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-    if(!useful[k][j][i]) fprintf(stderr,"HORROR 2!\n");
+    if(!useful[k][j][i]) fprintf(stdout,"HORROR 2!\n");
   }
   UsefulG2.RestoreDataPointerToLocalVector();
 */

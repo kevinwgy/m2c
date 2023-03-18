@@ -149,7 +149,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     zav1 /= 2.0;
   }
   if(!found_initial_interval) {
-    fprintf(stderr,"\033[0;31m*** Error: Saha equation solver failed. "
+    fprintf(stdout,"\033[0;31m*** Error: Saha equation solver failed. "
             "Cannot find an initial bracketing interval. (p = %e, T = %e)\n\033[0m", v[4], T);
     exit(-1);
   }
@@ -218,7 +218,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     }
 
     double zej = fun.GetZej(zav, j);
-    //fprintf(stderr,"zej = %e for j = %d.\n", zej, j);
+    //fprintf(stdout,"zej = %e for j = %d.\n", zej, j);
     double denom = 0.0;
     double zav_power = 1.0;
     for(int i=1; i<=elem[j].rmax; i++) {
@@ -285,7 +285,7 @@ SahaEquationSolver::ZavEquation::ZavEquation(double kb, double T, double nh, dou
     for(int r=0; r<elem[j].rmax; r++) {
       Ur1 = elem[j].CalculatePartitionFunction(r+1, T);
       f1 = 2.0*Ur1/Ur0*fcore*exp(-elem[j].I[r]/kbT);
-      //if(j==1) fprintf(stderr,"f(%d,%d) = %e, Ur1 = %e, Ur0 = %e, exp = %e.\n", r+1, j, f1, Ur1, Ur0, exp(-elem[j].I[r]/kbT));
+      //if(j==1) fprintf(stdout,"f(%d,%d) = %e, Ur1 = %e, Ur0 = %e, exp = %e.\n", r+1, j, f1, Ur1, Ur0, exp(-elem[j].I[r]/kbT));
       fprod[j][r+1] = fprod[j][r]*f1;
 
       if(fprod[j][r+1]<0) {

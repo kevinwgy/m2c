@@ -254,7 +254,7 @@ int ClosestTriangle::registerNodes(int ip1, int trId, int& repeated1, int& repea
           repeated2 = 1;
         }
     } else {
-      fprintf(stderr,"*** Error (software bug): node %d doesn't belong to triangle %d!\n", ip1+1, trId+1);
+      fprintf(stdout,"*** Error (software bug): node %d doesn't belong to triangle %d!\n", ip1+1, trId+1);
       exit(-1);
     }
 
@@ -356,7 +356,7 @@ double ClosestTriangle::findSignedVertexDistance()
       rr  = d_x_xt;
     }
   }
-  if(rr<1.0e-14) {fprintf(stderr,"*** Error: (in ClosestTriangle) distance = %e.\n",rr);exit(-1);}
+  if(rr<1.0e-14) {fprintf(stdout,"*** Error: (in ClosestTriangle) distance = %e.\n",rr);exit(-1);}
   dir *= 1.0/rr; //normalize dir
   rr = std::min(1.5*rr, std::max((x-xp).norm(), ry));
   rr *= 0.05;
@@ -372,13 +372,13 @@ double ClosestTriangle::findSignedVertexDistance()
     int sign = findTesterStatus(x_trial);
     if(sign!=0) {
       minDist = (double)sign*std::fabs(minDist);
-//      fprintf(stderr,"NOTE: x = (%e, %e, %e), node = %d, x_trial = (%e, %e, %e). sign = %d, minDist = %e\n", x[0], x[1], x[2], n1+1, x_trial[0], x_trial[1], x_trial[2], sign, minDist);
+//      fprintf(stdout,"NOTE: x = (%e, %e, %e), node = %d, x_trial = (%e, %e, %e). sign = %d, minDist = %e\n", x[0], x[1], x[2], n1+1, x_trial[0], x_trial[1], x_trial[2], sign, minDist);
       return minDist;
     }// else
- //     fprintf(stderr,"NOTE: x = (%e, %e, %e), node = %d, x_trial = (%e, %e, %e). I = %d, sign = %d\n", x[0], x[1], x[2], n1+1, x_trial[0], x_trial[1], x_trial[2], iTrial, sign);
+ //     fprintf(stdout,"NOTE: x = (%e, %e, %e), node = %d, x_trial = (%e, %e, %e). I = %d, sign = %d\n", x[0], x[1], x[2], n1+1, x_trial[0], x_trial[1], x_trial[2], iTrial, sign);
   }
 
-  fprintf(stderr,"*** Error: (in ClosestTriangle) failed in determining node status! nTrial = %d.\n", nTrial);
+  fprintf(stdout,"*** Error: (in ClosestTriangle) failed in determining node status! nTrial = %d.\n", nTrial);
   fail = true;
 //  exit(-1);
 
@@ -424,18 +424,18 @@ int ClosestTriangle::findTesterStatus(Vec3D xt) const
         checkEdgeForTester(xt, *it, triNodes[*it][0], triNodes[*it][1], triNodes[*it][2], dist, nn1, nn2, mindist, myMode, bestTriangle, eps);
     }
 //    if(debug)
-//      fprintf(stderr,"NOTE (debug): node = %d, trId = %d. | mode = %d, nn1 = %d, nn2 = %d, bestTriangle = %d, mindist = %e.\n",
+//      fprintf(stdout,"NOTE (debug): node = %d, trId = %d. | mode = %d, nn1 = %d, nn2 = %d, bestTriangle = %d, mindist = %e.\n",
 //              n1+1, *it+1, myMode, nn1+1, nn2+1, bestTriangle+1, mindist);
   }
 //  if(debug)
-//    fprintf(stderr,"NOTE (final): node = %d, mode = %d, nn1 = %d, nn2 = %d, bestTriangle = %d, mindist = %e.\n",
+//    fprintf(stdout,"NOTE (final): node = %d, mode = %d, nn1 = %d, nn2 = %d, bestTriangle = %d, mindist = %e.\n",
 //            n1+1, myMode, nn1+1, nn2+1, bestTriangle+1, mindist);
 
 
   int sign;
   if(myMode<0) {
-//    fprintf(stderr,"WARNING: (in IntersectorFRG) Mode = %d!\n", myMode);
-//    fprintf(stderr,"-- x = (%e %e %e), tester = (%e, %e, %e).\n", x[0], x[1], x[2], xt[0], xt[1], xt[2]);
+//    fprintf(stdout,"WARNING: (in IntersectorFRG) Mode = %d!\n", myMode);
+//    fprintf(stdout,"-- x = (%e %e %e), tester = (%e, %e, %e).\n", x[0], x[1], x[2], xt[0], xt[1], xt[2]);
     sign = 0;
   } else
     sign = mindist>=0.0 ? 1 : -1;

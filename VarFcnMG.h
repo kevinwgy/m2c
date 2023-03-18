@@ -98,7 +98,7 @@ inline
 VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::MIE_GRUNEISEN){
-    fprintf(stderr, "*** Error: MaterialModelData is not of type Mie-Gruneisen.\n");
+    fprintf(stdout, "*** Error: MaterialModelData is not of type Mie-Gruneisen.\n");
     exit(-1);
   }
 
@@ -143,7 +143,7 @@ double VarFcnMG::GetDensity(double p, double e) {
 
     double b2m4ac = b*b - 4.0*a*c;
     if(b2m4ac<0) {
-      fprintf(stderr, "*** Error: The M-G EOS is invalid for the given p(%e) and e(%e) --- unable to solve it for rho.\n",
+      fprintf(stdout, "*** Error: The M-G EOS is invalid for the given p(%e) and e(%e) --- unable to solve it for rho.\n",
               p, e);
       exit(-1);
     }
@@ -156,7 +156,7 @@ double VarFcnMG::GetDensity(double p, double e) {
       std::swap(rho1,rho2); //rho2 should be the bigger one
 
     if(rho1>0 || rho2<0) { //both are negative, or both are positive
-      fprintf(stderr, "*** Error: Cannot determine the solution (rho) of the M-G EOS (rho1 = %e, rho2 = %e). \n", 
+      fprintf(stdout, "*** Error: Cannot determine the solution (rho) of the M-G EOS (rho1 = %e, rho2 = %e). \n", 
               rho1, rho2);
       exit(-1);
     }

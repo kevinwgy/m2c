@@ -438,7 +438,7 @@ int main(int argc, char* argv[])
     embed->OutputSurfaces(); //!< write the mesh(es) to file
     embed->OutputResults(t, dt, time_step, true/*force_write*/); //!< write displacement and nodal loads to file
 
-    fprintf(stderr,"Done.\n");
+    fprintf(stdout,"Done.\n");
     exit(-1);
   }
 
@@ -546,9 +546,9 @@ int main(int argc, char* argv[])
 
 /*
       if(concurrent.GetTwinningStatus() == ConcurrentProgramsHandler::LEADER)
-        fprintf(stderr,"[Leader] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
+        fprintf(stdout,"[Leader] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
       else
-        fprintf(stderr,"[Follower] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
+        fprintf(stdout,"[Follower] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
 */
  
       if(steady_state) 

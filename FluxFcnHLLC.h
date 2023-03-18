@@ -105,7 +105,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
 
   double c_hat_square = dpdrho_hat + Gamma_hat*p_over_rho_hat;
   if(c_hat_square <= 0) {
-    fprintf(stderr,"Warning: The artificial state in the generalized Roe flux function loses hyperbolicity (c_hat_square = %e). Setting c_hat = %e.\n", c_hat_square, eps);
+    fprintf(stdout,"Warning: The artificial state in the generalized Roe flux function loses hyperbolicity (c_hat_square = %e). Setting c_hat = %e.\n", c_hat_square, eps);
     c_hat = eps;
     c_hat_square = c_hat*c_hat;
   } else
@@ -114,7 +114,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   double cm = vf[id]->ComputeSoundSpeedSquare(Vm[0], em);
 
   if(cm<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
             cm, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], id);
     exit(-1);
   } else
@@ -123,7 +123,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
   double cp = vf[id]->ComputeSoundSpeedSquare(Vp[0], ep);
 
   if(cp<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in HLLC flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
             cp, Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], id);
     exit(-1);
   } else
@@ -148,7 +148,7 @@ void FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage(int dir /*0~x, 1~y, 2~z*/,
       Sp = std::max(Vp[3] + cp, w_hat + c_hat); 
       break;
     default:
-      fprintf(stderr,"*** Error: Incorrect use of function FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage.\n");
+      fprintf(stdout,"*** Error: Incorrect use of function FluxFcnHLLC::ComputeMinMaxWaveSpeedsByRoeAverage.\n");
       exit(-1);
   }
 }
@@ -201,7 +201,7 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
   double Sm = 0.0, Sp = 0.0;
   ComputeMinMaxWaveSpeedsByRoeAverage(dir, Vm, Vp, id, Sm, Sp);
   if(!isfinite(Sm) || !isfinite(Sp)) {
-    fprintf(stderr, "*** Error: id = %d, Vm = %e %e %e %e %e, Vp = %e %e %e %e %e\n", id, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4],
+    fprintf(stdout, "*** Error: id = %d, Vm = %e %e %e %e %e, Vp = %e %e %e %e %e\n", id, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4],
             Vp[0], Vp[1], Vp[2], Vp[3], Vp[4]);
   }
 
@@ -236,8 +236,8 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
     else if (Sstar <= 0.0)
       ComputeFstar(dir, Vp, Sp, Sstar, id, flux);
     else {
-      fprintf(stderr,"*** Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface (Sstar = %e).\n", Sstar);
-      fprintf(stderr,"           rhom = %e, Sm = %e, velo_m = %e, rhop = %e, Sp = %e, velo_p = %e\n",
+      fprintf(stdout,"*** Error: Logic error in FluxFcnHLLC::ComputeNumericalFluxAtCellInterface (Sstar = %e).\n", Sstar);
+      fprintf(stdout,"           rhom = %e, Sm = %e, velo_m = %e, rhop = %e, Sp = %e, velo_p = %e\n",
               Vm[0], Sm, velo_m, Vp[0], Sp, velo_p);
       exit(-1);
     }

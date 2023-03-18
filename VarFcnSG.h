@@ -96,7 +96,7 @@ public:
   inline bool CheckState(double rho, double p, bool silence = false) {
     if(!std::isfinite(rho) || !std::isfinite(p)) {
       if(!silence)
-        fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);
+        fprintf(stdout, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);
       return true;
     }
     if(rho <= 0.0 || p+Pstiff <= 0.0){
@@ -115,7 +115,7 @@ inline
 VarFcnSG::VarFcnSG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::STIFFENED_GAS){
-    fprintf(stderr, "*** Error: MaterialModelData is not of type STIFFENED_GAS.\n");
+    fprintf(stdout, "*** Error: MaterialModelData is not of type STIFFENED_GAS.\n");
     exit(-1);
   }
 

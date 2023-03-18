@@ -195,7 +195,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
     myxyzmax[1] = (myidmax[1]-1)>=(int)y1.size() ? y1_plus[myidmax[1]-1-y1.size()] : y1[myidmax[1]-1];
     myxyzmax[2] = (myidmax[2]-1)>=(int)z1.size() ? z1_plus[myidmax[2]-1-z1.size()] : z1[myidmax[2]-1];
 
-//    fprintf(stderr,"[%d] Owner of mesh 1 [%d,%d,%d] (%e,%e,%e) -> [%d,%d,%d] (%e,%e,%e)\n", rank, ii0_1, jj0_1, kk0_1,
+//    fprintf(stdout,"[%d] Owner of mesh 1 [%d,%d,%d] (%e,%e,%e) -> [%d,%d,%d] (%e,%e,%e)\n", rank, ii0_1, jj0_1, kk0_1,
 //            myxyz0[0], myxyz0[1], myxyz0[2], iimax_1, jjmax_1, kkmax_1, myxyzmax[0], myxyzmax[1], myxyzmax[2]);
 
     for(int proc=0; proc<size; proc++) {
@@ -213,7 +213,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
       xyzmax[1] = (idmax[1]-1)>=(int)y2.size() ? y2_plus[idmax[1]-1-y2.size()] : y2[idmax[1]-1];
       xyzmax[2] = (idmax[2]-1)>=(int)z2.size() ? z2_plus[idmax[2]-1-z2.size()] : z2[idmax[2]-1];
 
-//      fprintf(stderr,"[%d] is looking at [%d], owner of mesh 2: [%d,%d,%d] (%e,%e,%e) -> [%d,%d,%d] (%e,%e,%e)\n", rank, proc, id0[0], 
+//      fprintf(stdout,"[%d] is looking at [%d], owner of mesh 2: [%d,%d,%d] (%e,%e,%e) -> [%d,%d,%d] (%e,%e,%e)\n", rank, proc, id0[0], 
 //              id0[1], id0[2], xyz0[0], xyz0[1], xyz0[2], idmax[0], idmax[1], idmax[2], xyzmax[0], 
 //              xyzmax[1], xyzmax[2]);
       bool overlap = true;
@@ -266,9 +266,9 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
           }
         }
 
-//        if(dir==0) fprintf(stderr,"[%d] send_i to [%d]: size = %d.\n", rank, proc, (int)send.size());
-//        else if(dir==1) fprintf(stderr,"[%d] send_j to [%d]: size = %d.\n", rank, proc, (int)send.size());
-//        else fprintf(stderr,"[%d] send_k to [%d]: size = %d.\n", rank, proc, (int)send.size());
+//        if(dir==0) fprintf(stdout,"[%d] send_i to [%d]: size = %d.\n", rank, proc, (int)send.size());
+//        else if(dir==1) fprintf(stdout,"[%d] send_j to [%d]: size = %d.\n", rank, proc, (int)send.size());
+//        else fprintf(stdout,"[%d] send_k to [%d]: size = %d.\n", rank, proc, (int)send.size());
         
         assert(!send.empty());
 
@@ -299,12 +299,12 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
         for(int receiver = 0; receiver < size; receiver++) {
           auto it = dest.find(receiver);
           package_size[receiver] = (it==dest.end()) ? 0 : it->second.size();
-          //fprintf(stderr,"[%d] dir = %d, I will send %d nodes to [%d].\n", rank, dir, package_size[receiver], receiver);
+          //fprintf(stdout,"[%d] dir = %d, I will send %d nodes to [%d].\n", rank, dir, package_size[receiver], receiver);
           MPI_Send(&(package_size[receiver]), 1, MPI_INT, receiver, sender, comm);
         }
       }  
       MPI_Wait(&recv_request, MPI_STATUSES_IGNORE);
-      //fprintf(stderr,"[%d] dir = %d, I will receive %d nodes from [%d].\n", rank, dir, num_nodes_to_receive, sender);
+      //fprintf(stdout,"[%d] dir = %d, I will receive %d nodes from [%d].\n", rank, dir, num_nodes_to_receive, sender);
 
       //send node-to-node mappings to everyone (including itself)
       if(num_nodes_to_receive>0) {
@@ -388,7 +388,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
     assert(receiver == it_j->first && receiver == it_k->first);
     assert(send_buffer_dim1[receiver].size() == it_i->second.size()*it_j->second.size()*it_k->second.size());
 
-//    fprintf(stderr,"[%d]: Sending %d points to [%d]. i = [%d, %d], j = [%d, %d], k = [%d, %d].\n", 
+//    fprintf(stdout,"[%d]: Sending %d points to [%d]. i = [%d, %d], j = [%d, %d], k = [%d, %d].\n", 
 //            rank, (int)send_buffer_dim1[receiver].size(), receiver,
 //            it_i->second.front(), it_i->second.back(),
 //            it_j->second.front(), it_j->second.back(),
@@ -405,7 +405,7 @@ MeshMatcher::SetupTransferExactMatch(vector<double>& x1, vector<double>& y1, vec
     assert(sender == it_j->first && sender == it_k->first);
     assert(recv_buffer_dim1[sender].size() == it_i->second.size()*it_j->second.size()*it_k->second.size());
 
-//    fprintf(stderr,"[%d]: Receiving %d points from [%d]. i = [%d, %d], j = [%d, %d], k = [%d, %d].\n", 
+//    fprintf(stdout,"[%d]: Receiving %d points from [%d]. i = [%d, %d], j = [%d, %d], k = [%d, %d].\n", 
 //            rank, (int)recv_buffer_dim1[sender].size(), sender,
 //            it_i->second.front(), it_i->second.back(),
 //            it_j->second.front(), it_j->second.back(),
@@ -438,7 +438,7 @@ MeshMatcher::Transfer(SpaceVariable3D* V1, SpaceVariable3D* V2)
   // if neither mesh1_owner nor mesh2_owner, dim does not matter (set to 1)
   
   if(dim<1 || dim>3) 
-    fprintf(stderr,"*** Error: Cannot transfer %d-dimensional data between two meshes.\n", dim);
+    fprintf(stdout,"*** Error: Cannot transfer %d-dimensional data between two meshes.\n", dim);
 
   map<int,vector<double> >& send_buffer(dim==1 ? send_buffer_dim1 : (dim==2 ? send_buffer_dim2 : send_buffer_dim3));
   map<int,vector<double> >& recv_buffer(dim==1 ? recv_buffer_dim1 : (dim==2 ? recv_buffer_dim2 : recv_buffer_dim3));

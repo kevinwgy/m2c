@@ -197,7 +197,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
   Color.WriteToVTRFile("Color.vtr", "color");
   Phi.StoreMeshCoordinates(coordinates);
   Phi.WriteToVTRFile("Phi.vtr", "phi");
-  fprintf(stderr,"Got here!\n");
+  fprintf(stdout,"Got here!\n");
   MPI_Barrier(comm);
   exit_mpi();
 */
@@ -298,7 +298,7 @@ Intersector::BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &
       scope.push_back(tri); //creating a copy of "tri" and store it in scope
   }
 
-//  fprintf(stderr,"scope size: %d.\n", (int)scope.size());
+//  fprintf(stdout,"scope size: %d.\n", (int)scope.size());
 
   // build the tree
   if(*tree)
@@ -926,7 +926,7 @@ Intersector::FloodFillColors()
 
 /*
   for(auto it = old2new.begin(); it != old2new.end(); it++)
-    fprintf(stderr,"old2new: %d --> %d.\n", it->first, it->second);
+    fprintf(stdout,"old2new: %d --> %d.\n", it->first, it->second);
 */
 
   int total_occluded = 0;
@@ -1015,7 +1015,7 @@ Intersector::RefillAfterSurfaceUpdate()
   
 /*
     if(total_remaining_nodes>0) {
-      fprintf(stderr,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
+      fprintf(stdout,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
       Color.StoreMeshCoordinates(coordinates);
       Color.WriteToVTRFile("Color.vtr", "color");
     }
@@ -1181,7 +1181,7 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
                                           Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], &collision_time, half_thickness, 
                                           NULL, NULL, &(As[id]), &(Ns[id]))) {
         swept.insert(*it);
-        //fprintf(stderr,"Found swept node: [%d][%d][%d] [%e %e %e].\n", (*it)[2], (*it)[1], (*it)[0],
+        //fprintf(stdout,"Found swept node: [%d][%d][%d] [%e %e %e].\n", (*it)[2], (*it)[1], (*it)[0],
         //        coords[0], coords[1], coords[2]);
       }
     }
@@ -1190,7 +1190,7 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
   // Verification
   for(auto&& ijk : previously_occluded_but_not_now) {
     if(swept.find(ijk) == swept.end()) {
-      fprintf(stderr,"\033[0;31m*** Error: Conflict between 'swept' and 'occluded': %d %d %d. A software bug.\033[0m\n",
+      fprintf(stdout,"\033[0;31m*** Error: Conflict between 'swept' and 'occluded': %d %d %d. A software bug.\033[0m\n",
               ijk[0], ijk[1], ijk[2]);
       exit(-1);
     } 
@@ -1285,7 +1285,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
 /*
       //verification
       double dist_true = fabs(19.4555 - sqrt(x_glob[i]*x_glob[i]+y_glob[j]*y_glob[j]));
-      fprintf(stderr,"[%d][%d][%d]: (%e, %e, %e) true: %e, numr: %e.\n", i,j,k, x_glob[i], y_glob[j], z_glob[k],
+      fprintf(stdout,"[%d][%d][%d]: (%e, %e, %e) true: %e, numr: %e.\n", i,j,k, x_glob[i], y_glob[j], z_glob[k],
                      dist_true, dist);
 */
 

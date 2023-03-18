@@ -340,11 +340,13 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 
       std::fstream out(iod_embedded_surfaces[surf]->wetting_output_filename, std::fstream::out);
       if(!out.is_open()) {
-        fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", 
+        fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", 
                 iod_embedded_surfaces[surf]->wetting_output_filename);
         exit(-1);
       }
 
+      if(twoD_to_threeD[surf])
+        fprintf(stdout,"- Warning (Outputing wetted surface): Out-of-domain elements may not have the correct status.\n");
 
       vector<Vec3D>&  Xs(surfaces[surf].X);
       vector<Int3>&   Es(surfaces[surf].elems);
@@ -718,6 +720,9 @@ EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 
   V.StoreMeshCoordinates(*coordinates_ptr);
   V.WriteToVTRFile("V.vtr","sol");
+  ID.StoreMeshCoordinates(*coordinates_ptr);
+  ID.WriteToVTRFile("ID.vtr","ID");
+
 
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id = ID.GetDataPointer();
@@ -998,6 +1003,11 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
 
         Vec3D xg = xgs[p];
 
+        Int3 ijk0;
+        if(!global_mesh_ptr->FindCellCoveringPoint(xg, ijk0, false))
+          continue; //before lofting, we need to make sure the original Gauss point is in the domain.
+                    //otherwise, there can be complexities.
+
         // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
         double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
         xg += loft*normal;
@@ -1005,10 +1015,28 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
         // Check if this Gauss point is in this subdomain.
         Int3 ijk;
         bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
-        if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
+        if(!foundit) { // two possibilities: either the Gauss point itself is outside, or "loft" is too big.
+                       // in the second case, we will bring it back.
+          Vec3D xg0 = xg - loft*normal;
+          double pull_back = 0.5*loft;
+          for(int step=0; step<5; step++) {
+            xg -= pull_back*normal;
+            foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
+            if(foundit)
+              break;
+            pull_back /= 2.0;
+          }
+          if(!foundit) {
+            xg = xg0;
+            ijk = ijk0;
+            foundit = true;
+          }
+        }
+
+        if(!coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
           continue;
 
-//        fprintf(stderr,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
+//        fprintf(stdout,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
         // Calculate traction at Gauss point on this "side"
         if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
           tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
@@ -1019,7 +1047,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
 
     }
 
-//    fprintf(stderr,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
+//    fprintf(stdout,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
 //            tg[0].norm());
 
     // Now, tg carries traction from both sides of the triangle
@@ -1056,7 +1084,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
 
-  fprintf(stderr,"[%d] Inside ComputeForcesOnSurface2DTo3D.\n", mpi_rank);
+  print("Inside ComputeForcesOnSurface2DTo3D.\n");
 
   // Collect info about the surface and intersection results
   vector<Vec3D>&  Xs(surfaces[surf].X);
@@ -1107,6 +1135,12 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
 
       for(int p=0; p<np; p++) { //loop through Gauss points
         Vec3D xg = xgs[p]; //has to be a new var because it will be lofted
+
+        Int3 ijk0;
+        if(!global_mesh_ptr->FindCellCoveringPoint(xg, ijk0, false))
+          continue; //before lofting, we need to make sure the original Gauss point is in the domain.
+                    //otherwise, there can be complexities.
+
         // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
         double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
         xg += loft*normal;
@@ -1114,15 +1148,34 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         // Check if this Gauss point is in this subdomain.
         Int3 ijk;
         bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
-        if(!foundit || !coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
+        if(!foundit) { // two possibilities: either the Gauss point itself is outside, or "loft" is too big.
+                       // in the second case, we will bring it back.
+          Vec3D xg0 = xg - loft*normal; 
+          double pull_back = 0.5*loft;
+          for(int step=0; step<5; step++) {
+            xg -= pull_back*normal;
+            foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
+            if(foundit)
+              break; 
+            pull_back /= 2.0;
+          }
+          if(!foundit) {
+            xg = xg0;
+            ijk = ijk0;
+            foundit = true;
+          }
+        }
+
+        if(!coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
           continue;
+
 
         if(status[tid]==side+1) //this side faces the interior of a solid body 
           tgs[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
         else 
           tgs[p] += CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
 
-        //fprintf(stderr,"tid = %d tgs[%d] = %e %e %e (%e).\n", tid, p, tgs[p][0], tgs[p][1], tgs[p][2], tgs[p].norm());
+        //fprintf(stdout,"tid = %d tgs[%d] = %e %e %e (%e).\n", tid, p, tgs[p][0], tgs[p][1], tgs[p][2], tgs[p].norm());
 
         special_tag[p]++;
       }
@@ -1181,7 +1234,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   //two sides of a Gauss point are computed by two different processors!)
   if(!all_shared_data.empty()) {
     int nCombined = CombineSharedGaussPointData(all_data, all_shared_data);  
-    fprintf(stdout,"  o Combined %d shared Gauss points in 2D->3D force calculation.\n", nCombined);
+    if(verbose>=2)
+      fprintf(stdout,"  o Combined %d shared Gauss points in 2D->3D force calculation.\n", nCombined);
   }
 
 
@@ -1202,10 +1256,12 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   int maxCand = numPoints*25;
   PointIn2D candidates[maxCand];
 
+/*
   for(int sam=0; sam<Nsamples; sam++)
-    fprintf(stderr,"%d: tg = %e %e, norm = %e.\n", sam, all_data[4*sam+2], all_data[4*sam+3],
+    fprintf(stdout,"%d: tg = %e %e, norm = %e.\n", sam, all_data[4*sam+2], all_data[4*sam+3],
             sqrt(all_data[4*sam+2]*all_data[4*sam+2] + all_data[4*sam+3]*all_data[4*sam+3]));
-    
+*/
+   
   // for each triangle, calculates traction vector tg
   for(int tid=0; tid<(int)Es.size(); tid++) {
 
@@ -1226,7 +1282,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       int trial_counter = 0;
       while(nFound<numPoints || nFound>maxCand) {
         if(trial_counter>5) {
-          fprintf(stderr,"\033[0;31m*** Error: Cannot find candidates for interpolation "
+          fprintf(stdout,"\033[0;31m*** Error: Cannot find candidates for interpolation "
                          "(ComputeForces, 2D->3D).\033[0m\n");
           exit(-1);
         }
@@ -1283,9 +1339,6 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         } 
       }
 
-      fprintf(stderr,"Tri %d: tg = %e %e, norm = %e.\n", tid, tgs[p][0], tgs[p][1], 
-              sqrt(tgs[p][0]*tgs[p][0]+tgs[p][1]*tgs[p][1]));
-
 
       // go from 2D->3D
 
@@ -1301,6 +1354,11 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       else 
         tgs[p][2] = 0.0;
           
+
+      fprintf(stdout,"Tri %d: tg = %e %e %e, norm = %e.\n", tid, tgs[p][0], tgs[p][1], tgs[p][2],
+              tgs[p].norm());
+
+
     }
 
     // Integrate (See KW's notes for the formula)
@@ -1312,7 +1370,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
     }
   }
 
-  fprintf(stderr,"[%d] Completed ComputeForcesOnSurface2DTo3D.\n", mpi_rank);
+  print("Completed ComputeForcesOnSurface2DTo3D.\n");
 
 }
 
@@ -1411,7 +1469,7 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side,
 
   if(iter>=5 && verbose>=1) {
     if(found_sameside)
-      fprintf(stderr,"\033[0;35mWarning: Applied a lofting height of %e (iter=%d) to find valid nodes for interpolating \n"
+      fprintf(stdout,"\033[0;35mWarning: Applied a lofting height of %e (iter=%d) to find valid nodes for interpolating \n"
                                "         pressure at Gauss point (%e, %e, %e).\033[0m\n",
               loft, iter, p[0], p[1], p[2]);
     //if found_sameside == false, will trigger another warning message below.
@@ -1434,7 +1492,7 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side,
         j = ijk0[1] + dj;
         k = ijk0[2] + dk;
 
-        //fprintf(stderr,"[%d] side = %d: (%d,%d,%d), p = %e.\n", mpi_rank, side, i,j,k, v[k][j][i][4]);
+        //fprintf(stdout,"[%d] side = %d: (%d,%d,%d), p = %e.\n", mpi_rank, side, i,j,k, v[k][j][i][4]);
         pressure[dk][dj][di] = v[k][j][i][4]; //get pressure
         total_pressure += pressure[dk][dj][di];
         n_pressure++;
@@ -1442,7 +1500,7 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side,
 
   double avg_pressure;
   if(n_pressure==0) {
-    fprintf(stderr,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
+    fprintf(stdout,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
                    "Gauss point (%e, %e, %e). Try adjusting surface thickness.\033[0m\n",
                    p[0], p[1], p[2]);
     avg_pressure = 0.0;
@@ -1482,7 +1540,12 @@ EmbeddedBoundaryOperator::CombineSharedGaussPointData(vector<double>& data, vect
   if(shared_data.empty())
     return 0;
 
-  assert(shared_data.size()%2==0);
+  if(shared_data.size()%2!=0 || data.size()%4!=0) {
+    fprintf(stdout,"\033[0;31m*** Error: Encountered issue in load transfer (2D->3D). "
+                   "Lofting may be too large.\n\033[0m");
+    exit(-1);
+  }
+
   int Nshared = shared_data.size()/2;
 
   double tolerance = std::max(1.0e-12, 1.0e-12*std::min(fabs(shared_data[0]), fabs(shared_data[1])));
@@ -1520,7 +1583,13 @@ EmbeddedBoundaryOperator::CombineSharedGaussPointData(vector<double>& data, vect
         }
       }
     }
-    assert(first_index>0 && dup_index>0);
+
+    if(first_index<0 || dup_index<0) {
+      fprintf(stdout,"\033[0;31m*** Error: Encountered issue in load transfer (2D->3D). "
+                     "Lofting may be too large.\n\033[0m");
+      exit(-1);
+    }
+
     data.erase(data.begin()+4*dup_index, data.begin()+4*dup_index+4); //erase 4 elements
     
     counter++;

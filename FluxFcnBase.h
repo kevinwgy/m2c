@@ -134,7 +134,7 @@ void FluxFcnBase::EvaluateEigensOfJacobian_F(double *V, int id,
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_F. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_F. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -187,7 +187,7 @@ void FluxFcnBase::EvaluateEigensOfJacobian_G(double *V, int id,
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_G. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_G. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -240,7 +240,7 @@ void FluxFcnBase::EvaluateEigensOfJacobian_H(double *V, int id,
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_H. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_H. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -288,7 +288,7 @@ void FluxFcnBase::EvaluateMaxEigenvalues(double *V, int id, double &lam_f_max, d
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateMaxEigenvalues. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateMaxEigenvalues. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -311,7 +311,7 @@ void FluxFcnBase::PrimitiveToPrimitiveCharacteristic(int dir/*0~x/F,1~y/G,2~z/H*
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveToPrimitiveCharacteristic. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveToPrimitiveCharacteristic. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else
@@ -371,7 +371,7 @@ void FluxFcnBase::PrimitiveCharacteristicToPrimitive(int dir/*0~x/F,1~y/G,2~z/H*
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveCharacteristicToPrimitive. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveCharacteristicToPrimitive. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else
@@ -427,7 +427,7 @@ void FluxFcnBase::ConservativeToConservativeCharacteristic(int dir/*0~x/F,1~y/G,
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in ConservativeToConservativeCharacteristic. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in ConservativeToConservativeCharacteristic. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else
@@ -477,7 +477,7 @@ void FluxFcnBase::ConservativeCharacteristicToConservative(int dir/*0~x/F,1~y/G,
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in ConservativeCharacteristicToConservative. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in ConservativeCharacteristicToConservative. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else

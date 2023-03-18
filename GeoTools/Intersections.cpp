@@ -120,7 +120,7 @@ AxisIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis), or 2
     q2 = Q[1];
   }
   else {
-    fprintf(stderr,"*** Error: In AxisIntersectsTriangle, dir must be 0, 1, or 2. Found %d.\n", dir);
+    fprintf(stdout,"*** Error: In AxisIntersectsTriangle, dir must be 0, 1, or 2. Found %d.\n", dir);
     exit(-1);
   }
 

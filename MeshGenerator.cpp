@@ -229,7 +229,7 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
       }
     }
 
-    //fprintf(stderr,"xi[%d] = %e\n", k+1, xi[k+1]);
+    //fprintf(stdout,"xi[%d] = %e\n", k+1, xi[k+1]);
 
   }
   

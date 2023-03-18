@@ -105,7 +105,7 @@ NonIdealSahaEquationSolver::ComputeStateForElement(int j, double T, double nh, d
 
     deltaI1 = ComputeDeltaI(r,j,T,nh,zav,one_over_lambD);
     if(r<rmax && deltaI1>iod_ion_mat->depression_max*elem[j].I[r]) {
-      fprintf(stderr,"\033[0;35mWarning: Depression energy (deltaI) is truncated at %e: [j, r] = [%d, %d], "
+      fprintf(stdout,"\033[0;35mWarning: Depression energy (deltaI) is truncated at %e: [j, r] = [%d, %d], "
                      "deltaI before truncation = %e, I = %e.\033[0m\n", iod_ion_mat->depression_max*elem[j].I[r],
                      j, r, deltaI1, elem[j].I[r]);
       deltaI1 = iod_ion_mat->depression_max*elem[j].I[r];
@@ -142,22 +142,22 @@ NonIdealSahaEquationSolver::ComputeStateForElement(int j, double T, double nh, d
   else { 
     zej = numerator/denominator;
     if(!std::isfinite(zej)) {
-      fprintf(stderr,"\033[0;31m*** Error: Non-Ideal Saha equation solver failed. "
+      fprintf(stdout,"\033[0;31m*** Error: Non-Ideal Saha equation solver failed. "
                      "Z for element %d is not finite.\n\033[0m", j);
       exit(-1);
     }
     if(zej<0.0) {
-      fprintf(stderr, "\033[0;35mWarning: Found negative Z (%e) for element %d. Setting it to 0.\n\033[0m",
+      fprintf(stdout, "\033[0;35mWarning: Found negative Z (%e) for element %d. Setting it to 0.\n\033[0m",
               zej, j);
       zej = 0.0;
     } else if (zej>rmax){
-      fprintf(stderr, "\033[0;35mWarning: Found Z greater than rmax (%e vs. %d) for element %d. Setting it to %d.\n\033[0m",
+      fprintf(stdout, "\033[0;35mWarning: Found Z greater than rmax (%e vs. %d) for element %d. Setting it to %d.\n\033[0m",
               zej, rmax, j, rmax);
       zej = (double)rmax;
     }
   }
   zej *= elem[j].molar_fraction;
-  //fprintf(stderr,"Zej = %e for j = %d.\n", zej, j);
+  //fprintf(stdout,"Zej = %e for j = %d.\n", zej, j);
 
   //compute molar fractions if needed
   if(compute_alpha) {
@@ -266,7 +266,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     }
   }
   if(!found_initial_interval) {
-    fprintf(stderr,"\033[0;31m*** Error: Non-ideal Saha equation solver failed. "
+    fprintf(stdout,"\033[0;31m*** Error: Non-ideal Saha equation solver failed. "
             "Cannot find an initial bracketing interval. (T = %e, nh = %e)\n\033[0m",
             T, nh);
     exit(-1);
@@ -311,7 +311,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
   //*******************************************************************
 
 #if DEBUG_SAHA_SOLVER == 1
-  fprintf(stderr,"-- Non-Ideal Saha equation solver terminated in %d iterations, Zav = %.12e,"
+  fprintf(stdout,"-- Non-Ideal Saha equation solver terminated in %d iterations, Zav = %.12e,"
           " 1/lambD = %.12e.\n",
           (int)maxit, zav, one_over_lambD);
 #endif
@@ -411,7 +411,7 @@ LambDEquation::operator()(double one_over_lambD)
     zav1 /= 2.0;
   }
   if(!found_initial_interval) {
-    fprintf(stderr,"\033[0;31m*** Error: Non-ideal Saha equation solver failed (1). "
+    fprintf(stdout,"\033[0;31m*** Error: Non-ideal Saha equation solver failed (1). "
             "Cannot find an initial bracketing interval. (T = %e, nh = %e, one_over_lambD = %e)\n\033[0m",
             T, nh, one_over_lambD);
     exit(-1);

@@ -51,7 +51,7 @@ AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm
   assert(m2c_size == joint_size);
 
   MPI_Comm_remote_size(joint_comm, &numAerosProcs);
-  //fprintf(stderr,"I am [%d]. Aero-S running on %d procs.\n", m2c_rank, numAerosProcs);
+  //fprintf(stdout,"I am [%d]. Aero-S running on %d procs.\n", m2c_rank, numAerosProcs);
 
   //----------------------
   // copied from AERO-F/DynamicNodalTransfer.cpp (written by KW in grad school...)
@@ -143,10 +143,10 @@ AerosMessenger::AerosMessenger(AerosCouplingData &iod_aeros_, MPI_Comm &m2c_comm
   if(m2c_rank==0) {
     vector<Vec3D> &x(surface.X);
     for(int i=0; i<x.size(); i++)
-      fprintf(stderr,"%d %e %e %e.\n", i, x[i][0], x[i][1], x[i][2]);
+      fprintf(stdout,"%d %e %e %e.\n", i, x[i][0], x[i][1], x[i][2]);
     vector<Int3> &e(surface.elems);
     for(int i=0; i<e.size(); i++)
-      fprintf(stderr,"%d %d %d %d.\n", i, e[i][0], e[i][1], e[i][2]);
+      fprintf(stdout,"%d %d %d %d.\n", i, e[i][0], e[i][1], e[i][2]);
   }
   MPI_Barrier(m2c_comm);
   exit_mpi();
@@ -211,7 +211,7 @@ AerosMessenger::GetEmbeddedWetSurface(int nNodes, Vec3D *nodes, int nElems, int 
 /*
   if(m2c_rank==0) {
     for(int i=0; i<nNodes; i++) {
-      fprintf(stderr,"%d  %e %e %e\n", i, nodes[i][0], nodes[i][1], nodes[i][2]);
+      fprintf(stdout,"%d  %e %e %e\n", i, nodes[i][0], nodes[i][1], nodes[i][2]);
     }
   }
 */
@@ -304,7 +304,7 @@ AerosMessenger::Negotiate()
     numStrNodes = new int[numAerosProcs][2];
     for(int proc = 0; proc < numAerosProcs; ++proc) {
       MPI_Recv(&numStrNodes[proc][0], 1, MPI_INT, proc, NEGO_NUM_TAG, joint_comm, MPI_STATUS_IGNORE);
-      //fprintf(stderr,"Got %d from proc %d.\n", numStrNodes[proc][0], proc);
+      //fprintf(stdout,"Got %d from proc %d.\n", numStrNodes[proc][0], proc);
 
       if(numStrNodes[proc][0] > 0) {
         MPI_Recv(ibuffer.data(), numStrNodes[proc][0], MPI_INT, proc, NEGO_BUF_TAG, joint_comm, MPI_STATUS_IGNORE);
@@ -322,14 +322,14 @@ AerosMessenger::Negotiate()
     }
 
     if((int)pack2local.size() != numCPUMatchedNodes) {
-      fprintf(stderr, "\033[0;31m*** Error (proc %d): wrong number of matched nodes (%d instead of %d).\n\033[0m",
+      fprintf(stdout, "\033[0;31m*** Error (proc %d): wrong number of matched nodes (%d instead of %d).\n\033[0m",
               m2c_rank, (int)pack2local.size(), numCPUMatchedNodes);
       exit(-1);
     }
 
     for(auto it = local2pack.begin(); it != local2pack.end(); it++) {
       if(*it < 0) {
-        fprintf(stderr, "\033[0;31m*** Error (proc %d): found unmatched node (local id: %d).\n\033[0m",
+        fprintf(stdout, "\033[0;31m*** Error (proc %d): found unmatched node (local id: %d).\n\033[0m",
               m2c_rank, (int)(it - local2pack.begin()));
         exit(-1);
       }
@@ -571,7 +571,7 @@ AerosMessenger::SendForce()
     for(int i=0; i<(int)pack2local.size(); i++) {
       for(int j=0; j<3; j++)
         temp_buffer[3*i+j] = F[pack2local[i]][j];
-    //  fprintf(stderr,"temp_buffer[%d] = %e %e %e.\n", i, temp_buffer[3*i], temp_buffer[3*i+1], temp_buffer[3*i+2]);
+    //  fprintf(stdout,"temp_buffer[%d] = %e %e %e.\n", i, temp_buffer[3*i], temp_buffer[3*i+1], temp_buffer[3*i+2]);
     }
 
     vector<MPI_Request> send_requests;

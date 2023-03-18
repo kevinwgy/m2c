@@ -281,7 +281,7 @@ private:
       }
 
       if(it==maxIts) {
-        fprintf(stderr,"*** Warning: Root-finding method failed to converge after %d iterations.\n", it);
+        fprintf(stdout,"*** Warning: Root-finding method failed to converge after %d iterations.\n", it);
         root = 0.5*(t0+t1);
       }
     }
@@ -348,7 +348,7 @@ public:
     else if(ellipsoid.e1 == ellipsoid.e2)
       type = PROLATE;
     else {
-      fprintf(stderr,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
+      fprintf(stdout,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
               ellipsoid.e0, ellipsoid.e1, ellipsoid.e2);
       type = NONE;
     }
@@ -377,7 +377,7 @@ public:
     else if(ellipsoid.e1 == ellipsoid.e2)
       type = PROLATE;
     else {
-      fprintf(stderr,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
+      fprintf(stdout,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
               ellipsoid.e0, ellipsoid.e1, ellipsoid.e2);
       type = NONE;
     }

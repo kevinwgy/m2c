@@ -180,7 +180,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
         for(auto&& ls_status : swept) {
           if(ls_status.second == -1) {
             if(myls!=-1) {
-              fprintf(stderr,"\033[0;31m*** Error: Node (%d,%d,%d) belongs to two material subdomains. "
+              fprintf(stdout,"\033[0;31m*** Error: Node (%d,%d,%d) belongs to two material subdomains. "
                              "phi[%d(matid:%d)] = %e, phi[%d(matid:%d)] = %e.\033[0m\n", i,j,k, myls, ls2matid[myls],
                              phi[myls][k][j][i], ls_status.first, ls2matid[ls_status.first],
                              phi[ls_status.first][k][j][i]); 
@@ -190,7 +190,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
           } 
         }
 
-     //   fprintf(stderr,"(%d,%d,%d)(%e,%e,%e) is swept, phi0: %e -> %e, phi1: %e -> %e. myls = %d\n", i,j,k,
+     //   fprintf(stdout,"(%d,%d,%d)(%e,%e,%e) is swept, phi0: %e -> %e, phi1: %e -> %e. myls = %d\n", i,j,k,
      //           global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k),
      //           phi0[0][k][j][i], phi[0][k][j][i], phi0[1][k][j][i], phi[1][k][j][i], myls);
 
@@ -256,7 +256,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
 
             neighborid = id[neighk][neighj][neighi];
 
-            //fprintf(stderr,"(%d,%d,%d): neighbor (%d %d %d), id = %d.\n", i,j,k, neighi, neighj, neighk, neighborid);
+            //fprintf(stdout,"(%d,%d,%d): neighbor (%d %d %d), id = %d.\n", i,j,k, neighi, neighj, neighk, neighborid);
 
             if(neighborid==INACTIVE_MATERIAL_ID)
               continue; //this neighbor is occluded
@@ -285,11 +285,11 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
         id[k][j][i] = *(matid_cands.begin());  //take the first one, if multiple
         tag[k][j][i] = 0;
         remaining_nodes.erase(remaining_nodes.find(ijk));
-        //fprintf(stderr,"  o Giving node (%d,%d,%d) ID %d.\n", i,j,k, (int)id[k][j][i]);
+        //fprintf(stdout,"  o Giving node (%d,%d,%d) ID %d.\n", i,j,k, (int)id[k][j][i]);
         progress++;
 
         if(matid_cands.size()>1)
-          fprintf(stderr,"\033[0;35mWarning: Detected a node with multiple possible material IDs (%d,%d,%d), "
+          fprintf(stdout,"\033[0;35mWarning: Detected a node with multiple possible material IDs (%d,%d,%d), "
                   "setting to %d.\n\033[0m\n", i,j,k, (int)id[k][j][i]);
       }
     }
@@ -564,7 +564,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   for(auto&& sub : swept)
     for(auto&& ijk : sub) {
       if(tag[ijk[2]][ijk[1]][ijk[0]] != 0)
-        fprintf(stderr,"\033[0;35mWarning: Node (%d %d %d) is swept by multiple (>1) embedded surfaces.\n\033[0m",
+        fprintf(stdout,"\033[0;35mWarning: Node (%d %d %d) is swept by multiple (>1) embedded surfaces.\n\033[0m",
                 ijk[0], ijk[1], ijk[2]);
 
       tag[ijk[2]][ijk[1]][ijk[0]] = 1; 
@@ -671,7 +671,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
                 myvote = id_votes[s];
               }
             if(myid==-1) {
-              fprintf(stderr,"\033[0;31m*** Error: Unable to determine the material ID at (%d,%d,%d).\n\033[0m",
+              fprintf(stdout,"\033[0;31m*** Error: Unable to determine the material ID at (%d,%d,%d).\n\033[0m",
                       i,j,k);
               exit(-1);
             }
@@ -702,7 +702,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
             continue;  //not ready to update this node
           }
           else {
-            fprintf(stderr,"\033[0;31m*** Error: Unable to determine the state at (%d,%d,%d), id:%d.\n\033[0m",
+            fprintf(stdout,"\033[0;31m*** Error: Unable to determine the state at (%d,%d,%d), id:%d.\n\033[0m",
                     i,j,k, myid);
             exit(-1);
           }
@@ -1015,11 +1015,11 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
     v /= sum_weight;
   else if(upwind) {
     if(verbose>1) 
-      fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions"
+      fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions"
               " w/ upwinding. Retrying.\033[0m\n", i,j,k);
   } else {
     if(verbose>1) 
-      fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions."
+      fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions."
               " Retrying.\033[0m\n", i,j,k);
   }
 
@@ -1121,10 +1121,10 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
         if(sum_weight==0) {
           if(verbose>1) {
             if(iod.multiphase.phasechange_dir == MultiPhaseData::ALL) 
-              fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+              fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
                       "by extrapolation.\n\033[0m", i,j,k, x0[0],x0[1],x0[2]);
             else
-              fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+              fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
                       "by extrapolation w/ upwinding.\n\033[0m", i,j,k, x0[0],x0[1],x0[2]);
           }
           unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
@@ -1273,7 +1273,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
     if(iod.multiphase.phasechange_dir == MultiPhaseData::UPWIND) {
       if(sum_weight>0) {
         v[k][j][i] /= sum_weight; //Done!
-        if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. (2nd attempt)\n",
+        if(verbose>1) fprintf(stdout,"*** (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. (2nd attempt)\n",
                               i,j,k);
         continue;
       }
@@ -1282,7 +1282,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
     // if still unresolved, try to apply an averaging w/o     
     if(sum_weight2>0) {
       v[k][j][i] = vtmp/sum_weight2; //Done!
-      if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/o enforcing upwinding."
+      if(verbose>1) fprintf(stdout,"*** (%d,%d,%d): Updated state variables by extrapolation w/o enforcing upwinding."
                             " (2nd attempt)\n", i,j,k);
       continue;
     }
@@ -1346,7 +1346,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
       if(sum_weight>0) {
         v[k][j][i][0] = density/sum_weight;
-        if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated density by interpolation w/ stencil width = %d: %e %e %e %e %e\n",
+        if(verbose>1) fprintf(stdout,"*** (%d,%d,%d): Updated density by interpolation w/ stencil width = %d: %e %e %e %e %e\n",
                             i,j,k, layer, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
         break; //done with this node
       }
@@ -1361,14 +1361,14 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
       //Treatment 2: apply a constant density.
 
       if(id[k][j][i]!=0 || apply_failsafe_density) {
-        fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). "
+        fprintf(stdout,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). "
                        "Id:%d->%d. No valid neighbors within %d layers.\033[0m\n", 
                        i,j,k, coords[k][j][i][0], coords[k][j][i][1],
                        coords[k][j][i][2], varFcn[id[k][j][i]]->failsafe_density, (int)idn[k][j][i], (int)id[k][j][i], 
                        max_layer);
         v[k][j][i][0] = varFcn[id[k][j][i]]->failsafe_density;
       } else { //id[k][j][i] = 0 && not applying failsafe
-        fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e). "
+        fprintf(stdout,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e). "
                        "Id:%d->%d. No valid neighbors within %d layers. Trying to correct the level set functions\033[0m\n", 
                        i,j,k, coords[k][j][i][0], coords[k][j][i][1],
                        coords[k][j][i][2], (int)idn[k][j][i], (int)id[k][j][i], max_layer);
@@ -1443,7 +1443,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
           double p  = varFcn[myid]->GetPressure(v[k][j][i][0], e);
           v[k][j][i][4] = p;
           if(coords[k][j][i].norm()<0.015)
-            fprintf(stderr,"Changing state at (%d,%d,%d) p: %e->%e, T: %e->%e, h: %e->%e\n", i,j,k, 
+            fprintf(stdout,"Changing state at (%d,%d,%d) p: %e->%e, T: %e->%e, h: %e->%e\n", i,j,k, 
                     p0, p, T0, T, e0 + p0/v[k][j][i][0], e + p/v[k][j][i][0]);
         }
       }
@@ -1463,7 +1463,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
           continue;
 
 //        if(lam[k][j][i]>0)
-//          fprintf(stderr,"lam[%d][%d][%d] = %e.\n", k,j,i, lam[k][j][i]);
+//          fprintf(stdout,"lam[%d][%d][%d] = %e.\n", k,j,i, lam[k][j][i]);
 
         for(auto it = trans[myid].begin(); it != trans[myid].end(); it++) {
 
@@ -1493,7 +1493,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             double p1 = v[k][j][i][4];
             double e1 = varFcn[(*it)->toID]->GetInternalEnergyPerUnitMass(rho1, p1);
             double T1 = varFcn[(*it)->toID]->GetTemperature(rho1, e1);
-            fprintf(stderr,"Detected phase transition at (%d,%d,%d)(%d->%d). rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
+            fprintf(stdout,"Detected phase transition at (%d,%d,%d)(%d->%d). rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
                     i,j,k, myid, (*it)->toID, rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
             // ------------------------------------------------------------------------
 

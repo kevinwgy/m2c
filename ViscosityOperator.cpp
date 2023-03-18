@@ -456,7 +456,7 @@ ViscosityOperator::AddCylindricalSymmetryTerms(Vec5D*** v, double*** id, Vec3D**
             lam[k][j][i] = visFcn[myid]->GetLambda(NULL, v[k][j][i][0], v[k][j][i][4], div, h);
             break;
           default:
-            fprintf(stderr,"\033[0;31m*** Error: ViscosityOperator detected unsupported "
+            fprintf(stdout,"\033[0;31m*** Error: ViscosityOperator detected unsupported "
                     "viscosity model.\033[0m\n");
             exit(-1);
             break;

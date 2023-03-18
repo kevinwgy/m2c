@@ -50,7 +50,7 @@ LagrangianOutput::OutputTriangulatedMesh(vector<Vec3D>& X0, vector<Int3>& elems)
     out.open(outname, std::fstream::out);
 
     if(!out.is_open()) {
-      fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
+      fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
       exit(-1);
     }
 
@@ -100,7 +100,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
   //Only Proc #0 writes
   
   if(!(strcmp(iod_lag.disp,"") || strcmp(iod_lag.sol,""))) {
-    fprintf(stderr,"\033[0;31m*** Error: Missing output file names.\n\033[0m");
+    fprintf(stdout,"\033[0;31m*** Error: Missing output file names.\n\033[0m");
     exit(-1);
   }
 
@@ -114,7 +114,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
     if(disp_file == NULL) { //create new file and write header
       disp_file = fopen(outname, "w");
       if(disp_file == NULL) {//unable to open file
-        fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
+        fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
         exit(-1);
       }
       fprintf(disp_file, "Vector DISP under NLDynamic for MyNodes\n");
@@ -124,7 +124,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
 
     disp_file = fopen(outname,"a");
     if(disp_file == NULL) {
-      fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
+      fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
       exit(-1);
     }
 
@@ -143,7 +143,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
     if(sol_file == NULL) { //create new file and write header
       sol_file = fopen(outname, "w");
       if(sol_file == NULL) {//unable to open file
-        fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
+        fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
         exit(-1);
       }
       fprintf(sol_file, "Vector SOLUTION under NLDynamic for MyNodes\n");
@@ -153,7 +153,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
 
     sol_file = fopen(outname,"a");
     if(sol_file == NULL) {//unable to open file
-      fprintf(stderr,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
+      fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
       exit(-1);
     }
     AppendResultToFile(sol_file, t, F.size(), 3, (double*)F.data());

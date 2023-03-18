@@ -65,7 +65,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
   for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
     if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
-      fprintf(stderr,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
+      fprintf(stdout,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
       exit_mpi();
     }
     std::get<0>(absorption[it->first]) = it->second->slope;
@@ -134,7 +134,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   absorption.resize(numMaterials, std::make_tuple(0,0,0)); //by default, set coeff = 0
   for (auto it = iod.laser.abs.dataMap.begin(); it != iod.laser.abs.dataMap.end(); it++) {
     if(it->second->materialid < 0 || it->second->materialid >= numMaterials) {
-      fprintf(stderr,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
+      fprintf(stdout,"*** Error: Found laser absorption coefficients for an unknown material (id = %d).\n", it->first);
       exit(-1);
     }
     std::get<0>(absorption[it->first]) = it->second->slope;
@@ -624,7 +624,7 @@ LaserAbsorptionSolver::DistanceToSource(Vec3D &x, int &loc, double *image)
     if(image && loc) { //calculate image coordinates
 
       if(loc>=1000) {
-        fprintf(stderr,"*** Error: Not able to find the image of a node on the wrong side of the focus (shouldn't need to).\n");
+        fprintf(stdout,"*** Error: Not able to find the image of a node on the wrong side of the focus (shouldn't need to).\n");
         exit(-1);
       }
 
@@ -668,7 +668,7 @@ LaserAbsorptionSolver::DistanceToSource(Vec3D &x, int &loc, double *image)
     if(image && loc) { //calculate image coordinates
 
       if(loc>=1000) {
-        fprintf(stderr,"*** Error: Not able to find the image of a node on the wrong side of the origin (shouldn't need to).\n");
+        fprintf(stdout,"*** Error: Not able to find the image of a node on the wrong side of the origin (shouldn't need to).\n");
         exit(-1);
       }
 
@@ -1095,7 +1095,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
         
           // verify that it is next to a symmetry boundary (of the laser)
           if(fabs(it->outward_normal*source.dir)>1.0e-12) {
-            fprintf(stderr,"*** Error: Detected ghost node (%d,%d,%d)(%e,%e,%e) within the laser domain. Reduce laser range.\n",
+            fprintf(stdout,"*** Error: Detected ghost node (%d,%d,%d)(%e,%e,%e) within the laser domain. Reduce laser range.\n",
                     i,j,k, x[0],x[1],x[2]);   
             exit(-1);
           }
@@ -1114,7 +1114,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
     Vec3D& x(coords[ghost_tmp[i][2]][ghost_tmp[i][1]][ghost_tmp[i][0]]);
     int tmp;
     double dtmp = DistanceToSource(image[i], tmp);
-    fprintf(stderr,"[%d] (%d,%d,%d)(%e,%e,%e)(%e) --> status = %d, (%e,%e,%e)(%e).\n", mpi_rank, ghost_tmp[i][0], ghost_tmp[i][1],
+    fprintf(stdout,"[%d] (%d,%d,%d)(%e,%e,%e)(%e) --> status = %d, (%e,%e,%e)(%e).\n", mpi_rank, ghost_tmp[i][0], ghost_tmp[i][1],
             ghost_tmp[i][2], x[0], x[1], x[2], ghost_phi[i], status[i], image[i][0], image[i][1], image[i][2], dtmp);
   }
 */
@@ -1157,7 +1157,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
       if(ihere==INT_MAX || jhere==INT_MAX || khere==INT_MAX) {//not found inside the subdomain or its ghost layer, case (2)
         status[n] = -98; //change its status to -98
         far_nodes.push_back(n);
-//        fprintf(stderr,"[%d] Found a far-node. (%d,%d,%d). image(%e,%e,%e). (%d,%d,%d).\n", mpi_rank, 
+//        fprintf(stdout,"[%d] Found a far-node. (%d,%d,%d). image(%e,%e,%e). (%d,%d,%d).\n", mpi_rank, 
 //                ghost_tmp[n][0], ghost_tmp[n][1], ghost_tmp[n][2], image[n][0], image[n][1], image[n][2], ihere, jhere, khere);
         continue;  //deal with all the problematic and "far" nodes later
       }
@@ -1210,7 +1210,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
 /*
           if(proc==17 && nod[3*n]==51 && nod[3*n+1]==88 && nod[3*n+2]==0) {
-            fprintf(stderr,"[%d] Working on (51,88,0) from proc 17... Image(%e,%e,%e)\n", mpi_rank,
+            fprintf(stdout,"[%d] Working on (51,88,0) from proc 17... Image(%e,%e,%e)\n", mpi_rank,
                     img[3*n],img[3*n+1],img[3*n+2]);
           }
 */
@@ -1224,7 +1224,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 
 /*
           if(proc==17 && nod[3*n]==51 && nod[3*n+1]==88 && nod[3*n+2]==0) {
-            fprintf(stderr,"[%d] Working on (51,88,0) from proc 17... (%d,%d,%d)\n", mpi_rank, ihere, jhere, khere);
+            fprintf(stdout,"[%d] Working on (51,88,0) from proc 17... (%d,%d,%d)\n", mpi_rank, ihere, jhere, khere);
           }
 */
 
@@ -1244,7 +1244,7 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
           int owner_rank = far_nodes_owner[n];
 /*
           if(owner_rank<0 || owner_rank>=mpi_size) {
-            fprintf(stderr,"[%d] Can't find an owner of far-node (%d,%d,%d)\n", mpi_rank, 
+            fprintf(stdout,"[%d] Can't find an owner of far-node (%d,%d,%d)\n", mpi_rank, 
                     ghost_tmp[far_nodes[n]][0], ghost_tmp[far_nodes[n]][1], ghost_tmp[far_nodes[n]][2]);
           }
 */
@@ -1300,12 +1300,12 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
 /*
   for(int i=0; i<ebm.ghostNodes2.size(); i++)
     for(int j=0; j<ebm.ghostNodes2[i].size(); j++)
-      fprintf(stderr,"[%d] GN2 (%d, %d, %d) owner = %d.\n", mpi_rank, ebm.ghostNodes2[i][j][0], ebm.ghostNodes2[i][j][1],
+      fprintf(stdout,"[%d] GN2 (%d, %d, %d) owner = %d.\n", mpi_rank, ebm.ghostNodes2[i][j][0], ebm.ghostNodes2[i][j][1],
               ebm.ghostNodes2[i][j][2], ebm.ghostNodes2_sender[i]);
 
   for(int i=0; i<ebm.friendsGhostNodes.size(); i++)
     for(int j=0; j<ebm.friendsGhostNodes[i].size(); j++)
-      fprintf(stderr,"[%d] FG (%d, %d, %d), friend = %d.\n", mpi_rank, ebm.friendsGhostNodes[i][j].first[0],
+      fprintf(stdout,"[%d] FG (%d, %d, %d), friend = %d.\n", mpi_rank, ebm.friendsGhostNodes[i][j].first[0],
               ebm.friendsGhostNodes[i][j].first[1], ebm.friendsGhostNodes[i][j].first[2], ebm.friendsGhostNodes_receiver[i]);
 */
 
@@ -1576,7 +1576,7 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
     }
     double adjust_ratio = Power_integrated/power;
     double power_old = power;
-    //fprintf(stderr,"The laser power is %e at time %e s, and the adjust ratio for laser power is: %e.\n", power, t, adjust_ratio);
+    //fprintf(stdout,"The laser power is %e at time %e s, and the adjust ratio for laser power is: %e.\n", power, t, adjust_ratio);
     power = power/adjust_ratio;
     //Check if the ratio is computed correct
     double power_checked = 0.0;
@@ -1613,7 +1613,7 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
         if(verbose >= OutputData::HIGH)
-          fprintf(stderr,"Warning: [%d] source radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+          fprintf(stdout,"Warning: [%d] source radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
 
@@ -1653,7 +1653,7 @@ LaserAbsorptionSolver::InitializeLaserDomainAndGhostNodes(double*** l, double***
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
         if(verbose >= OutputData::MEDIUM)
-          fprintf(stderr,"Warning: [%d] Initial radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+          fprintf(stdout,"Warning: [%d] Initial radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
 
@@ -1791,11 +1791,11 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
 
     if(l[k][j][i]<lmin) {
       if(verbose >= OutputData::MEDIUM)
-        fprintf(stderr,"Warning: [%d] Radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+        fprintf(stdout,"Warning: [%d] Radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                 mpi_rank, i,j,k, l[k][j][i], lmin);
       l[k][j][i] = lmin;
     }
-//    fprintf(stderr,"[%d] GN1 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
+//    fprintf(stdout,"[%d] GN1 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
   }
 
   // Step 2: Work on friendsGhostNodes
@@ -1810,7 +1810,7 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
       if(buffer[i]<lmin) {
         buffer[i] = lmin;
         if(verbose >= OutputData::MEDIUM)
-          fprintf(stderr,"Warning: [%d] Radiance at friend's ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+          fprintf(stdout,"Warning: [%d] Radiance at friend's ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, ebm.friendsGhostNodes[p][i].first[0], ebm.friendsGhostNodes[p][i].first[1],
                   ebm.friendsGhostNodes[p][i].first[2], buffer[i], lmin);
       }
@@ -1840,10 +1840,10 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
         if(verbose >= OutputData::MEDIUM)
-          fprintf(stderr,"Warning: [%d] Received radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+          fprintf(stdout,"Warning: [%d] Received radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
       }
-//      fprintf(stderr,"[%d] GN2 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
+//      fprintf(stdout,"[%d] GN2 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
     }
   }
 
@@ -2191,7 +2191,7 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
       if(l[k][j][i]<lmin) {
         l[k][j][i] = lmin;
         if(verbose >= OutputData::HIGH)
-          fprintf(stderr, "Warning: [%d] Applied cut-off radiance (%e) to (%d,%d,%d) (orig:%e).\n", 
+          fprintf(stdout, "Warning: [%d] Applied cut-off radiance (%e) to (%d,%d,%d) (orig:%e).\n", 
                   mpi_rank, lmin, i,j,k, l[k][j][i]);
       }
 

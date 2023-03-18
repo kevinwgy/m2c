@@ -57,7 +57,7 @@ void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, dou
   double c_m = vf[id]->ComputeSoundSpeedSquare(Vm[0], e_m);
 
   if(c_m<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
             c_m, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], id);
     exit(-1);
   } else
@@ -66,7 +66,7 @@ void FluxFcnLLF::ComputeMaxEigenvalue(int dir /*0~x, 1~y, 2~z*/, double *Vm, dou
   double c_p = vf[id]->ComputeSoundSpeedSquare(Vp[0], e_p);
 
   if(c_p<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
             c_p, Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], id);
     exit(-1);
   } else
@@ -98,7 +98,7 @@ void FluxFcnLLF::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, double
     EvaluateFluxFunction_H(Vm, id, fm);
     EvaluateFluxFunction_H(Vp, id, fp);
   } else {
-    fprintf(stderr, "*** Error: Dir. (%d) not recognized.\n", dir);
+    fprintf(stdout, "*** Error: Dir. (%d) not recognized.\n", dir);
     exit(-1);
   }
 
@@ -130,7 +130,7 @@ void FluxFcnLLF::ComputeMaxEigenvalueAtMaterialInterface(int dir, double *Vm, in
   double c_m = vf[idm]->ComputeSoundSpeedSquare(Vm[0], e_m);
 
   if(c_m<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vm = %e, %e, %e, %e, %e, ID = %d.\n",
             c_m, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4], idm);
     exit(-1);
   } else
@@ -139,7 +139,7 @@ void FluxFcnLLF::ComputeMaxEigenvalueAtMaterialInterface(int dir, double *Vm, in
   double c_p = vf[idp]->ComputeSoundSpeedSquare(Vp[0], e_p);
 
   if(c_p<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in LLF flux function. Vp = %e, %e, %e, %e, %e, ID = %d.\n",
             c_p, Vp[0], Vp[1], Vp[2], Vp[3], Vp[4], idp);
     exit(-1);
   } else
@@ -172,7 +172,7 @@ void FluxFcnLLF::ComputeNumericalFluxAtMaterialInterface(int dir, double *Vm, in
     EvaluateFluxFunction_H(Vm, idm, fm);
     EvaluateFluxFunction_H(Vp, idp, fp);
   } else {
-    fprintf(stderr, "*** Error: Dir. (%d) not recognized.\n", dir);
+    fprintf(stdout, "*** Error: Dir. (%d) not recognized.\n", dir);
     exit(-1);
   }
 

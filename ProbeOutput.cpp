@@ -307,7 +307,7 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
           ijk_valid[iNode].first++;
 
       if(ijk_valid[iNode].first==0) {
-        fprintf(stderr,"\033[0;31m*** Error: Location of probe node %d is too close to the edges "
+        fprintf(stdout,"\033[0;31m*** Error: Location of probe node %d is too close to the edges "
                        "of the domain boundary.\033[0m\n", iNode);
         exit(-1);
       }
