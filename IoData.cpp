@@ -1659,7 +1659,7 @@ void IcData::readUserSpecifiedIC_Planar(std::fstream &input)
                        //It must then contain 3 real numbers corresponding to the (x,y,z) coordinates
                        //of the "0" in this data file within the actual mesh
   input >> x0[0] >> x0[1] >> x0[2];
-  input.ignore(256,'\n'); //done with line 2
+  input.ignore(256,'\n'); //done with this line.
 
   // Read the next line
   input.ignore(2,' '); //This line should start with ##

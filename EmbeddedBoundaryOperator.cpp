@@ -1124,7 +1124,6 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
 
-  print("Inside ComputeForcesOnSurface2DTo3D.\n");
 
   // Collect info about the surface and intersection results
   vector<Vec3D>&  Xs(surfaces[surf].X);
@@ -1395,11 +1394,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       else 
         tgs[p][2] = 0.0;
           
-
-      fprintf(stdout,"Tri %d: tg = %e %e %e, norm = %e.\n", tid, tgs[p][0], tgs[p][1], tgs[p][2],
-              tgs[p].norm());
-
-
+//      fprintf(stdout,"Tri %d: tg = %e %e %e, norm = %e.\n", tid, tgs[p][0], tgs[p][1], tgs[p][2],
+//              tgs[p].norm());
     }
 
     // Integrate (See KW's notes for the formula)
@@ -1417,10 +1413,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   for(int i=0; i<(int)Fs.size(); i++)
     FAs[i] = An[i]==0.0 ? 0.0 : Fs[i]/An[i];
  
-
-  print("Completed ComputeForcesOnSurface2DTo3D.\n");
-
   MPI_Barrier(comm);
+
 }
 
 //------------------------------------------------------------------------------------------------
