@@ -1248,7 +1248,8 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
             double r0; //slightly larger than maximum separation
             r0 = dist2node.front().first + dist2node.back().first;
             double fd[numPoints];
-            double *rbf_weight, *interp;
+            double *rbf_weight = new double[numPoints];
+	    double *interp = new double[numPoints];
 
             //choose a radial basis function
             void (*phi)(int, double[], double, double[]); //a function pointer
@@ -1268,14 +1269,11 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
             if(iod.ic.specified[IcData::DENSITY]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::DENSITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
+              MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd, rbf_weight);
+              MathTools::rbf_interp(2, numPoints, xd, r0,
+                                    phi, rbf_weight,
+                                    1, pnode, interp);
               v[k][j][i][0] = interp[0];
-
-              delete [] rbf_weight;
-              delete [] interp;
             }
 
             if(iod.ic.specified[IcData::VELOCITY] || iod.ic.specified[IcData::RADIALVELOCITY])
@@ -1284,62 +1282,52 @@ SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** 
             if(iod.ic.specified[IcData::VELOCITY]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::VELOCITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
+              MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd, rbf_weight);
+              MathTools::rbf_interp(2, numPoints, xd, r0,
+                                    phi, rbf_weight,
+                                    1, pnode, interp);
               v[k][j][i][1] = interp[0]*dir[0]; 
               v[k][j][i][2] = interp[0]*dir[1]; 
               v[k][j][i][3] = interp[0]*dir[2];
-
-              delete [] rbf_weight;
-              delete [] interp;
             }
 
             if(iod.ic.specified[IcData::RADIALVELOCITY]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::RADIALVELOCITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
+              MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd, rbf_weight);
+              MathTools::rbf_interp(2, numPoints, xd, r0,
+                                    phi, rbf_weight,
+                                    1, pnode, interp);
               Vec3D dir2 = coords[k][j][i] - x0 - pnode[0]*dir;
               if(dir2.norm()>0)
                 dir2 /= dir2.norm();
               v[k][j][i][1] += interp[0]*dir2[0]; 
               v[k][j][i][2] += interp[0]*dir2[1]; 
               v[k][j][i][3] += interp[0]*dir2[2];
-
-              delete [] rbf_weight;
-              delete [] interp;
             }
 
             if(iod.ic.specified[IcData::PRESSURE]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::PRESSURE][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
+              MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd, rbf_weight);
+              MathTools::rbf_interp(2, numPoints, xd, r0,
+                                    phi, rbf_weight,
+                                    1, pnode, interp);
               v[k][j][i][4] = interp[0];
-
-              delete [] rbf_weight;
-              delete [] interp;
             }
 
             if(iod.ic.specified[IcData::MATERIALID]) {
               for(int i=0; i<numPoints; i++)
                 fd[i] = iod.ic.user_data[IcData::MATERIALID][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
+              MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd, rbf_weight);
+              MathTools::rbf_interp(2, numPoints, xd, r0,
+                                    phi, rbf_weight,
+                                    1, pnode, interp);
               id[k][j][i] = std::round(interp[0]);
-
-              delete [] rbf_weight;
-              delete [] interp;
             }
 
+            delete [] rbf_weight;
+            delete [] interp;
           }
 
       delete [] xy;
