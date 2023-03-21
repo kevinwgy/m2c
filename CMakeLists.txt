@@ -119,7 +119,6 @@ ClosestTriangle.cpp
 SteadyStateOperator.cpp
 GhostFluidOperator.cpp
 Utils.cpp
-MathTools/r8lib.cpp
 MathTools/rbf_interp.cpp
 MathTools/polynomial_equations.cpp
 MathTools/linear_algebra.cpp
