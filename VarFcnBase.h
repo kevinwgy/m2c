@@ -53,18 +53,18 @@ public:
     failsafe_density = data.failsafe_density;
   }
 
-  VarFcnBase(StateVariable &sv) {} //only used to construct VarFcnDummy
+  VarFcnBase() {} //only used to construct VarFcnDummy
 
   virtual ~VarFcnBase() {}
  
   //----- EOS-Specific Functions -----//
   //! get pressure from density (rho) and internal energy per unit mass (e)
-  virtual double GetPressure(double rho, double e) {
+  virtual double GetPressure([[maybe_unused]] double rho, [[maybe_unused]] double e) {
     fprintf(stdout,"\033[0;31m*** Error:  GetPressure Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
   //! get e (internal energy per unit mass) from density (rho) and pressure (p)
-  virtual double GetInternalEnergyPerUnitMass(double rho, double p) {
+  virtual double GetInternalEnergyPerUnitMass([[maybe_unused]] double rho, [[maybe_unused]] double p) {
     fprintf(stdout,"\033[0;31m*** Error:  GetInternalEnergyPerUnitMass Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
@@ -74,23 +74,23 @@ public:
     exit(-1); return 0.0;}
 
   //! get rho (density) from p (pressure) and p (internal energy per unit mass)
-  virtual double GetDensity(double p, double e) {
+  virtual double GetDensity([[maybe_unused]] double p, [[maybe_unused]] double e) {
     fprintf(stdout,"\033[0;31m*** Error:  GetDensity Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
   //! dpdrho = \frac{\partial p(\rho,e)}{\partial \rho}
-  virtual double GetDpdrho(double rho, double e) {
+  virtual double GetDpdrho([[maybe_unused]] double rho, [[maybe_unused]] double e) {
     fprintf(stdout,"\033[0;31m*** Error:  GetDpdrho Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
   //! BigGamma = 1/rho*(\frac{\partial p(\rho,e)}{\partial e})
   //  It is called "BigGamma" to distinguish it from the small "gamma" in perfect and stiffened EOS.
-  virtual double GetBigGamma(double rho, double e) {
+  virtual double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {
     fprintf(stdout,"\033[0;31m*** Error:  GetBigGamma Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
   //! temperature law, defined separately for each EOS
-  virtual double GetTemperature(double rho, double e) {
+  virtual double GetTemperature([[maybe_unused]] double rho, [[maybe_unused]] double e) {
     fprintf(stdout,"\033[0;31m*** Error:  GetTemperature Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
@@ -100,12 +100,12 @@ public:
     exit(-1); return 0.0;}
 
   //! temperature law, defined separately for each EOS
-  virtual double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {
+  virtual double GetInternalEnergyPerUnitMassFromTemperature([[maybe_unused]] double rho, [[maybe_unused]] double T) {
     fprintf(stdout,"\033[0;31m*** Error:  GetInternalEnergyPerUnitMassFromTemperature Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
   //! calculate e from rho and h
-  virtual double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) {
+  virtual double GetInternalEnergyPerUnitMassFromEnthalpy([[maybe_unused]] double rho, [[maybe_unused]] double h) {
     fprintf(stdout,"\033[0;31m*** Error:  GetInternalEnergyPerUnitMassFromEnthalpy Function not defined\n\033[0m");
     exit(-1); return 0.0;}
 
@@ -142,7 +142,7 @@ public:
   }
  
   //check for phase transitions
-  virtual bool CheckPhaseTransition(int id/*id of the other phase*/) {
+  virtual bool CheckPhaseTransition([[maybe_unused]] int id/*id of the other phase*/) {
     return false; //by default, phase transition is not allowed/considered
   }
 

@@ -944,7 +944,7 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 //-----------------------------------------------------
 
 void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R,
-                                       double time, double dt)
+                                       [[maybe_unused]] double time, [[maybe_unused]] double dt)
 {
 
 #ifdef LEVELSET_TEST
@@ -1563,8 +1563,8 @@ void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, ve
 
 //-----------------------------------------------------
 
-void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, SpaceVariable3D &Phi,
-                                                        double time, double dt)
+void LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariable3D &V, [[maybe_unused]] SpaceVariable3D &Phi,
+                                                        [[maybe_unused]] double time, [[maybe_unused]] double dt)
 {
  
 #if LEVELSET_TEST == 1

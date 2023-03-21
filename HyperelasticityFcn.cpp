@@ -134,7 +134,7 @@ HyperelasticityFcnSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBa
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnSaintVenantKirchhoff::GetCauchyStressTensor(double *F, double *V, double *sigma)
+HyperelasticityFcnSaintVenantKirchhoff::GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma)
 {
 
   MathTools::LinearAlgebra::CalculateATransposeA3x3(F,M3x3); //M(C) = F'F: right Cauchy-Green def. tensor
@@ -180,7 +180,7 @@ HyperelasticityFcnModifiedSaintVenantKirchhoff(HyperelasticityModelData &hyper, 
 
 void
 HyperelasticityFcnModifiedSaintVenantKirchhoff::GetCauchyStressTensor(double *F, 
-                                                                      double *V, double *sigma)
+                                                                      [[maybe_unused]] double *V, double *sigma)
 {
 
   MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
@@ -225,7 +225,7 @@ HyperelasticityFcnNeoHookean(HyperelasticityModelData &hyper, VarFcnBase &vf_)
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, double *V, double *sigma)
+HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma)
 {
 
   MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
@@ -281,7 +281,7 @@ HyperelasticityFcnMooneyRivlin(HyperelasticityModelData &hyper, VarFcnBase &vf_)
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, double *V, double *sigma)
+HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma)
 {
 
   MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor

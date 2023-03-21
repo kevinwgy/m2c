@@ -98,7 +98,7 @@ SahaEquationSolver::~SahaEquationSolver()
 
 void
 SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne, 
-                          map<int, vector<double> >& alpha_rj, double* lambD)
+                          map<int, vector<double> >& alpha_rj, [[maybe_unused]] double* lambD)
 {
   //nh = T>0 ? v[4]/(kb*T) : 0; //for dummy solver, there may not be a temperature law --> T = 0
 

@@ -144,7 +144,7 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
 }
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
+void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, SpaceVariable3D &V, 
                                    SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
                                    SpaceVariable3D *L, SpaceVariable3D *Xi)
 {

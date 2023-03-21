@@ -232,8 +232,7 @@ private:
   void ComputeErrorsInLaserDomain(double*** lold, double*** lnew, double &max_error, double &avg_error);
 
   void RunMeanFluxMethodOneIteration(double*** l, double*** T, Vec3D*** coords, Vec3D*** 
-                                     dxyz, double*** vol, double*** id, double*** level, double*** phi,
-                                     double alpha, double relax);
+                                     dxyz, double*** vol, double*** id, double alpha, double relax);
 
   void ComputeLaserHeating(double*** l, double*** T, double*** id, double*** s);
 

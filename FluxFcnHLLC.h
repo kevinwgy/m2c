@@ -21,7 +21,7 @@ private:
 
 public:
 
-  FluxFcnHLLC(std::vector<VarFcnBase*> &varFcn, IoData &iod) : FluxFcnBase(varFcn) 
+  FluxFcnHLLC(std::vector<VarFcnBase*> &varFcn, [[maybe_unused]] IoData &iod) : FluxFcnBase(varFcn) 
     {eps = 1e-10;} //!< Hard-coded for the moment. If needed, can be made a user input (IoData)
     
   ~FluxFcnHLLC() {}

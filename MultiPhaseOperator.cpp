@@ -2155,7 +2155,7 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
 //-----------------------------------------------------
 
 void
-MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
+MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, [[maybe_unused]] double*** id,
                                                       vector<Intersector*> *intersector,
                                                       vector<std::pair<Int3,bool> > &neighbors)
 {

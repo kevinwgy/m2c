@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.10)
 project(M2C VERSION 1.0)
 
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # build type
@@ -17,7 +17,7 @@ SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
 
 # compiler flags (turn on most of the warnings, except unused variables and parameters
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-reorder -Wno-unused-parameter")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-reorder")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 

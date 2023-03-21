@@ -869,7 +869,7 @@ EmbeddedBoundaryOperator::ApplyUserDefinedSurfaceDynamics(double t, double dt)
     vector<Vec3D> &Xs(surfaces[surf].X);
     vector<Vec3D> &X0(surfaces[surf].X0);
     vector<Vec3D> disp(Xs.size(), 0.0);
-    calculator->GetUserDefinedDynamics(t, disp.size(), (double*)X0.data(), (double*)Xs.data(),
+    calculator->GetUserDefinedDynamics(t, dt, disp.size(), (double*)X0.data(), (double*)Xs.data(),
                                        (double*)disp.data(), (double*)surfaces[surf].Udot.data());
     for(int i=0; i<(int)Xs.size(); i++) {
       for(int j=0; j<3; j++)
@@ -1064,7 +1064,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
         if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
           tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
         else 
-          tg[p] += CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
+          tg[p] += CalculateTractionAtPoint(xg, normal, v, id); 
 
       }
 
@@ -1212,7 +1212,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         if(status[tid]==side+1) //this side faces the interior of a solid body 
           tgs[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
         else 
-          tgs[p] += CalculateTractionAtPoint(xg, side, normal, n, Xs, v, id); 
+          tgs[p] += CalculateTractionAtPoint(xg, normal, v, id); 
 
         //fprintf(stdout,"tid = %d tgs[%d] = %e %e %e (%e).\n", tid, p, tgs[p][0], tgs[p][1], tgs[p][2], tgs[p].norm());
 
@@ -1440,11 +1440,9 @@ EmbeddedBoundaryOperator::CalculateLoftingHeight(Vec3D &p, double factor)
 }
 
 //------------------------------------------------------------------------------------------------
-
+// Calculates the one-sided traction from the side indicated by "normal"
 Vec3D
-EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, int side, 
-                                                   Vec3D &normal, Int3 &tnodes, vector<Vec3D> &Xs, 
-                                                   Vec5D*** v, double*** id)
+EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, Vec3D &normal, Vec5D*** v, double*** id)
 {
   //int mpi_rank;
   //MPI_Comm_rank(comm, &mpi_rank);

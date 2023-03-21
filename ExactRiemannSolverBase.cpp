@@ -517,7 +517,7 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 
   void
 ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm, 
-    double rhol, double ul, double pl, int idl, double ustar,
+    double rhol, double ul, double pl, int idl, 
     double rhol2, double u2/*ustar*/, double p2,
     bool trans_rare, double Vrare_x0[3], /*inputs*/
     double *Vs, int &id, double *Vsm /*outputs*/)
@@ -1060,9 +1060,10 @@ myLabel:
 
 //----------------------------------------------------------------------------------
 
-  int
-ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl, double el, double cl, int idl,
-    double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
+int
+ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl,
+    [[maybe_unused]] double el, double cl, int idl,
+    double rhor, double ur, double pr, [[maybe_unused]] double er, double cr, int idr, /*inputs*/
     double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0, 
     double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/)
 {
@@ -1116,7 +1117,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, d
 
   int
 ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticTheory(double rhol, double ul, 
-    double pl, double el, double cl, int idl, double ustar,
+    double pl, [[maybe_unused]] double el, double cl, int idl, double ustar,
     double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1)
 {
 
@@ -1581,8 +1582,8 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 //----------------------------------------------------------------------------------
 //! Connect the left initial state with the left star state (the 1-wave) --- for one-sided Riemann problem
 //! where the solution contains a rarefaction (not a shock).
-  bool  //true: success  | false: failure
-ExactRiemannSolverBase::ComputeOneSidedRarefaction(double rho, double u, double p, double e,
+bool  //true: success  | false: failure
+ExactRiemannSolverBase::ComputeOneSidedRarefaction(double rho, double u, double p, [[maybe_unused]] double e,
     double c, int id, double us/*inputs*/,
     double &rhos, double &ps/*outputs*/, 
     bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
@@ -1976,7 +1977,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 
   // A Trivial Case
   if(fabs(ul-ustar)<1.0e-20) {
-    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol, ul, pl, trans_rare, Vrare_x0, //inputs
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol, ul, pl, trans_rare, Vrare_x0, //inputs
 	Vs, id, Vsm/*outputs*/);
     return 0;
   }
@@ -2010,7 +2011,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 
     // success!
     //
-    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
 	Vs, id, Vsm);
     return 0;
 
@@ -2057,7 +2058,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
       return 1;
     }
 
-    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p1, trans_rare, Vrare_x0, /*inputs*/
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol2, ustar, p1, trans_rare, Vrare_x0, /*inputs*/
 	Vs, id, Vsm);
     return 1;
   }
@@ -2168,7 +2169,7 @@ try_again:
   // -------------------------------
   // Step 3: Find state at xi = x = 0 (for output)
   // -------------------------------
-  FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
+  FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
       Vs, id, Vsm);
 
   if(iter == maxIts_main) {

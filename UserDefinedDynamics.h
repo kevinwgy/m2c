@@ -17,7 +17,7 @@ public:
   UserDefinedDynamics() {}
   virtual ~UserDefinedDynamics() {}
 
-  virtual void GetUserDefinedDynamics(double time, int nNodes, double *X0, double *X,//these are inputs
+  virtual void GetUserDefinedDynamics(double time, double dt, int nNodes, double *X0, double *X,//these are inputs
                                        double *disp, double *velo/*output*/) = 0;
 
 };

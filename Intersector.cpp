@@ -1492,8 +1492,8 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 
   double dist;
   Vec3D xi; //barycentric coords of the projection point
-  for(int i=0; i<nTri; i++) {
-    int id = tri[i].trId();
+  for(int iTri=0; iTri<nTri; iTri++) {
+    int id = tri[iTri].trId();
     Int3& nodes(Es[id]);
     bool found = GeoTools::LineSegmentIntersectsTriangle(x0, dir, len, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
                                                          &dist, NULL, &xi);

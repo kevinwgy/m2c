@@ -291,7 +291,7 @@ public:
   PointIn2D() {}
   PointIn2D(int i, Vec2D xin) {id = i; x = xin;}
   double val(int i) const {return x[i];}
-  double width(int i) const {return 0.0;}
+  double width([[maybe_unused]] int i) const {return 0.0;}
   int pid() const {return id;}
 };
 

@@ -136,8 +136,8 @@ private:
 
   double CalculateLoftingHeight(Vec3D &p, double factor);
 
-  Vec3D CalculateTractionAtPoint(Vec3D &p, int side/*0 or 1*/, Vec3D &normal/*towards the "side"*/, 
-                                 Int3 &tnodes, vector<Vec3D> &Xs, Vec5D*** v, double*** id);
+  //! Compute one-sided traction from the "side" indicated by "normal"
+  Vec3D CalculateTractionAtPoint(Vec3D &p, Vec3D &normal/*towards the "side"*/, Vec5D*** v, double*** id);
 
 };
 

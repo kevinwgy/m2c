@@ -2011,7 +2011,6 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double
   double*** vol   = volume->GetDataPointer();
   double*** id    = ID->GetDataPointer();
   double*** level = Level.GetDataPointer();
-  double*** phi   = Phi.GetDataPointer();
 
 
   bool success = true;
@@ -2041,7 +2040,7 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double
     CopyValues(l, l0); //l0 = l
 
     //-----------------------------------------------------------------
-    RunMeanFluxMethodOneIteration(l, T, coords, dxyz, vol, id, level, phi, 
+    RunMeanFluxMethodOneIteration(l, T, coords, dxyz, vol, id,
                                   alpha, relax_coeff);
     //-----------------------------------------------------------------
 
@@ -2079,7 +2078,6 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double
   volume->RestoreDataPointerToLocalVector(); 
   ID->RestoreDataPointerToLocalVector();
   Level.RestoreDataPointerToLocalVector();
-  Phi.RestoreDataPointerToLocalVector();
 
 
   if(success)
@@ -2094,7 +2092,6 @@ LaserAbsorptionSolver::ComputeLaserRadianceMeanFluxMethod(const double t, double
 void
 LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, Vec3D*** coords, 
                                                      Vec3D*** dxyz, double*** vol, double*** id, 
-                                                     double*** level, double*** phi, 
                                                      double alpha, double relax)
 {
   auto it = sortedNodes.begin() + queueCounter[0];

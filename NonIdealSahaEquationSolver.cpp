@@ -40,7 +40,7 @@ NonIdealSahaEquationSolver::~NonIdealSahaEquationSolver()
 //--------------------------------------------------------------------------
 
 double 
-NonIdealSahaEquationSolver::ComputeDeltaI(int r, int j, double T, double nh, double zav,
+NonIdealSahaEquationSolver::ComputeDeltaI(int r, [[maybe_unused]] int j, double T, double nh, double zav,
                                           double one_over_lambD)
 {
 

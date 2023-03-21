@@ -56,7 +56,7 @@ public:
   inline double GetInternalEnergyPerUnitMass(double rho, double p) {return invgam1*(p+gam_pc)*(1.0/rho-b) + q;}
   inline double GetDensity(double p, double e) {return 1.0/(gam1*(e-q)/(p+gam_pc) + b);}
   inline double GetDpdrho(double rho, double e) {double V = 1.0/rho; return gam1*V*V*(e-q)/((V-b)*(V-b));}
-  inline double GetBigGamma(double rho, double e) {return gam1/(1.0 - b*rho);}
+  inline double GetBigGamma(double rho, [[maybe_unused]] double e) {return gam1/(1.0 - b*rho);}
 
   inline double GetTemperature(double rho, double e) {return invcv*(e - q - pc*(1.0/rho - b));}
 

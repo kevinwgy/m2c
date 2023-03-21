@@ -63,10 +63,12 @@ public:
   virtual ~TimeIntegratorBase();
 
   //! Integrate the ODE system for one time-step. Implemented in derived classes
-  virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                  vector<SpaceVariable3D*> &Phi,
-                                  SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
-                                  double time, double dt, int time_step, int subcycle, double dts) {
+  virtual void AdvanceOneTimeStep([[maybe_unused]] SpaceVariable3D &V, [[maybe_unused]] SpaceVariable3D &ID, 
+                                  [[maybe_unused]] vector<SpaceVariable3D*> &Phi,
+                                  [[maybe_unused]] SpaceVariable3D *L, [[maybe_unused]] SpaceVariable3D *Xi,
+                                  [[maybe_unused]] SpaceVariable3D *LocalDt,
+                                  [[maybe_unused]] double time, [[maybe_unused]] double dt, [[maybe_unused]] int time_step,
+                                  [[maybe_unused]] int subcycle, [[maybe_unused]] double dts) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
 

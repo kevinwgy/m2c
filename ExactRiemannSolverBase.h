@@ -129,7 +129,7 @@ protected: //internal functions
                                   double &rhos, double &ps/*outputs*/,
                                   bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/);
 
-  void FinalizeOneSidedSolution(double *dir, double *Vm, double rhol, double ul, double pl, int idl, double ustar,
+  void FinalizeOneSidedSolution(double *dir, double *Vm, double rhol, double ul, double pl, int idl,
                                 double rhol2, double u2/*ustar*/, double p2,
                                 bool trans_rare, double Vrare_x0[3], /*inputs*/
                                 double *Vs, int &id, double *Vsm /*outputs*/);

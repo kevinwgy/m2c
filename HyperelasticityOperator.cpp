@@ -221,15 +221,15 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
   interpolator.InterpolateAtCellInterfaces(2/*z-dir*/, V, i123, V_k_minus_half, i012); 
 
   //2. Calculate Xi derivatives at cell interfaces
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 0, V, i123, dXidx_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 1, V, i123, dXidx_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(0, 2, V, i123, dXidx_k_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 0, V, i123, dXidy_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 1, V, i123, dXidy_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(1, 2, V, i123, dXidy_k_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 0, V, i123, dXidz_i_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 1, V, i123, dXidz_j_minus_half, i012);
-  grad.CalculateFirstDerivativeAtCellInterfaces(2, 2, V, i123, dXidz_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 0, Xi, i012, dXidx_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 1, Xi, i012, dXidx_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 2, Xi, i012, dXidx_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 0, Xi, i012, dXidy_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 1, Xi, i012, dXidy_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 2, Xi, i012, dXidy_k_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 0, Xi, i012, dXidz_i_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 1, Xi, i012, dXidz_j_minus_half, i012);
+  grad.CalculateFirstDerivativeAtCellInterfaces(2, 2, Xi, i012, dXidz_k_minus_half, i012);
 
   //3. Loop through cell interfaces and calculate fluxes
   Vec3D*** dxidx_i = (Vec3D***)dXidx_i_minus_half.GetDataPointer();

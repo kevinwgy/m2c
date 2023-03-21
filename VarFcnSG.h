@@ -64,8 +64,8 @@ public:
   inline double GetPressure(double rho, double e) {return gam1*rho*e - gam*Pstiff;}
   inline double GetInternalEnergyPerUnitMass(double rho, double p) {return (p+gam*Pstiff)/(gam1*rho);}
   inline double GetDensity(double p, double e) {return (p+gam*Pstiff)/(gam1*e);}
-  inline double GetDpdrho(double rho, double e) {return gam1*e;}
-  inline double GetBigGamma(double rho, double e) {return gam1;}
+  inline double GetDpdrho([[maybe_unused]] double rho, double e) {return gam1*e;}
+  inline double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {return gam1;}
 
   inline double GetTemperature(double rho, double e) {
     if(use_cv_advanced) { //Method 3

@@ -51,7 +51,7 @@ public:
   HyperelasticityFcnBase(VarFcnBase &vf_) : vf(vf_), type(NONE) {}
   virtual ~HyperelasticityFcnBase() {}
 
-  virtual void GetCauchyStressTensor(double *F, double *V, double *sigma) { //!< V: state var.
+  virtual void GetCauchyStressTensor([[maybe_unused]] double *F, [[maybe_unused]] double *V, double *sigma) { //!< V: state var.
     for(int i=0; i<6; i++)
       sigma[i] = 0.0;
   }

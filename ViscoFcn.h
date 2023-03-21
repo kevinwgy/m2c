@@ -32,35 +32,41 @@ public:
   virtual ~ViscoFcnBase() {}
 
   //! Get viscosity coefficients (may depend on state variable and even local mesh resolution)
-  virtual double GetMu(double* V3 = NULL, double rho = 0.0, double p = 0.0,
-                       double div = 0.0, double h = 0.0) {return 0.0;}
-  virtual double GetLambda(double* V3 = NULL, double rho = 0.0, double p = 0.0,
-                           double div = 0.0, double h = 0.0) {return 0.0;}
+  virtual double GetMu([[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                       [[maybe_unused]] double div = 0.0, [[maybe_unused]] double h = 0.0) {return 0.0;}
+  virtual double GetLambda([[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                           [[maybe_unused]] double div = 0.0, [[maybe_unused]] double h = 0.0) {return 0.0;}
 
   //! Compute the stress tensor components
 
-  virtual double GetTauXX(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL, 
-                          double rho = 0.0, double p = 0.0, double* h = NULL) {
+  virtual double GetTauXX([[maybe_unused]] double* dVdx, [[maybe_unused]] double* dVdy, [[maybe_unused]] double* dVdz,
+                          [[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                          [[maybe_unused]] double* h = NULL) {
     return 0.0;}
 
-  virtual double GetTauXY(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                          double rho = 0.0, double p = 0.0, double* h = NULL) {
+  virtual double GetTauXY([[maybe_unused]] double* dVdx, [[maybe_unused]] double* dVdy, [[maybe_unused]] double* dVdz,
+                          [[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                          [[maybe_unused]] double* h = NULL) {
     return 0.0;}
 
-  virtual double GetTauXZ(double* dVdx, double* dVdy, double* dVdz, double* V3= NULL,
-                          double rho = 0.0, double p = 0.0, double* h = NULL) {
+  virtual double GetTauXZ([[maybe_unused]] double* dVdx, [[maybe_unused]] double* dVdy, [[maybe_unused]] double* dVdz, 
+                          [[maybe_unused]] double* V3= NULL, [[maybe_unused]] double rho = 0.0,  [[maybe_unused]] double p = 0.0,
+                          [[maybe_unused]] double* h = NULL) {
     return 0.0;}
 
-  virtual double GetTauYY(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                          double rho = 0.0, double p = 0.0, double* h = NULL) {
+  virtual double GetTauYY([[maybe_unused]] double* dVdx, [[maybe_unused]] double* dVdy, [[maybe_unused]] double* dVdz,
+                          [[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                          [[maybe_unused]] double* h = NULL) {
     return 0.0;}
 
-  virtual double GetTauYZ(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                          double rho = 0.0, double p = 0.0, double* h = NULL) {
+  virtual double GetTauYZ([[maybe_unused]] double* dVdx, [[maybe_unused]] double* dVdy, [[maybe_unused]] double* dVdz,
+                          [[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                          [[maybe_unused]] double* h = NULL) {
     return 0.0;}
 
-  virtual double GetTauZZ(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                          double rho = 0.0, double p = 0.0, double* h = NULL) {
+  virtual double GetTauZZ([[maybe_unused]] double* dVdx, [[maybe_unused]] double* dVdy, [[maybe_unused]] double* dVdz,
+                          [[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                          [[maybe_unused]] double* h = NULL) {
     return 0.0;}
 
 
@@ -136,43 +142,43 @@ public:
   }
   ~ViscoFcnConstant() {}
 
-  inline double GetMu(double* V3 = NULL, double rho = 0.0, double p = 0.0,
-                      double div = 0.0, double h = 0.0) {return dyna;}
+  inline double GetMu([[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                      [[maybe_unused]] double div = 0.0, [[maybe_unused]] double h = 0.0) {return dyna;}
 
-  inline double GetLambda(double* V3 = NULL, double rho = 0.0, double p = 0.0,
-                          double div = 0.0, double h = 0.0) {return bulk-2.0/3.0*dyna;}
+  inline double GetLambda([[maybe_unused]] double* V3 = NULL, [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0,
+                          [[maybe_unused]] double div = 0.0, [[maybe_unused]] double h = 0.0) {return bulk-2.0/3.0*dyna;}
 
   //! Compute the stress tensor components
 
-  inline double GetTauXX(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL, 
-                         double rho = 0.0, double p = 0.0, double* h = NULL) {
+  inline double GetTauXX(double* dVdx, double* dVdy, double* dVdz, [[maybe_unused]] double* V3 = NULL, 
+                         [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0, [[maybe_unused]] double* h = NULL) {
     double div = dVdx[0]+dVdy[1]+dVdz[2];
     return bulk*div + dyna*(2.0*dVdx[0] - 2.0/3.0*div);
   }
 
-  inline double GetTauXY(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                         double rho = 0.0, double p = 0.0, double* h = NULL) {
+  inline double GetTauXY(double* dVdx, double* dVdy, [[maybe_unused]] double* dVdz, [[maybe_unused]] double* V3 = NULL,
+                         [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0, [[maybe_unused]] double* h = NULL) {
     return dyna*(dVdx[1]+dVdy[0]);
   }
 
-  inline double GetTauXZ(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                         double rho = 0.0, double p = 0.0, double* h = NULL) {
+  inline double GetTauXZ(double* dVdx, [[maybe_unused]] double* dVdy, double* dVdz, [[maybe_unused]] double* V3 = NULL,
+                         [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0, [[maybe_unused]] double* h = NULL) {
     return dyna*(dVdx[2]+dVdz[0]);
   }
 
-  inline double GetTauYY(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                         double rho = 0.0, double p = 0.0, double* h = NULL) {
+  inline double GetTauYY(double* dVdx, double* dVdy, double* dVdz, [[maybe_unused]] double* V3 = NULL,
+                         [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0, [[maybe_unused]] double* h = NULL) {
     double div = dVdx[0]+dVdy[1]+dVdz[2];
     return bulk*div + dyna*(2.0*dVdy[1] - 2.0/3.0*div);
   }
  
-  inline double GetTauYZ(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                         double rho = 0.0, double p = 0.0, double* h = NULL) {
+  inline double GetTauYZ([[maybe_unused]] double* dVdx, double* dVdy, double* dVdz, [[maybe_unused]] double* V3 = NULL,
+                         [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0, [[maybe_unused]] double* h = NULL) {
     return dyna*(dVdy[2]+dVdz[1]);
   }
 
-  inline double GetTauZZ(double* dVdx, double* dVdy, double* dVdz, double* V3 = NULL,
-                         double rho = 0.0, double p = 0.0, double* h = NULL) {
+  inline double GetTauZZ(double* dVdx, double* dVdy, double* dVdz, [[maybe_unused]] double* V3 = NULL,
+                         [[maybe_unused]] double rho = 0.0, [[maybe_unused]] double p = 0.0, [[maybe_unused]] double* h = NULL) {
     double div = dVdx[0]+dVdy[1]+dVdz[2];
     return bulk*div + dyna*(2.0*dVdz[2] - 2.0/3.0*div);
   }
@@ -201,39 +207,39 @@ public:
   //! Compute the stress tensor components
 
   inline double GetTauXX(double* dVdx, double* dVdy, double* dVdz, double* V3,
-                         double rho, double p, double* h = NULL) { //V3 is not used
+                         double rho, double p, [[maybe_unused]] double* h = NULL) { //V3 is not used
     double dyna = GetMu(V3,rho,p);
     double div = dVdx[0]+dVdy[1]+dVdz[2];
     return bulk*div + dyna*(2.0*dVdx[0] - 2.0/3.0*div);
   }
 
-  inline double GetTauXY(double* dVdx, double* dVdy, double* dVdz, double* V3,
-                         double rho, double p, double* h = NULL) { //V3 is not used
+  inline double GetTauXY(double* dVdx, double* dVdy, [[maybe_unused]] double* dVdz, double* V3,
+                         double rho, double p, [[maybe_unused]] double* h = NULL) { //V3 is not used
     double dyna = GetMu(V3,rho,p);
     return dyna*(dVdx[1]+dVdy[0]);
   }
 
-  inline double GetTauXZ(double* dVdx, double* dVdy, double* dVdz, double* V3,
-                         double rho, double p, double* h = NULL) { //V3 is not used
+  inline double GetTauXZ(double* dVdx, [[maybe_unused]] double* dVdy, double* dVdz, double* V3,
+                         double rho, double p, [[maybe_unused]] double* h = NULL) { //V3 is not used
     double dyna = GetMu(V3,rho,p);
     return dyna*(dVdx[2]+dVdz[0]);
   }
 
   inline double GetTauYY(double* dVdx, double* dVdy, double* dVdz, double* V3,
-                         double rho, double p, double* h = NULL) { //V3 is not used
+                         double rho, double p, [[maybe_unused]] double* h = NULL) { //V3 is not used
     double dyna = GetMu(V3,rho,p);
     double div = dVdx[0]+dVdy[1]+dVdz[2];
     return bulk*div + dyna*(2.0*dVdy[1] - 2.0/3.0*div);
   }
  
-  inline double GetTauYZ(double* dVdx, double* dVdy, double* dVdz, double* V3,
-                         double rho, double p, double* h = NULL) { //V3 is not used
+  inline double GetTauYZ([[maybe_unused]] double* dVdx, double* dVdy, double* dVdz, double* V3,
+                         double rho, double p, [[maybe_unused]] double* h = NULL) { //V3 is not used
     double dyna = GetMu(V3,rho,p);
     return dyna*(dVdy[2]+dVdz[1]);
   }
 
   inline double GetTauZZ(double* dVdx, double* dVdy, double* dVdz, double* V3,
-                         double rho, double p, double* h = NULL) { //V3 is not used
+                         double rho, double p, [[maybe_unused]] double* h = NULL) { //V3 is not used
     double dyna = GetMu(V3,rho,p);
     double div = dVdx[0]+dVdy[1]+dVdz[2];
     return bulk*div + dyna*(2.0*dVdz[2] - 2.0/3.0*div);
@@ -241,13 +247,13 @@ public:
 
 
 
-  inline double GetMu(double* V3, double rho, double p, double div = 0.0, double h = 0.0) {
+  inline double GetMu([[maybe_unused]] double* V3, double rho, double p, [[maybe_unused]] double div = 0.0, [[maybe_unused]] double h = 0.0) {
     assert(rho>0);
     double T = vf.GetTemperature(rho,p);
     return mu0*pow(T/T0,1.5)*(T0+Smu)/(T+Smu);
   }
   
-  inline double GetLambda(double* V3, double rho, double p, double div = 0.0, double h = 0.0) {
+  inline double GetLambda(double* V3, double rho, double p, [[maybe_unused]] double div = 0.0, [[maybe_unused]] double h = 0.0) {
     return bulk - 2.0/3.0*GetMu(V3,rho,p);
   }
 
@@ -325,7 +331,7 @@ public:
 
 
 
-  inline double GetMu(double* V3, double rho, double p, double div, double h) { //V3 not used
+  inline double GetMu([[maybe_unused]] double* V3, double rho, double p, double div, double h) { //V3 not used
     assert(h>0.0 && rho>0.0);
     double e = vf.GetInternalEnergyPerUnitMass(rho,p);
     double c = vf.ComputeSoundSpeed(rho, e);

@@ -897,7 +897,7 @@ LevelSetReinitializer::PopulatePhiG2(SpaceVariable3D &Phi0, vector<Int3> *useful
 //Eq.(21a) of Hartmann et al., 2008, simplified
 double
 LevelSetReinitializer::DifferentiateInFirstLayer(double x0, double x1, double x2, 
-                                                 double tag0, double tag1, double tag2,
+                                                 double tag0, [[maybe_unused]] double tag1, double tag2,
                                                  double phi0, double phi1, double phi2, 
                                                  double phi00, double phi3, double eps)
 {

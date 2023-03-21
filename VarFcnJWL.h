@@ -50,7 +50,7 @@ public:
   inline double GetInternalEnergyPerUnitMass(double rho, double p) {return (p-Fun(rho))/(omega*rho);}
   inline double GetDensity(double p, double e); 
   inline double GetDpdrho(double rho, double e); 
-  inline double GetBigGamma(double rho, double e) {return omega;}
+  inline double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {return omega;}
 
 protected:
   inline double Fun(double rho) {

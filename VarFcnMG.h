@@ -72,13 +72,13 @@ public:
 
   inline double GetDensity(double p, double e);
 
-  inline double GetDpdrho(double rho, double e){
+  inline double GetDpdrho(double rho, [[maybe_unused]] double e){
     double eta = 1.0 - rho0/rho;
     double S = 1.0 - s*eta;
     return rho0_c0_c0*(1.0 + (s - Gamma0)*eta)/(S*S*S)*rho0/(rho*rho);
   }
 
-  inline double GetBigGamma(double rho, double e) {return Gamma0_rho0/rho;}
+  inline double GetBigGamma(double rho, [[maybe_unused]] double e) {return Gamma0_rho0/rho;}
 
   inline double GetTemperature(double rho, double e);
 

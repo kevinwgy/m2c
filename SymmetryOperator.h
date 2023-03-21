@@ -19,6 +19,8 @@
 
 class SymmetryOperator
 {
+  MPI_Comm& comm;
+
   MeshData& iod_mesh;
 
   vector<VarFcnBase*>& varFcn;

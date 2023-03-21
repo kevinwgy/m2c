@@ -18,7 +18,7 @@ class FluxFcnLLF : public FluxFcnBase {
 
 public:
 
-  FluxFcnLLF(std::vector<VarFcnBase*> &varFcn, IoData &iod) : FluxFcnBase(varFcn) { } 
+  FluxFcnLLF(std::vector<VarFcnBase*> &varFcn, [[maybe_unused]] IoData &iod) : FluxFcnBase(varFcn) { } 
     
   ~FluxFcnLLF() {}
 

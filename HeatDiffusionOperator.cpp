@@ -89,7 +89,7 @@ HeatDiffusionOperator::Destroy()
 // Add diffusion fluxes on the left hand side of the N-S equations
 void
 HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                          [[maybe_unused]] vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                           SpaceVariable3D &R)
 {
 
