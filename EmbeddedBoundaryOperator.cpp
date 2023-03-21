@@ -1266,10 +1266,13 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   CommunicationTools::GatherArray<double>(comm, worker, my_shared_data, all_shared_data);
  
 
+  // ---------------------------------
   if(mpi_rank != worker) {
     MPI_Barrier(comm); //not necessary
     return;
   }
+  // ---------------------------------
+
 
   //Proc 0 deals with duplicates. (In the case of lofting, it is possible that the
   //two sides of a Gauss point are computed by two different processors!)
@@ -1280,12 +1283,22 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   }
 
 
+
   // -----------------------------------------------------------
   // Step 3: Proc 0 builds a KDTree (K=2) and performs
   //         interpolation
   // -----------------------------------------------------------
 
   int Nsamples = all_data.size()/4;
+  if(Nsamples==0) {
+    fprintf(stdout,"\033[0;31m*** Error: No Gauss points are located inside the fluid domain.\033[0m\n");
+    exit(-1);
+  } else if(Nsamples<std::min(20.0, Es.size()/200.0)) {
+    fprintf(stdout,"\033[0;35mWarning: Only %d Gauss points are inside the fluid domain. "
+                   "Load may be inaccurate.\033[0m\n", Nsamples);
+  }
+
+
   vector<PointIn2D> samples;
   samples.reserve(Nsamples);
   for(int i=0; i<Nsamples; i++)
@@ -1297,11 +1310,11 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   int maxCand = numPoints*25;
   PointIn2D candidates[maxCand];
 
-/*
-  for(int sam=0; sam<Nsamples; sam++)
-    fprintf(stdout,"%d: tg = %e %e, norm = %e.\n", sam, all_data[4*sam+2], all_data[4*sam+3],
-            sqrt(all_data[4*sam+2]*all_data[4*sam+2] + all_data[4*sam+3]*all_data[4*sam+3]));
-*/
+
+//  for(int sam=0; sam<Nsamples; sam++)
+//    fprintf(stdout,"%d: tg = %e %e, norm = %e.\n", sam, all_data[4*sam+2], all_data[4*sam+3],
+//            sqrt(all_data[4*sam+2]*all_data[4*sam+2] + all_data[4*sam+3]*all_data[4*sam+3]));
+
    
   // for each triangle, calculates traction vector tg
   for(int tid=0; tid<(int)Es.size(); tid++) {

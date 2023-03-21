@@ -77,6 +77,7 @@ int main(int argc, char* argv[])
     SpecialToolsDriver special_tools_driver(iod, comm, concurrent);
     special_tools_driver.Run();
     concurrent.Destroy();
+    MPI_Finalize();
     return 0;
   }
   /*******************************************************/
