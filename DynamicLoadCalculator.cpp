@@ -474,9 +474,10 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
       for(int i=0; i<numPoints; i++) 
         fd[i] = S[dist2node[i].second][col+dim];
  
-      double *rbf_weight, *interp;
-      rbf_weight = MathTools::rbf_weight(3, numPoints, xd, r0, phi, fd);
-      interp = MathTools::rbf_interp(3, numPoints, xd, r0, phi, rbf_weight, 1, pnode);
+      double *rbf_weight = new double[numPoints];
+      double *interp = new double[numPoints];
+      MathTools::rbf_weight(3, numPoints, xd, r0, phi, fd, rbf_weight);
+      MathTools::rbf_interp(3, numPoints, xd, r0, phi, rbf_weight, 1, pnode, interp);
 
       output[var_dim*index + dim] = interp[0]; 
 
