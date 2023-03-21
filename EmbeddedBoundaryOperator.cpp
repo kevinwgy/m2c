@@ -734,12 +734,11 @@ void
 EmbeddedBoundaryOperator::ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
 
-/*
   V.StoreMeshCoordinates(*coordinates_ptr);
   V.WriteToVTRFile("V.vtr","sol");
   ID.StoreMeshCoordinates(*coordinates_ptr);
   ID.WriteToVTRFile("ID.vtr","ID");
-*/
+
 
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id = ID.GetDataPointer();
@@ -1362,8 +1361,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         double r0; //smaller than maximum separation, larger than typical separation
         r0 = 5.0*(dist2xg.front().first + dist2xg.back().first);
         double fd[numPoints];
-        double *rbf_weight = new double[numPoints];
-	double *interp = new double[numPoints];
+        double *rbf_weight, *interp;
 
         // interpolation (inverse multiquadric function)
         tgs[p] = 0.0;
@@ -1372,13 +1370,13 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
           for(int i=0; i<numPoints; i++)
             fd[i] = all_data[4*dist2xg[i].second+2+comp];
 
-          MathTools::rbf_weight(2, numPoints, xd, r0, MathTools::phi2, fd, rbf_weight);
-          MathTools::rbf_interp(2, numPoints, xd, r0, MathTools::phi2, rbf_weight, 1, xg2d, interp);
+          rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, MathTools::phi2, fd);
+          interp = MathTools::rbf_interp(2, numPoints, xd, r0, MathTools::phi2, rbf_weight, 1, xg2d);
           tgs[p][comp] = interp[0];
 
+          delete [] rbf_weight; //rbf_weight(...) and rbf_interp(...) allocates memory... 
+          delete [] interp;
         } 
-        delete [] rbf_weight;
-        delete [] interp;
       }
 
 
