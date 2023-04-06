@@ -101,7 +101,7 @@ inline double GetNormalAndAreaOfTriangle(Vec3D& xA, Vec3D& xB, Vec3D& xC,
                                          Vec3D& dir)
 {
   Vec3D ABC = 0.5*(xB-xA)^(xC-xA); //cross product
-  double area= ABC.norm();
+  double area = ABC.norm();
   assert(area != 0.0);
   dir = 1.0/area*ABC;
   return area;
@@ -148,8 +148,8 @@ double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi
  *     - Usually, you should avoid getting/using the "sign" of the returned value, as it has
  *        a sharp discontinuity when a point moves across the plane at a point outside the triange.
  *     - If you do not care about the sign of the returned value, the order of A, B, C, and
- *       the orientation of "dir" do not matter. But be careful, the returned value may
- *       be negative, if "return_signed_distance" is (mistakenly) turned on.
+ *       the orientation of "dir" do not matter. But be careful, if "return_signed_distance" is
+ *       mistakenly turned on, the returned value may be negative.
  *     - If you care about the sign of the returned value, xA, xB, xC have to be ordered
  *       such that the normal of the triangle can be determined based on the right-hand rule.
  *       This is the case even if you explicitly specify "dir".
@@ -157,6 +157,37 @@ double ProjectPointToPlane(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi
 double ProjectPointToTriangle(Vec3D& x0, Vec3D& xA, Vec3D& xB, Vec3D& xC, double xi[3],
                               double* area = NULL, Vec3D* dir = NULL, 
                               bool return_signed_distance = false);
+
+
+
+/**************************************************************************
+ * Project a point onto a parallelogram. Find the closest point to the point
+ *   Inputs:
+ *     x0 -- the point
+ *     xA -- coords of one vertex of the parallelogram
+ *     AB, AC -- the two edges that have xA as a vertex (vector)
+ *     area (optional) -- area of the parallelogram 
+ *     dir (optional) -- unit normal direction of the parallelogram 
+ *     return_signed_distance -- whether the returned distance is the signed distance or
+ *                               just the magnitude (usually it should be the latter)
+ *   Outputs:
+ *     xi[2] -- coordinates of the closest point. Specifically,
+ *              the point is at xA + xi[0]*AB + xi[1]*AC. Both coords are in [0, 1]
+ *     return value -- Distance from the point to the parallelogram, unsigned by default
+ *   Note:
+ *     - Usually, you should avoid getting/using the "sign" of the returned value, as it has
+ *        a sharp discontinuity when a point moves across the plane at a point outside the parallelogram
+ *     - If you do not care about the sign of the returned value, the order of AB and AC and
+ *       the orientation of "dir" do not matter. But be careful, if "return_signed_distance" is
+ *       mistakenly turned on, the returned value may be negative.
+ *     - If you care about the sign of the returned value, AB and AC must be ordered
+ *       such that the normal of the triangle can be determined based on the right-hand rule.
+ *       This is the case even if you explicitly specify "dir".
+ */
+double ProjectPointToParallelogram(Vec3D& x0, Vec3D& xA, Vec3D& AB, Vec3D& AC, double xi[2],
+                                   double* area = NULL, Vec3D* dir = NULL,
+                                   bool return_signed_distance = false);
+
 
 
 /**************************************************************************

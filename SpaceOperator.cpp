@@ -10,6 +10,7 @@
 #include <Vector5D.h>
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
+#include <DistancePointToParallelepiped.h>
 #include <EmbeddedBoundaryDataSet.h>
 #include <EmbeddedBoundaryOperator.h>
 #include <algorithm> //std::upper_bound
@@ -731,6 +732,12 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     print(comm, "- Applying initial condition on one side of a plane (material id: %d).\n\n", 
           it->second->initialConditions.materialid);
+
+    if(it->second->inclusion != PlaneData::OVERRIDE) {
+      print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
@@ -756,6 +763,17 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     print(comm, "- Applying initial condition within a cylinder-cone (material id: %d).\n\n",
           it->second->initialConditions.materialid);
+
+    if(it->second->side != CylinderConeData::INTERIOR) {
+      print_error("*** Error: Initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != CylinderConeData::OVERRIDE) {
+      print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
@@ -789,6 +807,17 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     print(comm, "- Applying initial condition within a cylinder-sphere (material id: %d).\n\n",
           it->second->initialConditions.materialid);
+
+    if(it->second->side != CylinderSphereData::INTERIOR) {
+      print_error("*** Error: Initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != CylinderSphereData::OVERRIDE) {
+      print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
@@ -833,6 +862,17 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     print(comm, "- Applying initial condition within a sphere (material id: %d).\n\n",
           it->second->initialConditions.materialid);
+
+    if(it->second->side != SphereData::INTERIOR) {
+      print_error("*** Error: Initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != SphereData::OVERRIDE) {
+      print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     double dist;
     for(int k=k0; k<kmax; k++)
@@ -850,12 +890,67 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
         }
   }
 
+  // parallelepipeds
+  for(auto it=ic.parallelepipedMap.dataMap.begin(); it!=ic.parallelepipedMap.dataMap.end(); it++) {
+
+    print(comm, "- Applying initial condition within a parallelepiped (material id: %d).\n\n",
+          it->second->initialConditions.materialid);
+
+    if(it->second->side != ParallelepipedData::INTERIOR) {
+      print_error("*** Error: Initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != ParallelepipedData::OVERRIDE) {
+      print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    Vec3D x0(it->second->x0, it->second->y0, it->second->z0);
+    Vec3D aa(it->second->ax, it->second->ay, it->second->az);
+    Vec3D bb(it->second->bx, it->second->by, it->second->bz);
+    Vec3D cc(it->second->cx, it->second->cy, it->second->cz);
+
+    if(aa.norm()==0 || bb.norm()==0 || cc.norm()==0 || (aa^bb)*cc<=0.0) {
+      print_error("*** Error: Detected error in a user-specified parallelepiped.\n");
+      exit_mpi();
+    }
+
+    GeoTools::DistanceFromPointToParallelepiped distCal(x0, aa, bb, cc);
+
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          if (dist<0) {
+            v[k][j][i][0] = it->second->initialConditions.density;
+            v[k][j][i][1] = it->second->initialConditions.velocity_x;
+            v[k][j][i][2] = it->second->initialConditions.velocity_y;
+            v[k][j][i][3] = it->second->initialConditions.velocity_z;
+            v[k][j][i][4] = it->second->initialConditions.pressure;
+            id[k][j][i]   = it->second->initialConditions.materialid;
+          }
+        }
+  } 
+
 
   // spheroids 
   for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
 
     print(comm, "- Applying initial condition within a spheroid (material id: %d).\n\n",
           it->second->initialConditions.materialid);
+
+    if(it->second->side != SpheroidData::INTERIOR) {
+      print_error("*** Error: Initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != SpheroidData::OVERRIDE) {
+      print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
     GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
@@ -880,6 +975,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     print(comm, "- Applying initial condition within a user-specified enclosure (material id: %d).\n\n",
           enclosure.second->initialConditions.materialid);
+
+    if(enclosure.second->inclusion != UserSpecifiedEnclosureData::OVERRIDE) {
+      print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
 
     coordinates.RestoreDataPointerToLocalVector();
 
@@ -935,6 +1035,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
       print(comm, "- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
             it->second->x, it->second->y, it->second->z, it->second->initialConditions.materialid);
+
+      if(it->second->inclusion != PointData::OVERRIDE) {
+        print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
 
       id2closure.insert(ApplyPointBasedInitialCondition(*it->second, *EBDS, color, v, id));
     }

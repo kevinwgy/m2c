@@ -1262,8 +1262,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   // -----------------------------------------------------------
   int worker = 0;
   vector<double> all_data, all_shared_data;
-  CommunicationTools::GatherArray<double>(comm, worker, my_data, all_data);
-  CommunicationTools::GatherArray<double>(comm, worker, my_shared_data, all_shared_data);
+  CommunicationTools::GatherArray<double>(comm, worker, my_data, &all_data);
+  CommunicationTools::GatherArray<double>(comm, worker, my_shared_data, &all_shared_data);
  
 
   // ---------------------------------
@@ -1335,7 +1335,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       int nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
       int trial_counter = 0;
       while(nFound<numPoints || nFound>maxCand) {
-        if(trial_counter>5) {
+        if(trial_counter>10) {
           fprintf(stdout,"\033[0;31m*** Error: Cannot find candidates for interpolation "
                          "(ComputeForces, 2D->3D).\033[0m\n");
           exit(-1);
@@ -1343,7 +1343,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         if(nFound<numPoints) 
           search_radius *= 2.0;
         else //nFound>maxCand
-          search_radius /= 2.0;
+          search_radius /= 1.8;
         nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
         trial_counter++;
       }

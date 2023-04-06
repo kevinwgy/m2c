@@ -8,8 +8,8 @@
 
 #include <cstdio>
 #include <map>
-#include "parser/Assigner.h"
-#include "parser/Dictionary.h"
+#include <parser/Assigner.h>
+#include <parser/Dictionary.h>
 #include <Vector2D.h>
 #include <Vector3D.h>
 #include <Utils.h>
@@ -78,6 +78,9 @@ struct StateVariable {
 struct PointData {
 
   double x,y,z;
+
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
   StateVariable initialConditions;
 
   PointData();
@@ -91,6 +94,9 @@ struct PointData {
 struct PlaneData {
 
   double cen_x, cen_y, cen_z, nx, ny, nz;
+
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
   StateVariable initialConditions;
 
   PlaneData();
@@ -101,9 +107,34 @@ struct PlaneData {
 
 //------------------------------------------------------------------------------
 
+struct ParallelepipedData {
+
+  double x0, y0, z0; //!< point 1
+
+  double ax, ay, az; //!< axis 1 and its length
+  double bx, by, bz; //!< axis 2 and its length
+  double cx, cy, cz; //!< axis 3 and its length
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  StateVariable initialConditions;
+
+  ParallelepipedData();
+  ~ParallelepipedData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
 struct SphereData {
 
   double cen_x, cen_y, cen_z, radius;
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
   StateVariable initialConditions;
 
   SphereData();
@@ -119,6 +150,9 @@ struct SpheroidData {
   double cen_x, cen_y, cen_z;
   double axis_x, axis_y, axis_z;
   double length, diameter;
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
   StateVariable initialConditions;
 
@@ -136,6 +170,9 @@ struct CylinderConeData {
   double cen_x, cen_y, cen_z, nx, ny, nz, r, L;
   //! info about the cone (connected to the top of the cylinder)
   double opening_angle_degrees, cone_height;
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
  
   StateVariable initialConditions;
 
@@ -155,6 +192,9 @@ struct CylinderSphereData {
   OnOff front_cap;
   OnOff back_cap;
 
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
   StateVariable initialConditions;
 
   CylinderSphereData();
@@ -170,6 +210,8 @@ struct UserSpecifiedEnclosureData {
   const char *surface_filename; //!< surface mesh that contains one or multiple enclosures
   double surface_thickness; //!< artificial thickness of the surface
 
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
   StateVariable initialConditions;
 
   UserSpecifiedEnclosureData();
@@ -182,11 +224,12 @@ struct UserSpecifiedEnclosureData {
 
 struct MultiInitialConditionsData {
 
-  ObjectMap<PointData>    pointMap;
-  ObjectMap<PlaneData>    planeMap;
-  ObjectMap<SphereData>   sphereMap;
-  ObjectMap<SpheroidData> spheroidMap;
-  ObjectMap<CylinderConeData> cylinderconeMap;
+  ObjectMap<PointData>          pointMap;
+  ObjectMap<PlaneData>          planeMap;
+  ObjectMap<SphereData>         sphereMap;
+  ObjectMap<ParallelepipedData> parallelepipedMap;
+  ObjectMap<SpheroidData>       spheroidMap;
+  ObjectMap<CylinderConeData>   cylinderconeMap;
   ObjectMap<CylinderSphereData> cylindersphereMap;
 
   ObjectMap<UserSpecifiedEnclosureData> enclosureMap;
@@ -483,9 +526,10 @@ struct EquationsData {
 
 struct FixData {
 
-  ObjectMap<SphereData>   sphereMap;
-  ObjectMap<SpheroidData> spheroidMap;
-  ObjectMap<CylinderConeData> cylinderconeMap;
+  ObjectMap<SphereData>         sphereMap;
+  ObjectMap<ParallelepipedData> parallelepipedMap;
+  ObjectMap<SpheroidData>       spheroidMap;
+  ObjectMap<CylinderConeData>   cylinderconeMap;
   ObjectMap<CylinderSphereData> cylindersphereMap;
 
   FixData();

@@ -5,6 +5,7 @@
 
 #include <Reconstructor.h>
 #include <DistancePointToSpheroid.h>
+#include <DistancePointToParallelepiped.h>
 #include <memory> //std::unique_ptr
 using std::round;
 
@@ -30,6 +31,7 @@ Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, Reconstru
   }
 
   if(iod_rec.fixes.sphereMap.dataMap.empty() &&
+     iod_rec.fixes.parallelepipedMap.dataMap.empty() &&
      iod_rec.fixes.spheroidMap.dataMap.empty() &&
      iod_rec.fixes.cylindersphereMap.dataMap.empty() &&
      iod_rec.fixes.cylinderconeMap.dataMap.empty())
@@ -144,6 +146,11 @@ void Reconstructor::TagNodesFixedByUser()
     print(comm, "- Applying constant reconstruction within sphere %d:\n", it->first);
     print(comm, "  o center: %e %e %e;  radius: %e.\n", x0[0], x0[1], x0[2], it->second->radius);
 
+    if(it->second->side != SphereData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
     double dist;
     // loop through the subdomain interior (i.e. No tags applied to ghost nodes outside physical domain)
     for(int k=k0; k<kmax; k++)
@@ -155,6 +162,42 @@ void Reconstructor::TagNodesFixedByUser()
         } 
   }
 
+  // parallelepipeds
+  for(auto it=iod_rec.fixes.parallelepipedMap.dataMap.begin(); 
+          it!=iod_rec.fixes.parallelepipedMap.dataMap.end(); it++) {
+  
+    Vec3D x0(it->second->x0, it->second->y0, it->second->z0);
+    Vec3D aa(it->second->ax, it->second->ay, it->second->az);
+    Vec3D bb(it->second->bx, it->second->by, it->second->bz);
+    Vec3D cc(it->second->cx, it->second->cy, it->second->cz);
+
+    print(comm, "- Applying constant reconstruction within parallelepiped %d:\n", it->first);
+    print(comm, "  o origin: %e %e %e;  edge 1: %e %e %e.\n", x0[0], x0[1], x0[2], aa[0], aa[1], aa[2]);
+    print(comm, "  o edge 2: %e %e %e;  edge 3: %e %e %e.\n", bb[0], bb[1], bb[2], cc[0], cc[1], cc[2]);
+
+    if(aa.norm()==0 || bb.norm()==0 || cc.norm()==0 || (aa^bb)*cc<=0.0) {
+      print_error(comm, "*** Error: Detected error in a user-specified parallelepiped.\n");
+      exit_mpi();
+    }
+
+    if(it->second->side != ParallelepipedData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    GeoTools::DistanceFromPointToParallelepiped distCal(x0, aa, bb, cc);
+
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          if (dist<0)
+            fixed[k][j][i] = 1;
+        }
+  }   
+
+
   // spheroids
   for(auto it=iod_rec.fixes.spheroidMap.dataMap.begin(); 
           it!=iod_rec.fixes.spheroidMap.dataMap.end(); it++) {
@@ -165,6 +208,11 @@ void Reconstructor::TagNodesFixedByUser()
     print(comm, "- Applying constant reconstruction within spheroid %d:\n", it->first);
     print(comm, "  o center: %e %e %e;  axis: %e %e %e.\n", x0[0], x0[1], x0[2], axis[0], axis[1], axis[2]);
     print(comm, "  o length: %e;  diameter: %e.\n", it->second->length, it->second->diameter);
+
+    if(it->second->side != SpheroidData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
 
     GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
 
@@ -198,6 +246,11 @@ void Reconstructor::TagNodesFixedByUser()
     print(comm, "  o cylinder height %e;  radius: %e;  openning angle: %e.\n", 
           L, R, it->second->opening_angle_degrees);
 
+    if(it->second->side != CylinderConeData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
     double x, r;
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)
@@ -228,6 +281,11 @@ void Reconstructor::TagNodesFixedByUser()
     print(comm, "  o cylinder center: %e %e %e;  axis: %e %e %e.\n", 
           x0[0], x0[1], x0[2], dir[0], dir[1], dir[2]);
     print(comm, "  o cylinder height %e;  radius: %e.\n", L, R);
+
+    if(it->second->side != CylinderSphereData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
 
     Vec3D xf = x0 + Lhalf*dir;
     Vec3D xb = x0 - Lhalf*dir;

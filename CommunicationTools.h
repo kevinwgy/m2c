@@ -21,7 +21,7 @@ public:
 
   template<typename T>
   static void GatherArray(MPI_Comm& comm, int gatherer, std::vector<T>& my_data,
-                          std::vector<T>& all_data);
+                          std::vector<T>* all_data_ptr);
 
 };
 

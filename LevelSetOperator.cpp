@@ -7,6 +7,7 @@
 #include <SpaceOperator.h>
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
+#include <DistancePointToParallelepiped.h>
 #include <GradientCalculatorFD3.h>
 #include <EmbeddedBoundaryDataSet.h>
 #include <EmbeddedBoundaryOperator.h>
@@ -317,6 +318,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
 
+    if(it->second->inclusion != PlaneData::OVERRIDE) {
+      print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
@@ -336,6 +342,16 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
+
+    if(it->second->side != CylinderConeData::INTERIOR) {
+      print_error("*** Error: Level set initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != CylinderConeData::OVERRIDE) {
+      print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
 
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
@@ -393,6 +409,17 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
+
+    if(it->second->side != CylinderSphereData::INTERIOR) {
+      print_error("*** Error: Level set initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != CylinderSphereData::OVERRIDE) {
+      print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
 
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
@@ -464,6 +491,16 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
 
+    if(it->second->side != SphereData::INTERIOR) {
+      print_error("*** Error: Level set initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != SphereData::OVERRIDE) {
+      print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     double dist;
 
@@ -477,11 +514,61 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
   }
 
 
+  // parallelepipeds 
+  for(auto it=ic.parallelepipedMap.dataMap.begin(); it!=ic.parallelepipedMap.dataMap.end(); it++) {
+
+    if(it->second->initialConditions.materialid != materialid)
+      continue; //not the right one
+
+    if(it->second->side != ParallelepipedData::INTERIOR) {
+      print_error("*** Error: Level set initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != ParallelepipedData::OVERRIDE) {
+      print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    Vec3D x0(it->second->x0, it->second->y0, it->second->z0);
+    Vec3D aa(it->second->ax, it->second->ay, it->second->az);
+    Vec3D bb(it->second->bx, it->second->by, it->second->bz);
+    Vec3D cc(it->second->cx, it->second->cy, it->second->cz);
+
+    if(aa.norm()==0 || bb.norm()==0 || cc.norm()==0 || (aa^bb)*cc<=0.0) {
+      print_error("*** Error: Detected error in a user-specified parallelepiped.\n");
+      exit_mpi();
+    }
+
+    GeoTools::DistanceFromPointToParallelepiped distCal(x0, aa, bb, cc);
+
+    double dist;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          if(fabs(dist)<fabs(phi[k][j][i]))
+            phi[k][j][i] = dist; //>0 outside the spheroid
+        }
+  }
+
+
   // spheroids
   for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
 
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
+
+    if(it->second->side != SpheroidData::INTERIOR) {
+      print_error("*** Error: Level set initialization only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->inclusion != SpheroidData::OVERRIDE) {
+      print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
 
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
@@ -505,6 +592,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
     if(enclosure.second->initialConditions.materialid != materialid)
       continue; //not the right one
+
+    if(enclosure.second->inclusion != UserSpecifiedEnclosureData::OVERRIDE) {
+      print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
 
     Phi.RestoreDataPointerAndInsert();
     coordinates.RestoreDataPointerToLocalVector();

@@ -8,13 +8,14 @@
 #include<Vector2D.h>
 #include<Vector3D.h>
 #include<Vector5D.h>
+#include<cassert>
 
 //------------------------------------------------------------------------------
 
 template<typename T>
 void
 CommunicationTools::GatherArray(MPI_Comm& comm, int gatherer, std::vector<T>& my_data,
-                                std::vector<T>& all_data)
+                                std::vector<T>* all_data_ptr)
 {
   // figure out the data type
   int multiplier = 1;
@@ -66,15 +67,17 @@ CommunicationTools::GatherArray(MPI_Comm& comm, int gatherer, std::vector<T>& my
 
   // talk again
   if(mpi_rank == gatherer) { //receiver
-    all_data.resize(counter/multiplier);
+    assert(all_data_ptr);
+    all_data_ptr->resize(counter/multiplier);
     if(double_or_int) 
-      MPI_Gatherv((double*)my_data.data(), my_data_count, MPI_DOUBLE, (double*)all_data.data(), counts.data(),
+      MPI_Gatherv((double*)my_data.data(), my_data_count, MPI_DOUBLE, (double*)all_data_ptr->data(), counts.data(),
                   displacements.data(), MPI_DOUBLE, gatherer, comm);
     else
-      MPI_Gatherv((int*)my_data.data(), my_data_count, MPI_INT, (int*)all_data.data(), counts.data(),
+      MPI_Gatherv((int*)my_data.data(), my_data_count, MPI_INT, (int*)all_data_ptr->data(), counts.data(),
                   displacements.data(), MPI_INT, gatherer, comm);
   } else {//sender
-    all_data.clear();
+    //if(all_data_ptr)
+    //  all_data_ptr->clear();
     if(double_or_int) 
       MPI_Gatherv((double*)my_data.data(), my_data_count, MPI_DOUBLE, NULL, NULL,
                   NULL, MPI_DOUBLE, gatherer, comm);
@@ -90,7 +93,7 @@ CommunicationTools::GatherArray(MPI_Comm& comm, int gatherer, std::vector<T>& my
 template void
 CommunicationTools::GatherArray<double>(MPI_Comm& comm, int gatherer,
                                         std::vector<double>& my_data,
-                                        std::vector<double>& all_data);
+                                        std::vector<double>* all_data_ptr);
 
 //------------------------------------------------------------------------------
 
