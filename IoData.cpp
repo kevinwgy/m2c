@@ -737,6 +737,62 @@ void MieGruneisenModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+TillotsonModelData::TillotsonModelData()
+{
+  // default values are for water. See Aaron Brundage (2013), Table 1
+
+  rho0 = 0.998e-3;     //unit: g/mm^3
+  e0   = 7.0e12;       //unit: mm^2/s^2 = 1.0e-9 J/g = 1.0e-2 erg/g
+  a = 0.7;
+  b = 0.15;
+  A = 2.18e9;          //unit: Pa
+  B = 1.325e10;        //unit: Pa
+  alpha = 10;
+  beta  = 5;
+
+  rhoIV = 0.958e-3;    //unit: g/mm^3
+  eIV   = 4.19e11;     //unit: mm^2/s^2
+  eCV   = 2.5e12;      //unit: mm^2/s^2
+
+  cv    = 3.69e9;      //unit: mm^2/(s^2.K)
+  T0    = 0.0;         //unit: K
+  temperature_depends_on_density = YES;
+
+}
+
+//------------------------------------------------------------------------------
+
+void TillotsonModelData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 14, father);
+
+  new ClassDouble<TillotsonModelData>(ca, "ReferenceDensity", this, &TillotsonModelData::rho0);
+  new ClassDouble<TillotsonModelData>(ca, "ReferenceSpecificInternalEnergy", this, &TillotsonModelData::e0);
+  new ClassDouble<TillotsonModelData>(ca, "a", this, &TillotsonModelData::a);
+  new ClassDouble<TillotsonModelData>(ca, "b", this, &TillotsonModelData::b);
+  new ClassDouble<TillotsonModelData>(ca, "A", this, &TillotsonModelData::A);
+  new ClassDouble<TillotsonModelData>(ca, "B", this, &TillotsonModelData::B);
+  new ClassDouble<TillotsonModelData>(ca, "Alpha", this, &TillotsonModelData::alpha);
+  new ClassDouble<TillotsonModelData>(ca, "Beta", this, &TillotsonModelData::beta);
+ 
+  new ClassDouble<TillotsonModelData>(ca, "IncipientVaporizationDensity", this, &TillotsonModelData::rhoIV);
+  new ClassDouble<TillotsonModelData>(ca, "IncipientVaporizationSpecificInternalEnergy", this, &TillotsonModelData::eIV);
+  new ClassDouble<TillotsonModelData>(ca, "CompleteVaporizationSpecificInternalEnergy", this, &TillotsonModelData::eCV);
+ 
+  
+
+  new ClassDouble<TillotsonModelData>(ca, "SpecificHeatAtConstantVolume", this, &TillotsonModelData::cv);
+  new ClassDouble<TillotsonModelData>(ca, "ReferenceTemperature", this, &TillotsonModelData::T0);
+
+  new ClassToken<TillotsonModelData>(ca, "TemperatureDependsOnDensity", this,
+                 reinterpret_cast<int TillotsonModelData::*>(&TillotsonModelData::temperature_depends_on_density), 2,
+                 "No", 0, "Yes", 1);
+
+}
+
+//------------------------------------------------------------------------------
+
 JonesWilkinsLeeModelData::JonesWilkinsLeeModelData() 
 {
   //default values are for the gaseous products of TNT (Page 21 of Arthur Rallu's thesis)
@@ -875,13 +931,14 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 15, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
-                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 5,
+                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 6,
                                  "StiffenedGas", MaterialModelData::STIFFENED_GAS, 
                                  "NobleAbelStiffenedGas", MaterialModelData::NOBLE_ABEL_STIFFENED_GAS, 
                                  "MieGruneisen", MaterialModelData::MIE_GRUNEISEN,
+                                 "Tillotson", MaterialModelData::TILLOTSON,
                                  "JonesWilkinsLee", MaterialModelData::JWL,
                                  "ANEOSBirchMurnaghanDebye", MaterialModelData::ANEOS_BIRCH_MURNAGHAN_DEBYE);
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
@@ -894,6 +951,7 @@ Assigner *MaterialModelData::getAssigner()
   sgModel.setup("StiffenedGasModel", ca);
   nasgModel.setup("NobleAbelStiffenedGasModel", ca);
   mgModel.setup("MieGruneisenModel", ca);
+  tillotModel.setup("TillotsonModel", ca);
   jwlModel.setup("JonesWilkinsLeeModel", ca);
   abmdModel.setup("ANEOSBirchMurnaghanDebyeModel", ca);
 

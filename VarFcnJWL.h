@@ -12,8 +12,8 @@
 using namespace boost::math::tools;
 
 /********************************************************************************
- * This class is the VarFcn class for the JWL EOS in Euler
- * Equations. Only elementary functions are declared and/or defined here.
+ * This class is the VarFcn class for the JWL equation of state (EOS)
+ * Only elementary functions are declared and/or defined here.
  * All arguments must be pertinent to only a single grid node or a single
  * state.
  *

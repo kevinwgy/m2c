@@ -10,8 +10,8 @@
 #include <fstream>
 
 /********************************************************************************
- * This class is the VarFcn class for the Mie-Gruneisen EOS in Euler
- * Equations. Only elementary functions are declared and/or defined here.
+ * This class is the VarFcn class for the Mie-Gruneisen equation of state (EOS)
+ * Only elementary functions are declared and/or defined here.
  * All arguments must be pertinent to only a single grid node or a single
  * state.
  *

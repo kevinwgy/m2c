@@ -352,6 +352,31 @@ struct MieGruneisenModelData {
 
 //------------------------------------------------------------------------------
 
+struct TillotsonModelData {
+
+  double rho0; //!< density in the ambient state
+  double e0;   //!< internal energy (per unit mass) in the ambient state
+  double a, b; //!< non-D model parameters. (a+b/4: Gruneisen param in ambient state; a+b: ... at low T (e=0))
+  double A, B; //!< dim: [force]/[length]^2. (A: bulk modulus at p = 0 and e = 0)
+  double alpha, beta; //!< non-D model parameters (in the formula for "hot expanded states")
+
+  double rhoIV; //!< "incipient vaporization" density (constant model param.)
+  double eIV;   //!< "incipient vaporization" internal energy (constant model param.)
+  double eCV;   //!< "complete vaporization" internal energy (constant model param.) (eCV-eIV: latent heat per unit mass)
+
+  double cv; //!< specific heat at constant volume
+  enum YesNo {NO = 0, YES = 1} temperature_depends_on_density; //!< whether T depends on both rho and e, or just e.
+  double T0; //!< temperature at rho0 and e0.
+
+  TillotsonModelData();
+  ~TillotsonModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+  
+};
+
+//------------------------------------------------------------------------------
+
 struct JonesWilkinsLeeModelData {
 
   double omega;
@@ -459,7 +484,7 @@ struct MaterialModelData {
 
   int id;
   enum EOS {STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, 
-            JWL = 3, ANEOS_BIRCH_MURNAGHAN_DEBYE = 4} eos;
+            TILLOTSON = 3, JWL = 4, ANEOS_BIRCH_MURNAGHAN_DEBYE = 5} eos;
   double rhomin;
   double pmin;
   double rhomax;
@@ -470,6 +495,7 @@ struct MaterialModelData {
   StiffenedGasModelData             sgModel;
   NobleAbelStiffenedGasModelData    nasgModel;
   MieGruneisenModelData             mgModel;
+  TillotsonModelData                tillotModel;
   JonesWilkinsLeeModelData          jwlModel;
   ANEOSBirchMurnaghanDebyeModelData abmdModel;
 
