@@ -88,7 +88,7 @@ public:
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-inline
+
 VarFcnNASG::VarFcnNASG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::NOBLE_ABEL_STIFFENED_GAS){

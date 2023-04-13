@@ -94,7 +94,7 @@ public:
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-inline
+
 VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::MIE_GRUNEISEN){
@@ -123,6 +123,12 @@ VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
   rho0_c0_c0 = rho0*c0*c0;
   Gamma0_over_2 = 0.5*Gamma0;
   Gamma0_rho0 = Gamma0*rho0;
+
+  if(rho0<=0.0 || c0<=0.0 || Gamma0<=0.0 || s<=0.0 || e0<=0.0) {
+    fprintf(stdout, "*** Error: VarFcnMG detected non-positive rho0 (%e), c0 (%e), "
+                    "Gamma0 (%e), s (%e), or e0 (%e).\n", rho0, c0, Gamma0, s, e0);
+    exit(-1);
+  }
 }
 
 //------------------------------------------------------------------------------

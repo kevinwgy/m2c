@@ -48,8 +48,8 @@ public:
   //! ----- EOS-Specific Functions -----
   inline double GetPressure(double rho, double e) {return omega*rho*e + Fun(rho);}
   inline double GetInternalEnergyPerUnitMass(double rho, double p) {return (p-Fun(rho))/(omega*rho);}
-  inline double GetDensity(double p, double e); 
-  inline double GetDpdrho(double rho, double e); 
+  double GetDensity(double p, double e); 
+  double GetDpdrho(double rho, double e); 
   inline double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {return omega;}
 
 protected:
@@ -79,7 +79,7 @@ protected:
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-inline
+
 VarFcnJWL::VarFcnJWL(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::JWL){
@@ -105,7 +105,6 @@ VarFcnJWL::VarFcnJWL(MaterialModelData &data) : VarFcnBase(data) {
 
 //------------------------------------------------------------------------------
 
-inline
 double VarFcnJWL::GetDensity(double p, double e) 
 {
 
@@ -131,7 +130,6 @@ double VarFcnJWL::GetDensity(double p, double e)
 
 //------------------------------------------------------------------------------
 
-inline 
 double VarFcnJWL::GetDpdrho(double rho, double e) 
 {
   return  omega*e 

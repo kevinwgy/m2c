@@ -368,6 +368,9 @@ struct TillotsonModelData {
   enum YesNo {NO = 0, YES = 1} temperature_depends_on_density; //!< whether T depends on both rho and e, or just e.
   double T0; //!< temperature at rho0 and e0.
 
+  double cp; //!< specific heat at constant pressure
+  double h0; //!< specific enthalpy corresponding to T0 (only used if T is calculated using cp)
+
   TillotsonModelData();
   ~TillotsonModelData() {}
 

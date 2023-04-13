@@ -111,7 +111,7 @@ public:
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-inline
+
 VarFcnSG::VarFcnSG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::STIFFENED_GAS){

@@ -9,6 +9,7 @@
 #include<VarFcnANEOSBase.h>
 #include<polylogarithm_function.h>
 #include<tuple>
+#include<boost/math/tools/roots.hpp>
 #include<boost/math/interpolators/cubic_b_spline.hpp>  //spline interpolation
 
 extern double avogadro_number;
@@ -58,7 +59,7 @@ public:
   VarFcnANEOSEx1(MaterialModelData &data);
   ~VarFcnANEOSEx1();
 
-  inline double GetPressure(double rho, double e);
+  double GetPressure(double rho, double e);
   double GetInternalEnergyPerUnitMass(double rho, double p);
   double GetDensity(double p, double e);
   //double GetDpdrho(double rho, double e);   //!< Using finite difference, defined in base class
@@ -94,13 +95,13 @@ private:
     return R_over_w*(1.125*Theta + 3.0*T*EvaluateDebyeFunction(Theta/T));}
 
   //! calculate F_l(rho,T)
-  inline double ComputeThermalSpecificHelmholtz(double rho, double T) {
+  double ComputeThermalSpecificHelmholtz(double rho, double T) {
     double Theta = ComputeDebyeTemperature(rho);   assert(T>0);
     double Theta_over_T = Theta/T;
     return R_over_w*(1.125*Theta + 3.0*T*log(1.0-exp(-Theta_over_T)) - T*EvaluateDebyeFunction(Theta_over_T));}
 
   //! calculates dF_l(rho,T)/drho
-  inline double ComputeThermalSpecificHelmholtzDerivativeRho(double rho, double T) {
+  double ComputeThermalSpecificHelmholtzDerivativeRho(double rho, double T) {
     double ThetaPrime = ComputeDebyeTemperatureDerivative(rho);
     double Theta_over_T = ComputeDebyeTemperature(rho)/T;
     assert(Theta_over_T>0);
@@ -123,23 +124,23 @@ private:
     return -3.0/x*EvaluateDebyeFunction(x) + 3.0*expmx/(1.0-expmx);}
 
   //! evaluate Debye function D(x) on the fly
-  inline double EvaluateDebyeFunctionOnTheFly(double x);
+  double EvaluateDebyeFunctionOnTheFly(double x);
   
   //! evaluate Debye function D(x) by spline interpolation
-  inline double EvaluateDebyeFunctionByInterpolation(double x);
+  double EvaluateDebyeFunctionByInterpolation(double x);
 
   //! build spline interpolation for Debye function D(x)
   void InitializeInterpolationForDebyeFunction(double expmx_min, double expmx_max, int sample_size);
 
   //! Update rho_e_T
-  inline void Update_rho_e_T(double rho, double e, double T) {
+  void Update_rho_e_T(double rho, double e, double T) {
     for(int i=0; i<(int)rho_e_T.size()-1; i++)
       rho_e_T[i] = rho_e_T[i+1];
     rho_e_T.back() = std::make_tuple(rho,e,T);
   }
 
   //! Update rho_e_p_T
-  inline void Update_rho_e_p_T(double rho, double e, double p, double T) {
+  void Update_rho_e_p_T(double rho, double e, double p, double T) {
     for(int i=0; i<(int)rho_e_p_T.size()-1; i++)
       rho_e_p_T[i] = rho_e_p_T[i+1];
     rho_e_p_T.back() = std::make_tuple(rho,e,p,T);
@@ -203,7 +204,7 @@ protected:
       e_cold_prime = vf->ComputeColdSpecificEnergyDerivative(rho);
     }
 
-    inline double operator() (double T) {
+    double operator() (double T) {
       assert(T>0.0);
       double Theta_over_T = Theta/T;
       double el = (vf->R_over_w)*(1.125*Theta + 3.0*T*(vf->EvaluateDebyeFunction(Theta_over_T)));
@@ -277,7 +278,7 @@ VarFcnANEOSEx1::~VarFcnANEOSEx1()
 
 //---------------------------------------------------------------------
 //! Compute pressure: p = rho*rho*(\partial F(rho,T))/(\partial rho)
-inline double 
+double 
 VarFcnANEOSEx1::GetPressure(double rho, double e) 
 {
   double T = GetTemperature(rho, e);
@@ -351,9 +352,9 @@ VarFcnANEOSEx1::GetDensity(double p, double e)
   for(auto&& mytuple : rho_e_p_T)
     if(std::get<1>(mytuple) == e && std::get<2>(mytuple) == p)
       return std::get<0>(mytuple);
-
-  //TODO: This function is not really needed... (KW)
   
+  //TODO: This function is not really needed at the moment. Therefore, it is not implemented
+
   fprintf(stdout,"\033[0;31m*** Error: Implementation of VarFcnANEOSEx1::GetDensity is incomplete.\n\033[0m");
   exit(-1); 
   return 0.0;
@@ -498,7 +499,7 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
 
 //---------------------------------------------------------------------
 //! evaluate Debye function D(x) on the fly
-inline double 
+double 
 VarFcnANEOSEx1::EvaluateDebyeFunctionOnTheFly(double x) 
 {
   assert(x>0.0); 
@@ -512,7 +513,7 @@ VarFcnANEOSEx1::EvaluateDebyeFunctionOnTheFly(double x)
 
 //---------------------------------------------------------------------
 //! evaluate Debye function D(x) by spline interpolation
-inline double
+double
 VarFcnANEOSEx1::EvaluateDebyeFunctionByInterpolation(double x) 
 {
   assert(x>0.0); 

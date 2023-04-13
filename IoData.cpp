@@ -701,7 +701,7 @@ MieGruneisenModelData::MieGruneisenModelData()
   s = 1.5;              // non-dimensional
   e0 = 0.0;         
 
-  cv = 3.90e8;          // unit: mm2/(s2.K)
+  cv = 0.0; //3.90e8;   // unit: mm2/(s2.K)
   cp = 0.0;
   h0 = 0.0;
   T0 = 0.0;
@@ -754,10 +754,12 @@ TillotsonModelData::TillotsonModelData()
   eIV   = 4.19e11;     //unit: mm^2/s^2
   eCV   = 2.5e12;      //unit: mm^2/s^2
 
-  cv    = 3.69e9;      //unit: mm^2/(s^2.K)
+  cv    = 0.0; //3.69e9;      //unit: mm^2/(s^2.K)
   T0    = 0.0;         //unit: K
-  temperature_depends_on_density = YES;
+  temperature_depends_on_density = NO;
 
+  cp    = 0.0;
+  h0    = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -765,7 +767,7 @@ TillotsonModelData::TillotsonModelData()
 void TillotsonModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 14, father);
+  ClassAssigner *ca = new ClassAssigner(name, 16, father);
 
   new ClassDouble<TillotsonModelData>(ca, "ReferenceDensity", this, &TillotsonModelData::rho0);
   new ClassDouble<TillotsonModelData>(ca, "ReferenceSpecificInternalEnergy", this, &TillotsonModelData::e0);
@@ -788,6 +790,11 @@ void TillotsonModelData::setup(const char *name, ClassAssigner *father)
   new ClassToken<TillotsonModelData>(ca, "TemperatureDependsOnDensity", this,
                  reinterpret_cast<int TillotsonModelData::*>(&TillotsonModelData::temperature_depends_on_density), 2,
                  "No", 0, "Yes", 1);
+
+  new ClassDouble<TillotsonModelData>(ca, "SpecificHeatAtConstantPressure", this,
+                                      &TillotsonModelData::cp);
+  new ClassDouble<TillotsonModelData>(ca, "ReferenceSpecificEnthalpy", this,
+                                      &TillotsonModelData::h0);
 
 }
 
