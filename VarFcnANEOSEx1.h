@@ -328,9 +328,9 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMass(double rho, double p)
 
   boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
   double tol = tol_Debye*T_low; 
-  std::pair<double,double> sol = toms748_solve(equation, T_low, T_high, f_low, f_high,
-                                            [=](double rr0, double rr1){return fabs(rr1-rr0)<tol;},
-                                            maxit); 
+  std::pair<double,double> sol = boost::math::tools::toms748_solve(equation, T_low, T_high, f_low, f_high,
+                                 [=](double rr0, double rr1){return fabs(rr1-rr0)<tol;},
+                                 maxit); 
 
   double T = 0.5*(sol.first + sol.second);
 
@@ -420,9 +420,9 @@ VarFcnANEOSEx1::GetTemperature(double rho, double e)
 
   boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
   double tol = tol_Debye*T_low; 
-  std::pair<double,double> sol = toms748_solve(equation, T_low, T_high, f_low, f_high,
-                                            [=](double rr0, double rr1){return fabs(rr1-rr0)<tol;},
-                                            maxit); 
+  std::pair<double,double> sol = boost::math::tools::toms748_solve(equation, T_low, T_high, f_low, f_high,
+                                 [=](double rr0, double rr1){return fabs(rr1-rr0)<tol;},
+                                 maxit); 
 
   double T = 0.5*(sol.first + sol.second);
   Update_rho_e_T(rho, e, T);
@@ -484,9 +484,9 @@ VarFcnANEOSEx1::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
 
   boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
   double tol = tol_Debye*T_low; 
-  std::pair<double,double> sol = toms748_solve(equation, T_low, T_high, f_low, f_high,
-                                            [=](double rr0, double rr1){return fabs(rr1-rr0)<tol;},
-                                            maxit); 
+  std::pair<double,double> sol = boost::math::tools::toms748_solve(equation, T_low, T_high, f_low, f_high,
+                                 [=](double rr0, double rr1){return fabs(rr1-rr0)<tol;},
+                                 maxit); 
 
   double T = 0.5*(sol.first + sol.second);
 
