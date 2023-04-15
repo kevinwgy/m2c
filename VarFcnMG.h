@@ -124,9 +124,9 @@ VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
   Gamma0_over_2 = 0.5*Gamma0;
   Gamma0_rho0 = Gamma0*rho0;
 
-  if(rho0<=0.0 || c0<=0.0 || Gamma0<=0.0 || s<=0.0 || e0<=0.0) {
+  if(rho0<=0.0 || c0<=0.0 || Gamma0<=0.0 || s<=0.0) {
     fprintf(stdout, "*** Error: VarFcnMG detected non-positive rho0 (%e), c0 (%e), "
-                    "Gamma0 (%e), s (%e), or e0 (%e).\n", rho0, c0, Gamma0, s, e0);
+                    "Gamma0 (%e), or s (%e).\n", rho0, c0, Gamma0, s);
     exit(-1);
   }
 }

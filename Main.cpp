@@ -71,35 +71,6 @@ int main(int argc, char* argv[])
   iod.finalize();
 
 
-  /********************************************************
-   *                   Special Tools                      *
-   *******************************************************/
-  if(iod.special_tools.type != SpecialToolsData::NONE) {
-    SpecialToolsDriver special_tools_driver(iod, comm, concurrent);
-    special_tools_driver.Run();
-    concurrent.Destroy();
-    MPI_Finalize();
-    return 0;
-  }
-  /*******************************************************/
-
-
-  //! Initialize Embedded Boundary Operator, if needed
-  EmbeddedBoundaryOperator *embed = NULL;
-  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
-    embed = new EmbeddedBoundaryOperator(comm, iod, true); 
-  else if(iod.ebm.embed_surfaces.surfaces.dataMap.size() != 0)
-    embed = new EmbeddedBoundaryOperator(comm, iod, false);
-
-  //! Call Messengers' initializers (which may require different inputs)
-  if(concurrent.Coupled()) {
-    if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
-      concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
-                                      embed->GetPointerToForcesOnSurface(0));
-    else
-      concurrent.InitializeMessengers(NULL, NULL);
-  }
-
 
   //! Initialize VarFcn (EOS, etc.) 
   std::set<int> vf_tracker;
@@ -139,6 +110,40 @@ int main(int argc, char* argv[])
 
   vf.push_back(new VarFcnDummy(iod.eqs.dummy_state)); //for "inactive" nodes, e.g., occluded or inside a solid body
   INACTIVE_MATERIAL_ID = vf.size() - 1;
+
+
+
+
+  /********************************************************
+   *                   Special Tools                      *
+   *******************************************************/
+  if(iod.special_tools.type != SpecialToolsData::NONE) {
+    SpecialToolsDriver special_tools_driver(iod, vf, comm, concurrent);
+    special_tools_driver.Run();
+    concurrent.Destroy();
+    MPI_Finalize();
+    return 0;
+  }
+  /*******************************************************/
+
+
+
+
+  //! Initialize Embedded Boundary Operator, if needed
+  EmbeddedBoundaryOperator *embed = NULL;
+  if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
+    embed = new EmbeddedBoundaryOperator(comm, iod, true); 
+  else if(iod.ebm.embed_surfaces.surfaces.dataMap.size() != 0)
+    embed = new EmbeddedBoundaryOperator(comm, iod, false);
+
+  //! Call Messengers' initializers (which may require different inputs)
+  if(concurrent.Coupled()) {
+    if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
+      concurrent.InitializeMessengers(embed->GetPointerToSurface(0),
+                                      embed->GetPointerToForcesOnSurface(0));
+    else
+      concurrent.InitializeMessengers(NULL, NULL);
+  }
 
 
   //! Initialize the exact Riemann problem solver.

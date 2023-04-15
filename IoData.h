@@ -1473,11 +1473,38 @@ struct ReferenceMapData {
 
 //------------------------------------------------------------------------------
 
+struct EOSTabulationData {
+
+  int materialid;
+
+  const char *filename; //!< output file name
+   
+  enum Variable {PRESSURE = 0, SPECIFIC_INTERNAL_ENERGY = 1, DENSITY = 2,
+                 DP_DE = 3, //!< dp(rho,e)/de
+                 GRUNEISEN_PARAMETER = 4, //!< 1/rho*dp(rho,e)/de
+                 DP_DRHO = 5, //!< dp(rho,e)/drho
+                 BULK_MODULUS = 6, //!< rho*dp(rho,e)/drho
+                 TEMPERATURE = 7,
+                 SPECIFIC_ENTHALPY = 8} output, xvar, yvar;
+
+  double x0, xmax, y0, ymax; //!< setting x0==xmax or y0==ymax will generate 1D data
+  int Nx, Ny;
+
+  EOSTabulationData();
+  ~EOSTabulationData() {}
+
+  Assigner *getAssigner();
+};
+
+//------------------------------------------------------------------------------
+
 struct SpecialToolsData {
 
-  enum Type {NONE = 0, DYNAMIC_LOAD_CALCULATION = 1, SIZE = 2} type;
+  enum Type {NONE = 0, DYNAMIC_LOAD_CALCULATION = 1, EOS_TABULATION = 2, SIZE = 3} type;
   
   TransientInputData transient_input;
+
+  ObjectMap<EOSTabulationData> eos_tabulationMap;
 
   SpecialToolsData();
   ~SpecialToolsData() {}

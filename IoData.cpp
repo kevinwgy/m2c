@@ -3256,6 +3256,62 @@ void ReferenceMapData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+EOSTabulationData::EOSTabulationData()
+{
+  materialid = -1;
+  filename = ""; 
+  output = PRESSURE;
+  xvar = DENSITY;
+  yvar = SPECIFIC_INTERNAL_ENERGY;
+  x0 = xmax = y0 = ymax = 1.0;
+  Nx = Ny = 100;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *EOSTabulationData::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
+
+  new ClassInt<EOSTabulationData>(ca, "MaterialID", this, &EOSTabulationData::materialid);
+
+  new ClassStr<EOSTabulationData>(ca, "OutputFile", this, &EOSTabulationData::filename);
+
+  new ClassToken<EOSTabulationData> (ca, "TabulatedVariable", this,
+          reinterpret_cast<int EOSTabulationData::*>(&EOSTabulationData::output), 10,
+          "Pressure", 0, 
+          "SpecificInternalEnergy", 1, "InternalEnergyPerUnitMass", 1,
+          "Density", 2, "PressureDerivativeEnergy", 3, 
+          "GruneisenParameter", 4, "PressureDerivativeDensity", 5,
+          "BulkModulus", 6, "Temperature", 7, 
+          "SpecificEnthalpy", 8, "EnthalpyPerUnitMass", 8);
+
+  new ClassToken<EOSTabulationData> (ca, "VariableX", this,
+          reinterpret_cast<int EOSTabulationData::*>(&EOSTabulationData::xvar), 5,
+          "Density", 2, 
+          "SpecificInternalEnergy", 1, "InternalEnergyPerUnitMass", 1,
+          "Pressure", 0, "Temperature", 7);
+
+  new ClassToken<EOSTabulationData> (ca, "VariableY", this,
+          reinterpret_cast<int EOSTabulationData::*>(&EOSTabulationData::yvar), 5,
+          "Density", 2, 
+          "SpecificInternalEnergy", 1, "InternalEnergyPerUnitMass", 1,
+          "Pressure", 0, "Temperature", 7);
+
+
+  new ClassDouble<EOSTabulationData>(ca, "X0", this, &EOSTabulationData::x0);
+  new ClassDouble<EOSTabulationData>(ca, "Xmax", this, &EOSTabulationData::xmax);
+  new ClassDouble<EOSTabulationData>(ca, "Y0", this, &EOSTabulationData::y0);
+  new ClassDouble<EOSTabulationData>(ca, "Ymax", this, &EOSTabulationData::ymax);
+
+  new ClassInt<EOSTabulationData>(ca, "NumberOfPointsX", this, &EOSTabulationData::Nx);
+  new ClassInt<EOSTabulationData>(ca, "NumberOfPointsY", this, &EOSTabulationData::Ny);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
 SpecialToolsData::SpecialToolsData()
 {
   type = NONE;
@@ -3265,13 +3321,14 @@ SpecialToolsData::SpecialToolsData()
 
 void SpecialToolsData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 2, father);
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
   new ClassToken<SpecialToolsData> (ca, "Type", this,
-     reinterpret_cast<int SpecialToolsData::*>(&SpecialToolsData::type), 2,
-     "None", 0, "DynamicLoadCalculation", 1);
+     reinterpret_cast<int SpecialToolsData::*>(&SpecialToolsData::type), 3,
+     "None", 0, "DynamicLoadCalculation", 1, "EquationOfStateTabulation", 2);
 
   transient_input.setup("TransientInputData");
+  eos_tabulationMap.setup("EquationOfStateTable", ca);
 } 
 
 //------------------------------------------------------------------------------

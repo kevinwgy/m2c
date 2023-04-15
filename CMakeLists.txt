@@ -114,6 +114,7 @@ TimeIntegrator.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
 LagrangianOutput.cpp
+EOSAnalyzer.cpp
 TerminalVisualization.cpp
 ClosestTriangle.cpp
 SteadyStateOperator.cpp

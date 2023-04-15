@@ -10,6 +10,7 @@
 #include <vector>
 #include <mpi.h>
 #include <cctype>
+#include <cassert>
 
 using std::string;
 
@@ -95,3 +96,60 @@ inline void setValue(double* out, double in, int dim)
       out[i] = in;
 }
 //--------------------------------------------------
+//! Tabulate a 2D function of the form "double F(double x, double y)" on a uniform grid;
+//! if xmin == xmax or ymin == ymax ==> a 1D array (in both cases, outer vector size = 1)
+void tabulate2Dfunction_uniform(double (*fun)(double,double), double xmin, double xmax,
+                                double dx, double ymin, double ymax, double dy,
+                                std::vector<std::vector<double> > &result);
+//--------------------------------------------------
+
+template<typename Functor>
+void tabulate2Dfunction_uniform(Functor fun, double xmin, double xmax,
+                                int Nx, double ymin, double ymax, int Ny,
+                                std::vector<std::vector<double> > &result)
+{
+  //NOTE: fun must be of type "double fun(double x, double y)".
+
+  //Check for the case of a 1D plot
+  if(xmin==xmax || Nx==1) {
+    result.resize(1);
+    assert(Ny>=1);
+    double dy = Ny==1 ? 0.0 : (ymax-ymin)/(Ny-1);
+    result[0].reserve(Ny);
+    for(int i=0; i<Ny; i++)
+      result[0].push_back(fun(xmin, ymin+i*dy));
+    return;
+  }
+  else if(ymin==ymax || Ny==1) {
+    result.resize(1);
+    assert(Nx>=1);
+    double dx = Nx==1 ? 0.0 : (xmax-xmin)/(Nx-1);
+    result[0].reserve(Nx);
+    for(int i=0; i<Nx; i++)
+      result[0].push_back(fun(xmin+i*dx, ymin));
+    return;
+  }
+
+  // 2D
+  assert(Nx>1 && Ny>1);
+  double dx = (xmax-xmin)/(Nx-1);
+  double dy = (ymax-ymin)/(Ny-1);
+  result.resize(Ny);
+  double y = ymin;
+  for(auto&& res : result) {
+    res.reserve(Nx);
+    for(int i=0; i<Nx; i++)
+      res.push_back(fun(xmin+i*dx, y));
+    y += dy;
+  }
+}
+
+//--------------------------------------------------
+
+
+//--------------------------------------------------
+
+
+
+
+

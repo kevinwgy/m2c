@@ -35,11 +35,6 @@ DynamicLoadCalculator::~DynamicLoadCalculator()
 void
 DynamicLoadCalculator::Run()
 {
-  print("\n");
-  print("----------------------------------------------------\n");
-  print("- Activated special tool: Dynamic load calculator. -\n");
-  print("----------------------------------------------------\n");
-  print("\n");
 
   prefix = string(iod.special_tools.transient_input.snapshot_file_prefix);
   suffix = string(iod.special_tools.transient_input.snapshot_file_suffix);

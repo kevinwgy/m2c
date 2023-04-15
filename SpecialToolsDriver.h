@@ -7,6 +7,7 @@
 #define _SPECIAL_TOOLS_DRIVER_H_
 
 #include<ConcurrentProgramsHandler.h>
+#include<VarFcnBase.h>
 
 /*****************************************
  * class SpecialToolsDriver is the driver
@@ -19,11 +20,13 @@ class SpecialToolsDriver
 
   MPI_Comm& comm;
   IoData& iod;
+  std::vector<VarFcnBase*>& vf;
   ConcurrentProgramsHandler& concurrent;
 
 public:
   
-  SpecialToolsDriver(IoData &iod_, MPI_Comm &comm_, ConcurrentProgramsHandler &concurrent_);
+  SpecialToolsDriver(IoData &iod_, std::vector<VarFcnBase*>& vf_,
+                     MPI_Comm &comm_, ConcurrentProgramsHandler &concurrent_);
   ~SpecialToolsDriver();
 
   void Run();
