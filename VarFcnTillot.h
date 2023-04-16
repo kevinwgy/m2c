@@ -77,7 +77,7 @@ public:
 
   double GetInternalEnergyPerUnitMass(double rho, double p);
 
-  double GetDensity([[maybe_unused]] double p, [[maybe_unused]] double e);
+  double GetDensity(double p, double e);
 
   inline double GetDpdrho(double rho, double e) {return (this->*GetDpdrhoCase[GetCaseWithRhoE(rho,e)])(rho,e);}
 
@@ -100,10 +100,13 @@ private:
 
   //! Determine the case id, given rho and e. Returns 0, 1, 2, or 3 for Case 1, 2, 3, and 1|2
   int GetCaseWithRhoE(double rho, double e) {
-    if(rho<=0.0 || e<0.0) {
-      fprintf(stdout,"\033[0;31m*** Error: VarFcnTillot::GetCaseWithRhoE detected negative rho (%e) or e (%e).\033[0m\n",
-              rho, e);
+    if(rho<=0.0) {
+      fprintf(stdout,"\033[0;31m*** Error: VarFcnTillot::GetCaseWithRhoE detected non-positive rho (%e).\033[0m\n",
+              rho);
       exit(-1);
+    }
+    if(e<0.0 && verbose>=1) {
+      fprintf(stdout,"\033[0;35mWarning: In VarFcnTillot::GetCaseWithRhoE detected negative e (%e).\033[0m\n", e);
     }
     if(rho>=rho0) return 0; // Case 1 
     if(e>=eCV)    return 1; // Case 2
@@ -143,7 +146,7 @@ private:
     double mu    = rho/rho0 - 1.0;
     double omega = rho0/rho - 1.0;
     double rho_e = rho*e;
-    return a*rho_e + (b*rho_e*GetChiWithOmega(omega,e) + A*mu*exp(-beta*mu))*exp(-alpha*omega*omega);
+    return a*rho_e + (b*rho_e*GetChiWithOmega(omega,e) + A*mu*exp(-beta*omega))*exp(-alpha*omega*omega);
   }
  
   double GetGamma2(double rho, double e) {
@@ -231,12 +234,12 @@ private:
   //! Solve f(e) = p - p1|2(rho,e) = 0 for e, given rho and p. (Divided by p to non-dimensionalize.)
   struct SpecificEnergyEquationP12 {
     SpecificEnergyEquationP12(double rho_, double p_, VarFcnTillot *vf_) 
-        : vf(vf_), rho(rho_), p(p_) {}
+        : vf(vf_), rho(rho_), p(p_), pfabs(fabs(p_)) {}
     inline double operator() (double e) {
-      return p==0.0 ?  -(vf->GetPressure12(rho, e)) : 1.0 - (vf->GetPressure12(rho, e))/p;}
+      return pfabs==0.0 ?  -(vf->GetPressure12(rho, e)) : (p - vf->GetPressure12(rho, e))/pfabs;}
 
   private:
-    double rho, p;
+    double rho, p, pfabs;
     VarFcnTillot *vf;
   };   
 
@@ -249,7 +252,7 @@ private:
     double enthalpy; //!< public member
     inline double operator() (double e) {
       return enthalpy==0.0 ? e + vf->GetPressure(rho,e)/rho
-                           : (e + vf->GetPressure(rho,e)/rho)/enthalpy - 1.0;}
+                           : (e + vf->GetPressure(rho,e)/rho - enthalpy)/fabs(enthalpy);}
     
   private:
     double rho, T;
@@ -261,13 +264,26 @@ private:
   //! (Divide by h to nondimensionalize.)
   struct EnthalpyEquation {
     EnthalpyEquation(double rho_, double h_, VarFcnTillot *vf_)
-        : vf(vf_), rho(rho_), h(h_) {}
+        : vf(vf_), rho(rho_), h(h_), hfabs(fabs(h_)) {}
     inline double operator() (double e) {
-      return h==0.0 ? e + vf->GetPressure(rho,e)/rho : (e + vf->GetPressure(rho,e)/rho)/h - 1.0;}
+      return hfabs==0.0 ? e + vf->GetPressure(rho,e)/rho : (e + vf->GetPressure(rho,e)/rho - h)/hfabs;}
 
   private:
-    double rho, h;
+    double rho, h, hfabs;
     VarFcnTillot *vf;
+  };
+
+
+  //! Solve f(rho) = p(rho,e) - p = 0 for rho, given p and e
+  //! (Divided by p to nondimensionalize)
+  struct DensityEquation {
+    DensityEquation(double p_, double e_, VarFcnTillot *vf_) : p(p_), pfabs(fabs(p_)), e(e_), vf(vf_) {}
+    inline double operator() (double rho) {
+      return pfabs==0.0 ? vf->GetPressure(rho,e) : (vf->GetPressure(rho,e)-p)/pfabs;}
+
+    private:
+      double p, pfabs, e;
+      VarFcnTillot *vf;
   };
 
 };
@@ -367,30 +383,31 @@ VarFcnTillot::GetInternalEnergyPerUnitMass1(double rho, double p)
   int num_real_roots = MathTools::quadratic_equation_solver(c2, c1, c0, e_root_1, e_root_2);
    
   if(num_real_roots==2) { // e_root_1 > e_root_2 (see quadratic_equation_solver)
-    if(e_root_1<0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P1) got two negative e's (%e,%e) for rho = %e, p = %e.\033[0m\n",
-              e_root_1, e_root_2, rho, p);
-      exit(-1);
+    if(e_root_1<0.0 && verbose==1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P1) got two negative e's (%e,%e) for rho = %e, p = %e. "
+              "Taking the first one.\033[0m\n", e_root_1, e_root_2, rho, p);
+      return e_root_1;
     }
-    else if(e_root_2>0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P1) got two positive e's (%e,%e) for rho = %e, p = %e.\033[0m\n",
-              e_root_1, e_root_2, rho, p);
-      exit(-1);
+    else if(e_root_2>0.0 && verbose==1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P1) got two positive e's (%e,%e) for rho = %e, p = %e. "
+              "Taking the first one.\033[0m\n", e_root_1, e_root_2, rho, p);
+      return e_root_1;
     }
     return e_root_1;
   }
   else if(num_real_roots==1) {
-    if(e_root_1<0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P1) got a negative e (%e) for rho = %e, p = %e. \033[0m\n",
+    if(e_root_1<0.0 && verbose==1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P1) got a negative e (%e) for rho = %e, p = %e. \033[0m\n",
               e_root_1, rho, p);
-      exit(-1);
+      return e_root_1;
     }
     return e_root_1;
   }
   else { // num_real_roots = 0
-    fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P1) failed to find an e for rho = %e, p = %e. "
-            "Solution does not exist.\033[0m\n", rho, p);
-    exit(-1);
+    fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P1) failed to find an e for rho = %e, p = %e. "
+            "Solution (real number) does not exist. Returning e = %e (1.0e-6*e0).\033[0m\n", 
+            rho, p, 1.0e-6*e0);
+    return 1.0e-6*e0;
   }
 
   return 0; //will not reach here
@@ -417,30 +434,31 @@ VarFcnTillot::GetInternalEnergyPerUnitMass2(double rho, double p)
   int num_real_roots = MathTools::quadratic_equation_solver(c2, c1, c0, e_root_1, e_root_2);
    
   if(num_real_roots==2) { // e_root_1 > e_root_2 (see quadratic_equation_solver)
-    if(e_root_1<0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P2) got two negative e's (%e,%e) for rho = %e, p = %e. \033[0m\n",
-              e_root_1, e_root_2, rho, p);
-      exit(-1);
+    if(e_root_1<0.0 && verbose>=1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P2) got two negative e's (%e,%e) for rho = %e, p = %e. "
+              "Taking the first one.\033[0m\n", e_root_1, e_root_2, rho, p);
+      return e_root_1;
     }
-    else if(e_root_2>0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P2) got two positive e's (%e,%e) for rho = %e, p = %e. \033[0m\n",
-              e_root_1, e_root_2, rho, p);
-      exit(-1);
+    else if(e_root_2>0.0 && verbose>=1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P2) got two positive e's (%e,%e) for rho = %e, p = %e. "
+              "Taking the first one.\033[0m\n", e_root_1, e_root_2, rho, p);
+      return e_root_1;
     }
     return e_root_1;
   }
   else if(num_real_roots==1) {
-    if(e_root_1<0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P2) got a negative e (%e) for rho = %e, p = %e. \033[0m\n",
+    if(e_root_1<0.0 && verbose>=1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P2) got a negative e (%e) for rho = %e, p = %e. \033[0m\n",
               e_root_1, rho, p);
-      exit(-1);
+      return e_root_1;
     }
     return e_root_1;
   }
   else { // num_real_roots = 0
-    fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P2) failed to find an e for rho = %e, p = %e. "
-            "Solution does not exist.\033[0m\n", rho, p);
-    exit(-1);
+    fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P2) failed to find an e for rho = %e, p = %e. "
+            "Solution (real number) does not exist. Returning e = %e (1.0e-6*e0).\033[0m\n",
+            rho, p, 1.0e-6*e0);
+    return 1.0e-6*e0;
   }
 
   return 0; //will not reach here
@@ -468,30 +486,31 @@ VarFcnTillot::GetInternalEnergyPerUnitMass3(double rho, double p)
   int num_real_roots = MathTools::quadratic_equation_solver(c2, c1, c0, e_root_1, e_root_2);
    
   if(num_real_roots==2) { // e_root_1 > e_root_2 (see quadratic_equation_solver)
-    if(e_root_1<0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P3) got two negative e's (%e,%e) for rho = %e, p = %e. \033[0m\n",
-              e_root_1, e_root_2, rho, p);
-      exit(-1);
+    if(e_root_1<0.0 && verbose>=1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P3) got two negative e's (%e,%e) for rho = %e, p = %e. "
+              "Taking the first one.\033[0m\n", e_root_1, e_root_2, rho, p);
+      return e_root_1;
     }
-    else if(e_root_2>0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P3) got two positive e's (%e,%e) for rho = %e, p = %e. \033[0m\n",
-              e_root_1, e_root_2, rho, p);
-      exit(-1);
+    else if(e_root_2>0.0 && verbose>=1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P3) got two positive e's (%e,%e) for rho = %e, p = %e. "
+              "Taking the first one.\033[0m\n", e_root_1, e_root_2, rho, p);
+      return e_root_1;
     }
     return e_root_1;
   }
   else if(num_real_roots==1) {
-    if(e_root_1<0.0) {
-      fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P3) got a negative e (%e) for rho = %e, p = %e. \033[0m\n",
+    if(e_root_1<0.0 && verbose>=1) {
+      fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P3) got a negative e (%e) for rho = %e, p = %e. \033[0m\n",
               e_root_1, rho, p);
-      exit(-1);
+      return e_root_1;
     }
     return e_root_1;
   }
   else { // num_real_roots = 0
-    fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot(P3) failed to find an e for rho = %e, p = %e. "
-            "Solution does not exist.\033[0m\n", rho, p);
-    exit(-1);
+    fprintf(stdout, "\033[0;35mWarning: VarFcnTillot(P3) failed to find an e for rho = %e, p = %e. "
+            "Solution (real number) does not exist. Returning e = %e (1.0e-6*e0).\033[0m\n",
+            rho, p, 1.0e-6*e0);
+    return 1.0e-6*e0;
   }
 
   return 0; //will not reach here
@@ -565,10 +584,9 @@ VarFcnTillot::GetInternalEnergyPerUnitMass(double rho, double p)
     }
   }
 
-  if(e<0) {
-    fprintf(stdout,"\033[0;31m*** Error: VarFcnTillot::GetInternalEnergyPerUnitMass got negative "
+  if(verbose>=1 && e<0.0) {
+    fprintf(stdout,"\033[0;35mWarning: VarFcnTillot::GetInternalEnergyPerUnitMass got negative "
                    "e (%e) for rho = %e, p = %e.\033[0m\n", e, rho, p);
-    exit(-1);
   }
 
   return e;
@@ -578,14 +596,67 @@ VarFcnTillot::GetInternalEnergyPerUnitMass(double rho, double p)
 //------------------------------------------------------------------------------
 
 double
-VarFcnTillot::GetDensity([[maybe_unused]] double p, [[maybe_unused]] double e)
+VarFcnTillot::GetDensity(double p, double e)
 {
-  //TODO: This function is not really needed at the moment. Therefore, it is not implemented.
 
-  fprintf(stdout,"\033[0;31m*** Error: VarFcnTillot::GetDensity has not been implemented.\033[0m\n");
-  exit(-1);
+  DensityEquation equation(p, e, this);
 
-  return 0.0;
+  // find bracketing interval
+  double rho_low = 1.0e-2*rho0;  //density must be positive!
+  double rho_high = 1.0e2*rho0;
+  double f_low(1.0), f_high(1.0);
+  bool found_low(false), found_high(false);
+  for(int iter=0; iter<20; iter++) {
+    f_low = equation(rho_low);
+    if(f_low<=0.0) {
+      found_low = true;
+      break;
+    }
+    rho_high = rho_low; //rho_low is actually an upperbound
+    f_high = f_low;
+    found_high = true; 
+
+    rho_low /= 10.0;
+  }
+  if(!found_low) {
+    rho_low *= 10.0;
+    if(verbose>=1)
+      fprintf(stdout,"\033[0;35mWarning: In VarFcnTillot::GetDensity, setting rho to %e,"
+                     " for p = %e, e = %e (fun = %e).\033[0m\n", rho_low, p, e, f_low);
+    return rho_low;
+  }
+
+  if(!found_high) {
+    for(int iter=0; iter<20; iter++) {
+      f_high = equation(rho_high);
+      if(f_high>=0.0) {
+        found_high = true;
+        break;
+      }
+      rho_low = rho_high;
+      f_low = f_high;
+      found_low = true; //not really needed.
+      rho_high *= 10.0;
+    }
+    if(!found_high) {
+      rho_high /= 10.0;
+      if(verbose>=1)
+        fprintf(stdout,"\033[0;35mWarning: In VarFcnTillot::GetDensity, setting rho to %e,"
+                       " for p = %e, e = %e (fun = %e).\033[0m\n", rho_high, p, e, f_high);
+      return rho_high;
+    }
+  }
+
+  //fprintf(stdout,"rho_low = %e, rho_high = %e.\n", rho_low, rho_high);
+
+  boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
+  double tolerance = tol*std::min(fabs(rho_low), fabs(rho_high-rho_low));
+  std::pair<double,double> sol = boost::math::tools::toms748_solve(equation, rho_low, rho_high, f_low, f_high,
+                                 [=](double rr0, double rr1){return fabs(rr1-rr0)<tolerance;},
+                                 maxit);
+
+  return 0.5*(sol.first + sol.second);
+
 }
 
 
@@ -626,11 +697,11 @@ VarFcnTillot::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T)
   EnthalpyTemperatureEquation equation(rho, T, this);
 
   // find bracketing interval
-  double e_low = equation.enthalpy>0 ? 1.0e-3*equation.enthalpy : 1.0e-3*e0; //energy should > 0!
+  double e_low = equation.enthalpy>0 ? 1.0e-2*equation.enthalpy : 1.0e-2*e0; //try positive values first
   double e_high = equation.enthalpy>0 ? equation.enthalpy : 10.0*e0;
   double f_low(1.0), f_high(1.0);
   bool found_low(false), found_high(false);
-  for(int iter=0; iter<20; iter++) {
+  for(int iter=0; iter<15; iter++) {
     f_low = equation(e_low);
     if(f_low<=0.0) {
       found_low = true;
@@ -643,21 +714,34 @@ VarFcnTillot::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T)
 
     e_low /= 10.0;
   }
-  if(!found_low) {
-    e_low *= 10.0;
-    if(verbose>=1)
+  if(!found_low) { //try negative values...
+    e_low = -1e-5*e0;
+    for(int iter=0; iter<15; iter++) {
+      f_low = equation(e_low);
+      if(f_low<=0.0) {
+        found_low = true;
+        break;
+      }
+      e_low *= 10.0;
+    }
+    if(verbose>=1 && !found_low) {
+      e_low /= 10.0;
       fprintf(stdout,"\033[0;35mWarning: In VarFcnTillot::GetInternalEnergyPerUnitMassFromTemperature, setting e to %e,"
                      " for rho = %e, T = %e (fun = %e).\033[0m\n", e_low, rho, T, f_low);
-    return e_low;
+      return e_low;
+    }
   }
 
-  if(!found_high) {
+  if(!found_high) { //e_high is always set to a positive number...
     for(int iter=0; iter<20; iter++) {
       f_high = equation(e_high);
       if(f_high>=0.0) {
         found_high = true;
         break;
       }
+      e_low = e_high;
+      f_low = f_high;
+      found_low = true; //not really needed
       e_high *= 10.0;
     }
     if(!found_high) {
@@ -669,6 +753,7 @@ VarFcnTillot::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T)
     }
   }
 
+  //fprintf(stdout,"e_low = %e, e_high = %e.\n", e_low, e_high);
 
   boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
   double tolerance = tol*std::min(fabs(e_low), fabs(e_high-e_low));
@@ -689,11 +774,11 @@ VarFcnTillot::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
   EnthalpyEquation equation(rho, h, this);
 
   // find bracketing interval
-  double e_low = h>0 ? 1.0e-3*h: 1.0e-3*e0; //energy should > 0!
+  double e_low = h>0 ? 1.0e-2*h: 1.0e-2*e0; //first try positive values.
   double e_high = h>0 ? h : 10.0*e0;
   double f_low(1.0), f_high(1.0);
   bool found_low(false), found_high(false);
-  for(int iter=0; iter<20; iter++) {
+  for(int iter=0; iter<15; iter++) {
     f_low = equation(e_low);
     if(f_low<=0.0) {
       found_low = true;
@@ -706,11 +791,22 @@ VarFcnTillot::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
     e_low /= 10.0;
   }
   if(!found_low) {
-    e_low *= 10.0;
-    if(verbose>=1)
-      fprintf(stdout,"\033[0;35mWarning: In VarFcnTillot::GetInternalEnergyPerUnitMassFromEnthalpy, setting e to %e,"
-                     " for rho = %e, h = %e (fun = %e).\033[0m\n", e_low, rho, h, f_low);
-    return e_low;
+    e_low = -1e-5*e0; //try negative values.
+    for(int iter=0; iter<15; iter++) {
+      f_low = equation(e_low);
+      if(f_low<=0.0) {
+        found_low = true;
+        break;
+      }
+      e_low *= 10.0;
+    }
+    if(!found_low && verbose>=1) {
+      e_low /= 10.0;
+      if(verbose>=1)
+        fprintf(stdout,"\033[0;35mWarning: In VarFcnTillot::GetInternalEnergyPerUnitMassFromEnthalpy, setting e to %e,"
+                       " for rho = %e, h = %e (fun = %e).\033[0m\n", e_low, rho, h, f_low);
+      return e_low;
+    }
   }
 
   if(!found_high) {
@@ -720,6 +816,9 @@ VarFcnTillot::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
         found_high = true;
         break;
       }
+      e_low = e_high;
+      f_low = f_high;
+      found_low = true; //not really needed
       e_high *= 10.0;
     }
     if(!found_high) {
@@ -731,6 +830,7 @@ VarFcnTillot::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h)
     }
   }
 
+  //fprintf(stdout,"e_low = %e, e_high = %e.\n", e_low, e_high);
 
   boost::uintmax_t maxit = 500; //!< "maxit" is both an input and an output!
   double tolerance = tol*std::min(fabs(e_low), fabs(e_high-e_low));
