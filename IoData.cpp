@@ -2918,6 +2918,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   wall_temperature = 300.0; //!< Kelvin
   heat_source = 0.0;
   dynamics_calculator = "";
+  force_calculator = "";
 
   wetting_output_filename = "";
 
@@ -2929,7 +2930,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 15, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
@@ -2970,6 +2971,9 @@ Assigner *EmbeddedSurfaceData::getAssigner()
 
   new ClassStr<EmbeddedSurfaceData>(ca, "UserDefinedDynamicsCalculator", this, 
                                     &EmbeddedSurfaceData::dynamics_calculator);
+
+  new ClassStr<EmbeddedSurfaceData>(ca, "UserDefinedForceCalculator", this, 
+                                    &EmbeddedSurfaceData::force_calculator);
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "ConstantReconstructionDepth", 
                                        this, &EmbeddedSurfaceData::conRec_depth);

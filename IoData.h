@@ -1324,6 +1324,7 @@ struct EmbeddedSurfaceData {
 
   //! tools
   const char *dynamics_calculator;
+  const char *force_calculator;
 
   //! force calculation (NONE: force is 0, i.e. one-way coupling)
   enum GaussQuadratureRule {NONE = 0, ONE_POINT = 1, THREE_POINT = 2, FOUR_POINT = 3,

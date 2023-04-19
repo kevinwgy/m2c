@@ -20,7 +20,9 @@ DynamicLoadCalculator::DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_,
                                              ConcurrentProgramsHandler &concurrent_)
                      : comm(comm_), iod(iod_), concurrent(concurrent_), 
                        lagout(comm_, iod_.special_tools.transient_input.output),
-                       S0(NULL), S1(NULL), tree0(NULL), tree1(NULL), id0(-INT_MAX), id1(-INT_MAX)
+                       S0(NULL), S1(NULL), tree0(NULL), tree1(NULL), id0(-INT_MAX), id1(-INT_MAX),
+                       force_calculator(std::make_tuple(nullptr,nullptr,nullptr))
+
 { }
 
 //-----------------------------------------------------------------
@@ -28,6 +30,14 @@ DynamicLoadCalculator::DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_,
 DynamicLoadCalculator::~DynamicLoadCalculator()
 { 
   //the smart pointers ("shared_ptr") are deleted automatically
+
+  //delete user-specified force calculator
+  if(std::get<0>(force_calculator)) {
+    assert(std::get<2>(force_calculator)); //this is the destruction function
+    (std::get<2>(force_calculator))(std::get<0>(force_calculator)); //use the destruction function to destroy the calculator
+    assert(std::get<1>(force_calculator));
+    dlclose(std::get<1>(force_calculator));
+  }
 }
 
 //-----------------------------------------------------------------
@@ -74,6 +84,9 @@ DynamicLoadCalculator::RunForAeroS()
   // Allocate memory for the (internal) force vector
   F0.assign(surface->X.size(), Vec3D(0.0));
   F1.assign(surface->X.size(), Vec3D(0.0)); //note that X may contain unused nodes (e.g., in fracture)
+
+  // Setup user-defined force calculator (if provided)
+  SetupUserDefinedForces();
 
   // ---------------------------------------------------
   // Main time loop (mimics the time loop in Main.cpp
@@ -124,6 +137,54 @@ DynamicLoadCalculator::RunForAeroS()
 
   if(embed)
     delete embed;
+}
+
+//-----------------------------------------------------------------
+
+void
+DynamicLoadCalculator::SetupUserDefinedForces()
+{
+  
+  for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
+           it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+    int index = it->first;
+    if(index != 0)
+      continue; // Externally provided embedded surface must have id = 0
+
+    if(strcmp(it->second->force_calculator, "") == 0)
+      return; // user did not specify a force calculator
+
+    // setup the calculator: dynamically load the object
+    std::get<1>(force_calculator) = dlopen(it->second->force_calculator, RTLD_NOW);
+    if(!std::get<1>(force_calculator)) {
+      print_error("*** Error: Unable to load object %s.\n", it->second->force_calculator);
+      exit_mpi();
+    }
+    dlerror();
+    CreateUDF* create = (CreateUDF*) dlsym(std::get<1>(force_calculator), "Create");
+    const char* dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Create in %s.\n",
+                  it->second->force_calculator);
+      exit_mpi();
+    }
+    std::get<2>(force_calculator) = (DestroyUDF*) dlsym(std::get<1>(force_calculator), "Destroy");
+    dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Destroy in %s.\n",
+                  it->second->force_calculator);
+      exit_mpi();
+    }
+
+    //This is the actual calculator
+    std::get<0>(force_calculator) = create();
+
+    print("- Loaded user-defined dynamics calculator for surface %d from %s.\n",
+          index, it->second->force_calculator);
+
+    return; //done!
+  } 
+
 }
 
 //-----------------------------------------------------------------
@@ -516,7 +577,13 @@ DynamicLoadCalculator::InterpolateInTime(double t1, double* input1, double t2, d
 void
 DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D> *force, double t)
 {
+
+  if(std::get<0>(force_calculator)) {//User has specified a force calculator
+    ApplyUserDefinedForces(surface, force, t);
+    return;
+  }
   
+
   // find the time interval
   int k0(-1), k1(-1);
   if(t<tmin) {
@@ -590,6 +657,32 @@ DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D>
   }
 
 }
+
+//-----------------------------------------------------------------
+
+void
+DynamicLoadCalculator::ApplyUserDefinedForces(TriangulatedSurface *surface, 
+                                              std::vector<Vec3D> *force, double t)
+{
+  UserDefinedForces *calculator(std::get<0>(force_calculator));
+  if(!calculator)
+    return;
+
+  vector<Vec3D> &Xs(surface->X);
+  vector<Vec3D> &X0(surface->X0);
+  vector<Int3> &elems(surface->elems);
+
+  calculator->GetUserDefinedForces(t, X0.size(), (double*)X0.data(), (double*)Xs.data(),
+                                   elems.size(), (int*)elems.data(),
+                                   (double*)force->data()); //output
+}
+
+
+
+//-----------------------------------------------------------------
+
+
+
 
 //-----------------------------------------------------------------
 

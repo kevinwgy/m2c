@@ -8,8 +8,10 @@
 
 #include<ConcurrentProgramsHandler.h>
 #include<LagrangianOutput.h>
+#include<UserDefinedForces.h>
 #include<KDTree.h>
 #include<memory> //shared_ptr
+#include<dlfcn.h> //dlopen, dlclose
 
 struct TriangulatedSurface;
 
@@ -49,6 +51,9 @@ class DynamicLoadCalculator
   std::vector<PointIn3D> tree0_data, tree1_data;
   std::vector<Vec3D> F0, F1; //!< interpolated forces (using S0 and S1)
 
+  //! User-defined force calculator
+  std::tuple<UserDefinedForces*, void*, DestroyUDF*> force_calculator;
+
 public:
 
   DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_, ConcurrentProgramsHandler &concurrent_);
@@ -61,6 +66,9 @@ private:
   void RunForAeroS();
 
   void ComputeForces(TriangulatedSurface *surface, std::vector<Vec3D> *force, double t);
+  
+  void SetupUserDefinedForces();
+  void ApplyUserDefinedForces(TriangulatedSurface *surface, std::vector<Vec3D> *force, double t);
 
   void ReadMetaFile(std::string filename);
   void ReadSnapshot(std::string filename, std::vector<std::vector<double> >& S);
