@@ -96,12 +96,6 @@ inline void setValue(double* out, double in, int dim)
       out[i] = in;
 }
 //--------------------------------------------------
-//! Tabulate a 2D function of the form "double F(double x, double y)" on a uniform grid;
-//! if xmin == xmax or ymin == ymax ==> a 1D array (in both cases, outer vector size = 1)
-void tabulate2Dfunction_uniform(double (*fun)(double,double), double xmin, double xmax,
-                                double dx, double ymin, double ymax, double dy,
-                                std::vector<std::vector<double> > &result);
-//--------------------------------------------------
 
 template<typename Functor>
 void tabulate2Dfunction_uniform(Functor fun, double xmin, double xmax,

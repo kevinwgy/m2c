@@ -8,6 +8,9 @@
 
 #include <VarFcnBase.h>
 #include <polynomial_equations.h>
+#include <ordinary_differential_equations.h>
+#include <vector>
+#include <algorithm> //std::lower_bound
 #include <boost/math/tools/roots.hpp>
 
 /********************************************************************************
@@ -40,7 +43,8 @@
  *   cv     : specific heat at constant volume
  *   cp     : specific heat at constant pressure 
  *   h0     : specific enthalpy corresponding to T0 (only used if T is calculated using cp)
- *   T0     : temperature at rho0 and e0
+ *   T0     : reference temperature at rho0 and e0 (w/ linear cv law), rho0 and h0 (w/ linear cp law), or
+ *            rho0 and e=ecold (w/ T(rho,e) law) 
  *   temperature_depends_on_density: whether T depends on both rho and e, or just e.
  *
  *   Note: We apply the convention that one should first check Cases 1,2,3 before calling Case 4 ("p1|2") functions.
@@ -68,6 +72,12 @@ private:
 
   double tol; //!< convergence tolerance, non-D.
 
+  //! Stores the rho-e trajectory of the interatomic/intermolecular potential ("cold internal energy") for 
+  //! temperature-related calculations. Only constructed & used if temperature_depends_on_density == true.
+  std::vector<double> ecold_plus, rho_plus; //!< for rho>=rho0
+  std::vector<double> ecold_minus, rho_minus; //!< for rho<=rho0
+  int Nmax = (int)1e7; //!< max size of ecold_plus & ecold_minus, hard-coded for the moment
+
 public:
 
   VarFcnTillot(MaterialModelData &data);
@@ -94,6 +104,13 @@ public:
   double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h);
 
 private:
+
+  void SetupColdEnergyTrajectory();
+  void ExtendColdEnergyTrajectoryUpwards(double rhomax);
+  void ExtendColdEnergyTrajectoryDownwards(double rhomin);
+
+  //! Get ecold from trajectory. Extend the trajectory if needed.
+  double GetColdEnergy(double rho);
 
   inline double GetChiWithEta(double eta, double e) {return 1.0/(e/(e0*eta*eta)+1.0);}
   inline double GetChiWithOmega(double omega, double e) {return 1.0/(e/e0*(omega+1.0)*(omega+1)+1.0);}
@@ -320,21 +337,16 @@ VarFcnTillot::VarFcnTillot(MaterialModelData &data) : VarFcnBase(data)
   temperature_depends_on_density = data.tillotModel.temperature_depends_on_density 
                                      == TillotsonModelData::YES;
 
-  // Brundage 2013 did not clearly say how to integrate e_c(rho) in the "expansion" region...
-  // Based on what he said, we would be evaluating p1, p2, p3, and p1|2 with negative e.
-  // I am not gonna implement it until I understand it... (KW)
-  if(temperature_depends_on_density) {
-    fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot does not support "
-                    "\"TemperatureDependsOnDensity\" at the moment.\033[0m\n");
-    exit(-1); 
-  }
-
   cp     = data.tillotModel.cp;
   h0     = data.tillotModel.h0;
 
+  tol = 1.0e-8; //!< TODO: hard-coded for the moment, non-dimensional.
+
   if(temperature_depends_on_density) {
-    use_cp = false;
-  } else {
+    use_cp = false; //we use e-T relation to determine the thermal vibration energy
+    SetupColdEnergyTrajectory(); //!< fill ecold_plus, rho_plus, ecold_minus, rho_minus
+  } 
+  else {
     use_cp = (cp>0 && cv<=0.0) ? true : false;
   }
 
@@ -342,8 +354,6 @@ VarFcnTillot::VarFcnTillot(MaterialModelData &data) : VarFcnBase(data)
   invcp = cp==0.0 ? 0.0 : 1.0/cp;
 
   elat = eCV-eIV;
-
-  tol = 1.0e-8; //!< TODO: hard-coded for the moment, non-dimensional.
 
   if(elat<=0.0) {
     fprintf(stdout, "\033[0;31m*** Error: VarFcnTillot detected eCV (%e) <= eIV (%e).\033[0m\n", eCV, eIV);
@@ -362,6 +372,151 @@ VarFcnTillot::VarFcnTillot(MaterialModelData &data) : VarFcnBase(data)
     exit(-1);
   }
 
+}
+
+//------------------------------------------------------------------------------
+
+void
+VarFcnTillot::SetupColdEnergyTrajectory()
+{
+  assert(temperature_depends_on_density); //otherwise, no need to do this
+
+  // Build the trajectory above rho0. 
+  rho_plus.push_back(rho0);
+  ecold_plus.push_back(0.0); //ecold(rho0) = 0.0; 
+  ExtendColdEnergyTrajectoryUpwards(2.0*rho0); 
+
+  // Build the trajectory below rho0.
+  rho_minus.push_back(rho0); 
+  ecold_minus.push_back(0.0); //ecold(rho0) = 0.0
+  ExtendColdEnergyTrajectoryDownwards(0.5*rho0);
+}
+
+//------------------------------------------------------------------------------
+
+void
+VarFcnTillot::ExtendColdEnergyTrajectoryUpwards(double rhomax)
+{
+  if(rhomax<=rho_plus.back())
+    return;
+
+  // sets up the ODE
+  auto fun = [&](double *ec, double rho, double *dec_drho) {
+    *dec_drho = GetPressure(rho, *ec)/(rho*rho); return;};
+
+  // determine the initial step size
+  double drho0;
+  int mysize = rho_plus.size();
+  if(mysize>2) {
+    drho0 = rho_plus[mysize-2] - rho_plus[mysize-3]; //rho_plus[mysize-1]-rho_plus[mysize-2] may not
+                                                     //be the desired step size, as the last element
+                                                     //of rho_plus is pre-specified/fixed.
+  } else
+    drho0 = 1e-3*rho0;
+
+  // integration
+  double ecold_max;
+  std::vector<double> rho_new, ecold_new;
+  int err = MathTools::runge_kutta_45(fun, 1, rho_plus[mysize-1], &ecold_plus[mysize-1], drho0, rhomax,
+                                      &ecold_max, [](double*){return false;}, 
+                                      tol/100.0, Nmax-mysize, &rho_new, &ecold_new); //smaller tol, because we will interpolate
+  assert(!err);
+
+  int new_size = rho_new.size();
+  assert(new_size == (int)ecold_new.size());
+
+  rho_plus.reserve(mysize + new_size - 1);
+  ecold_plus.reserve(mysize + new_size - 1);
+  for(int i=1; i<new_size; i++) {
+    rho_plus.push_back(rho_new[i]);
+    ecold_plus.push_back(ecold_new[i]);
+  }
+}
+
+//------------------------------------------------------------------------------
+
+void
+VarFcnTillot::ExtendColdEnergyTrajectoryDownwards(double rhomin)
+{
+  if(rhomin>=rho_minus.back())
+    return;
+
+  assert(rhomin>0.0);
+
+  // sets up the ODE
+  auto fun = [&](double *ec, double rho, double *dec_drho) {
+    *dec_drho = GetPressure(rho, *ec)/(rho*rho); return;};
+
+  // determine the initial step size (<0 in this case)
+  double drho0; 
+  int mysize = rho_minus.size();
+  if(mysize>2) {
+    drho0 = rho_minus[mysize-2] - rho_minus[mysize-3]; //rho_minus[mysize-1]-rho_minus[mysize-2] may not
+                                                       //be the desired step size, as the last element
+                                                       //of rho_minus is pre-specified/fixed.
+  } else
+    drho0 = -1e-3*rho0;
+
+  // integration
+  double ecold_min;
+  std::vector<double> rho_new, ecold_new;
+  int err = MathTools::runge_kutta_45(fun, 1, rho_minus[mysize-1], &ecold_minus[mysize-1], drho0, rhomin,
+                                      &ecold_min, [](double*){return false;}, 
+                                      tol/100.0, Nmax-mysize, &rho_new, &ecold_new); //smaller tol, because we will interpolate
+  assert(!err);
+
+  int new_size = rho_new.size();
+  assert(new_size == (int)ecold_new.size());
+
+  rho_minus.reserve(mysize + new_size - 1);
+  ecold_minus.reserve(mysize + new_size - 1);
+  for(int i=1; i<new_size; i++) {
+    rho_minus.push_back(rho_new[i]);
+    ecold_minus.push_back(ecold_new[i]);
+  }
+}
+
+//------------------------------------------------------------------------------
+
+double
+VarFcnTillot::GetColdEnergy(double rho)
+{
+  int ind, index;
+  if(rho>=rho0) { // get from ecold_plus
+    ind = std::lower_bound(rho_plus.begin(), rho_plus.end(), rho) - rho_plus.begin();
+    if(ind == (int)rho_plus.size()) {
+      assert(rho_plus.back()<rho);
+      ExtendColdEnergyTrajectoryUpwards(rho);
+      ind = rho_plus.size()-1;
+    }
+    if(rho_plus[ind]==rho) {
+      index = ind;
+      return ecold_plus[index];
+    } else { //linear interpolation
+      index = ind-1; 
+      return ((rho_plus[ind]-rho)*ecold_plus[index] + (rho-rho_plus[index])*ecold_plus[ind])/
+             (rho_plus[ind]-rho_plus[index]);
+    }  
+  }
+  else { // get from ecold_minus
+    ind = std::lower_bound(rho_minus.begin(), rho_minus.end(), rho,
+                               [](double a, double b){return a>b;}) - rho_minus.begin();
+    if(ind == (int)rho_minus.size()) {
+      assert(rho_minus.back()>rho);
+      ExtendColdEnergyTrajectoryDownwards(rho);
+      ind = rho_minus.size()-1;
+    }
+    if(rho_minus[ind]==rho) {
+      index = ind;
+      return ecold_minus[index];
+    } else { //linear interpolation
+      index = ind-1; 
+      return ((rho_minus[ind]-rho)*ecold_minus[index] + (rho-rho_minus[index])*ecold_minus[ind])/
+             (rho_minus[ind]-rho_minus[index]);
+    }  
+  }
+
+  return 0.0; //shouldn't get here.
 }
 
 //------------------------------------------------------------------------------
@@ -674,10 +829,8 @@ VarFcnTillot::GetTemperature(double rho, double e)
       return T0 + invcv*(e-e0);
   }
 
-  // Brundage 2013 did not clearly say how to integrate e_c(rho) in the "expansion" region...
-  // Based on what he said, we would be evaluating p1, p2, p3, and p1|2 with negative e.
-  // I am not gonna implement it until I understand it... (KW)
-  return 0.0;
+  // Implementing the method described in Brundage 2013
+  return T0 + invcv*(e - GetColdEnergy(rho));
 
 }
 
@@ -687,10 +840,11 @@ double
 VarFcnTillot::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T)
 {
 
-  assert(!temperature_depends_on_density);
+  if(temperature_depends_on_density)
+    return GetColdEnergy(rho) + cv*(T-T0); //Done
 
   if(!use_cp)  
-    return e0 + cv*(T-T0); //Done:)
+    return e0 + cv*(T-T0); //Done
 
   // use_cp == true
 
