@@ -48,7 +48,9 @@ DynamicLoadCalculator::Run()
 
   prefix = string(iod.special_tools.transient_input.snapshot_file_prefix);
   suffix = string(iod.special_tools.transient_input.snapshot_file_suffix);
-  ReadMetaFile(string(iod.special_tools.transient_input.metafile));
+
+  if(strcmp(iod.special_tools.transient_input.metafile, "") != 0)
+    ReadMetaFile(string(iod.special_tools.transient_input.metafile));
 
   if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
     RunForAeroS();
@@ -179,7 +181,7 @@ DynamicLoadCalculator::SetupUserDefinedForces()
     //This is the actual calculator
     std::get<0>(force_calculator) = create();
 
-    print("- Loaded user-defined dynamics calculator for surface %d from %s.\n",
+    print("- Loaded user-defined force calculator for surface %d from %s.\n",
           index, it->second->force_calculator);
 
     return; //done!

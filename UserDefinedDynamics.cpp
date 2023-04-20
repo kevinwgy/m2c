@@ -15,6 +15,7 @@
 
 class MyDynamicsCalculator : public UserDefinedDynamics{
 
+public:
   // The dimension of X0, X, disp, and velo is 3*nNodes. For example, X0[3*i+j] is the 
   // j-th coordinate (j = 0,1,2) of node i.
   void GetUserDefinedDynamics(double time, double dt, int nNodes, double *X0, double *X,//inputs
