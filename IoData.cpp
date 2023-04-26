@@ -2920,7 +2920,6 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   dynamics_calculator = "";
   force_calculator = "";
 
-  wetting_output_filename = "";
 
   conRec_depth = 0.0;
 }
@@ -2930,7 +2929,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 15, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
@@ -2940,8 +2939,6 @@ Assigner *EmbeddedSurfaceData::getAssigner()
                                       &EmbeddedSurfaceData::surface_thickness);
 
   new ClassStr<EmbeddedSurfaceData>(ca, "MeshFile", this, &EmbeddedSurfaceData::filename);
-
-  new ClassStr<EmbeddedSurfaceData>(ca, "ContactSurfaceOutput", this, &EmbeddedSurfaceData::wetting_output_filename);
 
 
   new ClassToken<EmbeddedSurfaceData> (ca, "GaussQuadrature", this,
@@ -3111,13 +3108,15 @@ LagrangianMeshOutputData::LagrangianMeshOutputData()
   orig_config = "";
   disp = "";
   sol  = "";
+
+  wetting_output_filename = "";
 }
 
 //------------------------------------------------------------------------------
 
 void LagrangianMeshOutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
   
   new ClassInt<LagrangianMeshOutputData>(ca, "Frequency", this, &LagrangianMeshOutputData::frequency);
   new ClassDouble<LagrangianMeshOutputData>(ca, "TimeInterval", this, &LagrangianMeshOutputData::frequency_dt);
@@ -3127,6 +3126,10 @@ void LagrangianMeshOutputData::setup(const char *name, ClassAssigner *father)
 
   new ClassStr<LagrangianMeshOutputData>(ca, "Displacement", this, &LagrangianMeshOutputData::disp);
   new ClassStr<LagrangianMeshOutputData>(ca, "Solution", this, &LagrangianMeshOutputData::sol);
+
+  new ClassStr<LagrangianMeshOutputData>(ca, "ContactSurfaceOutput", this,
+                                         &LagrangianMeshOutputData::wetting_output_filename);
+
 }
 
 //------------------------------------------------------------------------------

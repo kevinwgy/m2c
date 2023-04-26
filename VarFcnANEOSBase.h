@@ -46,8 +46,7 @@ public:
 
   //! BigGamma = 1/rho*(\frac{\partial p(\rho,e)}{\partial e})   (Gruneisen parameter)
   virtual double GetBigGamma(double rho, double e) {
-    assert(e!=0.0);
-    double de = finite_difference_step*fabs(e);
+    double de = finite_difference_step*(e==0.0 ? 1.0 : fabs(e));
     double pminus = GetPressure(rho, e - de);
     double pplus  = GetPressure(rho, e + de);
     return (pplus - pminus)/(2.0*de*rho);

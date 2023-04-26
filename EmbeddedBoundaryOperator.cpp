@@ -342,12 +342,12 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
     if(mpi_rank != 0)
       continue;
 
-    if(strcmp(iod_embedded_surfaces[surf]->wetting_output_filename,"")) {
+    if(strcmp(iod_embedded_surfaces[surf]->output.wetting_output_filename,"")) {
 
-      std::fstream out(iod_embedded_surfaces[surf]->wetting_output_filename, std::fstream::out);
+      std::fstream out(iod_embedded_surfaces[surf]->output.wetting_output_filename, std::fstream::out);
       if(!out.is_open()) {
         fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", 
-                iod_embedded_surfaces[surf]->wetting_output_filename);
+                iod_embedded_surfaces[surf]->output.wetting_output_filename);
         exit(-1);
       }
 
