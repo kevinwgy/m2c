@@ -1,0 +1,15 @@
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+m2c
+parser/AssignerCore.o
+parser/Dictionary.o
+parser/Lexer.C
+parser/Lexer.o
+parser/Parser.output
+parser/Parser.tab.cpp
+parser/Parser.tab.h
+parser/Parser.tab.o
+parser/libparser.a
+version.h

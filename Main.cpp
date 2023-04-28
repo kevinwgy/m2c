@@ -24,6 +24,7 @@
 #include <IonizationOperator.h>
 #include <HyperelasticityOperator.h>
 #include <SpecialToolsDriver.h>
+#include <ExactRiemannSolverInterfaceJump.h>
 #include <set>
 #include <string>
 using std::to_string;
@@ -147,7 +148,8 @@ int main(int argc, char* argv[])
 
 
   //! Initialize the exact Riemann problem solver.
-  ExactRiemannSolverBase riemann(vf, iod.exact_riemann);
+  ExactRiemannSolverBase *riemann = NULL;
+    riemann = new ExactRiemannSolverInterfaceJump(vf, iod.exact_riemann, 0.0);
 
 
   //! Initialize FluxFcn for the advector flux of the N-S equations
@@ -187,7 +189,7 @@ int main(int argc, char* argv[])
   global_mesh.GetSubdomainInfo(comm, dms);
 
   //! Initialize space operator
-  SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, global_mesh);
+  SpaceOperator spo(comm, dms, iod, vf, *ff, *riemann, global_mesh);
 
   //! Track the embedded boundaries
   if(embed) {
@@ -318,7 +320,7 @@ int main(int argc, char* argv[])
       print("- Initializing the laser radiation solver on a re-partitioned sub-mesh.\n");
       laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
                                         //the following inputs are used for creating a new dms/spo
-                                        *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
+                                        *ff, *riemann, xcoords, ycoords, zcoords, dx, dy, dz);
     } else
       laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
                                         spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
@@ -691,6 +693,7 @@ int main(int argc, char* argv[])
 
   delete integrator;
   delete ff;
+  delete riemann;
 
   for(int i=0; i<(int)vf.size(); i++)
     delete vf[i];

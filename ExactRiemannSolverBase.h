@@ -38,7 +38,7 @@ public:
                                      double *Vsm /*left 'star' solution*/,
                                      double *Vsp /*right 'star' solution*/);
 
-  void PrintStarRelations(double rhol, double ul, double pl, int idl,
+  virtual void PrintStarRelations(double rhol, double ul, double pl, int idl,
                           double rhor, double ur, double pr, int idr,
                           double pmin, double pmax, double dp);
 
@@ -74,17 +74,17 @@ protected: //internal functions
     double rho, p, e, ps, es, pavg, one_over_rho;
   };
 
-  bool FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,
+  virtual bool FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
 
-  bool FindInitialFeasiblePoints(double rhol, double ul, double pl, double el, double cl, int idl,
+  virtual bool FindInitialFeasiblePoints(double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
 
-  int FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl, double el, double cl, int idl,
+  virtual int FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
@@ -102,7 +102,7 @@ protected: //internal functions
                             double &rho, double &u, double &p, double &xi /*output*/,
                             double & uErr, double & rhoErr /*output: absolute error in us*/);
 
-  void FinalizeSolution(double *dir, double *Vm, double *Vp,
+  virtual void FinalizeSolution(double *dir, double *Vm, double *Vp,
            double rhol, double ul, double pl, int idl,
            double rhor, double ur, double pr, int idr,
            double rhol2, double rhor2, double u2, double p2,
