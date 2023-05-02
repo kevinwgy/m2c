@@ -271,11 +271,11 @@ int main(int argc, char* argv[])
       vector<std::pair<int,int> > surf_and_color;
       for(auto it2 = closures.first; it2 != closures.second; it2++)
         surf_and_color.push_back(it2->second);
-      lso.back()->SetInitialCondition(*Phi.back(), 
-                                      embed->GetPointerToEmbeddedBoundaryData(),
-                                      &surf_and_color);
+      lso[it->first]->SetInitialCondition(*Phi[it->first],
+                                          embed->GetPointerToEmbeddedBoundaryData(),
+                                          &surf_and_color);
     } else
-      lso.back()->SetInitialCondition(*Phi.back());
+      lso[it->first]->SetInitialCondition(*Phi[it->first]);
 
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           it->first, matid);
