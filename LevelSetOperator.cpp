@@ -531,16 +531,17 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
     }
 
     Vec3D x0(it->second->x0, it->second->y0, it->second->z0);
-    Vec3D aa(it->second->ax, it->second->ay, it->second->az);
-    Vec3D bb(it->second->bx, it->second->by, it->second->bz);
-    Vec3D cc(it->second->cx, it->second->cy, it->second->cz);
+    Vec3D oa(it->second->ax, it->second->ay, it->second->az); oa -= x0;
+    Vec3D ob(it->second->bx, it->second->by, it->second->bz); ob -= x0;
+    Vec3D oc(it->second->cx, it->second->cy, it->second->cz); oc -= x0;
 
-    if(aa.norm()==0 || bb.norm()==0 || cc.norm()==0 || (aa^bb)*cc<=0.0) {
-      print_error("*** Error: Detected error in a user-specified parallelepiped.\n");
+    if(oa.norm()==0 || ob.norm()==0 || oc.norm()==0 || (oa^ob)*oc<=0.0) {
+      print_error("*** Error: Detected error in a user-specified parallelepiped. "
+                  "Overlapping vertices or violation of right-hand rule.\n");
       exit_mpi();
     }
 
-    GeoTools::DistanceFromPointToParallelepiped distCal(x0, aa, bb, cc);
+    GeoTools::DistanceFromPointToParallelepiped distCal(x0, oa, ob, oc);
 
     double dist;
 
