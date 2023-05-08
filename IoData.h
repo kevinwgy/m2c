@@ -149,7 +149,8 @@ struct SpheroidData {
 
   double cen_x, cen_y, cen_z;
   double axis_x, axis_y, axis_z;
-  double length, diameter;
+  double semi_length; //!< half length (along axis)
+  double radius; //!< max. radius on the transverse plane
 
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;

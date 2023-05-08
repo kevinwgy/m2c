@@ -236,8 +236,8 @@ SpheroidData::SpheroidData()
   axis_y = 0.0;
   axis_z = 0.0;
 
-  length = 0.0;
-  diameter = 0.0;
+  semi_length = 0.0;
+  radius = 0.0;
 
   side = INTERIOR;
   inclusion = OVERRIDE;
@@ -256,8 +256,8 @@ Assigner *SpheroidData::getAssigner()
   new ClassDouble<SpheroidData> (ca, "Axis_x", this, &SpheroidData::axis_x);
   new ClassDouble<SpheroidData> (ca, "Axis_y", this, &SpheroidData::axis_y);
   new ClassDouble<SpheroidData> (ca, "Axis_z", this, &SpheroidData::axis_z);
-  new ClassDouble<SpheroidData> (ca, "Length", this, &SpheroidData::length);
-  new ClassDouble<SpheroidData> (ca, "Diameter", this, &SpheroidData::diameter);
+  new ClassDouble<SpheroidData> (ca, "SemiLength", this, &SpheroidData::semi_length);
+  new ClassDouble<SpheroidData> (ca, "Radius", this, &SpheroidData::radius);
 
   new ClassToken<SpheroidData> (ca, "Side", this,
      reinterpret_cast<int SpheroidData::*>(&SpheroidData::side), 2,

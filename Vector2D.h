@@ -33,6 +33,7 @@ struct Vec2D {
   Vec2D(double x[2]) { v[0] = x[0]; v[1] = x[1];}
   Vec2D(double x, double y) { v[0] = x; v[1] = y;}
   Vec2D(const Vec2D &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; }
+  Vec2D(const Int2 &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; }
   Vec2D(double x) { v[0] = v[1] = x; }
   ~Vec2D() {}
 

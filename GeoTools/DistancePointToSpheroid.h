@@ -50,13 +50,13 @@ struct Ellipsoid {
   //! convention: e0 >= e1 >= e2
   Vec3D C; //!< center
   Vec3D U0, U1, U2; //!< axes (must be normalized, and orthogonal)
-  double e0, e1, e2;
+  double e0, e1, e2; //!< semi axis length
 
-  void SetupSpheroid(Vec3D C_, Vec3D Umain, double length, double diameter) {
+  void SetupSpheroid(Vec3D C_, Vec3D Umain, double semi_length, double radius) {
     C = C_;
     U0 = Umain/Umain.norm();
-    e0 = length;
-    e1 = e2 = diameter;
+    e0 = semi_length;
+    e1 = e2 = radius;
 
     U1 = 0.0;
     U2 = 0.0;
@@ -365,9 +365,9 @@ public:
   /****************************************************************************
    * Constructor
    ***************************************************************************/
-  DistanceFromPointToSpheroid(double *C_, double *U0_, double length, double diameter) : type(NONE)
+  DistanceFromPointToSpheroid(double *C_, double *U0_, double semi_length, double radius) : type(NONE)
   {
-    ellipsoid.SetupSpheroid(Vec3D(C_), Vec3D(U0_), length, diameter);
+    ellipsoid.SetupSpheroid(Vec3D(C_), Vec3D(U0_), semi_length, radius);
 
     // figure out the type
     if(ellipsoid.e0 == ellipsoid.e1 && ellipsoid.e1 == ellipsoid.e2)

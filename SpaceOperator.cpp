@@ -922,7 +922,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++) {
-          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the parallelepiped 
           if (dist<0) {
             v[k][j][i][0] = it->second->initialConditions.density;
             v[k][j][i][1] = it->second->initialConditions.velocity_x;
@@ -953,7 +953,7 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
-    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
+    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->semi_length, it->second->radius);
     double dist;
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)

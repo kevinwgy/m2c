@@ -52,6 +52,7 @@ struct Vec3D {
   Vec3D(double x[3]) { v[0] = x[0]; v[1] = x[1]; v[2] = x[2]; }
   Vec3D(double x, double y, double z) { v[0] = x; v[1] = y; v[2] = z; }
   Vec3D(const Vec3D &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; v[2] = v2.v[2]; }
+  Vec3D(const Int3 &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; v[2] = v2.v[2]; }
   Vec3D(double x) { v[0] = v[1] = v[2] = x; }
   ~Vec3D() {}
 

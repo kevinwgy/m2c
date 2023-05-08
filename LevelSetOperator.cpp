@@ -573,7 +573,7 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
 
-    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
+    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->semi_length, it->second->radius);
 
     double dist;
 

@@ -207,14 +207,14 @@ void Reconstructor::TagNodesFixedByUser()
 
     print(comm, "- Applying constant reconstruction within spheroid %d:\n", it->first);
     print(comm, "  o center: %e %e %e;  axis: %e %e %e.\n", x0[0], x0[1], x0[2], axis[0], axis[1], axis[2]);
-    print(comm, "  o length: %e;  diameter: %e.\n", it->second->length, it->second->diameter);
+    print(comm, "  o semi-length: %e;  radius: %e.\n", it->second->semi_length, it->second->radius);
 
     if(it->second->side != SpheroidData::INTERIOR) {
       print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
       exit_mpi();
     }
 
-    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
+    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->semi_length, it->second->radius);
 
     double dist;
     for(int k=k0; k<kmax; k++)
