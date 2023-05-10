@@ -165,7 +165,7 @@ public:
 
   /****************************************************************************
    * calculate signed distance (>0 outside) from an arbitrary point Q to the ellipse, 
-   * including the closest point (P)
+   * including a closest point (P) (may not be unique)
    ***************************************************************************/
   double Calculate(double *Q_, double *P = NULL) {
 
@@ -392,7 +392,7 @@ public:
 
   /***************************************************************************
    * calculate signed distance (>0 outside) from an arbitrary point Q to the ellipsoid, 
-   * including the closest point (P)
+   * including a closest point (P) (may not be unique)
    ***************************************************************************/
   double Calculate(double *Q_, double *P = NULL) {
 

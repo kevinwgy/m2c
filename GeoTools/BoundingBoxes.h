@@ -9,7 +9,8 @@
 
 /**************************************************************************
  * Functions for finding bounding boxes for different shapes. The axes of
- * the bounding box can be specified by the user.
+ * the bounding box can be specified by the user, and do not have to be
+ * orthogonal to each other. The norm of each basis vector may not be 1.
  * Note: The result may NOT be the smallest bounding box.
  *************************************************************************/
 
@@ -23,7 +24,8 @@ namespace GeoTools {
  *     r, L: radius and height of the cylinder
  *     tan_alpha: tangent of the opening angle
  *     H: height of the cone (on top of the cylinder)
- *     O, dir0, dir1, dir2: ortho. coord. system (origin, axes) of the bounding box
+ *     O, dir0, dir1, dir2: origin and basis vectors of the user-specified axes.
+ *                          the basis vectors may not have length = 1
  *     scaling_factor: scale up/down the b.b. Default is 1.0. 
  *   Output:
  *     lmin, lmax: the min and max of the bounding box coordinates (in the
@@ -37,7 +39,7 @@ GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L,
                              [[maybe_unused]] double tan_alpha,
                              double H, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                              Vec3D &lmin, Vec3D &lmax, //outputs
-                             bool dir_normalized = false, double scaling_factor = 1.0);
+                             double scaling_factor = 1.0);
 
 
 /**************************************************************************
@@ -48,7 +50,8 @@ GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L,
  *     r, L: radius and height of the cylinder
  *     front_cap: (T/F) whether the front/top cap is on
  *     back_cap: (T/F) whether the back/bottom cap is on
- *     O, dir0, dir1, dir2: ortho. coord. system (origin, axes) of the bounding box
+ *     O, dir0, dir1, dir2: origin and basis vectors of the user-specified axes.
+ *                          the basis vectors may not have length = 1
  *     scaling_factor: scale up/down the b.b. Default is 1.0. 
  *   Output:
  *     lmin, lmax: the min and max of the bounding box coordinates (in the
@@ -58,7 +61,7 @@ void
 GetBoundingBoxOfCylinderSphere(Vec3D &p0, Vec3D &n, double r, double L, bool front_cap,
                                bool back_cap, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                                Vec3D &lmin, Vec3D &lmax, //outputs
-                               bool dir_normalized = false, double scaling_factor = 1.0);
+                               double scaling_factor = 1.0);
 
 
 /**************************************************************************
@@ -66,7 +69,8 @@ GetBoundingBoxOfCylinderSphere(Vec3D &p0, Vec3D &n, double r, double L, bool fro
  *   Inputs:
  *     p0: center of the sphere
  *     r: radius of the sphere
- *     O, dir0, dir1, dir2: ortho. coord. system (origin, axes) of the bounding box
+ *     O, dir0, dir1, dir2: origin and basis vectors of the user-specified axes.
+ *                          the basis vectors may not have length = 1
  *     scaling_factor: scale up/down the b.b. Default is 1.0. 
  *   Output:
  *     lmin, lmax: the min and max of the bounding box coordinates (in the
@@ -75,7 +79,7 @@ GetBoundingBoxOfCylinderSphere(Vec3D &p0, Vec3D &n, double r, double L, bool fro
 void
 GetBoundingBoxOfSphere(Vec3D &p0, double r, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                        Vec3D &lmin, Vec3D &lmax, //outputs
-                       bool dir_normalized = false, double scaling_factor = 1.0);
+                       double scaling_factor = 1.0);
 
 
 /**************************************************************************
@@ -83,7 +87,8 @@ GetBoundingBoxOfSphere(Vec3D &p0, double r, Vec3D &O, Vec3D &dir0, Vec3D &dir1, 
  *   Inputs:
  *     p0: the ``origin'' (one of the 8 vertices).
  *     pa, pb, pc: vectors from the origin to three edges, which defines the parallelepiped
- *     O, dir0, dir1, dir2: ortho. coord. system (origin, axes) of the bounding box
+ *     O, dir0, dir1, dir2: origin and basis vectors of the user-specified axes.
+ *                          the basis vectors may not have length = 1
  *     scaling_factor: scale up/down the b.b. Default is 1.0. 
  *   Output:
  *     lmin, lmax: the min and max of the bounding box coordinates (in the
@@ -93,7 +98,7 @@ void
 GetBoundingBoxOfParallelepiped(Vec3D &p0, Vec3D &pa, Vec3D &pb, Vec3D &pc, 
                                Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                                Vec3D &lmin, Vec3D &lmax, //outputs
-                               bool dir_normalized = false, double scaling_factor = 1.0);
+                               double scaling_factor = 1.0);
 
 
 /**************************************************************************
@@ -102,7 +107,8 @@ GetBoundingBoxOfParallelepiped(Vec3D &p0, Vec3D &pa, Vec3D &pb, Vec3D &pc,
  *     p0: the center of the spheroid
  *     n: revolutionary axis of the spheroid
  *     semi_length, r: half length along axis & max radius on transverse plane
- *     O, dir0, dir1, dir2: ortho. coord. system (origin, axes) of the bounding box
+ *     O, dir0, dir1, dir2: origin and basis vectors of the user-specified axes.
+ *                          the basis vectors may not have length = 1
  *     scaling_factor: scale up/down the b.b. Default is 1.0. 
  *   Output:
  *     lmin, lmax: the min and max of the bounding box coordinates (in the
@@ -112,7 +118,7 @@ void
 GetBoundingBoxOfSpheroid(Vec3D &p0, Vec3D &n, double semi_length, double r,
                          Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                          Vec3D &lmin, Vec3D &lmax, //outputs
-                         bool dir_normalized = false, double scaling_factor = 1.0);
+                         double scaling_factor = 1.0);
 
 
 }; //end of namespace

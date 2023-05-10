@@ -459,4 +459,69 @@ bool ContinuousRayTriangleCollision(Vec3D& x0, Vec3D& x, Vec3D& A0, Vec3D& B0, V
 }
 
 
+/**************************************************************************
+ * For a given vector, find two unit vectors such that the three form an
+ * orthonormal basis, satisfying the right hand rule (U0-U1-U2). (If the 
+ * given vector is NOT normalized, this function does not change it.
+ * The VALUE of U0 is passed in, not a reference.)
+ *   Inputs:
+ *     U0 -- a given vector
+ *     U0_normalized -- (T/F) whether U0 is normalized.
+ *   Outputs:
+ *     U1, U2: two unit vectors that are orthogonal to each other, and to U0.
+ */
+void GetOrthonormalVectors(Vec3D U0, Vec3D &U1, Vec3D &U2, bool U0_normalized)
+{
+
+  if(!U0_normalized) {
+    double norm = U0.norm();
+    assert(norm != 0.0);
+    U0 /= norm;
+  }
+
+  U1 = U2 = 0.0;
+  bool done = false;
+  for(int i=0; i<3; i++) {
+    if(U0[i]==0) {
+      U1[i] = 1.0; //got U1
+      bool gotU2 = false;
+      for(int j=i+1; j<3; j++) {
+        if(U0[j]==0) {
+          U2[j] = 1.0; //got U2;
+          gotU2 = true;
+          break;
+        }
+      }
+      if(!gotU2) {
+        int i1 = (i+1) % 3;
+        int i2 = (i+2) % 3;
+        U2[i1] = -U0[i2];
+        U2[i2] = U0[i1];
+        U2 /= U2.norm();
+      }
+      done = true;
+      break;
+    }
+  }
+  if(!done) { //!< all the three components of U0 are nonzero
+    U1[0] = 1.0;
+    U1[1] = 0.0;
+    U1[2] = -U0[0]/U0[2];
+    U1 /= U1.norm();
+    U2[0] = 1.0;
+    U2[1] = -(U0[2]*U0[2]/U0[0] + U0[0])/U0[1];
+    U2[2] = U0[2]/U0[0];
+    U2 /= U2.norm();
+  }
+
+  if((U0^U1)*U2<0.0) {//swap U1 and U2 to satisfy the right-hand rule
+    Vec3D Utmp = U1;
+    U1 = U2;
+    U2 = Utmp;
+  }
+
+}
+
+
+
 } //end of namespace

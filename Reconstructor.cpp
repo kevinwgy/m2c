@@ -278,7 +278,7 @@ void Reconstructor::TagNodesFixedByUser()
     bool front_cap = (it->second->front_cap == CylinderSphereData::On);
     bool back_cap = (it->second->back_cap == CylinderSphereData::On);
 
-    x0 += Lhalf*dir; //now, x0 becoes the center of the cylinder
+    x0 += Lhalf*dir; //now, x0 becomes the center of the cylinder
 
     print(comm, "- Applying constant reconstruction within cylinder-sphere %d:\n", it->first);
     print(comm, "  o cylinder center: %e %e %e;  axis: %e %e %e.\n", 

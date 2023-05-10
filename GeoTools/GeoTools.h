@@ -108,6 +108,27 @@ inline double GetNormalAndAreaOfTriangle(Vec3D& xA, Vec3D& xB, Vec3D& xC,
 }                                  
 
 /**************************************************************************
+ * Project a point onto a plane defined by a point on the plane and the
+ * normal direction
+ *   Inputs:
+ *     x0 -- the point
+ *     O  -- a point on the plane
+ *     dir -- normal direction
+ *     normalized -- (T/F) whether "dir" is normalized (i.e. norm = 1)
+ *   Outputs:
+ *     return value -- SIGNED distance from the point to the plane, along "dir"
+ */
+inline double ProjectPointToPlane(Vec3D& x0, Vec3D& O, Vec3D& dir, bool normalized = false)
+{
+  if(normalized)
+    return (x0-O)*dir;
+
+  double norm = dir.norm(); 
+  assert(norm!=0.0);
+  return (x0-O)*dir/norm;
+}
+
+/**************************************************************************
  * Project a point onto a plane defined by a triangle in 3D, specified by nodal coordinates
  *   Inputs:
  *     x0 -- the point
@@ -314,6 +335,18 @@ inline void BoundingBoxOfCylinder(Vec3D &x0, double r0, Vec3D &x1, double r1, Ve
   }
 }
 
+/**************************************************************************
+ * For a given vector, find two unit vectors such that the three form an
+ * orthonormal basis. (If the given vector is NOT normalized, this function
+ * takes care of it, but does not change it. The VALUE of U0 is passed in,
+ * not a reference.)
+ *   Inputs:
+ *     U0 -- a given vector
+ *     U0_normalized -- (T/F) whether U0 is normalized.
+ *   Outputs:
+ *     U1, U2: two unit vectors that are orthogonal to each other, and to U0.
+ */
+void GetOrthonormalVectors(Vec3D U0, Vec3D &U1, Vec3D &U2, bool U0_normalized = false);
 
 
 

@@ -3,9 +3,12 @@
  * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
  ************************************************************************/
 #include <BoundingBoxes.h>
+#include <GeoTools.h>
 #include <cfloat> //DBL_MAX
 
 namespace GeoTools {
+
+//NOTE: dir0, dir1, and dir2 may not be orthogonal to each other. They may not have norm = 1 either.
 
 //---------------------------------------------------------------------
 
@@ -14,112 +17,31 @@ GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L,
                              [[maybe_unused]] double tan_alpha,
                              double H, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                              Vec3D &lmin, Vec3D &lmax, //outputs
-                             bool dir_normalized, double scaling_factor)
+                             double scaling_factor)
 {
   
   // ----------------------------------------------------
-  // Step 1: Get three *orthogonal* axes for the object
+  // Step 1: Get three *orthonormal* basis vectors for the object
   // ----------------------------------------------------
   Vec3D U0(0.0), U1(0.0), U2(0.0);
   double h = n.norm();
-  assert(h>=0.0);
+  assert(h>0.0);
   U0 = n/h;
-  // calculate U1 and U2
-  bool done = false;
-  for(int i=0; i<3; i++) {
-    if(U0[i]==0) {
-      U1[i] = 1.0; //got U1
-      bool gotU2 = false;
-      for(int j=i+1; j<3; j++) {
-        if(U0[j]==0) {
-          U2[j] = 1.0; //got U2;
-          gotU2 = true;
-          break;
-        }
-      }
-      if(!gotU2) {
-        int i1 = (i+1) % 3;
-        int i2 = (i+2) % 3;
-        U2[i1] = -U0[i2];
-        U2[i2] = U0[i1];
-        U2 /= U2.norm();
-      }
-      done = true;
-      break;
-    }
-  }
-  if(!done) { //!< all the three components of U0 are nonzero
-    U1[0] = 1.0;
-    U1[1] = 0.0;
-    U1[2] = -U0[0]/U0[2];
-    U1 /= U1.norm();
-    U2[0] = 1.0;
-    U2[1] = -(U0[2]*U0[2]/U0[0] + U0[0])/U0[1];
-    U2[2] = U0[2]/U0[0];
-    U2 /= U2.norm();
-  }
-  
+  GetOrthonormalVectors(U0, U1, U2, true);
+ 
   // ----------------------------------------------------
-  // Step 2: Get the 8 vertices of the intermediate bounding box in (U0,U1,U2)
+  // Step 2: Get the intermediate bounding box in (U0,U1,U2)
   // ----------------------------------------------------
-  Vec3D v[8];
-  v[0] = p0 - r*U1 - r*U2;
-  v[1] = p0 + r*U1 - r*U2;
-  v[2] = p0 - r*U1 + r*U2;
-  v[3] = p0 + r*U1 + r*U2;
-  Vec3D disp = (L + H)*U0;
-  for(int i=4; i<8; i++)
-    v[i] = v[i-4] + disp;
+  Vec3D P  = p0 - r*U1 - r*U2;
+  Vec3D PA = 2.0*r*U1;
+  Vec3D PB = 2.0*r*U2;
+  Vec3D PC = (L+H)*U0;
 
   // ----------------------------------------------------
   // Step 3: Get the bounding box in dir0, dir1, dir2 axes that contains the 8 vertices
   // ----------------------------------------------------
-  Vec3D dir[3];
-  if(dir_normalized) {
-    dir[0] = dir0;
-    dir[1] = dir1;
-    dir[2] = dir2;
-  }
-  else {
-    h = dir0.norm(); assert(h!=0.0);
-    dir[0] = dir0/h;
-    h = dir1.norm(); assert(h!=0.0);
-    dir[1] = dir1/h;
-    h = dir2.norm(); assert(h!=0.0);
-    dir[2] = dir2/h;
-  }
-
-  lmin = DBL_MAX;
-  lmax = -DBL_MAX;
-  double coord;
-  Vec3D Ov;
-  for(int i=0; i<8; i++) {
-    Ov = v[i]-O;
-    for(int j=0; j<3; j++) {
-      coord = Ov*dir[j];
-      if(coord<lmin[j])
-        lmin[j] = coord;
-      if(coord>lmax[j])
-        lmax[j] = coord;
-    }
-  }
-
-  for(int i=0; i<3; i++)
-    assert(lmax[i]>lmin[i]);
-  
-  // ----------------------------------------------------
-  // Step 4: Apply expansion if needed
-  // ----------------------------------------------------
-  if(scaling_factor != 1.0) {
-    assert(scaling_factor>0.0);
-    double mid, wid;
-    for(int i=0; i<3; i++) {
-      mid = 0.5*(lmin[i] + lmax[i]);
-      wid = scaling_factor*(mid - lmin[i]);
-      lmin[i] = mid - wid;
-      lmax[i] = mid + wid;
-    }
-  }
+  GetBoundingBoxOfParallelepiped(P, PA, PB, PC, O, dir0, dir1, dir2, lmin, lmax,
+                                 scaling_factor);
 
 }
 
@@ -129,118 +51,32 @@ void
 GetBoundingBoxOfCylinderSphere(Vec3D &p0, Vec3D &n, double r, double L, bool front_cap,
                                bool back_cap, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                                Vec3D &lmin, Vec3D &lmax, //outputs
-                               bool dir_normalized, double scaling_factor)
+                               double scaling_factor)
 {
-  
+
   // ----------------------------------------------------
-  // Step 1: Get three *orthogonal* axes for the object
+  // Step 1: Get three *orthonormal* basis vectors for the object
   // ----------------------------------------------------
   Vec3D U0(0.0), U1(0.0), U2(0.0);
   double h = n.norm();
-  assert(h>=0.0);
+  assert(h>0.0);
   U0 = n/h;
-  // calculate U1 and U2
-  bool done = false;
-  for(int i=0; i<3; i++) {
-    if(U0[i]==0) {
-      U1[i] = 1.0; //got U1
-      bool gotU2 = false;
-      for(int j=i+1; j<3; j++) {
-        if(U0[j]==0) {
-          U2[j] = 1.0; //got U2;
-          gotU2 = true;
-          break;
-        }
-      }
-      if(!gotU2) {
-        int i1 = (i+1) % 3;
-        int i2 = (i+2) % 3;
-        U2[i1] = -U0[i2];
-        U2[i2] = U0[i1];
-        U2 /= U2.norm();
-      }
-      done = true;
-      break;
-    }
-  }
-  if(!done) { //!< all the three components of U0 are nonzero
-    U1[0] = 1.0;
-    U1[1] = 0.0;
-    U1[2] = -U0[0]/U0[2];
-    U1 /= U1.norm();
-    U2[0] = 1.0;
-    U2[1] = -(U0[2]*U0[2]/U0[0] + U0[0])/U0[1];
-    U2[2] = U0[2]/U0[0];
-    U2 /= U2.norm();
-  }
-  
-  // ----------------------------------------------------
-  // Step 2: Get the 8 vertices of the intermediate bounding box in (U0,U1,U2)
-  // ----------------------------------------------------
-  Vec3D v[8];
-  v[0] = p0 - r*U1 - r*U2;
-  v[1] = p0 + r*U1 - r*U2;
-  v[2] = p0 - r*U1 + r*U2;
-  v[3] = p0 + r*U1 + r*U2;
-  if(back_cap) {
-    for(int i=0; i<3; i++)
-      v[i] -= r*U0;
-  }
+  GetOrthonormalVectors(U0, U1, U2, true);
 
-  h = L + (back_cap ? r : 0.0) + (front_cap ? r : 0.0);
-  Vec3D disp = h*U0;
-  for(int i=4; i<8; i++)
-    v[i] = v[i-4] + disp;
+  // ----------------------------------------------------
+  // Step 2: Get the intermediate bounding box in (U0,U1,U2)
+  Vec3D P = p0 - r*U1 - r*U2;
+  if(back_cap)
+    P -= r*U0;
+  Vec3D PA = 2.0*r*U1;
+  Vec3D PB = 2.0*r*U2;
+  Vec3D PC = (L + (back_cap ? r : 0.0) + (front_cap ? r : 0.0))*U0;
 
   // ----------------------------------------------------
   // Step 3: Get the bounding box in dir0, dir1, dir2 axes that contains the 8 vertices
   // ----------------------------------------------------
-  Vec3D dir[3];
-  if(dir_normalized) {
-    dir[0] = dir0;
-    dir[1] = dir1;
-    dir[2] = dir2;
-  }
-  else {
-    h = dir0.norm(); assert(h!=0.0);
-    dir[0] = dir0/h;
-    h = dir1.norm(); assert(h!=0.0);
-    dir[1] = dir1/h;
-    h = dir2.norm(); assert(h!=0.0);
-    dir[2] = dir2/h;
-  }
-
-  lmin = DBL_MAX;
-  lmax = -DBL_MAX;
-  double coord;
-  Vec3D Ov;
-  for(int i=0; i<8; i++) {
-    Ov = v[i]-O;
-    for(int j=0; j<3; j++) {
-      coord = Ov*dir[j];
-      if(coord<lmin[j])
-        lmin[j] = coord;
-      if(coord>lmax[j])
-        lmax[j] = coord;
-    }
-  }
-
-  for(int i=0; i<3; i++)
-    assert(lmax[i]>lmin[i]);
-  
-  // ----------------------------------------------------
-  // Step 4: Apply expansion if needed
-  // ----------------------------------------------------
-  if(scaling_factor != 1.0) {
-    assert(scaling_factor>0.0);
-    double mid, wid;
-    for(int i=0; i<3; i++) {
-      mid = 0.5*(lmin[i] + lmax[i]);
-      wid = scaling_factor*(mid - lmin[i]);
-      lmin[i] = mid - wid;
-      lmax[i] = mid + wid;
-    }
-  }
+  GetBoundingBoxOfParallelepiped(P, PA, PB, PC, O, dir0, dir1, dir2, lmin, lmax,
+                                 scaling_factor);
 
 }
 
@@ -249,29 +85,26 @@ GetBoundingBoxOfCylinderSphere(Vec3D &p0, Vec3D &n, double r, double L, bool fro
 void
 GetBoundingBoxOfSphere(Vec3D &p0, double r, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                        Vec3D &lmin, Vec3D &lmax, //outputs
-                       bool dir_normalized, double scaling_factor)
+                       double scaling_factor)
 {
   Vec3D dir[3];
-  if(dir_normalized) {
-    dir[0] = dir0;
-    dir[1] = dir1;
-    dir[2] = dir2;
-  }
-  else {
-    double h = dir0.norm(); assert(h!=0.0);
-    dir[0] = dir0/h;
-    h = dir1.norm(); assert(h!=0.0);
-    dir[1] = dir1/h;
-    h = dir2.norm(); assert(h!=0.0);
-    dir[2] = dir2/h;
-  }
+  dir[0] = dir0;
+  dir[1] = dir1;
+  dir[2] = dir2;
+
+  Vec3D dir_norm;
+  for(int i=0; i<3; i++) {
+    dir_norm[i] = dir[i].norm();
+    assert(dir_norm[i]!=0.0);
+    dir[i] /= dir_norm[i]; //now, dir becomes unit vectors
+  }    
 
   Vec3D Op0 = p0 - O;
   double scaled = scaling_factor*r, projection;
   for(int i=0; i<3; i++) {
     projection = Op0*dir[i];
-    lmin[i] = projection - scaled;
-    lmax[i] = projection + scaled;
+    lmin[i] = (projection - scaled)/dir_norm[i];
+    lmax[i] = (projection + scaled)/dir_norm[i];
   }
 }
 
@@ -281,7 +114,7 @@ void
 GetBoundingBoxOfParallelepiped(Vec3D &p0, Vec3D &pa, Vec3D &pb, Vec3D &pc,
                                Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                                Vec3D &lmin, Vec3D &lmax, //outputs
-                               bool dir_normalized, double scaling_factor)
+                               double scaling_factor)
 {
 
 //         F________________
@@ -307,19 +140,14 @@ GetBoundingBoxOfParallelepiped(Vec3D &p0, Vec3D &pa, Vec3D &pb, Vec3D &pc,
   // ----------------------------------------------------
   // Step 2: Get the bounding box in dir0, dir1, dir2 axes that contains the 8 vertices
   // ----------------------------------------------------
-  Vec3D dir[3];
-  if(dir_normalized) {
-    dir[0] = dir0;
-    dir[1] = dir1;
-    dir[2] = dir2;
-  }
-  else {
-    double h = dir0.norm(); assert(h!=0.0);
-    dir[0] = dir0/h;
-    h = dir1.norm(); assert(h!=0.0);
-    dir[1] = dir1/h;
-    h = dir2.norm(); assert(h!=0.0);
-    dir[2] = dir2/h;
+  Vec3D dir[3], dir_norm;
+  dir[0] = dir0;
+  dir[1] = dir1;
+  dir[2] = dir2;
+  for(int i=0; i<3; i++) {
+    dir_norm[i] = dir[i].norm();
+    assert(dir_norm[i]!=0.0);
+    dir[i] /= dir_norm[i]; //now, dirs have unit norm.
   }
 
   lmin = DBL_MAX;
@@ -354,6 +182,14 @@ GetBoundingBoxOfParallelepiped(Vec3D &p0, Vec3D &pa, Vec3D &pb, Vec3D &pc,
     }
   }
 
+  // ----------------------------------------------------
+  // Step 4: Get the coordinates in terms of the original dirs
+  // ----------------------------------------------------
+  for(int i=0; i<3; i++) {
+    lmin[i] /= dir_norm[i];
+    lmax[i] /= dir_norm[i];
+  }
+
 }
 
 //---------------------------------------------------------------------
@@ -362,113 +198,31 @@ void
 GetBoundingBoxOfSpheroid(Vec3D &p0, Vec3D &n, double semi_length, double r,
                          Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                          Vec3D &lmin, Vec3D &lmax, //outputs
-                         bool dir_normalized, double scaling_factor)
+                         double scaling_factor)
 {
-  
+
   // ----------------------------------------------------
-  // Step 1: Get three *orthogonal* axes for the spheroid
+  // Step 1: Get three *orthonormal* basis vectors for the object
   // ----------------------------------------------------
   Vec3D U0(0.0), U1(0.0), U2(0.0);
   double h = n.norm();
-  assert(h>=0.0);
+  assert(h>0.0);
   U0 = n/h;
-  // calculate U1 and U2
-  bool done = false;
-  for(int i=0; i<3; i++) {
-    if(U0[i]==0) {
-      U1[i] = 1.0; //got U1
-      bool gotU2 = false;
-      for(int j=i+1; j<3; j++) {
-        if(U0[j]==0) {
-          U2[j] = 1.0; //got U2;
-          gotU2 = true;
-          break;
-        }
-      }
-      if(!gotU2) {
-        int i1 = (i+1) % 3;
-        int i2 = (i+2) % 3;
-        U2[i1] = -U0[i2];
-        U2[i2] = U0[i1];
-        U2 /= U2.norm();
-      }
-      done = true;
-      break;
-    }
-  }
-  if(!done) { //!< all the three components of U0 are nonzero
-    U1[0] = 1.0;
-    U1[1] = 0.0;
-    U1[2] = -U0[0]/U0[2];
-    U1 /= U1.norm();
-    U2[0] = 1.0;
-    U2[1] = -(U0[2]*U0[2]/U0[0] + U0[0])/U0[1];
-    U2[2] = U0[2]/U0[0];
-    U2 /= U2.norm();
-  }
+  GetOrthonormalVectors(U0, U1, U2, true);
   
   // ----------------------------------------------------
-  // Step 2: Get the 8 vertices of the intermediate bounding box in (U0,U1,U2)
+  // Step 2: Get the intermediate bounding box in (U0,U1,U2)
   // ----------------------------------------------------
-  Vec3D v[8];
-  Vec3D disp = semi_length*U0;
-  v[0] = p0 - disp - r*U1 - r*U2;
-  v[1] = p0 - disp + r*U1 - r*U2;
-  v[2] = p0 - disp - r*U1 + r*U2;
-  v[3] = p0 - disp + r*U1 + r*U2;
-  disp *= 2.0;
-  for(int i=4; i<8; i++)
-    v[i] = v[i-4] + disp;
+  Vec3D P  = p0 - semi_length*U0 - r*U1 - r*U2;
+  Vec3D PA = 2.0*r*U1;
+  Vec3D PB = 2.0*r*U2;
+  Vec3D PC = 2.0*semi_length*U0;
 
   // ----------------------------------------------------
   // Step 3: Get the bounding box in dir0, dir1, dir2 axes that contains the 8 vertices
   // ----------------------------------------------------
-  Vec3D dir[3];
-  if(dir_normalized) {
-    dir[0] = dir0;
-    dir[1] = dir1;
-    dir[2] = dir2;
-  }
-  else {
-    h = dir0.norm(); assert(h!=0.0);
-    dir[0] = dir0/h;
-    h = dir1.norm(); assert(h!=0.0);
-    dir[1] = dir1/h;
-    h = dir2.norm(); assert(h!=0.0);
-    dir[2] = dir2/h;
-  }
-
-  lmin = DBL_MAX;
-  lmax = -DBL_MAX;
-  double coord;
-  Vec3D Ov;
-  for(int i=0; i<8; i++) {
-    Ov = v[i]-O;
-    for(int j=0; j<3; j++) {
-      coord = Ov*dir[j];
-      if(coord<lmin[j])
-        lmin[j] = coord;
-      if(coord>lmax[j])
-        lmax[j] = coord;
-    }
-  }
-
-  for(int i=0; i<3; i++)
-    assert(lmax[i]>lmin[i]);
-  
-  // ----------------------------------------------------
-  // Step 4: Apply expansion if needed
-  // ----------------------------------------------------
-  if(scaling_factor != 1.0) {
-    assert(scaling_factor>0.0);
-    double mid, wid;
-    for(int i=0; i<3; i++) {
-      mid = 0.5*(lmin[i] + lmax[i]);
-      wid = scaling_factor*(mid - lmin[i]);
-      lmin[i] = mid - wid;
-      lmax[i] = mid + wid;
-    }
-  }
+  GetBoundingBoxOfParallelepiped(P, PA, PB, PC, O, dir0, dir1, dir2, lmin, lmax,
+                                 scaling_factor);
 
 }
 

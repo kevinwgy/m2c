@@ -78,7 +78,7 @@ public:
 
   /****************************************************************************
    * Calculate signed distance (>0 outside) from an arbitrary point Q to the 
-   * parallelepiped, including the closest point (P)
+   * parallelepiped, including a closest point (P) (may not be unique)
    ***************************************************************************/
   double Calculate(double *Q_, double *P = NULL) {
 
