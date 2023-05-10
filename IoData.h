@@ -81,6 +81,8 @@ struct PointData {
 
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+
   StateVariable initialConditions;
 
   PointData();
@@ -96,6 +98,8 @@ struct PlaneData {
   double cen_x, cen_y, cen_z, nx, ny, nz;
 
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
 
   StateVariable initialConditions;
 
@@ -118,6 +122,8 @@ struct ParallelepipedData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+
   StateVariable initialConditions;
 
   ParallelepipedData();
@@ -134,6 +140,8 @@ struct SphereData {
 
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
 
   StateVariable initialConditions;
 
@@ -155,6 +163,8 @@ struct SpheroidData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+
   StateVariable initialConditions;
 
   SpheroidData();
@@ -175,6 +185,8 @@ struct CylinderConeData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
  
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+
   StateVariable initialConditions;
 
   CylinderConeData();
@@ -196,6 +208,8 @@ struct CylinderSphereData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+
   StateVariable initialConditions;
 
   CylinderSphereData();
@@ -212,6 +226,8 @@ struct UserSpecifiedEnclosureData {
   double surface_thickness; //!< artificial thickness of the surface
 
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
 
   StateVariable initialConditions;
 

@@ -410,8 +410,9 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
   MPI_Comm_rank(comm, &mpi_rank);
   MPI_Comm_size(comm, &mpi_size);
 
-  int block_size = floor((double)active_nodes/(double)mpi_size); 
+  int block_size = active_nodes/mpi_size;
   int remainder = active_nodes - block_size*mpi_size;
+  assert(remainder>=0 && remainder<mpi_size);
 
   int* counts = new int[mpi_size];
   int* displacements = new int[mpi_size];
@@ -419,6 +420,7 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
     counts[i] = (i<remainder) ? block_size + 1 : block_size;
     displacements[i] = (i<remainder) ? (block_size+1)*i : block_size*i + remainder;
   }
+  assert(displacements[mpi_size-1]+counts[mpi_size-1] == active_nodes);
 
   int my_start_id = displacements[mpi_rank];
   int my_block_size = counts[mpi_rank];  

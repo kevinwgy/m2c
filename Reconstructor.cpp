@@ -268,7 +268,7 @@ void Reconstructor::TagNodesFixedByUser()
   for(auto it=iod_rec.fixes.cylindersphereMap.dataMap.begin(); 
           it!=iod_rec.fixes.cylindersphereMap.dataMap.end(); it++) {
 
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z); //base center
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
 
@@ -277,6 +277,8 @@ void Reconstructor::TagNodesFixedByUser()
     double Lhalf = 0.5*L;
     bool front_cap = (it->second->front_cap == CylinderSphereData::On);
     bool back_cap = (it->second->back_cap == CylinderSphereData::On);
+
+    x0 += Lhalf*dir; //now, x0 becoes the center of the cylinder
 
     print(comm, "- Applying constant reconstruction within cylinder-sphere %d:\n", it->first);
     print(comm, "  o cylinder center: %e %e %e;  axis: %e %e %e.\n", 

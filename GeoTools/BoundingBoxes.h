@@ -10,6 +10,7 @@
 /**************************************************************************
  * Functions for finding bounding boxes for different shapes. The axes of
  * the bounding box can be specified by the user.
+ * Note: The result may NOT be the smallest bounding box.
  *************************************************************************/
 
 namespace GeoTools {
@@ -20,7 +21,8 @@ namespace GeoTools {
  *     p0: center of the base of the cylinder (in x,y,z coords)
  *     n: axis of the cylinder (in x,y,z coords)
  *     r, L: radius and height of the cylinder
- *     cone_height: height of the cone (on top of the cylinder)
+ *     tan_alpha: tangent of the opening angle
+ *     H: height of the cone (on top of the cylinder)
  *     O, dir0, dir1, dir2: ortho. coord. system (origin, axes) of the bounding box
  *     scaling_factor: scale up/down the b.b. Default is 1.0. 
  *   Output:
@@ -31,8 +33,9 @@ namespace GeoTools {
  *         should be passed in. 
  **************************************************************************/
 void
-GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L, double cone_height,
-                             Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
+GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L, 
+                             [[maybe_unused]] double tan_alpha,
+                             double H, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                              Vec3D &lmin, Vec3D &lmax, //outputs
                              bool dir_normalized = false, double scaling_factor = 1.0);
 

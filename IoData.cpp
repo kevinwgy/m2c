@@ -68,6 +68,8 @@ PointData::PointData()
   z  = 0.0;
 
   inclusion = OVERRIDE;
+
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -75,7 +77,7 @@ PointData::PointData()
 Assigner *PointData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 6, nullAssigner);
 
   new ClassDouble<PointData>
     (ca, "X", this, &PointData::x);
@@ -89,6 +91,8 @@ Assigner *PointData::getAssigner()
   new ClassToken<PointData> (ca, "Inclusion", this,
      reinterpret_cast<int PointData::*>(&PointData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
+
+  new ClassInt<PointData>(ca, "OperationOrder", this, &PointData::order);
 
   return ca;
 }
@@ -108,6 +112,7 @@ PlaneData::PlaneData()
 
   inclusion = OVERRIDE;
 
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -115,7 +120,7 @@ PlaneData::PlaneData()
 Assigner *PlaneData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 8, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
 
   new ClassDouble<PlaneData> (ca, "Point_x", this, &PlaneData::cen_x);
   new ClassDouble<PlaneData> (ca, "Point_y", this, &PlaneData::cen_y);
@@ -129,6 +134,8 @@ Assigner *PlaneData::getAssigner()
   new ClassToken<PlaneData> (ca, "Inclusion", this,
      reinterpret_cast<int PlaneData::*>(&PlaneData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
+
+  new ClassInt<PlaneData>(ca, "OperationOrder", this, &PlaneData::order);
 
   return ca;
 }
@@ -145,6 +152,8 @@ SphereData::SphereData()
 
   side = INTERIOR;
   inclusion = OVERRIDE;
+
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -152,7 +161,7 @@ SphereData::SphereData()
 Assigner *SphereData::getAssigner()
 {
   
-  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 8, nullAssigner);
   
   new ClassDouble<SphereData> (ca, "Center_x", this, &SphereData::cen_x);
   new ClassDouble<SphereData> (ca, "Center_y", this, &SphereData::cen_y);
@@ -166,6 +175,8 @@ Assigner *SphereData::getAssigner()
   new ClassToken<SphereData> (ca, "Inclusion", this,
      reinterpret_cast<int SphereData::*>(&SphereData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
+
+  new ClassInt<SphereData>(ca, "OperationOrder", this, &SphereData::order);
 
   initialConditions.setup("InitialState", ca);
   
@@ -185,6 +196,7 @@ ParallelepipedData::ParallelepipedData()
   side = INTERIOR;
   inclusion = OVERRIDE;
 
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -192,7 +204,7 @@ ParallelepipedData::ParallelepipedData()
 Assigner *ParallelepipedData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 15, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 16, nullAssigner);
 
   new ClassDouble<ParallelepipedData> (ca, "X0", this, &ParallelepipedData::x0);
   new ClassDouble<ParallelepipedData> (ca, "Y0", this, &ParallelepipedData::y0);
@@ -218,6 +230,8 @@ Assigner *ParallelepipedData::getAssigner()
      reinterpret_cast<int ParallelepipedData::*>(&ParallelepipedData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
 
+  new ClassInt<ParallelepipedData>(ca, "OperationOrder", this, &ParallelepipedData::order);
+
   initialConditions.setup("InitialState", ca);
 
   return ca;
@@ -241,6 +255,8 @@ SpheroidData::SpheroidData()
 
   side = INTERIOR;
   inclusion = OVERRIDE;
+
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -248,7 +264,7 @@ SpheroidData::SpheroidData()
 Assigner *SpheroidData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 11, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 12, nullAssigner);
 
   new ClassDouble<SpheroidData> (ca, "Center_x", this, &SpheroidData::cen_x);
   new ClassDouble<SpheroidData> (ca, "Center_y", this, &SpheroidData::cen_y);
@@ -266,6 +282,8 @@ Assigner *SpheroidData::getAssigner()
   new ClassToken<SpheroidData> (ca, "Inclusion", this,
      reinterpret_cast<int SpheroidData::*>(&SpheroidData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
+
+  new ClassInt<SpheroidData>(ca, "OperationOrder", this, &SpheroidData::order);
 
   initialConditions.setup("InitialState", ca);
 
@@ -291,13 +309,15 @@ CylinderConeData::CylinderConeData() {
 
   side = INTERIOR;
   inclusion = OVERRIDE;
+
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
 
 Assigner *CylinderConeData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
 
   new ClassDouble<CylinderConeData> (ca, "Axis_x", this, &CylinderConeData::nx);
   new ClassDouble<CylinderConeData> (ca, "Axis_y", this, &CylinderConeData::ny);
@@ -318,6 +338,8 @@ Assigner *CylinderConeData::getAssigner()
   new ClassToken<CylinderConeData> (ca, "Inclusion", this,
      reinterpret_cast<int CylinderConeData::*>(&CylinderConeData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
+
+  new ClassInt<CylinderConeData>(ca, "OperationOrder", this, &CylinderConeData::order);
 
   initialConditions.setup("InitialState", ca);
 
@@ -343,20 +365,22 @@ CylinderSphereData::CylinderSphereData() {
 
   side = INTERIOR;
   inclusion = OVERRIDE;
+
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
 
 Assigner *CylinderSphereData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
 
   new ClassDouble<CylinderSphereData> (ca, "Axis_x", this, &CylinderSphereData::nx);
   new ClassDouble<CylinderSphereData> (ca, "Axis_y", this, &CylinderSphereData::ny);
   new ClassDouble<CylinderSphereData> (ca, "Axis_z", this, &CylinderSphereData::nz);
-  new ClassDouble<CylinderSphereData> (ca, "CylinderCenter_x", this, &CylinderSphereData::cen_x);
-  new ClassDouble<CylinderSphereData> (ca, "CylinderCenter_y", this, &CylinderSphereData::cen_y);
-  new ClassDouble<CylinderSphereData> (ca, "CylinderCenter_z", this, &CylinderSphereData::cen_z);
+  new ClassDouble<CylinderSphereData> (ca, "BaseCenter_x", this, &CylinderSphereData::cen_x);
+  new ClassDouble<CylinderSphereData> (ca, "BaseCenter_y", this, &CylinderSphereData::cen_y);
+  new ClassDouble<CylinderSphereData> (ca, "BaseCenter_z", this, &CylinderSphereData::cen_z);
   new ClassDouble<CylinderSphereData> (ca, "CylinderRadius", this, &CylinderSphereData::r);
   new ClassDouble<CylinderSphereData> (ca, "CylinderHeight", this, &CylinderSphereData::L);
   new ClassToken<CylinderSphereData> (ca, "FrontSphericalCap", this,
@@ -374,6 +398,8 @@ Assigner *CylinderSphereData::getAssigner()
      reinterpret_cast<int CylinderSphereData::*>(&CylinderSphereData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
 
+  new ClassInt<CylinderSphereData>(ca, "OperationOrder", this, &CylinderSphereData::order);
+
   initialConditions.setup("InitialState", ca);
 
   return ca;
@@ -387,13 +413,15 @@ UserSpecifiedEnclosureData::UserSpecifiedEnclosureData()
   surface_thickness = 1.0e-8;
 
   inclusion = OVERRIDE;
+
+  order = 0;
 }
 
 //------------------------------------------------------------------------------
 
 Assigner *UserSpecifiedEnclosureData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 4, nullAssigner);
 
   new ClassStr<UserSpecifiedEnclosureData>(ca, "SurfaceMeshFile", this,
           &UserSpecifiedEnclosureData::surface_filename);
@@ -406,6 +434,8 @@ Assigner *UserSpecifiedEnclosureData::getAssigner()
   new ClassToken<UserSpecifiedEnclosureData> (ca, "Inclusion", this,
      reinterpret_cast<int UserSpecifiedEnclosureData::*>(&UserSpecifiedEnclosureData::inclusion), 3,
      "Override", 0, "Intersection", 1, "Union", 2);
+
+  new ClassInt<UserSpecifiedEnclosureData>(ca, "OperationOrder", this, &UserSpecifiedEnclosureData::order);
 
   return ca;
 }

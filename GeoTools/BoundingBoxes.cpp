@@ -10,8 +10,9 @@ namespace GeoTools {
 //---------------------------------------------------------------------
 
 void
-GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L, double cone_height,
-                             Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
+GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L,
+                             [[maybe_unused]] double tan_alpha,
+                             double H, Vec3D &O, Vec3D &dir0, Vec3D &dir1, Vec3D &dir2,
                              Vec3D &lmin, Vec3D &lmax, //outputs
                              bool dir_normalized, double scaling_factor)
 {
@@ -66,7 +67,7 @@ GetBoundingBoxOfCylinderCone(Vec3D &p0, Vec3D &n, double r, double L, double con
   v[1] = p0 + r*U1 - r*U2;
   v[2] = p0 - r*U1 + r*U2;
   v[3] = p0 + r*U1 + r*U2;
-  Vec3D disp = (L + cone_height)*U0;
+  Vec3D disp = (L + H)*U0;
   for(int i=4; i<8; i++)
     v[i] = v[i-4] + disp;
 

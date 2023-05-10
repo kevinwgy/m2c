@@ -323,6 +323,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
       exit_mpi();
     }
 
+    if(it->second->order != 0) {
+      print_error("*** Error: Level set initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
@@ -350,6 +355,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
     if(it->second->inclusion != CylinderConeData::OVERRIDE) {
       print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->order != 0) {
+      print_error("*** Error: Level set initialization does not support operation orders at the moment.\n");
       exit_mpi();
     }
 
@@ -420,8 +430,13 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
       exit_mpi();
     }
 
+    if(it->second->order != 0) {
+      print_error("*** Error: Level set initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
 
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z); //center of base
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
 
@@ -431,9 +446,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
     bool front_cap = (it->second->front_cap == CylinderSphereData::On);
     bool back_cap = (it->second->back_cap == CylinderSphereData::On);
  
+    x0 += Lhalf*dir; //now, x0 becomes the center of the cylinder
+
     // define the geometry
     vector<pair<Vec3D, Vec3D> > lineSegments; //boundary of the cylinder
-    Vec3D p0(-Lhalf, 0.0, 0.0); //x0
+    Vec3D p0(-Lhalf, 0.0, 0.0); 
     Vec3D p1(-Lhalf, R, 0.0);
     Vec3D p2(Lhalf, R, 0.0);
     Vec3D p3(Lhalf, 0.0, 0.0);
@@ -501,6 +518,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
       exit_mpi();
     }
 
+    if(it->second->order != 0) {
+      print_error("*** Error: Level set initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     double dist;
 
@@ -527,6 +549,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
     if(it->second->inclusion != ParallelepipedData::OVERRIDE) {
       print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->order != 0) {
+      print_error("*** Error: Level set initialization does not support operation orders at the moment.\n");
       exit_mpi();
     }
 
@@ -571,6 +598,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
       exit_mpi();
     }
 
+    if(it->second->order != 0) {
+      print_error("*** Error: Level set initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
 
@@ -596,6 +628,11 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
     if(enclosure.second->inclusion != UserSpecifiedEnclosureData::OVERRIDE) {
       print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    if(enclosure.second->order != 0) {
+      print_error("*** Error: Level set initialization does not support operation orders at the moment.\n");
       exit_mpi();
     }
 

@@ -738,6 +738,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       exit_mpi();
     }
 
+    if(it->second->order != 0) {
+      print_error("*** Error: Initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
@@ -771,6 +776,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     if(it->second->inclusion != CylinderConeData::OVERRIDE) {
       print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->order != 0) {
+      print_error("*** Error: Initialization does not support operation orders at the moment.\n");
       exit_mpi();
     }
 
@@ -818,7 +828,12 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       exit_mpi();
     }
 
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    if(it->second->order != 0) {
+      print_error("*** Error: Initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
+
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z); //base center
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
 
@@ -827,6 +842,8 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
     double Lhalf = 0.5*L;
     bool front_cap = (it->second->front_cap == CylinderSphereData::On);
     bool back_cap = (it->second->back_cap == CylinderSphereData::On);
+
+    x0 += Lhalf*dir; //now, x0 becomes the center of the cylinder
 
     Vec3D xf = x0 + Lhalf*dir;
     Vec3D xb = x0 - Lhalf*dir;
@@ -873,6 +890,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       exit_mpi();
     }
 
+    if(it->second->order != 0) {
+      print_error("*** Error: Initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     double dist;
     for(int k=k0; k<kmax; k++)
@@ -903,6 +925,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     if(it->second->inclusion != ParallelepipedData::OVERRIDE) {
       print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    if(it->second->order != 0) {
+      print_error("*** Error: Initialization does not support operation orders at the moment.\n");
       exit_mpi();
     }
 
@@ -952,6 +979,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       exit_mpi();
     }
 
+    if(it->second->order != 0) {
+      print_error("*** Error: Initialization does not support operation orders at the moment.\n");
+      exit_mpi();
+    }
+
     Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
     Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
     GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->semi_length, it->second->radius);
@@ -979,6 +1011,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     if(enclosure.second->inclusion != UserSpecifiedEnclosureData::OVERRIDE) {
       print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+      exit_mpi();
+    }
+
+    if(enclosure.second->order != 0) {
+      print_error("*** Error: Initialization does not support operation orders at the moment.\n");
       exit_mpi();
     }
 
@@ -1039,6 +1076,11 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
       if(it->second->inclusion != PointData::OVERRIDE) {
         print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
+
+      if(it->second->order != 0) {
+        print_error("*** Error: Initialization does not support operation orders at the moment.\n");
         exit_mpi();
       }
 
