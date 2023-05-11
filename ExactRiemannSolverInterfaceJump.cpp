@@ -91,7 +91,7 @@ ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir,
 
 
   // A Trivial Case
-  if(ul == ur && pl == pr) {
+  if(ul == ur && pl + delta_p == pr) {
     FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol, rhor, ul, pl, 
 	trans_rare, Vrare_x0, //inputs
 	Vs, id, Vsm, Vsp/*outputs*/);
@@ -124,7 +124,6 @@ ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir,
 	Vsm[i] = Vm[i];
 	Vsp[i] = Vp[i];
       }
-      Vsp[4] = Vp[4] + delta_p; // include pressure jump in the right star state
       double u_avg = 0.5*(ul+ur);
       if(u_avg >= 0) {
 	id = idl;
@@ -137,7 +136,7 @@ ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir,
       }
 
       if(verbose>=1)
-	cout << "Warning: Riemann solver failed to find an initial bracketing interval. Activated the non-adaptive version." << endl; 
+	cout << "Warning: Riemann solver failed to find an initial bracketing interval." << endl; 
       return 1;
     }
 
@@ -146,7 +145,7 @@ ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir,
 	Vs, id, Vsm, Vsp /*outputs*/);
 
     if(verbose>=1)
-      cout << "Warning: Riemann solver failed to find an initial bracketing interval. Activated the non-adaptive version." << endl;
+      cout << "Warning: Riemann solver failed to find an initial bracketing interval." << endl;
     return 1;
   }
 
@@ -287,7 +286,7 @@ try_again:
     }
 
     if(verbose>=1)
-      cout << "Warning: Exact Riemann solver (adaptive) failed to converge. Activated the non-adaptive version." << endl;
+      cout << "Warning: Exact Riemann solver (adaptive) failed to converge." << endl;
     return 1;
   }
 

@@ -149,7 +149,7 @@ int main(int argc, char* argv[])
 
   //! Initialize the exact Riemann problem solver.
   ExactRiemannSolverBase *riemann = NULL;
-    riemann = new ExactRiemannSolverInterfaceJump(vf, iod.exact_riemann, 0.0);
+    riemann = new ExactRiemannSolverInterfaceJump(vf, iod.exact_riemann, -8.0e4);
 
 
   //! Initialize FluxFcn for the advector flux of the N-S equations
