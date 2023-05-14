@@ -8,13 +8,14 @@
 #include<Vector2D.h>
 #include<Vector3D.h>
 #include<Vector5D.h>
+#include<algorithm> //copy()
 #include<cassert>
 
 //------------------------------------------------------------------------------
 
 template<typename T>
 void
-CommunicationTools::GatherArray(MPI_Comm& comm, int gatherer, std::vector<T>& my_data,
+CommunicationTools::GatherVector(MPI_Comm& comm, int gatherer, std::vector<T>& my_data,
                                 std::vector<T>* all_data_ptr)
 {
   // figure out the data type
@@ -37,7 +38,7 @@ CommunicationTools::GatherArray(MPI_Comm& comm, int gatherer, std::vector<T>& my
     double_or_int = false;
     multiplier = 3;
   } else {
-    print_error(comm, "*** Error: gather_array detected unknown data type.\n");
+    print_error(comm, "*** Error: GatherVector detected unknown data type.\n");
     exit(-1);
   }
 
@@ -90,10 +91,85 @@ CommunicationTools::GatherArray(MPI_Comm& comm, int gatherer, std::vector<T>& my
 
 //------------------------------------------------------------------------------
 
+template<typename T>
+void
+CommunicationTools::AllGatherVector(MPI_Comm& comm, std::vector<T>& data)
+{
+  // figure out the data type
+  int multiplier = 1;
+  bool double_or_int = true;
+  if(std::is_same<T, double>::value) {
+    /*nothing*/
+  } else if(std::is_same<T, Vec2D>::value) {
+    multiplier = 2;
+  } else if(std::is_same<T, Vec3D>::value) {
+    multiplier = 3;
+  } else if(std::is_same<T, Vec5D>::value) {
+    multiplier = 5;
+  } else if(std::is_same<T, int>::value) {
+    double_or_int = false;
+  } else if(std::is_same<T, Int2>::value) {
+    double_or_int = false;
+    multiplier = 2;
+  } else if(std::is_same<T, Int3>::value) {
+    double_or_int = false;
+    multiplier = 3;
+  } else {
+    print_error(comm, "*** Error: AllGatherVector detected unknown data type.\n");
+    exit(-1);
+  }
+
+  int mpi_rank, mpi_size;
+  MPI_Comm_rank(comm, &mpi_rank);
+  MPI_Comm_size(comm, &mpi_size);
+
+  // talk to get package size
+  std::vector<int> counts(mpi_size, 0);
+  counts[mpi_rank] = multiplier*data.size();
+  MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts.data(), 1, MPI_INT, comm);
+
+  // work
+  std::vector<int> displacements(mpi_size, 0);
+  int counter = 0;
+  for(int i=0; i<(int)displacements.size(); i++) {
+    displacements[i] = counter;
+    counter += counts[i];
+  }
+
+  std::vector<T> my_data = data; //temporarily stores my data
+  data.resize(counter/multiplier); //existing data outside my range will be overwritten after "Allgatherv"
+  int T0 = displacements[mpi_rank]/multiplier;
+  for(int i=0; i<(int)my_data.size(); i++)
+    data[T0 + i] = my_data[i]; //add my data to the full data vector
+  
+  // talk again to exchange data
+  if(double_or_int)
+    MPI_Allgatherv(MPI_IN_PLACE, counts[mpi_rank], MPI_DOUBLE, (double*)data.data(), counts.data(),
+                   displacements.data(), MPI_DOUBLE, comm);
+  else
+    MPI_Allgatherv(MPI_IN_PLACE, counts[mpi_rank], MPI_INT, (int*)data.data(), counts.data(),
+                   displacements.data(), MPI_INT, comm);
+
+}
+
+
+//------------------------------------------------------------------------------
+
 template void
-CommunicationTools::GatherArray<double>(MPI_Comm& comm, int gatherer,
+CommunicationTools::GatherVector<double>(MPI_Comm& comm, int gatherer,
                                         std::vector<double>& my_data,
                                         std::vector<double>* all_data_ptr);
+
+template void
+CommunicationTools::GatherVector<Vec3D>(MPI_Comm& comm, int gatherer,
+                                       std::vector<Vec3D>& my_data,
+                                       std::vector<Vec3D>* all_data_ptr);
+
+template void
+CommunicationTools::AllGatherVector<double>(MPI_Comm& comm, std::vector<double>& data);
+
+template void
+CommunicationTools::AllGatherVector<Vec3D>(MPI_Comm& comm, std::vector<Vec3D>& data);
 
 //------------------------------------------------------------------------------
 

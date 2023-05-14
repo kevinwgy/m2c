@@ -1266,8 +1266,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   // -----------------------------------------------------------
   int worker = 0;
   vector<double> all_data, all_shared_data;
-  CommunicationTools::GatherArray<double>(comm, worker, my_data, &all_data);
-  CommunicationTools::GatherArray<double>(comm, worker, my_shared_data, &all_shared_data);
+  CommunicationTools::GatherVector<double>(comm, worker, my_data, &all_data);
+  CommunicationTools::GatherVector<double>(comm, worker, my_shared_data, &all_shared_data);
  
 
   // ---------------------------------
