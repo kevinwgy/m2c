@@ -155,10 +155,90 @@ CommunicationTools::AllGatherVector(MPI_Comm& comm, std::vector<T>& data)
 
 //------------------------------------------------------------------------------
 
+template<typename T>
+void
+CommunicationTools::GatherVectorOfVectors(MPI_Comm& comm, int gatherer, std::vector<std::vector<T> >& my_data,
+                                          std::vector<std::vector<T> >* all_data_ptr)
+{
+
+  // First, construct a vector that stores the size of each inner vector
+  std::vector<int> my_data_size;
+  my_data_size.reserve(my_data.size());
+  for(auto&& d : my_data)
+    my_data_size.push_back(d.size());
+  std::vector<int> all_data_size;
+  GatherVector<int>(comm, gatherer, my_data_size, &all_data_size);
+
+
+  // Second, Create a long vector that combines the two layers
+  std::vector<T> my_data1D;
+  for(auto&& dat : my_data)
+    for(auto&& d : dat)
+      my_data1D.push_back(d);
+  std::vector<T> all_data1D;
+  GatherVector<T>(comm, gatherer, my_data1D, &all_data1D);
+
+
+  // "gatherer" gets the final 2D vector
+  int mpi_rank;
+  MPI_Comm_rank(comm, &mpi_rank);
+  if(mpi_rank == gatherer) { 
+    assert(all_data_ptr);
+    all_data_ptr->clear();
+    all_data_ptr->reserve(all_data_size.size());
+    auto it = all_data1D.begin();
+    for(auto&& dsize : all_data_size) {
+     all_data_ptr->push_back(std::vector<T>(it, it+dsize));
+     it += dsize;
+    }
+  }
+ 
+}
+
+//------------------------------------------------------------------------------
+
+template<typename T>
+void
+CommunicationTools::AllGatherVectorOfVectors(MPI_Comm& comm, std::vector<std::vector<T> >& data)
+{
+
+  // First, construct a vector that stores the size of each inner vector
+  std::vector<int> data_size;
+  data_size.reserve(data.size());
+  for(auto&& d : data)
+    data_size.push_back(d.size());
+  AllGatherVector<int>(comm, data_size);
+
+
+  // Second, Create a long vector that combines the two layers
+  std::vector<T> data1D;
+  for(auto&& dat : data)
+    for(auto&& d : dat)
+      data1D.push_back(d);
+  AllGatherVector<T>(comm, data1D);
+
+  // get the final 2D vector
+  data.clear();
+  data.reserve(data_size.size());
+  auto it = data1D.begin();
+  for(auto&& dsize : data_size) {
+   data.push_back(std::vector<T>(it, it+dsize));
+   it += dsize;
+  }
+   
+}
+
+//------------------------------------------------------------------------------
+
 template void
 CommunicationTools::GatherVector<double>(MPI_Comm& comm, int gatherer,
                                         std::vector<double>& my_data,
                                         std::vector<double>* all_data_ptr);
+
+template void
+CommunicationTools::GatherVectorOfVectors<double>(MPI_Comm& comm, int gatherer,
+                                                  std::vector<std::vector<double> >& my_data,
+                                                  std::vector<std::vector<double> >* all_data_ptr);
 
 template void
 CommunicationTools::GatherVector<Vec3D>(MPI_Comm& comm, int gatherer,
@@ -166,10 +246,27 @@ CommunicationTools::GatherVector<Vec3D>(MPI_Comm& comm, int gatherer,
                                        std::vector<Vec3D>* all_data_ptr);
 
 template void
+CommunicationTools::GatherVectorOfVectors<Vec3D>(MPI_Comm& comm, int gatherer,
+                                                 std::vector<std::vector<Vec3D> >& my_data,
+                                                 std::vector<std::vector<Vec3D> >* all_data_ptr);
+
+template void
 CommunicationTools::AllGatherVector<double>(MPI_Comm& comm, std::vector<double>& data);
 
 template void
 CommunicationTools::AllGatherVector<Vec3D>(MPI_Comm& comm, std::vector<Vec3D>& data);
+
+template void
+CommunicationTools::AllGatherVector<int>(MPI_Comm& comm, std::vector<int>& data);
+
+template void
+CommunicationTools::AllGatherVectorOfVectors<int>(MPI_Comm& comm, std::vector<std::vector<int> >& data);
+
+template void
+CommunicationTools::AllGatherVectorOfVectors<double>(MPI_Comm& comm, std::vector<std::vector<double> >& data);
+
+template void
+CommunicationTools::AllGatherVectorOfVectors<Vec3D>(MPI_Comm& comm, std::vector<std::vector<Vec3D> >& data);
 
 //------------------------------------------------------------------------------
 

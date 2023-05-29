@@ -359,7 +359,7 @@ DynamicLoadCalculator::ReadSnapshot(string filename, vector<vector<double> >& S)
 //-----------------------------------------------------------------
 
 void
-DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3>* &tree, vector<PointIn3D>& p)
+DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3>* tree, vector<PointIn3D>& p)
 {
   if(tree)
     delete tree; //build a new tree

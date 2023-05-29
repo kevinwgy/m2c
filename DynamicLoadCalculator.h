@@ -73,7 +73,7 @@ private:
   void ReadMetaFile(std::string filename);
   void ReadSnapshot(std::string filename, std::vector<std::vector<double> >& S);
 
-  void BuildKDTree(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3>* &tree, std::vector<PointIn3D> &tree_data);
+  void BuildKDTree(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3>* tree, std::vector<PointIn3D> &tree_data);
   void InterpolateInSpace(std::vector<std::vector<double> >& S, KDTree<PointIn3D,3>* tree,
                           std::vector<Vec3D>& X, int active_nodes, Var var, int var_dim, double* output);
   void InterpolateInTime(double t1, double* input1, double t2, double* input2,

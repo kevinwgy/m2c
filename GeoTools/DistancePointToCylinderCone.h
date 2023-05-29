@@ -51,7 +51,7 @@ public:
     assert(norm!=0.0);
     dir /= norm;
 
-    double Hmax = R/tan_alpha;
+    Hmax = R/tan_alpha;
 
     // define the geometry
     Vec3D p0(0.0, 0.0, 0.0); //x0

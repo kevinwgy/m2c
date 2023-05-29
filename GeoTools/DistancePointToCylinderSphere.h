@@ -43,7 +43,7 @@ public:
     assert(norm!=0.0);
     dir /= norm;
 
-    double Lhalf = L/2.0;
+    Lhalf = L/2.0;
 
     xcen += Lhalf*dir; //xcen is the center of the cylinder
 
@@ -76,7 +76,7 @@ public:
       rdir /= r;
 
     //calculate unsigned distance from node to the boundary of the cylinder
-    double dist, rb, rf;
+    double dist, rb(0.0), rf(0.0);
     if(back_cap && x<=-Lhalf) {
       Vec3D vec = *(Vec3D *)Q_ - xb;
       rb = vec.norm();

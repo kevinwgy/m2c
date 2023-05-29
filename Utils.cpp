@@ -192,7 +192,7 @@ void print(FILE* fd, const char format[],...)
     va_end(Argp);
   }
 
-  MPI_Barrier(m2c_comm);
+  //MPI_Barrier(m2c_comm); (This slows down the code!)
   return;
 }
 
@@ -210,7 +210,7 @@ void print(MPI_Comm& comm, FILE* fd, const char format[],...)
     va_end(Argp);
   }
 
-  MPI_Barrier(comm);
+  //MPI_Barrier(comm); (This slows down the code)
   return;
 }
 

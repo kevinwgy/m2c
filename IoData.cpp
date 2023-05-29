@@ -206,9 +206,9 @@ Assigner *ParallelepipedData::getAssigner()
 
   ClassAssigner *ca = new ClassAssigner("normal", 16, nullAssigner);
 
-  new ClassDouble<ParallelepipedData> (ca, "X0", this, &ParallelepipedData::x0);
-  new ClassDouble<ParallelepipedData> (ca, "Y0", this, &ParallelepipedData::y0);
-  new ClassDouble<ParallelepipedData> (ca, "Z0", this, &ParallelepipedData::z0);
+  new ClassDouble<ParallelepipedData> (ca, "Px", this, &ParallelepipedData::x0);
+  new ClassDouble<ParallelepipedData> (ca, "Py", this, &ParallelepipedData::y0);
+  new ClassDouble<ParallelepipedData> (ca, "Pz", this, &ParallelepipedData::z0);
 
   new ClassDouble<ParallelepipedData> (ca, "Ax", this, &ParallelepipedData::ax);
   new ClassDouble<ParallelepipedData> (ca, "Ay", this, &ParallelepipedData::ay);
