@@ -1877,6 +1877,10 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
   NPhi.RestoreDataPointerAndInsert();
 }
 
+  void ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &KappaPhi) {
+
+  }
+
 //-----------------------------------------------------
 
 

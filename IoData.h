@@ -742,6 +742,8 @@ struct ExactRiemannSolverData {
                               //find a bracketing interval and the best approximation obtained is poor.
                               //this is the last resort. Usually it can be set to a very low but physical pressure
 
+  double surface_tension_coefficient; // used when surface tension is considered
+
   ExactRiemannSolverData();
   ~ExactRiemannSolverData() {}
 

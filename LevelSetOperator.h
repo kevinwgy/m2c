@@ -97,6 +97,8 @@ public:
 
   void ComputeNormalDirection(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
 
+  void ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &KappaPhi);
+
   void Destroy();
 
   //! for debugging/testing the level set solver (Euler / N-S solver not activated)
