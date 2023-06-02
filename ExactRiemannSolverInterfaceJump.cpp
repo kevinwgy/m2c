@@ -12,6 +12,12 @@ extern int verbose;
 
 #define INVALID_MATERIAL_ID -1
 
+ExactRiemannSolverInterfaceJump::ExactRiemannSolverInterfaceJump(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_) : ExactRiemannSolverBase(vf_, iod_riemann_) {
+  surface_tension_coefficient = iod_riemann.surface_tension_coefficient;
+  surface_tension_materialid = iod_riemann.surface_tension_materialid;
+  interface_curvature = 0.0;
+  delta_p = 0.0; 
+}
 
 //-----------------------------------------------------
 /** Solves the one-dimensional Riemann problem. Extension of Kamm 2015 
@@ -28,6 +34,9 @@ ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir,
     double *Vsm /*left 'star' solution*/,
     double *Vsp /*right 'star' solution*/)
 {
+
+  ComputePressureJump(idr);
+
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
   double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
@@ -874,5 +883,4 @@ ExactRiemannSolverInterfaceJump::FinalizeSolution(double *dir, double *Vm, doubl
 
 }
 
-
-
+void ExactRiemannSolverInterfaceJump::SetLevelSetOperatorInRiemannSolver(std::vector<LevelSetOperator*> lso_) {lso = lso_;}

@@ -3014,3 +3014,7 @@ myLabel:
 //----------------------------------------------------------------------------------
 
 
+  void ExactRiemannSolverBase::SetLevelSetOperatorInRiemannSolver(std::vector<LevelSetOperator*> lso_) {
+    std::cout << "ExactRiemannSolverBase::SetLevelSetOperatorInRiemannSolver: This function in the base class should be overrided by the one in the derived class \"ExactRiemannSolverInterfaceJump\". Saying this message indicating something is wrong." << std::endl;
+    exit(-1);
+  }

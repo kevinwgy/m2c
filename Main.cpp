@@ -296,7 +296,9 @@ int main(int argc, char* argv[])
           "N-S solver not activated.\033[0m\n", (int)LEVELSET_TEST);
   }
 #endif
-  
+  riemann->SetLevelSetOperatorInRiemannSolver(lso); // update Riemann solver object after initializing lso 
+
+ 
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
   if((int)lso.size()>1) { //at each node, at most one "phi" can be negative

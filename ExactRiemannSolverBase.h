@@ -6,8 +6,10 @@
 #ifndef _EXACT_RIEMANN_SOLVER_BASE_H_
 #define _EXACT_RIEMANN_SOLVER_BASE_H_
 
+#include <LevelSetOperator.h>
 #include <VarFcnBase.h>
 #include <vector>
+
 /*****************************************************************************************
  * Base class for solving one-dimensional, single- or two-material Riemann problems
  *****************************************************************************************/
@@ -30,6 +32,7 @@ protected:
 
 public:
   ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_);
+
   virtual ~ExactRiemannSolverBase() {}
 
   virtual int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
@@ -47,6 +50,8 @@ public:
                                              double *Ustar, /*interface/wall velocity (3D)*/
                                              double *Vs, int &id, /*solution at xi = 0 (i.e. x=0), id = -1 if invalid*/
                                              double *Vsm /*left 'star' solution*/);
+
+  virtual void SetLevelSetOperatorInRiemannSolver(std::vector<LevelSetOperator*> lso_);
 
 #if PRINT_RIEMANN_SOLUTION == 1
   vector<vector<double> > sol1d;

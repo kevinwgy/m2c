@@ -743,6 +743,7 @@ struct ExactRiemannSolverData {
                               //this is the last resort. Usually it can be set to a very low but physical pressure
 
   double surface_tension_coefficient; // used when surface tension is considered
+  double surface_tension_materialid;
 
   ExactRiemannSolverData();
   ~ExactRiemannSolverData() {}
