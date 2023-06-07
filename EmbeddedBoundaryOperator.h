@@ -122,6 +122,12 @@ private:
 
   void ReadMeshFile(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
 
+  void ReadMeshFileInTopFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
+
+  void ReadMeshFileInSTLFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
+
+  void ReadMeshFileInOBJFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
+
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
 
   //! Compute "Fs" and "FAs".

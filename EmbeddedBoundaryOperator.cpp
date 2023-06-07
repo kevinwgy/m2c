@@ -424,12 +424,33 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
 void
 EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es)
 {
+  string fname(filename);
+  auto loc = fname.find_last_of(".");
+  if(loc>=fname.size()-1) {//assume the default format (top) if file extension not detected
+    ReadMeshFileInTopFormat(filename, Xs, Es); 
+    return;
+  }
+
+  string ext = fname.substr(loc+1);
+  if(ext == "obj" || ext == "Obj" || ext == "OBJ")
+    ReadMeshFileInOBJFormat(filename, Xs, Es);
+  else if(ext == "stl" || ext == "Stl" || ext == "STL")
+    ReadMeshFileInSTLFormat(filename, Xs, Es);
+  else
+    ReadMeshFileInTopFormat(filename, Xs, Es); 
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::ReadMeshFileInTopFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es)
+{
 
   // read data from the surface input file.
   FILE *topFile;
   topFile = fopen(filename, "r");
   if(topFile == NULL) {
-    print_error("*** Error: embedded structure surface mesh doesn't exist (%s).\n", filename);
+    print_error("*** Error: Cannot open embedded surface mesh file (%s).\n", filename);
     exit_mpi();
   }
  
@@ -680,6 +701,205 @@ EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, vector<Vec3D> &Xs, 
     }
   }
 
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::ReadMeshFileInOBJFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es)
+{
+  // This function is adapted from toys::obj2top. But unlike the "toy", it does not separate different groups
+
+  Xs.clear();
+  Es.clear();
+
+  std::ifstream input(filename, std::ifstream::in);
+  if(input.fail()) {
+    print_error("*** Error: Cannot open embedded surface mesh file (%s).\n", filename);
+    exit_mpi();
+  }
+
+  string line, word;
+
+  double area_tol = 1e-12;
+
+  Vec3D xyz;
+  int nVerts, maxVerts = 1024, n1, n2, n3;
+  vector<int> ind(maxVerts); //should not have polygons with more than 1024 vertices!
+  vector<Vec3D> nodes;
+  vector<std::pair<string, vector<Int3> > > elem_groups;
+  vector<Int3> *elems = NULL; 
+
+  std::set<string> ignored_keywords;
+
+  int line_number = 0;
+
+  while(getline(input, line)) {
+
+    line_number++;
+
+    auto first_nonspace_id = line.find_first_not_of(" ");
+    if((unsigned)first_nonspace_id<line.size() && line[first_nonspace_id] == '#')
+      continue;  //this line is comment
+
+    std::stringstream linestream(line);
+    if(!(linestream >> word)) //the first word in the line
+      continue;
+
+    if(word == "v") { //vertex
+      linestream >> xyz[0] >> xyz[1] >> xyz[2]; //skipping vertex properties (if present)
+      Xs.push_back(xyz);
+    }
+    else if(word == "g") { //element group
+      string group_name;
+      linestream >> group_name; //the second word in the line -> group name  
+      while(linestream >> word) //in stl, group name may have multiple words...
+        group_name = group_name + "_" + word;
+
+      bool found(false);
+      for(auto&& eg : elem_groups) {
+        if(eg.first == group_name) {
+          elems = &eg.second;
+          found = true;
+          break;
+        }
+      }
+      if(!found) {
+        elem_groups.push_back(std::make_pair(group_name, vector<Int3>()));
+        elems = &elem_groups.back().second;
+      }
+    }
+    else if(word == "f") { //face element
+
+      if(elem_groups.empty()) { //user did not specify group name
+        assert(elems==NULL);
+        elem_groups.push_back(std::make_pair("Default", vector<Int3>()));
+        elems = &elem_groups.back().second;
+      }
+
+      nVerts = 0;
+      while(linestream >> word) { 
+        ind[nVerts++] = std::stoi(word.substr(0,word.find("/")));
+        if(nVerts>maxVerts) {
+          print_error("*** Error: Found a face element in %s with more than %d nodes.\n",
+                      filename, maxVerts); 
+          exit_mpi(); 
+        }
+      }
+      if(nVerts<3) {
+        print_error("*** Error: Found a face element in %s with only %d nodes.\n",
+                    filename, nVerts); 
+        exit_mpi(); 
+      }
+      for(int i=1; i<nVerts-1; i++)
+        elems->push_back(Int3(ind[0], ind[i], ind[i+1]));
+    }
+    else
+      ignored_keywords.insert(word);
+  }
+
+
+  for(auto&& key : ignored_keywords) {
+    if(!key.empty())
+      print_warning("Warning: Ignored lines in %s starting with %s.\n",
+                    filename, key.c_str());
+  }
+
+  if(verbose>=1) {
+    print("- Found %d nodes in %s.\n", (int)Xs.size(), filename);
+    for(auto&& eg : elem_groups)
+      print("- Obtained %d triangular elements in group %s from %s.\n",
+            (int)eg.second.size(), eg.first.c_str(), filename);
+
+    if(elem_groups.size()>=2)
+      print_warning("Warning: Merging multiple (%d) groups into one.\n", (int)elem_groups.size()); 
+  }
+
+
+  for(auto&& eg : elem_groups) {
+    for(auto&& e : eg.second) {
+      n1 = e[0]; n2 = e[1]; n3 = e[2];
+      if(n1<=0 || n1>(int)nodes.size() || n2<=0 || n2>(int)nodes.size() ||
+         n3<=0 || n3>(int)nodes.size()) {
+        print_error("*** Error: Found element (%d %d %d) in %s with unknown node(s).\n",
+                n1, n2, n3, filename);
+        exit_mpi();
+      }
+      Vec3D cr = (nodes[n2-1] - nodes[n1-1])^(nodes[n3-1] - nodes[n1-1]);
+      if(cr.norm() < area_tol) {
+        print_warning("Warning: Detected a degenerate triangle with area %e --- dropped from the list.\n",
+                      cr.norm());
+        continue;
+      }
+      Es.push_back(Int3(n1-1,n2-1,n3-1)); //node id starts at 0
+    }
+  }
+
+  input.close();
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::ReadMeshFileInSTLFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es)
+{
+  // This function is adapted from toys::stl2top.
+
+  Xs.clear();
+  Es.clear();
+  
+  std::ifstream input(filename, std::ifstream::in);
+
+  string line;
+  string word;
+  getline(input, line);
+
+  double area_tol = 1e-12;
+
+  int nodeid(0);
+  int n1, n2, n3;
+  double x,y,z;
+  int iter = 0;
+ 
+  while(true) {
+
+    iter++;
+
+    getline(input, line);
+
+    if(line.compare(0,8,"endsolid") == 0)
+      break;
+
+    getline(input, line);
+    input >> word >> x >> y >> z;
+    Xs.push_back(Vec3D(x,y,z));
+    input >> word >> x >> y >> z;
+    Xs.push_back(Vec3D(x,y,z));
+    input >> word >> x >> y >> z;
+    Xs.push_back(Vec3D(x,y,z));
+    Es.push_back(Int3(nodeid, nodeid+1, nodeid+2));
+    nodeid += 3;
+
+    getline(input, line); //get the end of line
+    getline(input, line);
+    getline(input, line);
+  }
+
+  if(verbose>=1)
+    print("Found %d triangular elements from %s.\n", (int)Es.size(), filename);
+
+  for(auto it = Es.begin(); it != Es.end(); it++) {
+    //check if area is non-zero
+    n1 = (*it)[0]; n2 = (*it)[1]; n3 = (*it)[2];
+    Vec3D cr = (Xs[n2] - Xs[n1])^(Xs[n3] - Xs[n1]);
+    if(cr.norm() < area_tol) {
+      print_warning("Warning: Detected a degenerate triangle with area %e --- dropped from the list.\n",
+                    cr.norm());
+      continue;
+    }
+  }
+
+  input.close();
 }
 
 //------------------------------------------------------------------------------------------------
