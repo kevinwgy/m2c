@@ -97,7 +97,7 @@ public:
 
   void ComputeNormalDirection(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
 
-  void ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &KappaPhi);
+  void ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi);
 
   void Destroy();
 
@@ -140,6 +140,10 @@ private:
     double c1 = 1.0/(x1-x0) - 1.0/(x2-x1);
     double c2 = (x1-x0)/((x2-x0)*(x2-x1));
     return c0*phi0 + c1*phi1 + c2*phi2;
+  }
+
+  inline double SecondOrderDifference(double phi0, double phi1, double phi2, double x0, double x1, double x2) {
+    return 2.0*phi0 / ((x0-x1)*(x0-x2)) + 2.0*phi1 / ((x1-x0)*(x1-x2)) + 2*phi2 / ((x2-x0)*(x2-x1));
   }
 
 };

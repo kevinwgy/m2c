@@ -236,6 +236,9 @@ int main(int argc, char* argv[])
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
   std::vector<SpaceVariable3D*>  Phi;
+  std::vector<SpaceVariable3D*> NPhi; // unit normal, first derivative of Phi
+  std::vector<SpaceVariable3D*> KappaPhi; // curvature, second derivative of Phi
+
   std::set<int> ls_tracker;
   int ls_input_id_min = 9999, ls_input_id_max = -9999;
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
@@ -253,6 +256,8 @@ int main(int argc, char* argv[])
   }
   lso.resize(ls_tracker.size(),NULL);
   Phi.resize(ls_tracker.size(),NULL);
+  NPhi.resize(ls_tracker.size(),NULL);
+  KappaPhi.resize(ls_tracker.size(),NULL);
   ls_tracker.clear(); //for re-use
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
@@ -281,6 +286,12 @@ int main(int argc, char* argv[])
 
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           it->first, matid);
+
+    NPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
+    KappaPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
+    lso[it->first]->ComputeCurvature(*Phi[it->first], *NPhi[it->first], *KappaPhi[it->first]);
+    NPhi[it->first]->WriteToVTRFile("NPhi.vtr");
+    KappaPhi[it->first]->WriteToVTRFile("KappaPhi.vtr");
   }  
 
   // check for user effor
@@ -453,7 +464,7 @@ int main(int argc, char* argv[])
   }
 
   //! write initial condition to file
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, true/*force_write*/);
 
   if(concurrent.Coupled()) {
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
@@ -628,7 +639,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    out.OutputSolutions(t, dts0, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
+    out.OutputSolutions(t, dts0, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, false/*force_write*/);
 
   }
 
@@ -641,7 +652,7 @@ int main(int argc, char* argv[])
   if(embed)
     embed->OutputResults(t, dt, time_step, true/*force_write*/);
 
-  out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
+  out.OutputSolutions(t, dts, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, true/*force_write*/);
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");
@@ -673,6 +684,8 @@ int main(int argc, char* argv[])
   for(int ls = 0; ls<(int)lso.size(); ls++) {
     Phi[ls]->Destroy(); delete Phi[ls];
     lso[ls]->Destroy(); delete lso[ls];
+    NPhi[ls]->Destroy(); delete NPhi[ls];
+    KappaPhi[ls]->Destroy(); delete KappaPhi[ls];
   }
 
   if(heo) {heo->Destroy(); delete heo;}
