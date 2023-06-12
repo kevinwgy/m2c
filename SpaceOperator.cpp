@@ -2322,7 +2322,7 @@ void SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                           vector<SpaceVariable3D*> *Phi,
+                                           vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                            vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
   //------------------------------------
@@ -2365,11 +2365,13 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Extract level set gradient data
   //------------------------------------
-  vector<double***> phi;
+  vector<double***> phi, kappaPhi;
   if(Phi && ls_mat_id) {
     phi.assign(Phi->size(), NULL);
-    for(int i=0; i<(int)phi.size(); i++)
+    for(int i=0; i<(int)phi.size(); i++) {
       phi[i] = (*Phi)[i]->GetDataPointer();
+      kappaPhi[i] = (*KappaPhi)[i]->GetDataPointer();
+    }
   }
  
   //------------------------------------
@@ -2500,11 +2502,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
 
+                double*** curvature = kappaPhi[0];
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
                 else//linear reconstruction w/ limitor
-                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2627,12 +2630,13 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
+                 
+                double*** curvature = kappaPhi[0];
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2754,12 +2758,13 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
+                 
+                double*** curvature = kappaPhi[0];
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2826,8 +2831,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
 
   if(Phi && ls_mat_id) {
-    for(int i=0; i<(int)Phi->size(); i++)
+    for(int i=0; i<(int)Phi->size(); i++) {
       (*Phi)[i]->RestoreDataPointerToLocalVector();
+      (*KappaPhi)[i]->RestoreDataPointerToLocalVector();
+    }
   }
 
   if(xf.size()>0) {
@@ -3350,7 +3357,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                    vector<SpaceVariable3D*> *Phi,
+                                    vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                     vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                     SpaceVariable3D *Xi)
 {
@@ -3362,7 +3369,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
-  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, EBDS);
+  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, KappaPhi, EBDS);
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, EBDS, R); //including extra terms from cylindrical symmetry

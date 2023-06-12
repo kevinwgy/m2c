@@ -1881,7 +1881,7 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
 void LevelSetOperator::ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi) { // currently only implemented the full domain version
   double*** phi   = Phi.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  Vec3D*** curvature = (Vec3D***)KappaPhi.GetDataPointer();
+  double*** curvature = (double***)KappaPhi.GetDataPointer();
   Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
 
   double mynorm;
@@ -1889,12 +1889,14 @@ void LevelSetOperator::ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &N
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
 
-	curvature[k][j][i][0] = SecondOrderDifference(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+	double curvature_0 = SecondOrderDifference(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
 	    coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
-	curvature[k][j][i][1] = SecondOrderDifference(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+	double curvature_1 = SecondOrderDifference(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
 	    coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
-	curvature[k][j][i][2] = SecondOrderDifference(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+	double curvature_2 = SecondOrderDifference(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
 	    coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+
+        curvature[k][j][i] = curvature_0 + curvature_1 + curvature_2;
 
         normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
                                                  coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);

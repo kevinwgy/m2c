@@ -14,7 +14,6 @@ class ExactRiemannSolverInterfaceJump: public ExactRiemannSolverBase {
     double delta_p; // pressure jump across the contact discontinuity
     double surface_tension_coefficient; // In general, it depends on the material property on both sides of the interface and temperature;
                                         // currently, we assume it to be a constant specified from the input file
-    double interface_curvature;
     int surface_tension_materialid;
     std::vector<LevelSetOperator*> lso;    
 
@@ -23,10 +22,9 @@ class ExactRiemannSolverInterfaceJump: public ExactRiemannSolverBase {
 
     ExactRiemannSolverInterfaceJump(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_);
 
-    inline double ComputeInterfaceCurvature() {return 10.;} // hard-coded for specific case at moment, will be implemented in a better way
-
     int ComputeRiemannSolution(double *dir /*unit normal*/, double *Vm, int idm /*"left" state*/, 
 	double *Vp, int idp /*"right" state*/, 
+        double curvature,
 	double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
 	double *Vsm /*left 'star' solution*/,
 	double *Vsp /*right 'star' solution*/);
@@ -59,9 +57,8 @@ class ExactRiemannSolverInterfaceJump: public ExactRiemannSolverBase {
 	double *Vs, int &id, double *Vsm, double *Vsp /*outputs*/);
 
   protected:
-    inline void ComputePressureJump(int idr) {
-      interface_curvature = ComputeInterfaceCurvature();
-      delta_p = surface_tension_coefficient * interface_curvature;
+    inline void ComputePressureJump(int idr, double curvature) {
+      delta_p = surface_tension_coefficient * curvature;
       if (idr != surface_tension_materialid) 
         delta_p *= -1.;
       // std::cout << "delta_p = " << delta_p << std::endl;

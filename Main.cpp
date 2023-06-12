@@ -288,10 +288,10 @@ int main(int argc, char* argv[])
           it->first, matid);
 
     NPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
-    KappaPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
+    KappaPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
     lso[it->first]->ComputeCurvature(*Phi[it->first], *NPhi[it->first], *KappaPhi[it->first]);
-    NPhi[it->first]->WriteToVTRFile("NPhi.vtr");
-    KappaPhi[it->first]->WriteToVTRFile("KappaPhi.vtr");
+    //NPhi[it->first]->WriteToVTRFile("NPhi.vtr");
+    //KappaPhi[it->first]->WriteToVTRFile("KappaPhi.vtr");
   }  
 
   // check for user effor
@@ -590,7 +590,7 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      integrator->AdvanceOneTimeStep(V, ID, Phi, L, Xi, LocalDt, t, dt, time_step, subcycle, dts); 
+      integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 

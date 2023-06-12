@@ -135,7 +135,7 @@ public:
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,
-                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL, vector<SpaceVariable3D*> *KappaPhi = NULL,
                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr,
                        SpaceVariable3D *Xi = NULL);
 
@@ -184,7 +184,7 @@ private:
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL,
-                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL, vector<SpaceVariable3D*> *KappaPhi = NULL,
                               vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
 
   Vec3D GetNormalForOneSidedRiemann(int d,/*0,1,2*/

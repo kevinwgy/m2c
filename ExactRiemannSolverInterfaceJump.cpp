@@ -15,7 +15,6 @@ extern int verbose;
 ExactRiemannSolverInterfaceJump::ExactRiemannSolverInterfaceJump(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_) : ExactRiemannSolverBase(vf_, iod_riemann_) {
   surface_tension_coefficient = iod_riemann.surface_tension_coefficient;
   surface_tension_materialid = iod_riemann.surface_tension_materialid;
-  interface_curvature = 0.0;
   delta_p = 0.0; 
 }
 
@@ -30,12 +29,13 @@ ExactRiemannSolverInterfaceJump::ExactRiemannSolverInterfaceJump(std::vector<Var
 ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
+    double curvature,
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
     double *Vsp /*right 'star' solution*/)
 {
 
-  ComputePressureJump(idr);
+  ComputePressureJump(idr, curvature);
 
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
