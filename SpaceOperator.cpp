@@ -2370,10 +2370,20 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     phi.assign(Phi->size(), NULL);
     for(int i=0; i<(int)phi.size(); i++) {
       phi[i] = (*Phi)[i]->GetDataPointer();
-      kappaPhi[i] = (*KappaPhi)[i]->GetDataPointer();
     }
   }
- 
+
+  kappaPhi.assign(KappaPhi->size(), NULL);
+  for(int i=0; i<(int)kappaPhi.size(); i++) {
+    kappaPhi[i] = (*KappaPhi)[i]->GetDataPointer();
+    //std::cout << "kappaPhi[" << i << "] = " << (kappaPhi[i]) << std::endl;
+    //std::cout << "*kappaPhi[" << i << "] = " << *(kappaPhi[i]) << std::endl;
+    //std::cout << "**kappaPhi[" << i << "] = " << **(kappaPhi[i]) << std::endl;
+    //std::cout << "***kappaPhi[" << i << "] = " << ***(kappaPhi[i]) << std::endl;
+    //std::cout << "(kappaPhi[" << i << "])[0][0][0] = " << (kappaPhi[i])[0][0][0] << std::endl;
+  }
+
+
   //------------------------------------
   // Extract intersection data
   //------------------------------------
@@ -2418,7 +2428,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   int err;
 
   bool use_LLF_at_interface = (iod.multiphase.flux == MultiPhaseData::LOCAL_LAX_FRIEDRICHS);
-
+  
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
   Vec3D vwallf(0.0), vwallb(0.0), nwallf(0.0), nwallb(0.0);
@@ -2502,12 +2512,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
 
-                double*** curvature = kappaPhi[0];
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
                 else//linear reconstruction w/ limitor
-                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2631,12 +2640,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
                  
-                double*** curvature = kappaPhi[0];
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2759,12 +2767,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
                  
-                double*** curvature = kappaPhi[0];
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, curvature[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2975,6 +2982,8 @@ SpaceOperator::GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k
                                              vector<double***> *phi)
 {
   Vec3D dir(0.0,0.0,0.0);
+  //std::cout << "At [" << k << "][" << j << "][" << i << "] = " << curvature << std::endl;
+
   if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
     dir[d] = 1.0;
   else { //LEVEL_SET or AVERAGE
