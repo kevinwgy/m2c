@@ -291,7 +291,8 @@ try_again:
 	<< ", err_u = " << err_u << "." << endl;
       cout << "    Vm = [" << Vm[0] << ", " << Vm[1] << ", " << Vm[2] << ", " << Vm[3] << ", " << Vm[4] << "] (" << idl
 	<< "),  Vp = [" << Vp[0] << ", " << Vp[1] << ", " << Vp[2] << ", " << Vp[3] << ", " << Vp[4] << "] (" << idr
-	<< ")" << endl;
+	<< ")" << "pressure jump = " << delta_p << ", curvature = " << curvature << endl;
+      cout << "dir = [" << dir[0] << ", " << dir[1] << ", " << dir[2] << "]" << endl;
     }
 
     if(verbose>=1)
@@ -734,7 +735,7 @@ ExactRiemannSolverInterfaceJump::FinalizeSolution(double *dir, double *Vm, doubl
 #if PRINT_RIEMANN_SOLUTION == 1
   // the 2-wave
   sol1d.push_back(vector<double>{u2 - std::max(1e-6, 0.001*fabs(u2)), rhol2, u2, p2, (double)idl});
-  sol1d.push_back(vector<double>{u2, rhor2, u2, p2, (double)idr});
+  sol1d.push_back(vector<double>{u2, rhor2, u2, p2+delta_p, (double)idr});
 #endif
 
   Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
@@ -793,7 +794,7 @@ ExactRiemannSolverInterfaceJump::FinalizeSolution(double *dir, double *Vm, doubl
       bool is_star_state = false;
 
       if(pr >= p2) {//3-wave is rarefaction
-	double er2 = vf[idr]->GetInternalEnergyPerUnitMass(rhor2, p2);
+	double er2 = vf[idr]->GetInternalEnergyPerUnitMass(rhor2, p2+delta_p);
 	double cr2 = vf[idr]->ComputeSoundSpeedSquare(rhor2, er2);
 
 	if(rhor2<=0 || cr2<0) {

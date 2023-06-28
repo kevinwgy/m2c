@@ -2222,6 +2222,7 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
   } else {//apply the CFL number
     cfl = iod.ts.cfl;      
     dt = cfl*dx_over_char_speed_min;
+    dt = std::min( dt, 0.9*sqrt( pow(0.0025,3.) * (1.+0.001) / (4.*M_PI*1.) ) );
   }
 
 }
@@ -2511,12 +2512,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else { 
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
+                double curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
                 else//linear reconstruction w/ limitor
-                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2639,12 +2640,13 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
+                double curvature = CalculateCurvatureAtCellInterface(1, phi[0], kappaPhi[0], i, j, k);
                  
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2766,12 +2768,13 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
+                double curvature = CalculateCurvatureAtCellInterface(2, phi[0], kappaPhi[0], i, j, k);
                  
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, (kappaPhi[0])[k][j][i], Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -2840,8 +2843,11 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   if(Phi && ls_mat_id) {
     for(int i=0; i<(int)Phi->size(); i++) {
       (*Phi)[i]->RestoreDataPointerToLocalVector();
-      (*KappaPhi)[i]->RestoreDataPointerToLocalVector();
     }
+  }
+
+  for(int i=0; i<(int)KappaPhi->size(); i++) {
+    (*KappaPhi)[i]->RestoreDataPointerToLocalVector();
   }
 
   if(xf.size()>0) {
@@ -3549,7 +3555,24 @@ SpaceOperator::GetNormalForOneSidedRiemann(int d, int forward_or_backward, Vec3D
 }
 
 //-----------------------------------------------------
+double SpaceOperator::CalculateCurvatureAtCellInterface(int d /*0,1,2*/, double*** phi, double*** kappaPhi, int i, int j, int k) {
+  double ans = 0.;
+  if (d == 0) { // x-direction
+    ans = ( kappaPhi[k][j][i-1]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j][i-1]) ) / ( fabs(phi[k][j][i-1]) + fabs(phi[k][j][i]) ); 
+  } else if(d == 1) { // y-direction
+    ans = ( kappaPhi[k][j-1][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j-1][i]) ) / ( fabs(phi[k][j-1][i]) + fabs(phi[k][j][i]) ); 
+  } else if(d == 2) { // z-direction
+    ans = ( kappaPhi[k-1][j][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k-1][j][i]) ) / ( fabs(phi[k-1][j][i]) + fabs(phi[k][j][i]) ); 
+  } else {
+    std::cout << "direction variable should only be 0, 1, or 2" << std::endl;
+    exit_mpi();
+  }
+  return ans;
+}
 
+
+  
+ 
 
 //-----------------------------------------------------
 

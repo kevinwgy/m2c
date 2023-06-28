@@ -203,6 +203,8 @@ private:
   Vec3D CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
                                          Vec3D*** dxyz, double*** phi);
 
+  double CalculateCurvatureAtCellInterface(int d/*0,1,2*/, double*** phi, double*** kappaPhi, int i, int j, int k);  
+
   bool TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi, 
                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                   SpaceVariable3D &Tag0);

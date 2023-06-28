@@ -272,24 +272,24 @@ int main(int argc, char* argv[])
     ls_tracker.insert(matid);    
     lso[it->first] = new LevelSetOperator(comm, dms, iod, *it->second, spo);
     Phi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
-
+    NPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
+    KappaPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
+ 
     auto closures = id2closure.equal_range(matid);
     if(closures.first != closures.second) {//found this matid
       vector<std::pair<int,int> > surf_and_color;
       for(auto it2 = closures.first; it2 != closures.second; it2++)
         surf_and_color.push_back(it2->second);
-      lso.back()->SetInitialCondition(*Phi.back(), 
+      lso.back()->SetInitialCondition(*Phi.back(), *NPhi.back(), *KappaPhi.back(), 
                                       embed->GetPointerToEmbeddedBoundaryData(),
                                       &surf_and_color);
     } else
-      lso.back()->SetInitialCondition(*Phi.back());
+      lso.back()->SetInitialCondition(*Phi.back(), *NPhi.back(), *KappaPhi.back());
 
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           it->first, matid);
 
-    NPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
-    KappaPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
-    lso[it->first]->ComputeCurvature(*Phi[it->first], *NPhi[it->first], *KappaPhi[it->first]);
+    //lso[it->first]->ComputeCurvature(*Phi[it->first], *NPhi[it->first], *KappaPhi[it->first]);
     //NPhi[it->first]->WriteToVTRFile("NPhi.vtr");
     //KappaPhi[it->first]->WriteToVTRFile("KappaPhi.vtr");
   }  

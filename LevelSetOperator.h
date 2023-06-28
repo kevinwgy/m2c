@@ -77,7 +77,7 @@ public:
                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo);
   ~LevelSetOperator();
 
-  void SetInitialCondition(SpaceVariable3D &Phi, 
+  void SetInitialCondition(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi, 
                            std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr,
                            vector<std::pair<int,int> > *surf_and_color = NULL);
 

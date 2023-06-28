@@ -178,7 +178,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   if(use_grad_phi)
     spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); // compute Rn
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL, &KappaPhi, EBDS.get(), Xi); // compute Rn
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); // compute Rn
 
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 

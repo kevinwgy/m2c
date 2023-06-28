@@ -288,7 +288,7 @@ void LevelSetOperator::CreateGhostNodeLists()
 
 //-----------------------------------------------------
 
-void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, 
+void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi,
                                            unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                                            vector<pair<int,int> > *surf_and_color)
 {
@@ -810,6 +810,41 @@ DONE:
     Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
 
+  phi   = Phi.GetDataPointer();
+  coords = (Vec3D***)coordinates.GetDataPointer(); 
+  double*** curvature = (double***)KappaPhi.GetDataPointer();
+  Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
+
+  // Compute and store first direvatives, needed for the computation of second order mixed partial derivatives
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+                                                 coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+        normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+                                                 coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+        normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+                                                 coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+      }
+
+  double mynorm;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+	                                        
+        curvature[k][j][i] = 10.0; 
+
+        mynorm = normal[k][j][i].norm();
+
+        if(mynorm!=0.0) {
+          normal[k][j][i] /= mynorm;
+        }
+      }
+
+  Phi.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  NPhi.RestoreDataPointerAndInsert();
+  KappaPhi.RestoreDataPointerAndInsert();
 }
 
 //-----------------------------------------------------
@@ -1879,36 +1914,55 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
 //-----------------------------------------------------
 
 void LevelSetOperator::ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi) { // currently only implemented the full domain version
+
   double*** phi   = Phi.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   double*** curvature = (double***)KappaPhi.GetDataPointer();
   Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
 
-  double mynorm;
+  // Compute and store first direvatives, needed for the computation of second order mixed partial derivatives
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
-
-	double curvature_0 = SecondOrderDifference(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
-	    coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
-	double curvature_1 = SecondOrderDifference(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
-	    coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
-	double curvature_2 = SecondOrderDifference(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
-	    coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
-
-        curvature[k][j][i] = curvature_0 + curvature_1 + curvature_2;
-
         normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
                                                  coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
         normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
                                                  coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
         normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
                                                  coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+      }
+
+  double mynorm;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+	double phi_xx = SecondOrderDifference(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+	                                        coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+	double phi_yy = SecondOrderDifference(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+	                                        coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+	double phi_zz = SecondOrderDifference(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+	                                        coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+        double phi_xy = CentralDifferenceLocal(/* y-direvative of dphi/dx */
+                                               normal[k][j-1][i][0], normal[k][j][i][0], normal[k][j+1][i][0],
+                                               coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+        double phi_xz = CentralDifferenceLocal(/* z-direvative of dphi/dx */
+                                               normal[k-1][j][i][0], normal[k][j][i][0], normal[k+1][j][i][0], 
+                                               coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+        double phi_yz = CentralDifferenceLocal(/* z-direvative of dphi/dy */
+                                               normal[k-1][j][i][1], normal[k][j][i][1], normal[k+1][j][i][1],
+                                               coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+        double phi_x = normal[k][j][i][0];
+        double phi_y = normal[k][j][i][1];
+        double phi_z = normal[k][j][i][2];   
+
+        curvature[k][j][i] = phi_x*phi_x*phi_yy - 2.*phi_x*phi_y*phi_xy + phi_y*phi_y*phi_xx
+                            +phi_x*phi_x*phi_zz - 2.*phi_x*phi_z*phi_xz + phi_z*phi_z*phi_xx
+                            +phi_y*phi_y*phi_zz - 2.*phi_y*phi_z*phi_yz + phi_z*phi_z*phi_yy;  
 
         mynorm = normal[k][j][i].norm();
 
         if(mynorm!=0.0) {
-          curvature[k][j][i] /= mynorm; 
+          curvature[k][j][i] /= (mynorm*mynorm*mynorm); 
           normal[k][j][i] /= mynorm;
         }
       }
