@@ -602,7 +602,7 @@ ExactRiemannSolverInterfaceJump::FindInitialFeasiblePointsByAcousticTheory(doubl
   // 1.1: Initialize p0 using acoustic theory ((20) of Kamm)
   double Cl = rhol*cl; //acoustic impedance
   double Cr = rhor*cr; //acoustic impedance
-  p0 = (Cr*pl + Cl*pr + Cl*Cr*(ul - ur))/(Cl + Cr);
+  p0 = (Cr*pl + Cl*(pr-delta_p) + Cl*Cr*(ul - ur))/(Cl + Cr);
 
   success = ComputeRhoUStar(1, integrationPath1, rhol, ul, pl, p0, idl/*inputs*/,
       rhol, (p0>pl) ? rhol*1.1 : rhol*0.9/*initial guesses for Hugo. eq.*/,
@@ -620,8 +620,8 @@ ExactRiemannSolverInterfaceJump::FindInitialFeasiblePointsByAcousticTheory(doubl
 
   // 1.2. Initialize p1 ((21)(22) of Kamm)
   double Clbar = (ul0 == ul) ? Cl : fabs(p0 - pl)/fabs(ul0 - ul);
-  double Crbar = (ur0 == ur) ? Cr : fabs(p0 - pr)/fabs(ur0 - ur);
-  p1 = (Crbar*pl + Clbar*pr + Clbar*Crbar*(ul - ur))/(Clbar + Crbar);
+  double Crbar = (ur0 == ur) ? Cr : fabs(p0+delta_p - pr)/fabs(ur0 - ur);
+  p1 = (Crbar*pl + Clbar*(pr-delta_p) + Clbar*Crbar*(ul - ur))/(Clbar + Crbar);
   double tmp = std::max(fabs(p0), fabs(p1));
   if(fabs(p1 - p0)/tmp<1.0e-8)
     p1 = p0 + 1.0e-8*tmp; //to avoid f0 = f1 (divide-by-zero)
