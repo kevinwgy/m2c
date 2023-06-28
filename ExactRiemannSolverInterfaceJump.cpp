@@ -517,7 +517,7 @@ ExactRiemannSolverInterfaceJump::FindInitialFeasiblePoints(double rhol, double u
 	rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
 	rhol0, ul0);
     success = success && ComputeRhoUStar(3, integrationPath3, rhor, ur, pr, p0 + delta_p, idr, 
-	rhor, (p0>pr) ? rhor*1.1 : rhor*0.9,
+	rhor, (p0+delta_p>pr) ? rhor*1.1 : rhor*0.9,
 	rhor0, ur0);
     if(success)
       break;
@@ -531,7 +531,7 @@ ExactRiemannSolverInterfaceJump::FindInitialFeasiblePoints(double rhol, double u
 	  rhol, (p0>pl) ? rhol*1.1 : rhol*0.9,
 	  rhol0, ul0);
       success = success && ComputeRhoUStar(3, integrationPath3, rhor, ur, pr, p0 + delta_p, idr, 
-	  rhor, (p0>pr) ? rhor*1.1 : rhor*0.9,
+	  rhor, (p0+delta_p>pr) ? rhor*1.1 : rhor*0.9,
 	  rhor0, ur0);
       if(success)
 	break;
@@ -611,7 +611,7 @@ ExactRiemannSolverInterfaceJump::FindInitialFeasiblePointsByAcousticTheory(doubl
     return found;
 
   success = ComputeRhoUStar(3, integrationPath3, rhor, ur, pr, p0 + delta_p, idr/*inputs*/,
-      rhor, (p0>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
+      rhor, (p0+delta_p>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
       rhor0, ur0/*outputs*/);
   if(!success)
     return found;
@@ -671,7 +671,7 @@ ExactRiemannSolverInterfaceJump::PrintStarRelations(double rhol, double ul, doub
 	  rhol, ul, pl, idl, ps);
 
     success = ComputeRhoUStar(3, integrationPath3, rhor, ur, pr, ps + delta_p, idr/*inputs*/,
-	rhor, (ps>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
+	rhor, (ps+delta_p>pr) ? rhor*1.1 : rhor*0.9/*initial guesses for Hugo. eq.*/,
 	rhors, urs/*outputs*/);
     if(success)
       right.push_back(std::array<double,3>{{ps,rhors,urs}});
