@@ -1337,6 +1337,41 @@ void LevelSetReinitializationData::setup(const char *name, ClassAssigner *father
 
 //------------------------------------------------------------------------------
 
+PrescribedMotionData::PrescribedMotionData()
+{
+  materialid = -1;
+
+  velocity_x = 0.0;
+  velocity_y = 0.0;
+  velocity_z = 0.0;
+
+  velocity_time_history = "";
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *PrescribedMotionData::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 5, nullAssigner);
+
+  new ClassInt<PrescribedMotionData>(ca, "MaterialID", this, 
+          &PrescribedMotionData::materialid);
+
+  new ClassDouble<PrescribedMotionData>(ca, "VelocityX", this, 
+          &PrescribedMotionData::velocity_x);
+  new ClassDouble<PrescribedMotionData>(ca, "VelocityY", this, 
+          &PrescribedMotionData::velocity_y);
+  new ClassDouble<PrescribedMotionData>(ca, "VelocityZ", this, 
+          &PrescribedMotionData::velocity_z);
+
+  new ClassStr<PrescribedMotionData>(ca, "VelocityTimeHistoryFile", this, 
+          &PrescribedMotionData::velocity_time_history);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
 LevelSetSchemeData::LevelSetSchemeData() 
 {
   materialid = -1;
@@ -1426,13 +1461,16 @@ SchemesData::SchemesData()
 void SchemesData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   ns.setup("NavierStokes", ca);
 
   bc.setup("Boundaries", ca);
 
   ls.setup("LevelSet", ca);
+
+  pm.setup("PrescribedMotion", ca);
+
 }
 
 //------------------------------------------------------------------------------

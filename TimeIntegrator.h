@@ -13,6 +13,7 @@
 #include <RiemannSolutions.h>
 #include <EmbeddedBoundaryOperator.h>
 #include <HyperelasticityOperator.h>
+#include <PrescribedMotionOperator.h>
 #include <SteadyStateOperator.h>
 using std::vector;
 
@@ -38,6 +39,9 @@ protected:
   //! Hyperelaticity operator (NULL if not activated)
   HyperelasticityOperator* heo;
 
+  //! Prescribed motion operator (NULL if not activated)
+  PrescribedMotionOperator* pmo;
+ 
   //! Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
@@ -58,7 +62,7 @@ public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
                      vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
                      LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                     HyperelasticityOperator* heo_);
+                     HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
 
   virtual ~TimeIntegratorBase();
 
@@ -111,7 +115,7 @@ public:
   TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                    vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
                    LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                   HyperelasticityOperator* heo_);
+                   HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
   ~TimeIntegratorFE();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
@@ -148,7 +152,7 @@ public:
   TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
                     LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                    HyperelasticityOperator* heo_);
+                    HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
   ~TimeIntegratorRK2();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
@@ -186,7 +190,7 @@ public:
   TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
                     LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                    HyperelasticityOperator* heo_);
+                    HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
   ~TimeIntegratorRK3();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,

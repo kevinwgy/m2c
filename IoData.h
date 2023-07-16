@@ -695,10 +695,29 @@ struct LevelSetReinitializationData {
 };
 
 //------------------------------------------------------------------------------
+/** Enforces a uniform velocity field (constant value or time-history) for a certain materialid;
+  * Activated when materialid is set to a non-negative value. First, tries to read the file. If it
+  * is not specified, apply the constant velocity values (default: (0,0,0)). */
+struct PrescribedMotionData {
+
+  int materialid; //!< The material id that will have a prescribed velocity
+
+  double velocity_x, velocity_y, velocity_z;
+
+  const char *velocity_time_history;
+
+  PrescribedMotionData();
+  ~PrescribedMotionData() {}
+
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
 
 struct LevelSetSchemeData {
 
-  int materialid; //! The material in the phi<0 region ("inside")
+  int materialid; //!< The material in the phi<0 region ("inside")
 
   enum Solver {FINITE_VOLUME = 0, FINITE_DIFFERENCE = 1} solver;
 
@@ -706,13 +725,13 @@ struct LevelSetSchemeData {
 
   enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, UPWIND = 2} flux;
   ReconstructionData rec;
-  double delta; //! The coeffient in Harten's entropy fix.
+  double delta; //!< The coeffient in Harten's entropy fix.
 
   enum BcType {NONE = 0, ZERO_NEUMANN = 1, LINEAR_EXTRAPOLATION = 2, NON_NEGATIVE = 3, SIZE = 4};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
   
 
-  int bandwidth; //number of layers of nodes on each side of interface
+  int bandwidth; //!< number of layers of nodes on each side of interface
 
   LevelSetReinitializationData reinit;
 
@@ -731,6 +750,8 @@ struct SchemesData {
   BoundarySchemeData bc;
 
   ObjectMap<LevelSetSchemeData> ls;
+
+  ObjectMap<PrescribedMotionData> pm;
 
   SchemesData();
   ~SchemesData() {}

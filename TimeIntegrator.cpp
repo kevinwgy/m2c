@@ -17,9 +17,9 @@ using std::unique_ptr;
 TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                         SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
                         LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                        HyperelasticityOperator* heo_)
+                        HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_)
                   : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_), embed(embed_),
-                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)), sso(NULL),
+                    heo(heo_), pmo(pmo_), IDn(comm_, &(dms_.ghosted1_1dof)), sso(NULL),
                     local_time_stepping(iod.ts.local_dt == TsData::YES)
 {
   for(int i=0; i<(int)lso.size(); i++) {
@@ -101,8 +101,8 @@ TimeIntegratorBase::AddFluxWithLocalTimeStep(SpaceVariable3D &U, double alpha,
 TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, 
                       SpaceOperator& spo_, vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
                       LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                      HyperelasticityOperator* heo_)
-                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_),
+                      HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_)
+                : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_, pmo_),
                   Un(comm_, &(dms_.ghosted1_5dof)),
                   Rn(comm_, &(dms_.ghosted1_5dof)), Rn_xi(NULL)
 {
@@ -233,8 +233,9 @@ TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers
                                      SpaceOperator& spo_ ,vector<LevelSetOperator*>& lso_,
                                      MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_,
                                      EmbeddedBoundaryOperator* embed_,
-                                     HyperelasticityOperator* heo_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_),
+                                     HyperelasticityOperator* heo_,
+                                     PrescribedMotionOperator* pmo_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_, pmo_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
@@ -435,8 +436,9 @@ TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers
                                      SpaceOperator& spo_, vector<LevelSetOperator*>& lso_,
                                      MultiPhaseOperator& mpo_, LaserAbsorptionSolver* laser_,
                                      EmbeddedBoundaryOperator* embed_,
-                                     HyperelasticityOperator* heo_)
-                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_),
+                                     HyperelasticityOperator* heo_,
+                                     PrescribedMotionOperator* pmo_)
+                 : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_, pmo_),
                    Un(comm_, &(dms_.ghosted1_5dof)), 
                    U1(comm_, &(dms_.ghosted1_5dof)),
                    V1(comm_, &(dms_.ghosted1_5dof)), 
@@ -786,13 +788,21 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     }
   }
 
+
   // Apply smoothing to U (if specified by user)
   if(subcycle==0) //only consider doing this in the first subcycle
     spo.ApplySmoothingFilter(time, dts, time_step, V, ID);
 
+
   // Solve laser radiation equation
   if(laser)
     laser->ComputeLaserRadiance(V,ID,*L,time);
+
+  // Prescribe velocity (if specified by user)
+  if(pmo) {
+    pmo->UpdateVelocity(V,ID,time);
+    spo.ApplyBoundaryConditions(V); //to be safe...
+  }
 
 }
 

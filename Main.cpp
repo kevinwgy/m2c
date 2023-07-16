@@ -23,6 +23,7 @@
 #include <GradientCalculatorCentral.h>
 #include <IonizationOperator.h>
 #include <HyperelasticityOperator.h>
+#include <PrescribedMotionOperator.h>
 #include <SpecialToolsDriver.h>
 #include <set>
 #include <string>
@@ -281,7 +282,7 @@ int main(int argc, char* argv[])
           it->first, matid);
   }  
 
-  // check for user effor
+  // check for user error
   for(int ls=0; ls<OutputData::MAXLS; ls++)
     if(iod.output.levelset[ls] == OutputData::ON && ls>=(int)Phi.size()) {
       print_error("*** Error: Cannot output level set %d, which is undefined.\n"); exit_mpi();}
@@ -353,7 +354,13 @@ int main(int argc, char* argv[])
     Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
     heo->InitializeReferenceMap(*Xi);
   }
-       
+
+
+  //! Create prescribed motion operator (if needed)
+  PrescribedMotionOperator* pmo = NULL;
+  if(!iod.schemes.pm.empty())
+    pmo = new PrescribedMotionOperator(iod.schemes.pm);
+
 /*
   ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
   V.StoreMeshCoordinates(spo.GetMeshCoordinates());
@@ -376,11 +383,11 @@ int main(int argc, char* argv[])
   TimeIntegratorBase *integrator = NULL;
   if(iod.ts.type == TsData::EXPLICIT) {
     if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
-      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed, heo);
+      integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed, heo, pmo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
-      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed, heo);
+      integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed, heo, pmo);
     else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
-      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed, heo);
+      integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed, heo, pmo);
     else {
       print_error("*** Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();
@@ -503,6 +510,14 @@ int main(int argc, char* argv[])
         lso[i]->ApplyBoundaryConditions(*Phi[i]);
     }
   }
+
+
+  // Enforce user-prescribed velocity
+  if(pmo) {
+    pmo->UpdateVelocity(V,ID,t);
+    spo.ApplyBoundaryConditions(V);
+  }
+
 
   // find maxTime, and dts (meaningful only with concurrent programs)
   double tmax = iod.ts.maxTime;
@@ -673,6 +688,8 @@ int main(int argc, char* argv[])
 
   if(heo) {heo->Destroy(); delete heo;}
   if(Xi) {Xi->Destroy(); delete Xi;}
+
+  if(pmo) {pmo->Destroy(); delete pmo;}
 
   out.FinalizeOutput();
   integrator->Destroy();

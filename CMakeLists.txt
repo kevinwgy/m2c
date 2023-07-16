@@ -110,6 +110,7 @@ EmbeddedBoundaryFormula.cpp
 HyperelasticityFcn.cpp
 HyperelasticityOperator.cpp
 ReferenceMapOperator.cpp
+PrescribedMotionOperator.cpp
 TimeIntegrator.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
