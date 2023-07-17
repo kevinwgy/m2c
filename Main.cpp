@@ -358,8 +358,8 @@ int main(int argc, char* argv[])
 
   //! Create prescribed motion operator (if needed)
   PrescribedMotionOperator* pmo = NULL;
-  if(!iod.schemes.pm.empty())
-    pmo = new PrescribedMotionOperator(iod.schemes.pm);
+  if(!iod.schemes.pm.dataMap.empty())
+    pmo = new PrescribedMotionOperator(iod.schemes.pm, vf.size()); //vf.size includes INACTIVE
 
 /*
   ID.StoreMeshCoordinates(spo.GetMeshCoordinates());

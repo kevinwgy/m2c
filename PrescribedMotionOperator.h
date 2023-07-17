@@ -8,6 +8,8 @@
 
 #include<IoData.h>
 
+class SpaceVariable3D;
+
 /*********************************************************************
  * class PrescribedMotionOperator enforces user-prescribed velocities
  * for specific material subdomains
@@ -23,8 +25,19 @@ class PrescribedMotionOperator {
   //! maps material id to velocity time history (if constant ==> just one entry)
   std::map<int,VelocityTimeHistory> velo;
 
-  PrescribedMotionOperator( 
-  I AM HERE
+public:
+
+  PrescribedMotionOperator(ObjectMap<PrescribedMotionData> &pm_data, int id_size);
+
+  ~PrescribedMotionOperator();
+
+  void Destroy();
+
+  void UpdateVelocity(SpaceVariable3D &V, SpaceVariable3D &ID, double time);
+
+private:
+
+  void ReadVelocityFromFile(VelocityTimeHistory &vth, const char *filename);
 
 };
 
