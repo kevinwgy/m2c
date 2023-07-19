@@ -11,6 +11,7 @@
 #include <VarFcnSG.h>
 #include <VarFcnNASG.h>
 #include <VarFcnMG.h>
+#include <VarFcnMGExt.h>
 #include <VarFcnTillot.h>
 #include <VarFcnJWL.h>
 #include <VarFcnANEOSEx1.h>
@@ -92,6 +93,8 @@ int main(int argc, char* argv[])
       vf[matid] = new VarFcnNASG(*it->second);
     else if(it->second->eos == MaterialModelData::MIE_GRUNEISEN)
       vf[matid] = new VarFcnMG(*it->second);
+    else if(it->second->eos == MaterialModelData::EXTENDED_MIE_GRUNEISEN)
+      vf[matid] = new VarFcnMGExt(*it->second);
     else if(it->second->eos == MaterialModelData::TILLOTSON)
       vf[matid] = new VarFcnTillot(*it->second);
     else if(it->second->eos == MaterialModelData::JWL)

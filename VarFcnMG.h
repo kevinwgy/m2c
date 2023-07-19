@@ -10,17 +10,18 @@
 #include <fstream>
 
 /********************************************************************************
- * This class is the VarFcn class for the Mie-Gruneisen equation of state (EOS)
+ * This class is the VarFcn class for the Mie-Gruneisen equation of state (EOS). It
+ * applies the same equation --- see below --- for compression and tension. It only
+ * supports simplified linear temperature laws (cv or cp specified).
+ *
+ * NOTE: In general, the user should try to apply the extended version, implemented in
+ *       VarFcnMGExt.h
+ *
  * Only elementary functions are declared and/or defined here.
  * All arguments must be pertinent to only a single grid node or a single
  * state.
  *
- * Pressure equation: 
- *      / rho0*c0*c0*eta*(1-Gamma0/2*eta)/(1-s*eta)^2     + rho0*Gamma0*(e-e0) ... if eta>=0,
- *  p = | rho0*c0*c0*eta*(1-Gamma0/2*eta)                 + rho0*Gamma0*(e-e0) ... if eta_min<=eta<0,
- *      \ rho0*c0*c0*eta_min*(1-Gamma0/2*(2*eta-eta_min)) + rho0*Gamma0*(e-e0) ... if eta<eta_min
- *
- *  T = (e - e_R)/cv + T_R. If
+ * EOS: Pressure = rho0*c0*c0*eta*(1-Gamma0/2*eta)/(1-s*eta)^2 + rho0*Gamma0*(e-e0)
  *
  * where
  *
@@ -34,7 +35,7 @@
  *   s      : slope of shock Hugoniot
  *   e0     : internal energy at ref. state (including temperature T0)
  *
- * References: KW's notes,  Allen Robinson (SNL)'s technical report (2019)
+ * References: Shafquat Islam's report (01/2021), Allen Robinson's technical report (2019)
  *
  *   Note: default temperature law is de = cv*dT or dh = cp*dT. 
  ********************************************************************************/
@@ -66,23 +67,16 @@ public:
   ~VarFcnMG() {}
 
   //! ----- EOS-Specific Functions -----
-  double GetPressure(double rho, double e) {
+  inline double GetPressure(double rho, double e) {
     double eta = 1.0 - rho0/rho;
-    if(eta>=0.0) 
-      return rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta)) + Gamma0_rho0*(e-e0);
-    else if(eta>=eta_min)
-      return rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta) + Gamma0_rho0*(e-e0);
-    return rho0_c0_c0*eta_min*(1.0 - Gamma0_over_2*(2.0*eta-eta_min)) + Gamma0_rho0*(e-e0);
-  }  
+    return rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta)) + Gamma0_rho0*(e-e0);}
 
   inline double GetInternalEnergyPerUnitMass(double rho, double p) {
     double eta = 1.0 - rho0/rho;
-    if(eta>=0.0)
-      return (p - rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta)))/Gamma0_rho0 + e0;
-    I AM HERE
+    return (p - rho0_c0_c0*eta*(1.0 - Gamma0_over_2*eta)/((1.0-s*eta)*(1.0-s*eta)))/Gamma0_rho0 + e0;
   }
 
-  inline double GetDensity(double p, double e);
+  double GetDensity(double p, double e);
 
   inline double GetDpdrho(double rho, [[maybe_unused]] double e){
     double eta = 1.0 - rho0/rho;
@@ -92,15 +86,15 @@ public:
 
   inline double GetBigGamma(double rho, [[maybe_unused]] double e) {return Gamma0_rho0/rho;}
 
-  inline double GetTemperature(double rho, double e);
+  double GetTemperature(double rho, double e);
 
   inline double GetReferenceTemperature() {return T0;}
 
   inline double GetReferenceInternalEnergyPerUnitMass() {return e0;}
 
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T);
+  double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T);
 
-  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h);
+  double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h);
 
 };
 
@@ -145,7 +139,6 @@ VarFcnMG::VarFcnMG(MaterialModelData &data) : VarFcnBase(data) {
 
 //------------------------------------------------------------------------------
 
-inline
 double VarFcnMG::GetDensity(double p, double e) {
 
   //solving a quadratic equation a*eta^2 + b*eta + c = 0 for eta ==> rho = rho0/(1-eta)
@@ -186,7 +179,6 @@ double VarFcnMG::GetDensity(double p, double e) {
 
 //------------------------------------------------------------------------------
 
-inline 
 double VarFcnMG::GetTemperature(double rho, double e) {
 
   if(use_cp) {
@@ -198,7 +190,6 @@ double VarFcnMG::GetTemperature(double rho, double e) {
 
 //------------------------------------------------------------------------------
 
-inline
 double VarFcnMG::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) 
 {
   if(use_cp) {
@@ -211,7 +202,6 @@ double VarFcnMG::GetInternalEnergyPerUnitMassFromTemperature(double rho, double 
 
 //------------------------------------------------------------------------------
 
-inline
 double VarFcnMG::GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) 
 {
   double eta = 1.0 - rho0/rho;

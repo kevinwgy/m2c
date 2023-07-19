@@ -369,6 +369,36 @@ struct MieGruneisenModelData {
 
 //------------------------------------------------------------------------------
 
+struct ExtendedMieGruneisenModelData {
+
+  double rho0;
+  double c0;
+  double Gamma0;
+  double s;
+  double e0;
+
+  double eta_min; //!< a negative value (tension) that triggers pR = const (rho0*c0*c0*eta_min).
+
+  //! parameters related to temperature
+
+  enum TemperatureLaw {ORIGINAL_CV = 0, SIMPLIFIED_CV = 1, SIMPLIFIED_CP = 2} Tlaw;
+  //! Note: All the three laws require T0. In addition, "0" & "1" require cv. "2" requires cp and h0.
+
+  double cv; //!< specific heat at constant volume
+  double T0;  //!< temperature is T0 when internal energy (per mass) is e0
+
+  double cp; //!< specific heat at constant pressure
+  double h0; //!< enthalpy per specific mass at T0
+
+  ExtendedMieGruneisenModelData();
+  ~ExtendedMieGruneisenModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct TillotsonModelData {
 
   double rho0; //!< density in the ambient state
@@ -504,7 +534,8 @@ struct MaterialModelData {
 
   int id;
   enum EOS {STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, 
-            TILLOTSON = 3, JWL = 4, ANEOS_BIRCH_MURNAGHAN_DEBYE = 5} eos;
+            EXTENDED_MIE_GRUNEISEN = 3,
+            TILLOTSON = 4, JWL = 5, ANEOS_BIRCH_MURNAGHAN_DEBYE = 6} eos;
   double rhomin;
   double pmin;
   double rhomax;
@@ -515,6 +546,7 @@ struct MaterialModelData {
   StiffenedGasModelData             sgModel;
   NobleAbelStiffenedGasModelData    nasgModel;
   MieGruneisenModelData             mgModel;
+  ExtendedMieGruneisenModelData     mgextModel;
   TillotsonModelData                tillotModel;
   JonesWilkinsLeeModelData          jwlModel;
   ANEOSBirchMurnaghanDebyeModelData abmdModel;
