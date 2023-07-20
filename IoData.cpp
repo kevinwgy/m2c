@@ -767,7 +767,7 @@ void MieGruneisenModelData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-ExtendedMieGruneisenModelData::MieGruneisenModelData() 
+ExtendedMieGruneisenModelData::ExtendedMieGruneisenModelData() 
 {
   // default values are for copper
   // These values are taken from Wikipedia 
