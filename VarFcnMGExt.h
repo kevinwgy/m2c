@@ -8,7 +8,7 @@
 
 #include <VarFcnBase.h>
 #include <ordinary_differential_equations.h>
-#include <boost/math/interpolators/cubic_b_spline.hpp>  //spline interpolation
+//#include <boost/math/interpolators/cubic_b_spline.hpp>  //spline interpolation
 #include <fstream>
 #include <cassert>
 
@@ -81,7 +81,7 @@ private:
   double e0;
 
   double eta_min; //!< a negative value that triggers special treatment (not "min eta"!)
-  double p_min; //!< p_min = rho0*c0*c0*eta_min;
+  double p_min; //!< p_min = rho0*c0*c0*eta_min; (NOTE: This is NOT the "pmin" in the base class.)
 
   double eta_max; //!< 1/s - tol; (too much compression when reaching it. May get division-by-zero.)
 
@@ -104,12 +104,14 @@ private:
   //! Calculate Tr(eta) (eta>0) by uniform sampling & spline integration
   double delta_eta;
   std::vector<double> Trs;
-  boost::math::cubic_b_spline<double>* Tr_spline; 
+  //boost::math::cubic_b_spline<double>* Tr_spline;  //!< Tried. Not better (& slower) than linear interp
   // -----------------------------
 
 public:
   VarFcnMGExt(MaterialModelData &data);
-  ~VarFcnMGExt() {if(Tr_spline) delete Tr_spline;}
+  ~VarFcnMGExt() {
+    //if(Tr_spline) delete Tr_spline;
+  }
 
   //! ----- EOS-Specific Functions -----
   double GetPressure(double rho, double e) {
@@ -180,7 +182,7 @@ private:
     else if(eta>=eta_min)
       return 0.5*c0*c0*eta*eta + e0;
 
-    return er_min + pmin/rho0*(eta-eta_min);
+    return er_min + p_min/rho0*(eta-eta_min);
   }
 
   inline double GetTr(double eta) {
@@ -192,7 +194,15 @@ private:
                   "(eta=%e, eta_max=%e).\n",eta, eta_max);
         eta = eta_max;
       }
-      return (*Tr_spline)(eta);
+
+      double division = eta/delta_eta; 
+      int N = int(division); //Note: cast-to-int is different from "floor" for negative numbers. Not relevant
+                             //      here though. cast-to-int is much faster than "floor"!
+      assert(N+1<(int)Trs.size());
+      double remainder = division - (double)N;
+      return Trs[N]*(1.0-remainder)+Trs[N+1]*remainder;
+
+      //return (*Tr_spline)(eta);
     }
     return T0*exp(Gamma0*eta);
   }
@@ -304,14 +314,14 @@ VarFcnMGExt::VarFcnMGExt(MaterialModelData &data) : VarFcnBase(data)
 
 void VarFcnMGExt::SetupTrInterpolation()
 {
-  Tr_spline = NULL;
+  //Tr_spline = NULL;
   Trs.clear();
 
   double eta0 = 0.0;
   [[maybe_unused]] double sol0 = 0.0; 
   double eta1 = std::min(eta_max, 1.0);
   [[maybe_unused]] double sol1;
-  int N = 5001;
+  int N = 500001;
   delta_eta = (eta1 - eta0)/(N-1.0);  //small enough?
 
   // sets up the integration
@@ -334,7 +344,7 @@ void VarFcnMGExt::SetupTrInterpolation()
     Trs[i] = exp(Gamma0*eta)*(T0 + coeff*Trs[i]);
   }
 
-  Tr_spline = new boost::math::cubic_b_spline<double>(Trs.begin(), Trs.end(), eta0, delta_eta);
+  //Tr_spline = new boost::math::cubic_b_spline<double>(Trs.begin(), Trs.end(), eta0, delta_eta);
 }
 
 //------------------------------------------------------------------------------
@@ -348,7 +358,6 @@ double VarFcnMGExt::GetDensity(double p, double e)
   // other two formulas.
   // -----------------------------
   double ptrial = GetPressure(rho0,e);
-
   if(ptrial==p) //so lucky...
     return rho0;
 
@@ -366,7 +375,7 @@ double VarFcnMGExt::GetDensity(double p, double e)
 
     double b2m4ac = b*b - 4.0*a*c;
     if(b2m4ac<0) {
-      fprintf(stdout, "*** Error: The M-G EOS is invalid for the given p(%e) and e(%e) "
+      fprintf(stdout, "*** Error: The Extended M-G EOS is invalid for the given p(%e) and e(%e) "
               "--- unable to solve it for rho.\n", p, e);
       exit(-1);
     }
@@ -377,8 +386,25 @@ double VarFcnMGExt::GetDensity(double p, double e)
     if(eta1>eta2)
       std::swap(eta1,eta2); //eta2 should be the bigger one
 
-    if(eta1>0 || eta2<0) { //both are negative, or both are positive
-      fprintf(stdout, "*** Error: Cannot determine the solution (rho) of the M-G EOS "
+    if(eta1>=1.0 || eta2<0) { //both are negative, or both are positive
+      fprintf(stdout, "*** Error: Cannot determine the solution (rho) of the Extended M-G EOS "
+              "(eta1 = %e, eta2 = %e). \n", eta1, eta2);
+      exit(-1);
+    }
+
+    if(eta2>=1.0) { //eta1 should be the valid root.
+      if(eta1<0.0) {
+        fprintf(stdout, "*** Error: Cannot find the solution (rho) of the Extended M-G EOS "
+                "(eta1 = %e, eta2 = %e). \n", eta1, eta2);
+        exit(-1);
+      }   
+      return rho0/(1.0 - eta1);
+    }
+
+    // now, eta2 must be between 0 and 1 (i.e., valid)
+    
+    if(eta1>=0.0 && eta1 != eta2) { //both eta1 and eta2 can be valid...
+      fprintf(stdout, "*** Error: Cannot find the solution (rho) of the Extended M-G EOS "
               "(eta1 = %e, eta2 = %e). \n", eta1, eta2);
       exit(-1);
     }
@@ -395,14 +421,14 @@ double VarFcnMGExt::GetDensity(double p, double e)
   double eta = (1.0-c/eta_min)/Gamma0 + 0.5*eta_min;
   if(eta<=eta_min)
     return rho0/(1.0-eta);
-  
+
 
   //If we get here, it means eta_min < eta < 0
 
   //solving a quadratic equation a*eta^2 + b*eta + c = 0 for eta ==> rho = rho0/(1-eta)
   double b2m4ac = 1.0 - 2.0*Gamma0*c;
   if(b2m4ac<0) {
-    fprintf(stdout, "*** Error: The M-G EOS is invalid for the given p(%e) and e(%e) "
+    fprintf(stdout, "*** Error: The Extended M-G EOS is invalid for the given p(%e) and e(%e) "
             "--- unable to solve it for rho (eta_min<eta<0).\n", p, e);
     exit(-1);
   }
@@ -410,7 +436,7 @@ double VarFcnMGExt::GetDensity(double p, double e)
   eta = (1.0 - sqrt(b2m4ac))/Gamma0; //eta has to be the one with (-). The other root is positive
 
   if(eta>0 || eta<eta_min) {
-    fprintf(stdout, "*** Error: Cannot determine the solution (rho) of the M-G EOS "
+    fprintf(stdout, "*** Error: Cannot determine the solution (rho) of the Extended M-G EOS "
             "(eta = %e). \n", eta);
     exit(-1);
   }
@@ -423,13 +449,13 @@ double VarFcnMGExt::GetDensity(double p, double e)
 
 double VarFcnMGExt::GetTemperature(double rho, double e)
 {
+  if(Tlaw == SIMPLIFIED_CV)
+    return T0 + invcv*(e-e0);
+
   if(Tlaw == ORIGINAL_CV) {
     double eta = 1.0 - rho0/rho;
     return GetTr(eta) + invcv*(e - GetEr(eta));
   }
-
-  if(Tlaw == SIMPLIFIED_CV)
-    return T0 + invcv*(e-e0);
 
   // SimplifiedCp
   double p = GetPressure(rho, e);
@@ -440,13 +466,13 @@ double VarFcnMGExt::GetTemperature(double rho, double e)
 
 double VarFcnMGExt::GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) 
 {
+  if(Tlaw == SIMPLIFIED_CV)
+    return e0 + cv*(T-T0);
+
   if(Tlaw == ORIGINAL_CV) {
     double eta = 1.0 - rho0/rho;
     return GetEr(eta) + cv*(T - GetTr(eta));
   }
-
-  if(Tlaw == SIMPLIFIED_CV)
-    return e0 + cv*(T-T0);
 
   // SimplifiedCp
   double eta = 1.0 - rho0/rho;
