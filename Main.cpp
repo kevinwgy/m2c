@@ -194,6 +194,7 @@ int main(int argc, char* argv[])
   SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, global_mesh);
 
   //! Track the embedded boundaries
+  print("o I AM HERE!\n");
   if(embed) {
     // determine whether force should be "spread out" to a 3D structure
     embed->SetCommAndMeshInfo(dms, spo.GetMeshCoordinates(), 
@@ -203,6 +204,9 @@ int main(int argc, char* argv[])
     embed->TrackSurfaces();
   }
   
+  print("o I AM HERE too!\n");
+  exit_mpi();
+
   //! Initialize interpolator
   InterpolatorBase *interp = NULL;
   if(true) //may add more choices later
