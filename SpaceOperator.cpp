@@ -1060,9 +1060,9 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //! specify point-based initial condition
   if(!ic.pointMap.dataMap.empty() && EBDS == nullptr) {
-    print_error(comm, "*** Error: Unable to specify point-based initial conditions without embedded boundaries.\n"
-                "           Background state can be specified using the 'Farfield' or 'Inlet' structure, even\n"
-                "           if the domain does not contain a far-field or inlet boundary.\n");
+    print_error(comm, "*** Error: Unable to specify point-based initial conditions w/o embedded boundaries.\n"
+                      "           Background state can be defined using the 'Farfield' or 'Inlet' structure,\n"
+                      "           even if the domain does not contain a far-field or inlet boundary.\n");
     exit_mpi();
   }
 
@@ -1632,7 +1632,8 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
     }
     for(int n=0; n<8; n++) {
       if(max_color[n] != INT_MIN && max_color[n] != mycolor[surf]) {
-        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), using surface %d.\n",
+        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), "
+                    "using surface %d.\n",
                     mycolor[surf], max_color[n], point.x, point.y, point.z, surf);
         print_error(comm, "           This point may be too close to the embedded surface.\n");
         exit_mpi();
@@ -1640,7 +1641,8 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
     }
     for(int n=0; n<8; n++) {
       if(min_color[n] != INT_MAX && min_color[n] != mycolor[surf]) {
-        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), using embedded surface %d.\n",
+        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), "
+                    "using embedded surface %d.\n",
                     mycolor[surf], min_color[n], point.x, point.y, point.z, surf);
         print_error(comm, "           This point may be too close to the embedded surface.\n");
         exit_mpi();

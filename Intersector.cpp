@@ -914,8 +914,12 @@ Intersector::FloodFillColors()
      old2new[i] = 1; //inlet_color;
   for(int i=0; i<(int)out_colors.size(); i++)
     if(out_colors[i] == 1) {
-     assert(old2new.find(i) == old2new.end());
-     old2new[i] = 2; //outlet_color;
+     if(old2new.find(i) != old2new.end() && verbose>=1) {
+       print_warning("Warning: Embedded surface (%d elems) cannot separate Inlet/Farfield0 and Outlet/Farfield1.\n"
+                     "         Treating both as Inlet/Farfield0.\n", surface.elems.size());
+       old2new[i] = 1; //inlet_color
+     } else
+       old2new[i] = 2; //outlet_color;
     }
 
   // give negative colors to enclusures (i.e. regions not connected to farfield)

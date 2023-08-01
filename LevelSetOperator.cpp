@@ -748,15 +748,15 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
   if(EBDS && surf_and_color) {
     if(!reinit) {
-      print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary. In this case, \n"
-                  "           level set reinitialization must be turned on.\n", materialid);
+      print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary.\n"
+                  "           In this case, level set reinitialization must be turned on.\n", materialid);
       exit_mpi();
     }    
 
     if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::FIXED)
-      print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary. In this case,\n"
-                    "         it may be better to 'fix' the first layer nodes when reinitializing the level set.\n",
-                    materialid);
+      print_warning("Warning: Material %d is tracked by both a level set function and an embedded boundary.\n"
+                    "         In this case, it may be better to 'fix' the first layer nodes when "
+                              "reinitializing the level set.\n", materialid);
 
 
     for(auto&& mypair : *surf_and_color) {
@@ -766,8 +766,8 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi,
 
       int nLayer = (*EBDS)[surf]->Phi_nLayer;
       if(nLayer<2) 
-        print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary.\n"
-                      "         The intersector should compute unsigned distance ('phi') for at least two layers\n"
+        print_warning("Warning: Material %d is tracked by a level set function AND an embedded boundary.\n"
+                      "         Intersector should compute unsigned distance ('phi') for at least two layers\n"
                       "         of nodes. Currently, this value is set to %d.\n", (*EBDS)[surf]->Phi_nLayer); 
 
       double*** color = (*EBDS)[surf]->Color_ptr->GetDataPointer();

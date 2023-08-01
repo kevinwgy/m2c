@@ -194,7 +194,6 @@ int main(int argc, char* argv[])
   SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, global_mesh);
 
   //! Track the embedded boundaries
-  print("o I AM HERE!\n");
   if(embed) {
     // determine whether force should be "spread out" to a 3D structure
     embed->SetCommAndMeshInfo(dms, spo.GetMeshCoordinates(), 
@@ -204,9 +203,6 @@ int main(int argc, char* argv[])
     embed->TrackSurfaces();
   }
   
-  print("o I AM HERE too!\n");
-  exit_mpi();
-
   //! Initialize interpolator
   InterpolatorBase *interp = NULL;
   if(true) //may add more choices later
@@ -230,7 +226,7 @@ int main(int argc, char* argv[])
   //! Impose initial condition
   std::multimap<int, std::pair<int,int> >
   id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
-  if(embed) //even if id2closure is empty, we must still still call this function to set "inactive_elem_status"
+  if(embed) //even if id2closure is empty, we must still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
   /** Create a set that stores additional nodes/cells where solutions should *not* be updated

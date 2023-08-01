@@ -1047,6 +1047,18 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
     hasOutlet[i] = b;
     hasOccluded[i] = c;
     numRegions[i] = d;
+
+/*
+    // debug only
+    print("o Surface %d: Inlet %d, Outlet %d, Occluded %d, numRegions %d.\n", i, a, b, c, d);
+    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
+    string filename = "Phi_" + std::to_string(i) + ".vtr";
+    EBDS->Phi_ptr->StoreMeshCoordinates(*coordinates_ptr);
+    EBDS->Phi_ptr->WriteToVTRFile(filename.c_str(), "Phi");
+    filename = "Color_" + std::to_string(i) + ".vtr";
+    EBDS->Color_ptr->StoreMeshCoordinates(*coordinates_ptr);
+    EBDS->Color_ptr->WriteToVTRFile(filename.c_str(), "Color");
+*/
   }
 
   return max_dist;
