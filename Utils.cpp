@@ -197,6 +197,13 @@ void print(FILE* fd, const char format[],...)
 }
 
 //--------------------------------------------------
+
+void mpi_barrier()
+{
+  MPI_Barrier(m2c_comm);
+}
+
+//--------------------------------------------------
 // MPI Rank 0 will print to a file
 void print(MPI_Comm& comm, FILE* fd, const char format[],...)
 {

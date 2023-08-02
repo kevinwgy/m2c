@@ -43,6 +43,8 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
   print(pvdfile, "  </Collection>\n");
   print(pvdfile, "</VTKFile>\n");
 
+  mpi_barrier();
+
   fclose(pvdfile); pvdfile = NULL;
 
   // setup line plots
@@ -401,6 +403,7 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
   print(pvdfile, "  <DataSet timestep=\"%e\" file=\"%s\"/>\n", time, fname);
   print(pvdfile, "  </Collection>\n");
   print(pvdfile, "</VTKFile>\n");
+  mpi_barrier();
   fclose(pvdfile); pvdfile = NULL;
 
   // clean up

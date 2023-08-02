@@ -40,6 +40,8 @@ void print(MPI_Comm& comm, int i, const char format[],...);
 void print(FILE* fd, const char format[],...);
 void print(MPI_Comm& comm, FILE* fd, const char format[],...);
 //--------------------------------------------------
+void mpi_barrier();
+//--------------------------------------------------
 //! Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const string getCurrentDateTime();
 //--------------------------------------------------

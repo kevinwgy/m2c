@@ -836,6 +836,13 @@ DONE:
 
   MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
 
+/*
+  Phi.StoreMeshCoordinates(coordinates);
+  Phi.WriteToVTRFile("LS.vtr", "phi");
+  MPI_Barrier(comm);
+  exit_mpi();
+*/
+
   if(ebds_counter>0) { 
     //reinit must have been created (not NULL)
     print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
