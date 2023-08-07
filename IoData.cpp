@@ -1861,6 +1861,44 @@ void BcsWallData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+FloodIcData::FloodIcData()
+{
+  source_x = DBL_MAX; //DBL_MAX means the user did not specify it.
+  source_y = DBL_MAX;
+  source_z = DBL_MAX;
+
+  waterline_x = 0.0;
+  waterline_y = 0.0;
+  waterline_z = 0.0;
+
+  gx = 0.0;
+  gy = 0.0;
+  gz = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+void FloodIcData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 10, father);
+
+  new ClassDouble<FloodIcData>(ca, "Source_x", this, &FloodIcData::source_x);
+  new ClassDouble<FloodIcData>(ca, "Source_y", this, &FloodIcData::source_y);
+  new ClassDouble<FloodIcData>(ca, "Source_z", this, &FloodIcData::source_z);
+
+  new ClassDouble<FloodIcData>(ca, "Waterline_x", this, &FloodIcData::waterline_x);
+  new ClassDouble<FloodIcData>(ca, "Waterline_y", this, &FloodIcData::waterline_y);
+  new ClassDouble<FloodIcData>(ca, "Waterline_z", this, &FloodIcData::waterline_z);
+
+  new ClassDouble<FloodIcData>(ca, "Gravity_x", this, &FloodIcData::gx);
+  new ClassDouble<FloodIcData>(ca, "Gravity_y", this, &FloodIcData::gy);
+  new ClassDouble<FloodIcData>(ca, "Gravity_z", this, &FloodIcData::gz);
+
+  waterline_ic.setup("InitialState");
+}
+
+//------------------------------------------------------------------------------
+
 IcData::IcData()
 {
   user_specified_ic = "";
@@ -1879,7 +1917,7 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
 
@@ -1894,6 +1932,9 @@ void IcData::setup(const char *name, ClassAssigner *father)
   default_ic.setup("DefaultInitialState");
 
   multiInitialConditions.setup("GeometricEntities");
+
+  floodIc.setup("Flood");
+
 }
 
 //------------------------------------------------------------------------------

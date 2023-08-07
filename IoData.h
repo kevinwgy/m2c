@@ -962,6 +962,25 @@ struct BcsData {
 };
 
 //------------------------------------------------------------------------------
+//! Fill the domain with a certain material from a source point, up to a "waterline". Pressure varied linearly.
+//! Useful for simulations involving floating vehicles/structures and those that gravity needs to be specified
+struct FloodIcData {
+
+  double source_x, source_y, source_z; //!< "water" source: any point underwater
+  double waterline_x, waterline_y, waterline_z; //!< a point on the waterline
+  double gx, gy, gz; //!< gravitational acceleration 
+
+  //! Note: "source" is needed. Filling everywhere under "waterline" would also flood the ship...
+
+  StateVariable waterline_ic;
+
+  FloodIcData();
+  ~FloodIcData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
 
 struct IcData {
 
@@ -997,6 +1016,11 @@ struct IcData {
   std::vector<double> user_data[SIZE];
 
   std::vector<double> user_data2[SIZE]; //!< for radial variation 
+  //-----------------------------------------------------------------------
+
+  //-----------------------------------------------------------------------
+  //! initial condition specified through "flooding".
+  FloodIcData floodIc;
   //-----------------------------------------------------------------------
 
   IcData();
