@@ -120,6 +120,7 @@ TerminalVisualization.cpp
 ClosestTriangle.cpp
 SteadyStateOperator.cpp
 GhostFluidOperator.cpp
+GravityHandler.cpp
 Utils.cpp
 MathTools/rbf_interp.cpp
 MathTools/polynomial_equations.cpp
