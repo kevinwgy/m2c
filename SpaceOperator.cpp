@@ -1124,12 +1124,6 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
     ApplyUserSpecifiedInitialConditionFile(coords, v, id);
 
 
-  //! apply flooding (if specified by user)
-  if(iod.ic.floodIc.source_x<DBL_MAX && iod.ic.floodIc.source_y<DBL_MAX &&
-     iod.ic.floodIc.source_z<DBL_MAX)
-    SetInitialConditionByFlooding(coords, v, id, EBDS);
-
-
   V.RestoreDataPointerAndInsert();
   ID.RestoreDataPointerAndInsert();
   coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
@@ -1712,97 +1706,6 @@ SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
         }
 
   return make_pair(point.initialConditions.materialid, make_pair(ruling_surface, mycolor_final));
-}
-
-//-----------------------------------------------------
-//! Apply initial condition by flood-filling up to a user-specified waterline. Enforce pressure gradient due to G.
-void SetInitialConditionByFlooding(Vec3D*** coords, Vec5D*** v, double*** id,
-                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
-{
-  
-  if(iod.ic.floodIc.source_x == DBL_MAX || iod.ic.floodIc.source_y == DBL_MAX ||
-     iod.ic.floodIc.source_z == DBL_MAX)
-    return; //user did not specify this
-
-  if(iod.ic.floodIc.gx == 0.0 && iod.ic.floodIc.gy == 0.0 && iod.ic.floodIc.gz == 0.0) {
-    print_error("*** Error: in InitialCondition.Flood, gravitational acceleration vector is 0.\n");
-    exit_mpi();
-  }
-
-  Vec3D source(iod.ic.floodIc.source_x, iod.ic.floodIc.source_y, iod.ic.floodIc.source_z);
-  Vec3D wl(iod.ic.floodIc.waterline_x, iod.ic.floodIc.waterline_y, iod.ic.floodIc.waterline_z);
-  Vec3D gravity(iod.ic.floodIc.gx, iod.ic.floodIc.gy, iod.ic.floodIc.gz);
-  Vec3D gdir = gravity / gravity.norm();
-
-
-  // Get intersection data (if any)
-  vector<Vec3D***> xf;  
-  if(EBDS)
-    for(auto&& ebds : *EBDS)
-      xf.push_back((Vec3D***)ebds->XForward_ptr->GetDataPointer());
-
-
-  // Create temporary variables
-  SpaceVariable3D Obs(comm, &(dm_all.ghosted1_3dof)); //default value is 0
-  SpaceVariable3D d2s(comm, &(dm_all.ghosted1_1dof)); //distance to surface (signed)
-  SpaceVariable3D Color(comm, &(dm_all.ghosted1_1dof)); 
-
-  Vec3D***    ob = (Vec3D***)Obs.GetDataPointer(); 
-  double*** dist = d2s.GetDataPointer();
-
-
-  // Calculate signed distance to water surface
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++) 
-      for(int i=i0; i<imax; i++)
-        dist[k][j][i] = GeoTools::ProjectPointToPlane(coords[k][j][i], wl, gdir, true);
-
-
-  // Separate regions
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++) 
-      for(int i=i0; i<imax; i++) {
-
-        if(i>i0 && id[k][j][i] != id[k][j][i-1])   //Does not add edge obstructions at boundaries
-          ob[k][j][i][0] = 1;
-        if(j>j0 && id[k][j][i] != id[k][j-1][i])
-          ob[k][j][i][1] = 1;
-        if(k>k0 && id[k][j][i] != id[k-1][j][i])
-          ob[k][j][i][2] = 1;
-
-        for(auto&& myxf : xf) 
-          for(int p=0; p<3; p++)
-            if(myxf[k][j][i][p] >= 0)
-              ob[k][j][i][p] += 10; //the number can be used for debugging
-
-        if(i>i0 && dist[k][j][i]*dist[k][j][i-1]<=0.0)
-          ob[k][j][i][0] += 100;
-        if(j>j0 && dist[k][j][i]*dist[k][j-1][i]<=0.0)
-          ob[k][j][i][1] += 100;
-        if(k>k0 && dist[k][j][i]*dist[k-1][j][i]<=0.0)
-          ob[k][j][i][2] += 100;
-        
-      }
-
-  d2s.RestoreDataPointerToLocalVector(); //not needed anymore
-  Obs.RestoreDataPointerAndInsert();
-
-  // Create & run flood-filler
-  FloodFill floodfiller(comm, dm_all, ghost_nodes_inner, ghost_nodes_outer);
-  std::set<Int3> occluded;
-  floodfiller.FillBasedOnEdgeObstructions(Obs, 0, occluded, Color); //0 is the non-obstructing tag
-
-  Int3 source_ijk = global_mesh.FindClosestNodeToPoint(source);
-  XXX Color
-
-  if(xf.size()>0)
-    for(auto&& ebds : *EBDS)
-      ebds->XForward_ptr->RestoreDataPointerToLocalVector();
-
-  //Destroy locally created objects
-  Obs.Destroy();
-  d2s.Destroy();
-  floodfiller.Destroy();
 }
 
 //-----------------------------------------------------

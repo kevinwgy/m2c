@@ -175,9 +175,6 @@ private:
                                   vector<double***> &color,
                                   Vec5D*** v, double*** id);
                                        
-  void SetInitialConditionByFlooding(Vec3D*** coords, Vec5D*** v, double*** id, 
-                                     vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
-
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
 
   void CheckReconstructedStates(SpaceVariable3D &V,

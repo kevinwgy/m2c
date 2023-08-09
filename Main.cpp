@@ -20,6 +20,7 @@
 #include <FluxFcnLLF.h>
 #include <FluxFcnHLLC.h>
 #include <FluxFcnGodunov.h>
+#include <GravityHandler.h>
 #include <TimeIntegrator.h>
 #include <GradientCalculatorCentral.h>
 #include <IonizationOperator.h>
@@ -299,6 +300,19 @@ int main(int argc, char* argv[])
   }
 #endif
   
+
+  //! Update initial condition (V, ID, Phi[i]) by flooding, if specified by user (i: corresponding to "water")
+  GravityHandler* ghand = NULL;
+  if(iod.ic.floodIc.source_x<DBL_MAX && iod.ic.floodIc.source_y<DBL_MAX &&
+     iod.ic.floodIc.source_z<DBL_MAX) {
+    ghand = new GravityHandler(comm, dms, iod, spo.GetMeshCoordinates(),
+                               *(spo.GetPointerToInnerGhostNodes()), *(spo.GetPointerToOuterGhostNodes()),
+                               global_mesh);
+    ghand->UpdateInitialConditionByFlooding(V, ID, lso, Phi,
+                                            embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
+  }
+
+
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
   if((int)lso.size()>1) { //at each node, at most one "phi" can be negative
@@ -693,6 +707,8 @@ int main(int argc, char* argv[])
   if(Xi) {Xi->Destroy(); delete Xi;}
 
   if(pmo) {pmo->Destroy(); delete pmo;}
+
+  if(ghand) {ghand->Destroy(); delete ghand;}
 
   out.FinalizeOutput();
   integrator->Destroy();
