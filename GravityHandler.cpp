@@ -110,10 +110,10 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
   double*** dist = Dist.GetDataPointer();
 
 
-  // Calculate signed distance to water surface
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++)
+  // Calculate signed distance to water surface (need to include ghosts, used below)
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
         dist[k][j][i] = GeoTools::ProjectPointToPlane(coords[k][j][i], wl, gdir, true);
 
 
@@ -225,6 +225,13 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
   Color.Destroy();
   floodfiller.Destroy();
 
+  V.StoreMeshCoordinates(coordinates);
+  V.WriteToVTRFile("V.vtr", "V");
+  ID.StoreMeshCoordinates(coordinates);
+  ID.WriteToVTRFile("ID.vtr", "ID");
+  Phi[water_lsid]->StoreMeshCoordinates(coordinates);
+  Phi[water_lsid]->WriteToVTRFile("Phi.vtr", "Phi");
+  exit_mpi();
 }
 
 //------------------------------------------------------------------------
