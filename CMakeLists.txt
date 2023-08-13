@@ -95,6 +95,7 @@ ProbeOutput.cpp
 PlaneOutput.cpp
 MaterialVolumeOutput.cpp
 Output.cpp
+SpaceInitializer.cpp
 Reconstructor.cpp
 SpaceOperator.cpp
 MeshGenerator.cpp

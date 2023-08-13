@@ -708,6 +708,10 @@ struct LevelSetReinitializationData {
   int frequency; 
   double frequency_dt;
 
+  //! Initialization of Phi: by distance calculation (accurate, but not robust for complex geometries), \n
+  //! or by the solution of the reinitialization function (may be less accurate, but more robust).
+  enum InitializationMethod {DISTANCE_CALCULATION = 0, REINITIALIZATION = 1} init;
+
   int maxIts;
 
   double cfl;
@@ -994,8 +998,6 @@ struct IcData {
   //-----------------------------------------------------------------------
   //! user-specified file
   const char *user_specified_ic;
-
-  enum YesNo {NO = 0, YES = 1} apply_user_file_before_geometries;
 
   enum RadialBasisFunction {MULTIQUADRIC = 0, INVERSE_MULTIQUADRIC = 1, 
                             THIN_PLATE_SPLINE = 2, GAUSSIAN = 3} rbf; //radial basis function for interpolation

@@ -92,7 +92,6 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
 
   Vec5D***      v = (Vec5D***) V.GetDataPointer();
   double***    id = ID.GetDataPointer();
-  Vec3D*** coords = (Vec3D***) coordinates.GetDataPointer();
 
   // Get intersection data (if any)
   vector<Vec3D***> xf;
@@ -111,11 +110,12 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
 
 
   // Calculate signed distance to water surface (need to include ghosts, used below)
+  Vec3D*** coords = (Vec3D***) coordinates.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
         dist[k][j][i] = GeoTools::ProjectPointToPlane(coords[k][j][i], wl, gdir, true);
-
+  coordinates.RestoreDataPointerToLocalVector();
 
   // Separate regions
   for(int k=k0; k<kmax; k++)
@@ -173,6 +173,12 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
       for(int i=i0; i<imax; i++) {
         // first, update phi
         if(phi) {
+          double dxmin_half = 0.5*global_mesh.GetMinDXYZ(Int3(i,j,k));
+          if(color[k][j][i] == flood_color)
+            phi[k][j][i] = -dxmin_half;
+          else
+            phi[k][j][i] = dxmin_half;
+/*
           if(fabs(dist[k][j][i])<fabs(phi[k][j][i])) {
             if(color[k][j][i] == flood_color)
               phi[k][j][i] = -fabs(dist[k][j][i]); //negative inside the material subdomain
@@ -188,6 +194,7 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
               phi[k][j][i] = -fabs(phi[k][j][i]);
             // if color is not flood_color, it may still be the same (water) material, i.e. inside the subdomain.
           }
+*/
         }
 
         // update ID and V
@@ -215,20 +222,29 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
   if(water_lsid>=0)
     Phi[water_lsid]->RestoreDataPointerAndInsert();
 
+  lso[water_lsid]->ApplyBoundaryConditions(*Phi[water_lsid]);
+  lso[water_lsid]->Reinitialize(0.0, 1.0, 0.0, *Phi[water_lsid], 600, true);
+  MPI_Barrier(comm);
+  print("Done Done\n");
+
   Color.RestoreDataPointerToLocalVector();
-  coordinates.RestoreDataPointerToLocalVector();
+  print("Done Done 2\n");
+  print("Done Done 3\n");
   Dist.RestoreDataPointerToLocalVector();
 
+  print("Done Done 4\n");
   //Destroy locally created objects
   Obs.Destroy();
   Dist.Destroy();
   Color.Destroy();
   floodfiller.Destroy();
 
+  print("Done Done 5\n");
   V.StoreMeshCoordinates(coordinates);
   V.WriteToVTRFile("V.vtr", "V");
   ID.StoreMeshCoordinates(coordinates);
   ID.WriteToVTRFile("ID.vtr", "ID");
+  print("Done Done 6\n");
   Phi[water_lsid]->StoreMeshCoordinates(coordinates);
   Phi[water_lsid]->WriteToVTRFile("Phi.vtr", "Phi");
   exit_mpi();

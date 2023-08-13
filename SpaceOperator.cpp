@@ -719,6 +719,38 @@ SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
       }
 
 
+  //! Setup the operation order. Create distance calculators
+  // Internal Geometry ID:
+  // Plane: 0, CylinderCone: 1, CylinderSphere: 2, Sphere: 3,
+  // Parallelepiped: 4, Spheroid: 5, Custom-Geometry: 6
+  //-------------------------------------
+  vector<std::pair<int,int> > order;  //<geom type, geom dataMap index>
+  map<int, DistanceFromPointToPlane*> plane_cal;
+  map<int, DistanceFromPointToCylinderCone*> cylindercone_cal;
+  map<int, DistanceFromPointToCylinderSphere*> cylindersphere_cal;
+  map<int, DistanceFromPointToSphere*> sphere_cal;
+  map<int, DistanceFromPointToParallelepiped*> parallelepiped_cal;
+  map<int, DistanceFromPointToSpheroid*> spheroid_cal;
+     
+
+
+  //! Go over user-specified functions and geometries, following the specified order.
+  bool found;
+  while(true) {
+    found = false;
+    
+
+
+
+
+
+    if(!found)
+      break;
+  } 
+
+
+
+
   //! apply user-specified function
   if(iod.ic.apply_user_file_before_geometries==IcData::YES)
     ApplyUserSpecifiedInitialConditionFile(coords, v, id);

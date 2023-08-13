@@ -151,6 +151,9 @@ RETRY_FullDomain:
     }
   }
 
+  MPI_Barrier(comm);
+  print(" Done.\n");
+
   // apply failsafe
   if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
