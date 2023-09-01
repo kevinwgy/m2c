@@ -22,6 +22,7 @@
 #include <FluxFcnGodunov.h>
 #include <GravityHandler.h>
 #include <TimeIntegrator.h>
+#include <SpaceInitializer.h>
 #include <GradientCalculatorCentral.h>
 #include <IonizationOperator.h>
 #include <HyperelasticityOperator.h>
@@ -220,21 +221,67 @@ int main(int argc, char* argv[])
   //! Setup heat diffusion operator in spo (if heat diffusion model is not NONE)
   spo.SetupHeatDiffusionOperator(interp, grad);
  
-  //! Initialize State Variables
+
+  //! Allocate memory for V and ID 
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables
   SpaceVariable3D ID(comm, &(dms.ghosted1_1dof)); //!< material id
 
-  //! Impose initial condition
+  //! Allocate memory for Phi. Initialize LevelSetOperators
+  std::vector<LevelSetOperator*> lso;
+  std::vector<SpaceVariable3D*>  Phi;
+  std::set<int> ls_tracker;
+  int ls_input_id_min = 9999, ls_input_id_max = -9999;
+  for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
+    if(ls_tracker.find(it->first) != ls_tracker.end()){
+      print_error("*** Error: Detected two level sets with the same id (%d).\n", it->first);
+      exit_mpi();
+    }
+    ls_tracker.insert(it->first);
+    ls_input_id_min = std::min(ls_input_id_min, it->first);
+    ls_input_id_max = std::max(ls_input_id_max, it->first);
+  } 
+  if(ls_input_id_min<0 || ls_input_id_max>=(int)ls_tracker.size()){
+    print_error("*** Error: Level set ids should start from 0 and have no gaps.\n"); 
+    exit_mpi();
+  }
+  lso.resize(ls_tracker.size(),NULL);
+  Phi.resize(ls_tracker.size(),NULL);
+  ls_tracker.clear(); //for re-use
+  for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
+    int matid = it->second->materialid;
+    if(matid<=0 || matid>=(int)vf.size()) { //cannot use ls to track material 0
+      print_error("*** Error: Cannot initialize a level set for tracking material %d.\n", matid);
+      exit_mpi();
+    }
+    if(ls_tracker.find(matid) != ls_tracker.end()) {
+      print_error("*** Error: Cannot initialize multiple level sets for the same material (id=%d).\n", matid);
+      exit_mpi();
+    }
+    ls_tracker.insert(matid);    
+    lso[it->first] = new LevelSetOperator(comm, dms, iod, *it->second, spo);
+    Phi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
+  }
+  
+  // ------------------------------------------------------------------------
+  //! Initialize V, ID, Phi.
+  SpaceInitializer spinit(comm, iod, global_mesh);
   std::multimap<int, std::pair<int,int> >
-  id2closure = spo.SetInitialCondition(V, ID, embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
+  id2closure = spinit.SetInitialCondition(V, ID, Phi, spo, lso, 
+                                          embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
+  // ------------------------------------------------------------------------
+
   if(embed) //even if id2closure is empty, we must still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
+
 
   /** Create a set that stores additional nodes/cells where solutions should *not* be updated
     * In the vast majority of cases, this set should be empty. Use it only when other options
     * are impossible or a lot more intrusive.*/
   std::set<Int3> spo_frozen_nodes;
   spo.SetPointerToFrozenNodes(&spo_frozen_nodes); 
+
+
+
 
   //! Initialize Levelset(s)
   std::vector<LevelSetOperator*> lso;
@@ -271,6 +318,9 @@ int main(int argc, char* argv[])
     lso[it->first] = new LevelSetOperator(comm, dms, iod, *it->second, spo);
     Phi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
 
+
+
+
     auto closures = id2closure.equal_range(matid);
     if(closures.first != closures.second) {//found this matid
       vector<std::pair<int,int> > surf_and_color;
@@ -285,6 +335,8 @@ int main(int argc, char* argv[])
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           it->first, matid);
   }  
+
+
 
   // check for user error
   for(int ls=0; ls<OutputData::MAXLS; ls++)
@@ -687,6 +739,8 @@ int main(int argc, char* argv[])
 
   V.Destroy();
   ID.Destroy();
+
+  spinit.Destory();
 
   if(LocalDt) {LocalDt->Destroy(); delete LocalDt;}
 
