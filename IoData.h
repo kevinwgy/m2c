@@ -81,7 +81,7 @@ struct PointData {
 
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -99,7 +99,7 @@ struct PlaneData {
 
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -122,7 +122,7 @@ struct ParallelepipedData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -141,7 +141,7 @@ struct SphereData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -163,7 +163,7 @@ struct SpheroidData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -185,7 +185,7 @@ struct CylinderConeData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
  
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -208,7 +208,7 @@ struct CylinderSphereData {
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -227,7 +227,7 @@ struct UserSpecifiedEnclosureData {
 
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
 
-  int order; //!< set operation order (0, 1, ...). Currently NOT used in M2C (but used in A2C).
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -708,10 +708,6 @@ struct LevelSetReinitializationData {
   int frequency; 
   double frequency_dt;
 
-  //! Initialization of Phi: by distance calculation (accurate, but not robust for complex geometries), \n
-  //! or by the solution of the reinitialization function (may be less accurate, but more robust).
-  enum InitializationMethod {DISTANCE_CALCULATION = 0, REINITIALIZATION = 1} init;
-
   int maxIts;
 
   double cfl;
@@ -766,6 +762,10 @@ struct LevelSetSchemeData {
   enum BcType {NONE = 0, ZERO_NEUMANN = 1, LINEAR_EXTRAPOLATION = 2, NON_NEGATIVE = 3, SIZE = 4};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
   
+  //! Initialization of Phi: by distance calculation (accurate, but not robust for complex geometries), \n
+  //! or by the solution of the reinitialization function (may be less accurate, but more robust).
+  enum InitializationMethod {DISTANCE_CALCULATION = 0, REINITIALIZATION = 1} init;
+
 
   int bandwidth; //!< number of layers of nodes on each side of interface
 

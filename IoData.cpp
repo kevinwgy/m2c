@@ -1365,7 +1365,6 @@ void BoundarySchemeData::setup(const char *name, ClassAssigner *father)
 
 LevelSetReinitializationData::LevelSetReinitializationData()
 {
-  init = DISTANCE_CALCULATION;
   frequency = -1;
   frequency_dt = -1.0;
   maxIts = 30;
@@ -1378,11 +1377,7 @@ LevelSetReinitializationData::LevelSetReinitializationData()
 
 void LevelSetReinitializationData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
-
-  new ClassToken<LevelSetReinitializationData>(ca, "Initialization", this,
-     reinterpret_cast<int LevelSetReinitializationData::*>(&LevelSetReinitializationData::init), 2,
-     "DistanceCalculation", 0, "Reinitialization", 1);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassInt<LevelSetReinitializationData>(ca, "Frequency", this, 
           &LevelSetReinitializationData::frequency);
@@ -1464,6 +1459,7 @@ LevelSetSchemeData::LevelSetSchemeData()
 
   delta = 0.2; //the coefficient in Harten's entropy fix.
 
+  init = DISTANCE_CALCULATION;
 }
 
 //------------------------------------------------------------------------------
@@ -1471,7 +1467,7 @@ LevelSetSchemeData::LevelSetSchemeData()
 Assigner *LevelSetSchemeData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 13, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
 
   new ClassInt<LevelSetSchemeData>(ca, "MaterialID", this, 
     &LevelSetSchemeData::materialid);
@@ -1508,6 +1504,10 @@ Assigner *LevelSetSchemeData::getAssigner()
   new ClassToken<LevelSetSchemeData>(ca, "BoundaryConditionZmax", this,
           reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::bc_zmax), 4,
           "None", 0, "ZeroNeumann", 1, "LinearExtrapolation", 2, "NonNegative", 3);
+
+  new ClassToken<LevelSetSchemeData>(ca, "Initialization", this,
+          reinterpret_cast<int LevelSetSchemeData::*>(&LevelSetSchemeData::init), 2,
+          "DistanceCalculation", 0, "Reinitialization", 1);
 
   rec.setup("Reconstruction", ca);
 

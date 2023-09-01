@@ -38,15 +38,11 @@ public:
 
 private:
 
+  int OrderUserSpecifiedGeometries(std::vector<std::pair<int,int> > &order);
 
-void SortUserSpecifiedGeometries(IoDataGeo &iod_geo,
-                                 std::vector<std::pair<int,int> > &order,
-                                 std::map<int,GeoTools::DistanceFromPointToPlane*> &plane_cal,
-                                 std::map<int,GeoTools::DistanceFromPointToCylinderCone*> &cylindercone_cal,
-                                 std::map<int,GeoTools::DistanceFromPointToCylinderSphere*> &cylindersphere_cal,
-                                 std::map<int,GeoTools::DistanceFromPointToSphere*> &sphere_cal,
-                                 std::map<int,GeoTools::DistanceFromPointToParallelepiped*> &parallelepiped_cal,
-                                 std::map<int,GeoTools::DistanceFromPointToSpheroid*> &spheroid_cal);
+  void AddGeomToVector(int o, int type, int ind, string& name, std::vector<std::pair<int,int> > &order,
+                       std::vector<int> &user_specified_order);
+
 };
 
 #endif
