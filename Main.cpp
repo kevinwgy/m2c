@@ -264,7 +264,7 @@ int main(int argc, char* argv[])
   
   // ------------------------------------------------------------------------
   //! Initialize V, ID, Phi.
-  SpaceInitializer spinit(comm, iod, global_mesh);
+  SpaceInitializer spinit(comm, iod, global_mesh, spo.GetMeshCoordinates());
   std::multimap<int, std::pair<int,int> >
   id2closure = spinit.SetInitialCondition(V, ID, Phi, spo, lso, 
                                           embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
