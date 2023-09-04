@@ -42,8 +42,7 @@ GravityHandler::Destroy()
 void
 GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                                  vector<LevelSetOperator*> lso, vector<SpaceVariable3D*>& Phi,
-                                                 std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > >
-                                                 EBDS)
+                                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> >* EBDS)
 {
 
   if(iod.ic.floodIc.source_x == DBL_MAX || iod.ic.floodIc.source_y == DBL_MAX ||

@@ -86,9 +86,7 @@ public:
 
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
 
-  void ConstructNarrowBandInReinitializer(SpaceVariable3D &Phi,
-                                          SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, SpaceVariable3D &Active,
-                                          vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
+  void ConstructNarrowBandInReinitializer(SpaceVariable3D &Phi);
 
   bool Reinitialize(double time, double dt, int time_step,
                     SpaceVariable3D &Phi, int special_maxIts = 0,//!< if >0, will use it instead of iod value

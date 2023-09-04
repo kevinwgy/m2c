@@ -1908,6 +1908,8 @@ IcData::IcData()
 {
   user_specified_ic = "";
 
+  apply_user_file_before_geometries = NO;
+
   rbf = MULTIQUADRIC;
 
   type = NONE;
@@ -1920,9 +1922,13 @@ IcData::IcData()
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 6, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
+
+  new ClassToken<IcData> (ca, "ApplyUserDataBeforeGeometricEntities", this,
+        reinterpret_cast<int IcData::*>(&IcData::apply_user_file_before_geometries), 2,
+        "No", 0, "Yes", 1);
 
   new ClassToken<IcData> (ca, "InterpolationFunction", this,
         reinterpret_cast<int IcData::*>(&IcData::rbf), 4, "Multiquadric", 0, 

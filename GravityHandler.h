@@ -50,8 +50,7 @@ public:
 
   void UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariable3D &ID,
                                         std::vector<LevelSetOperator*> lso, std::vector<SpaceVariable3D*>& Phi,
-                                        std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > >
-                                        EBDS = NULL);
+                                        std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> >* EBDS = NULL);
 
 };
 

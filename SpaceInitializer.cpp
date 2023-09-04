@@ -7,6 +7,7 @@
 #include <SpaceOperator.h>
 #include <LevelSetOperator.h>
 #include <EmbeddedBoundaryDataSet.h>
+#include <EmbeddedBoundaryOperator.h>
 #include <GravityHandler.h>
 #include <DistancePointToParallelepiped.h>
 #include <DistancePointToSpheroid.h>
@@ -14,6 +15,8 @@
 #include <DistancePointToCylinderCone.h>
 #include <DistancePointToCylinderSphere.h>
 #include <DistancePointToPlane.h>
+#include <KDTree.h>
+#include <rbf_interp.hpp>
 
 #ifdef LEVELSET_TEST
   #include <Vector2D.h>
@@ -27,9 +30,11 @@ using std::make_pair;
 using std::unique_ptr;
 
 extern double domain_diagonal;
+extern int verbose;
+extern int INACTIVE_MATERIAL_ID;
 //---------------------------------------------------------------------
 
-SpaceInitializer::SpaceInitializer(MPI_Comm &comm_, DataManager3D &dms_, IoData &iod_,
+SpaceInitializer::SpaceInitializer(MPI_Comm &comm_, DataManagers3D &dms_, IoData &iod_,
                                    GlobalMeshInfo &global_mesh_, SpaceVariable3D &coordinates)
                 : comm(comm_), dms(dms_), iod(iod_), global_mesh(global_mesh_)
 {
@@ -40,7 +45,7 @@ SpaceInitializer::SpaceInitializer(MPI_Comm &comm_, DataManager3D &dms_, IoData 
 
 //---------------------------------------------------------------------
 
-SpaceInitializer::~SpaceInitialier()
+SpaceInitializer::~SpaceInitializer()
 { }
 
 //---------------------------------------------------------------------
@@ -53,7 +58,7 @@ SpaceInitializer::Destroy()
 
 multimap<int, pair<int,int> >
 SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, vector<SpaceVariable3D*> &Phi,
-                                      SpaceOperator &spo, vector<SpaceVariable3D*> &lso,
+                                      SpaceOperator &spo, vector<LevelSetOperator*> &lso,
                                       GravityHandler* ghand,
                                       unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS)
 {
@@ -71,17 +76,17 @@ SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, v
   // 7: Point
   //-------------------------------------
   vector<pair<int,int> > order;  //<geom type, geom dataMap index>
-  int nGeom = OrderUserSpecifiedGeometries(order);
+  [[maybe_unused]] int nGeom = OrderUserSpecifiedGeometries(order);
 
   // Step 2: Apply initial conditions to V, ID (B.C. applied to V, but not ID!)
-  multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, spo, EBDS, order);
+  multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, spo, EBDS.get(), order);
 
   // Step 3:: Apply initial conditions to Phi
-  InitializePhi(ID, spo, Phi, lso, EBDS, order, id2closure);
+  InitializePhi(ID, spo, Phi, lso, EBDS.get(), order, id2closure);
 
   // Step 4:: Apply flooding if specified by user
   if(ghand)
-    ghand->UpdateInitialConditionByFlooding(V, ID, lso, Phi, EBDS);
+    ghand->UpdateInitialConditionByFlooding(V, ID, lso, Phi, EBDS.get());
 
   return id2closure;
 }
@@ -142,12 +147,13 @@ SpaceInitializer::OrderUserSpecifiedGeometries(vector<std::pair<int,int> > &orde
 //---------------------------------------------------------------------
 
 void
-SpaceInitializer::AddGeomToVector(int o, int type, int ind, string& name, vector<std::pair<int,int> > &order,
+SpaceInitializer::AddGeomToVector(int o, int type, int ind, string name, vector<std::pair<int,int> > &order,
                                   vector<int> &user_specified_order)
 {
   int nGeom = order.size();
   if(o<0 || o>=nGeom) {
-    print_error("*** Error: Detected incorrect Plane order (%d). Range: [0, %d)\n", o, nGeom);
+    print_error("*** Error: Detected incorrect %s order (%d). Range: [0, %d)\n",
+                name.c_str(), o, nGeom);
     exit_mpi();
   }
 
@@ -178,7 +184,7 @@ SpaceInitializer::AddGeomToVector(int o, int type, int ind, string& name, vector
 
 multimap<int, pair<int,int> >
 SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceOperator &spo,
-                                   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                   vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                                    vector<pair<int,int> > &order)
 {
 
@@ -290,7 +296,7 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
       GeoTools::DistanceFromPointToPlane distCal(x0, dir); //dir will be normalized by the constructor
 
       print("  o Found Plane[%d]: (%e %e %e) | normal: (%e %e %e). material id: %d.\n",
-            it->first, x0[0], x0[1], x0[2], dir[0], dir[1], dir[2]
+            it->first, x0[0], x0[1], x0[2], dir[0], dir[1], dir[2],
             it->second->initialConditions.materialid);
 
       for(int k=k0; k<kmax; k++)
@@ -333,8 +339,8 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
       for(int k=k0; k<kmax; k++)
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
-            if(interior  && distCal.Calculate(coords[k][j][i])<0 ||
-               !interior && distCal.Calculate(coords[k][j][i])>0) {
+            if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
+               (!interior && distCal.Calculate(coords[k][j][i])>0)) {
               v[k][j][i][0] = it->second->initialConditions.density;
               v[k][j][i][1] = it->second->initialConditions.velocity_x;
               v[k][j][i][2] = it->second->initialConditions.velocity_y;
@@ -370,8 +376,8 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
       for(int k=k0; k<kmax; k++)
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
-            if(interior  && distCal.Calculate(coords[k][j][i])<0 ||
-               !interior && distCal.Calculate(coords[k][j][i])>0) {
+            if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
+               (!interior && distCal.Calculate(coords[k][j][i])>0)) {
               v[k][j][i][0] = it->second->initialConditions.density;
               v[k][j][i][1] = it->second->initialConditions.velocity_x;
               v[k][j][i][2] = it->second->initialConditions.velocity_y;
@@ -402,8 +408,8 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
       for(int k=k0; k<kmax; k++)
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
-            if(interior  && distCal.Calculate(coords[k][j][i])<0 ||
-               !interior && distCal.Calculate(coords[k][j][i])>0) {
+            if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
+               (!interior && distCal.Calculate(coords[k][j][i])>0)) {
               v[k][j][i][0] = it->second->initialConditions.density;
               v[k][j][i][1] = it->second->initialConditions.velocity_x;
               v[k][j][i][2] = it->second->initialConditions.velocity_y;
@@ -442,8 +448,8 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
       for(int k=k0; k<kmax; k++)
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
-            if(interior  && distCal.Calculate(coords[k][j][i])<0 ||
-               !interior && distCal.Calculate(coords[k][j][i])>0) {
+            if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
+               (!interior && distCal.Calculate(coords[k][j][i])>0)) {
               v[k][j][i][0] = it->second->initialConditions.density;
               v[k][j][i][1] = it->second->initialConditions.velocity_x;
               v[k][j][i][2] = it->second->initialConditions.velocity_y;
@@ -474,8 +480,8 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
       for(int k=k0; k<kmax; k++)
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
-            if(interior  && distCal.Calculate(coords[k][j][i])<0 ||
-               !interior && distCal.Calculate(coords[k][j][i])>0) {
+            if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
+               (!interior && distCal.Calculate(coords[k][j][i])>0)) {
               v[k][j][i][0] = it->second->initialConditions.density;
               v[k][j][i][1] = it->second->initialConditions.velocity_x;
               v[k][j][i][2] = it->second->initialConditions.velocity_y;
@@ -1025,7 +1031,7 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
         j = ijk0[1] + dj;
         k = ijk0[2] + dk;
         vertices.push_back(Int3(i,j,k));
-        owner.push_back(coordinates.IsHere(i,j,k,false));
+        owner.push_back(i>=i0 && i<imax && j>=j0 && j<jmax && k>=k0 && k<kmax);
       }
 
 
@@ -1157,33 +1163,32 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
 void
 SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
                                 vector<SpaceVariable3D*> &Phi, vector<LevelSetOperator*> &lso,
-                                unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                                 vector<pair<int,int> > &order,
                                 multimap<int, pair<int,int> > &id2closure)
 {
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
 
-    print("\n- Initializing level set function (%d) for tracking the boundary of material %d.\n",
+    print("\n- Initializing Phi[%d] for tracking the boundary of material %d.\n", it->first, matid);
 
     auto closures = id2closure.equal_range(matid);
     if(closures.first != closures.second) {//found this matid
       vector<std::pair<int,int> > surf_and_color;
       for(auto it2 = closures.first; it2 != closures.second; it2++)
         surf_and_color.push_back(it2->second);
-      if(it->second->init = LevelSetSchemeData::DISTANCE_CALCULATION)
-        InitializePhiByDistance(ID, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
+      if(it->second->init == LevelSetSchemeData::DISTANCE_CALCULATION)
+        InitializePhiByDistance(order, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
                                 *(spo.GetPointerToInnerGhostNodes()),
                                 *(spo.GetPointerToOuterGhostNodes()),
-                                *Phi[it->first], *lso[it->first],
-                                embed->GetPointerToEmbeddedBoundaryData(),
+                                *Phi[it->first], *lso[it->first], EBDS,
                                 &surf_and_color);
       else //by reinitialization
         InitializePhiByReinitialization(ID, *Phi[it->first], *lso[it->first], &surf_and_color);
     }
     else {
-      if(it->second->init = LevelSetSchemeData::DISTANCE_CALCULATION)
-        InitializePhiByDistance(ID, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
+      if(it->second->init == LevelSetSchemeData::DISTANCE_CALCULATION)
+        InitializePhiByDistance(order, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
                                 *(spo.GetPointerToInnerGhostNodes()),
                                 *(spo.GetPointerToOuterGhostNodes()),
                                 *Phi[it->first], *lso[it->first]);
@@ -1196,12 +1201,13 @@ SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
 //---------------------------------------------------------------------
 
 void
-SpaceInitializer::InitializePhiByDistance(SpaceVariable3D &ID, SpaceVariable3D &coordinates,
+SpaceInitializer::InitializePhiByDistance(vector<pair<int,int> > &order,
+                                          SpaceVariable3D &coordinates,
                                           SpaceVariable3D &delta_xyz,
                                           vector<GhostPoint> &spo_ghost_nodes_inner,
                                           vector<GhostPoint> &spo_ghost_nodes_outer,
-                                          SpaceSpaceVariable3D &Phi, LevelSetOperator &lso,
-                                          unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                          SpaceVariable3D &Phi, LevelSetOperator &lso,
+                                          vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                                           vector<pair<int,int> > *surf_and_color)
 {
 
@@ -1421,7 +1427,7 @@ SpaceInitializer::InitializePhiByDistance(SpaceVariable3D &ID, SpaceVariable3D &
 
       Phi.RestoreDataPointerAndInsert();
       coordinates.RestoreDataPointerToLocalVector();
-      bool active = InitializePhiWithinEnclosure(*enclosure.second, coordinates, delta_xyz,
+      bool active = InitializePhiWithinEnclosure(*it->second, coordinates, delta_xyz,
                                                  spo_ghost_nodes_inner, spo_ghost_nodes_outer, Phi, lso);
       phi = Phi.GetDataPointer();
       coords = (Vec3D***)coordinates.GetDataPointer();
@@ -1539,15 +1545,14 @@ SpaceInitializer::InitializePhiByDistance(SpaceVariable3D &ID, SpaceVariable3D &
 
   // Now, take care of embedded surfaces
   int ebds_counter = 0;
-  
+  LevelSetSchemeData& iod_ls(lso.GetLevelSetSchemeData());
+
   if(EBDS && surf_and_color) {
     if(!lso.HasReinitializer()) {
       print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary.\n"
                   "           In this case, level set reinitialization must be turned on.\n", materialid);
       exit_mpi();
     }
-
-    LevelSetSchemeData& iod_ls(lso.GetLevelSetSchemeData());
 
     if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::FIXED)
       print_warning("Warning: Material %d is tracked by both a level set function and an embedded boundary.\n"
@@ -1628,7 +1633,7 @@ DONE:
 
   if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
     assert(lso.HasReinitializer());
-    lso.ConstructNarrowBandInReinitializer(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+    lso.ConstructNarrowBandInReinitializer(Phi);
   }
 
   MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
@@ -1777,7 +1782,7 @@ SpaceInitializer::InitializePhiWithinEnclosure(UserSpecifiedEnclosureData &enclo
 
 void
 SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
-                                                  SpaceSpaceVariable3D &Phi, LevelSetOperator &lso,
+                                                  SpaceVariable3D &Phi, LevelSetOperator &lso,
                                                   vector<pair<int,int> > *surf_and_color)
 {
   int materialid = lso.GetMaterialID();
@@ -1849,7 +1854,7 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
 
   if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
     assert(lso.HasReinitializer());
-    lso.ConstructNarrowBandInReinitializer(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+    lso.ConstructNarrowBandInReinitializer(Phi);
   }
 
   print("  o Set Phi (material id: %d) near subdomain boundary. Going to reinitialize it.\n", materialid);

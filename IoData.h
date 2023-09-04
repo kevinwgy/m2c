@@ -999,6 +999,8 @@ struct IcData {
   //! user-specified file
   const char *user_specified_ic;
 
+  enum YesNo {NO = 0, YES = 1} apply_user_file_before_geometries;
+
   enum RadialBasisFunction {MULTIQUADRIC = 0, INVERSE_MULTIQUADRIC = 1, 
                             THIN_PLATE_SPLINE = 2, GAUSSIAN = 3} rbf; //radial basis function for interpolation
 

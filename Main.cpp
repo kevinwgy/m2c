@@ -681,7 +681,7 @@ int main(int argc, char* argv[])
   V.Destroy();
   ID.Destroy();
 
-  spinit.Destory();
+  spinit.Destroy();
 
   if(LocalDt) {LocalDt->Destroy(); delete LocalDt;}
 
