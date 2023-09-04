@@ -163,6 +163,7 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
                        locations[iNode][2]);
       print(file[i], "## Time step  |  Time  |  Solutions at probe nodes (0, 1, 2, etc.)\n");
       fflush(file[i]);
+      MPI_Barrier(comm);
     }
 
 }
@@ -383,6 +384,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
     print(file, "  |  Mean Charge  |  Heavy Particles Density");
 
   print(file, "\n");
+  MPI_Barrier(comm);
 
   //get data
   double***  v  = (double***) V.GetDataPointer();
@@ -420,6 +422,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
 
     print(file, "\n");
   }
+  MPI_Barrier(comm);
 
   fclose(file);
 
@@ -623,6 +626,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     ID.RestoreDataPointerToLocalVector();
   }
 
+  MPI_Barrier(comm);
 
   V.RestoreDataPointerToLocalVector();
 
