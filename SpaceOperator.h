@@ -114,6 +114,7 @@ public:
 
   void SetHyperelasticityOperatorPointer(HyperelasticityOperator *heo_) {heo = heo_;}
 
+  //! This function is obsolete, after introducing SpaceInitializer (09/2023)
   std::multimap<int,std::pair<int,int> > SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, 
                              std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
     

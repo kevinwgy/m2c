@@ -7,12 +7,17 @@
 #include <SpaceOperator.h>
 #include <LevelSetOperator.h>
 #include <EmbeddedBoundaryDataSet.h>
+#include <GravityHandler.h>
 #include <DistancePointToParallelepiped.h>
 #include <DistancePointToSpheroid.h>
 #include <DistancePointToSphere.h>
 #include <DistancePointToCylinderCone.h>
 #include <DistancePointToCylinderSphere.h>
 #include <DistancePointToPlane.h>
+
+#ifdef LEVELSET_TEST
+  #include <Vector2D.h>
+#endif
 
 using std::vector;
 using std::multimap;
@@ -21,11 +26,12 @@ using std::pair;
 using std::make_pair;
 using std::unique_ptr;
 
+extern double domain_diagonal;
 //---------------------------------------------------------------------
 
-SpaceInitializer::SpaceInitializer(MPI_Comm &comm_, IoData &iod_, GlobalMeshInfo &global_mesh_,
-                                   SpaceVariable3D &coordinates)
-                : comm(comm_), iod(iod_), global_mesh(global_mesh_)
+SpaceInitializer::SpaceInitializer(MPI_Comm &comm_, DataManager3D &dms_, IoData &iod_,
+                                   GlobalMeshInfo &global_mesh_, SpaceVariable3D &coordinates)
+                : comm(comm_), dms(dms_), iod(iod_), global_mesh(global_mesh_)
 {
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
@@ -48,13 +54,11 @@ SpaceInitializer::Destroy()
 multimap<int, pair<int,int> >
 SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, vector<SpaceVariable3D*> &Phi,
                                       SpaceOperator &spo, vector<SpaceVariable3D*> &lso,
+                                      GravityHandler* ghand,
                                       unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS)
 {
 
-  //----------------------------------------------------------------
   // Step 1: Setup the operation order for user-specified geometries.
-  //         Also, create signed distance calculators for later use.
-  //----------------------------------------------------------------
   //-------------------------------------
   // Internal Geometry ID:
   // 0: Plane: 0,
@@ -73,9 +77,13 @@ SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, v
   multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, spo, EBDS, order);
 
   // Step 3:: Apply initial conditions to Phi
-  InitializePhi(ID, Phi, lso, EBDS, order, id2closure);
+  InitializePhi(ID, spo, Phi, lso, EBDS, order, id2closure);
 
   // Step 4:: Apply flooding if specified by user
+  if(ghand)
+    ghand->UpdateInitialConditionByFlooding(V, ID, lso, Phi, EBDS);
+
+  return id2closure;
 }
 
 //---------------------------------------------------------------------
@@ -487,27 +495,24 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
       }
 
       coordinates.RestoreDataPointerToLocalVector(); //because the next function calls some emb fun.
-      InitializeVandIDWithinEnclosure(*it->second, v, id);
+      InitializeVandIDWithinEnclosure(*it->second, coordinates, *(spo.GetPointerToInnerGhostNodes()),
+                                      *(spo.GetPointerToOuterGhostNodes()), v, id);
       coords = (Vec3D***)coordinates.GetDataPointer();
     }
     else if(obj.first == 7) { //point (must be inside an embedded closed surface)
+      auto it = ic.pointMap.dataMap.find(obj.second);
+      assert(it != ic.pointMap.dataMap.end());
 
-      for(auto it=ic.pointMap.dataMap.begin(); it!=ic.pointMap.dataMap.end(); it++) {
+      print("  o Found Point[%d]: (%e %e %e). Mat. ID: %d\n",
+            it->first, it->second->x, it->second->y, it->second->z,
+            it->second->initialConditions.materialid);
 
-        auto it = ic.pointMap.dataMap.find(obj.second);
-        assert(it != ic.pointMap.dataMap.end());
-
-        print("  o Found Point[%d]: (%e %e %e). Mat. ID: %d\n",
-              it->first, it->second->x, it->second->y, it->second->z,
-              it->second->initialConditions.materialid);
-
-        if(it->second->inclusion != PointData::OVERRIDE) {
-          print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
-          exit_mpi();
-        }
-
-        id2closure.insert(InitializeVandIDByPoint(*it->second, *EBDS, color, v, id));
+      if(it->second->inclusion != PointData::OVERRIDE) {
+        print_error("*** Error: Initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
       }
+
+      id2closure.insert(InitializeVandIDByPoint(*it->second, *EBDS, color, v, id));
     }
     else {
       print_error("*** Error: Found unrecognized object id (%d).\n", obj.first);
@@ -942,6 +947,9 @@ SpaceInitializer::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*
 //---------------------------------------------------------------------
 void
 SpaceInitializer::InitializeVandIDWithinEnclosure(UserSpecifiedEnclosureData &enclosure,
+                                                  SpaceVariable3D &coordinates,
+                                                  vector<GhostPoint> &ghost_nodes_inner,
+                                                  vector<GhostPoint> &ghost_nodes_outer, 
                                                   Vec5D*** v, double*** id)
 {
 
@@ -956,7 +964,7 @@ SpaceInitializer::InitializeVandIDWithinEnclosure(UserSpecifiedEnclosureData &en
 
   //create the embedded operator to track the surface
   EmbeddedBoundaryOperator embed(comm, esd);
-  embed.SetCommAndMeshInfo(dm_all, coordinates, ghost_nodes_inner, ghost_nodes_outer,
+  embed.SetCommAndMeshInfo(dms, coordinates, ghost_nodes_inner, ghost_nodes_outer,
                            global_mesh);
   embed.SetupIntersectors();
 
@@ -1147,42 +1155,706 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
 //---------------------------------------------------------------------
 
 void
-SpaceInitializer::InitializePhi(SpaceVariable3D &ID, vector<SpaceVariable3D*> &Phi,
-                                vector<SpaceVariable3D*> &lso,
+SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
+                                vector<SpaceVariable3D*> &Phi, vector<LevelSetOperator*> &lso,
                                 unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
                                 vector<pair<int,int> > &order,
                                 multimap<int, pair<int,int> > &id2closure)
 {
-  set<int> ls_tracker;
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
 
     print("\n- Initializing level set function (%d) for tracking the boundary of material %d.\n",
 
-    if(it->second->init = LevelSetSchemeData::DISTANCE_CALCULATION) {
-      auto closures = id2closure.equal_range(matid);
-      if(closures.first != closures.second) {//found this matid
-        vector<std::pair<int,int> > surf_and_color;
-        for(auto it2 = closures.first; it2 != closures.second; it2++)
-          surf_and_color.push_back(it2->second);
-        InitializePhiByDistanceCalculation(*Phi[it->first],
-                                            embed->GetPointerToEmbeddedBoundaryData(),
-                                            &surf_and_color);
-      } else
-        InitializePhiByDistanceCalculation(*Phi[it->first]);
+    auto closures = id2closure.equal_range(matid);
+    if(closures.first != closures.second) {//found this matid
+      vector<std::pair<int,int> > surf_and_color;
+      for(auto it2 = closures.first; it2 != closures.second; it2++)
+        surf_and_color.push_back(it2->second);
+      if(it->second->init = LevelSetSchemeData::DISTANCE_CALCULATION)
+        InitializePhiByDistance(ID, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
+                                *(spo.GetPointerToInnerGhostNodes()),
+                                *(spo.GetPointerToOuterGhostNodes()),
+                                *Phi[it->first], *lso[it->first],
+                                embed->GetPointerToEmbeddedBoundaryData(),
+                                &surf_and_color);
+      else //by reinitialization
+        InitializePhiByReinitialization(ID, *Phi[it->first], *lso[it->first], &surf_and_color);
     }
-    else { //by reinitialization
-      InitializePhiByReinitialization(*Phi[it->first]);
+    else {
+      if(it->second->init = LevelSetSchemeData::DISTANCE_CALCULATION)
+        InitializePhiByDistance(ID, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
+                                *(spo.GetPointerToInnerGhostNodes()),
+                                *(spo.GetPointerToOuterGhostNodes()),
+                                *Phi[it->first], *lso[it->first]);
+      else //by reinitialization
+        InitializePhiByReinitialization(ID, *Phi[it->first], *lso[it->first]);
     }
   }
 }
 
 //---------------------------------------------------------------------
 
-I AM HERE!
+void
+SpaceInitializer::InitializePhiByDistance(SpaceVariable3D &ID, SpaceVariable3D &coordinates,
+                                          SpaceVariable3D &delta_xyz,
+                                          vector<GhostPoint> &spo_ghost_nodes_inner,
+                                          vector<GhostPoint> &spo_ghost_nodes_outer,
+                                          SpaceSpaceVariable3D &Phi, LevelSetOperator &lso,
+                                          unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                          vector<pair<int,int> > *surf_and_color)
+{
+
+  int materialid = lso.GetMaterialID();
+
+  //get info
+  Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
+  double*** phi    = (double***)Phi.GetDataPointer();
+
+  //first, set phi to be a large number everywhere
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++)
+        phi[k][j][i] = domain_diagonal;
+
+  //TODO: Add this feature later
+  if(iod.ic.specified[IcData::LEVELSET]) {
+    print_error("*** Error: Currently, cannot read level set from user-specified data file.\n");
+    exit_mpi();
+  }
+
+
+  //initialize phi based on plane, cylinder-cones, and sphere.
+  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
+  bool active_arbitrary_enclosure = false;
+
+  for(auto&& obj : order) {
+    //-------------------------------------
+    // Internal Geometry ID:
+    // 0: Plane: 0,
+    // 1: CylinderCone
+    // 2: CylinderSphere
+    // 3: Sphere
+    // 4: Parallelepiped
+    // 5: Spheroid
+    // 6: Custom-Geometry ("enclosure")
+    // 7: Point
+    //-------------------------------------
+    double dist;
+    if(obj.first == 0) {//plane
+      auto it = ic.planeMap.dataMap.find(obj.second);
+      assert(it != ic.planeMap.dataMap.end()); 
+      if(it->second->initialConditions.materialid != materialid)
+        continue; //not the right one
+
+      if(it->second->inclusion != PlaneData::OVERRIDE) {
+        print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
+
+      Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+      Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+      GeoTools::DistanceFromPointToPlane distCal(x0, dir); //dir will be normalized by the constructor
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            dist = distCal.Calculate(coords[k][j][i]);
+            if(fabs(dist)<fabs(phi[k][j][i]))
+              phi[k][j][i] = -dist; //phi is negative inside the material subdomain, positive outside
+          }
+    }
+    else if(obj.first == 1) {//cylinder-cone
+      auto it = ic.cylinderconeMap.dataMap.find(obj.second);
+      assert(it != ic.cylinderconeMap.dataMap.end());
+      if(it->second->initialConditions.materialid != materialid)
+        continue; //not the right one
+
+      if(it->second->side != CylinderConeData::INTERIOR) {
+        print_error("*** Error: Level set initialization only supports Side = Interior at the moment.\n");
+        exit_mpi();
+      }
+
+      bool interior = (it->second->side == CylinderConeData::INTERIOR);
+
+      Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+      Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+      double L = it->second->L; //cylinder height
+      double R = it->second->r; //cylinder radius
+      double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
+      double Hmax = R/tan_alpha;
+      double H = std::min(it->second->cone_height, Hmax); //cone's height
+      GeoTools::DistanceFromPointToCylinderCone distCal(x0,dir,L,R,tan_alpha,H);
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            dist = distCal.Calculate(coords[k][j][i]);
+            if(fabs(dist)<fabs(phi[k][j][i]))
+              phi[k][j][i] = interior ? dist : -dist;
+          }
+    }
+    else if(obj.first == 2) { //cylinder-sphere (i.e., possibly with spherical cap(s))
+      auto it = ic.cylindersphereMap.dataMap.find(obj.second);
+      assert(it != ic.cylindersphereMap.dataMap.end());
+      if(it->second->initialConditions.materialid != materialid)
+        continue; //not the right one
+
+      if(it->second->inclusion != CylinderSphereData::OVERRIDE) {
+        print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
+
+      bool interior = (it->second->side == CylinderSphereData::INTERIOR);
+
+      Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z); //center of base
+      Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
+      double L = it->second->L; //cylinder height
+      double R = it->second->r; //cylinder radius
+      bool front_cap = (it->second->front_cap == CylinderSphereData::On);
+      bool back_cap = (it->second->back_cap == CylinderSphereData::On);
+      GeoTools::DistanceFromPointToCylinderSphere distCal(x0, dir, L, R, front_cap, back_cap);
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            dist = distCal.Calculate(coords[k][j][i]);
+            if(fabs(dist)<fabs(phi[k][j][i]))
+              phi[k][j][i] = interior ? dist : -dist;
+          }
+    }
+    else if(obj.first == 3) { //sphere
+      auto it = ic.sphereMap.dataMap.find(obj.second);
+      assert(it != ic.sphereMap.dataMap.end());
+      if(it->second->initialConditions.materialid != materialid)
+        continue; //not the right one
+
+      if(it->second->inclusion != SphereData::OVERRIDE) {
+        print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
+
+      bool interior = (it->second->side == SphereData::INTERIOR);
+
+      Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+      double R = it->second->radius;
+      GeoTools::DistanceFromPointToSphere distCal(x0, R);
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            dist = distCal.Calculate(coords[k][j][i]);
+            if(fabs(dist)<fabs(phi[k][j][i]))
+              phi[k][j][i] = interior ? dist : -dist;
+          }
+
+    }
+    else if(obj.first == 4) { //parallelepiped
+      auto it = ic.parallelepipedMap.dataMap.find(obj.second);
+      assert(it != ic.parallelepipedMap.dataMap.end());
+      if(it->second->initialConditions.materialid != materialid)
+        continue; //not the right one
+
+      if(it->second->inclusion != ParallelepipedData::OVERRIDE) {
+        print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
+
+      bool interior = (it->second->side == ParallelepipedData::INTERIOR);
+
+      Vec3D x0(it->second->x0, it->second->y0, it->second->z0);
+      Vec3D oa(it->second->ax, it->second->ay, it->second->az);  oa -= x0;
+      Vec3D ob(it->second->bx, it->second->by, it->second->bz);  ob -= x0;
+      Vec3D oc(it->second->cx, it->second->cy, it->second->cz);  oc -= x0;
+
+      if(oa.norm()==0 || ob.norm()==0 || oc.norm()==0 || (oa^ob)*oc<=0.0) {
+        print_error("*** Error: Detected error in a user-specified parallelepiped. "
+                    "Overlapping vertices or violation of right-hand rule.\n");
+        exit_mpi();
+      }
+
+      GeoTools::DistanceFromPointToParallelepiped distCal(x0, oa, ob, oc);
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+            if(fabs(dist)<fabs(phi[k][j][i]))
+              phi[k][j][i] = interior ? dist : -dist;
+          }
+    }
+    else if(obj.first == 5) { //spheroid
+      auto it = ic.spheroidMap.dataMap.find(obj.second);
+      assert(it != ic.spheroidMap.dataMap.end());
+      if(it->second->initialConditions.materialid != materialid)
+        continue; //not the right one
+
+      if(it->second->inclusion != SpheroidData::OVERRIDE) {
+        print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
+
+      bool interior = (it->second->side == SpheroidData::INTERIOR);
+
+      Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+      Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
+      GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->semi_length, it->second->radius);
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+            dist = distCal.Calculate(coords[k][j][i]);
+            if(fabs(dist)<fabs(phi[k][j][i]))
+              phi[k][j][i] = interior ? dist : -dist;
+          }
+    }
+    else if(obj.first == 6) { //user-specified enclosure
+      auto it = ic.enclosureMap.dataMap.find(obj.second);
+      assert(it != ic.enclosureMap.dataMap.end());
+      if(it->second->initialConditions.materialid != materialid)
+        continue; //not the right one
+
+      if(it->second->inclusion != UserSpecifiedEnclosureData::OVERRIDE) {
+        print_error("*** Error: Level set initialization only supports Inclusion = Override at the moment.\n");
+        exit_mpi();
+      }
+
+      Phi.RestoreDataPointerAndInsert();
+      coordinates.RestoreDataPointerToLocalVector();
+      bool active = InitializePhiWithinEnclosure(*enclosure.second, coordinates, delta_xyz,
+                                                 spo_ghost_nodes_inner, spo_ghost_nodes_outer, Phi, lso);
+      phi = Phi.GetDataPointer();
+      coords = (Vec3D***)coordinates.GetDataPointer();
+
+      if(active)
+        active_arbitrary_enclosure = true;
+    }
+    else if(obj.first == 7) { //point (must be inside an embedded closed surface)
+      /* nothing to do here */
+    }
+    else {
+      print_error("*** Error: Level-set initializer found unrecognized object id (%d).\n", obj.first);
+      exit_mpi();
+    }
+  }
+
+
+//SPECIAL TEST CASES
+#if LEVELSET_TEST == 1
+  // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
+  Vec2D x0(50.0,75.0); //center of disk
+  double r = 15.0; //radius of disk
+  double wid = 5.0, len = 25.0; //slot
+
+  // derivated params
+  Vec2D x1(x0[0]-0.5*wid, x0[1]-sqrt(r*r - pow(0.5*wid ,2))); //lowerleft corner of slot
+  Vec2D x2(x0[0]-0.5*wid, x0[1]+(len-r)); //upperleft corner of slot
+  Vec2D x3(x0[0]+0.5*wid, x0[1]+(len-r)); //upperright corner of slot
+  Vec2D x4(x0[0]+0.5*wid, x0[1]-sqrt(r*r - pow(0.5*wid ,2))); //lowerright corner of slot
+  double alpha = atan((x4[0]-x0[0])/(x0[1]-x4[1])); //half of the `opening angle'
+  //fprintf(stdout,"alpha = %e.\n",alpha);
+
+  double dist;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+
+        if(x[1]<=x1[1] && atan(fabs((x[0]-x0[0])/(x[1]-x0[1])))<=alpha) { //Zone 1: Outside-bottom
+          if(x[0]<=x0[0])
+            phi[k][j][i] = (x-x1).norm();
+          else
+            phi[k][j][i] = (x-x4).norm();
+        }
+
+        else if((x-x0).norm()>=r) { //Zone 2: Outside-rest
+          phi[k][j][i] = (x-x0).norm() - r;
+        }
+
+        else if(x[0]<=x4[0] && x[0]>=x1[0] && x[1]<=x2[1]) { //Zone 3: Slot
+          phi[k][j][i] = min(x4[0]-x[0], min(x[0]-x1[0], x2[1]-x[1]));
+        }
+
+        else if(x[0]<=x2[0] && x[1]<=x2[1]) { //Zone 4: Inside-left
+          phi[k][j][i] = -min(r-(x-x0).norm(), x2[0]-x[0]);
+        }
+
+        else if(x[0]>=x3[0] && x[1]<=x3[1]) { //Zone 5: Inside-right
+          phi[k][j][i] = -min(r-(x-x0).norm(), x[0]-x3[0]);
+        }
+
+        else if(x[0]<=x2[0]) { //Zone 6: Inside-topleft
+          phi[k][j][i] = -min(r-(x-x0).norm(), (x-x2).norm());
+        }
+
+        else if(x[0]<=x3[0]) { //Zone 7: Inside-top
+          phi[k][j][i] = -min(r-(x-x0).norm(), x[1]-x2[1]);
+        }
+
+        else { //Zone 8: Inside-topright
+          phi[k][j][i] = -min(r-(x-x0).norm(), (x-x3).norm());
+        }
+
+      }
+
+#elif LEVELSET_TEST == 2
+
+  double r = 0.15;
+  Vec2D x0(0.5, 0.75);
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+
+        phi[k][j][i] = (x-x0).norm() - r;
+
+      }
+
+#elif LEVELSET_TEST == 3
+
+  // merging and separation of two circles (4.2.3 of Hartmann et al. 2008)
+
+  double a = 1.75, r = 1.5;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+        double phi1 = sqrt((x[0]-a)*(x[0]-a) + x[1]*x[1]) - r;
+        double phi2 = sqrt((x[0]+a)*(x[0]+a) + x[1]*x[1]) - r;
+
+        if(phi1<=0)
+          phi[k][j][i] = phi1;
+        else if(phi2<=0)
+          phi[k][j][i] = phi2;
+        else
+          phi[k][j][i] = min(phi1, phi2);
+
+      }
+
+#endif
+
+
+  // Now, take care of embedded surfaces
+  int ebds_counter = 0;
+  
+  if(EBDS && surf_and_color) {
+    if(!lso.HasReinitializer()) {
+      print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary.\n"
+                  "           In this case, level set reinitialization must be turned on.\n", materialid);
+      exit_mpi();
+    }
+
+    LevelSetSchemeData& iod_ls(lso.GetLevelSetSchemeData());
+
+    if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::FIXED)
+      print_warning("Warning: Material %d is tracked by both a level set function and an embedded boundary.\n"
+                    "         In this case, it may be better to 'fix' the first layer nodes when "
+                              "reinitializing the level set.\n", materialid);
+
+    for(auto&& mypair : *surf_and_color) {
+
+      int surf = mypair.first;
+      int mycolor = mypair.second;
+
+      int nLayer = (*EBDS)[surf]->Phi_nLayer;
+      if(nLayer<2)
+        print_warning("Warning: Material %d is tracked by a level set function AND an embedded boundary.\n"
+                      "         Intersector should compute unsigned distance ('phi') for at least two layers\n"
+                      "         of nodes. Currently, this value is set to %d.\n", (*EBDS)[surf]->Phi_nLayer);
+
+      double*** color = (*EBDS)[surf]->Color_ptr->GetDataPointer();
+      double*** psi   = (*EBDS)[surf]->Phi_ptr->GetDataPointer();
+      double*** cpi   = (*EBDS)[surf]->ClosestPointIndex_ptr->GetDataPointer();
+
+      for(int k=k0; k<kmax; k++)
+        for(int j=j0; j<jmax; j++)
+          for(int i=i0; i<imax; i++) {
+
+/*
+            //Check if this node is within nLayer of the interface
+            bool near = false;
+            for(int k1 = k-nLayer; k1 <= k+nLayer; k1++)
+              for(int j1 = j-nLayer; j1 <= j+nLayer; j1++)
+                for(int i1 = i-nLayer; i1 <= i+nLayer; i1++) {
+                  if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
+                    continue;
+                  if(color[k1][j1][i1] == mycolor) {
+                    near = true;
+                    goto DONE;
+                  }
+                }
+DONE:
+
+            if(!near)
+              continue; //nothing to do
+*/
+            if(cpi[k][j][i]<0 && color[k][j][i] != mycolor)
+              continue;
+
+            ebds_counter++;
+
+            // determine phi at [k][j][i]
+            if(color[k][j][i] == mycolor) {//"inside"
+              if(phi[k][j][i]>=0)
+                phi[k][j][i] = -psi[k][j][i];
+              else
+                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+            } else if(color[k][j][i] == 0) {//occluded
+              phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
+            } else { //"outside"
+              if(phi[k][j][i]>=0)
+                phi[k][j][i] = std::min(phi[k][j][i], psi[k][j][i]);
+              else //this is really bad... the user should avoid this...
+                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+            }
+          }
+
+
+      (*EBDS)[surf]->Color_ptr->RestoreDataPointerToLocalVector();
+      (*EBDS)[surf]->Phi_ptr->RestoreDataPointerToLocalVector();
+      (*EBDS)[surf]->ClosestPointIndex_ptr->RestoreDataPointerToLocalVector();
+    }
+  }
+
+
+  // Finalize
+  coordinates.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerAndInsert();
+
+  lso.ApplyBoundaryConditions(Phi);
+
+  if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
+    assert(lso.HasReinitializer());
+    lso.ConstructNarrowBandInReinitializer(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
+
+/*
+  Phi.StoreMeshCoordinates(coordinates);
+  Phi.WriteToVTRFile("LS.vtr", "phi");
+  MPI_Barrier(comm);
+  exit_mpi();
+*/
+
+  if(ebds_counter>0) {
+    //reinit must have been created (not NULL)
+    print("  o Updated Phi (material id: %d) at %d nodes based on embedded boundary. "
+          "Going to reinitialize phi.\n", materialid, ebds_counter);
+    lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //first 3 inputs are not used ("must do"!)
+  }
+  else if(active_arbitrary_enclosure && lso.HasReinitializer()) {
+    //if reinit is NULL, should have reinitialized phi (full-domain) in InitializePhiWithinEnclosure
+    print("  o Updated Phi (material id: %d) based on surface mesh(es). "
+          "Going to reinitialize phi.\n", materialid);
+    lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //first 3 inputs are not used ("must do"!)
+  }
+
+}
 
 //---------------------------------------------------------------------
 
+bool 
+SpaceInitializer::InitializePhiWithinEnclosure(UserSpecifiedEnclosureData &enclosure,
+                                               SpaceVariable3D &coordinates, 
+                                               SpaceVariable3D &delta_xyz,
+                                               vector<GhostPoint> &spo_ghost_nodes_inner,
+                                               vector<GhostPoint> &spo_ghost_nodes_outer,
+                                               SpaceVariable3D &Phi, LevelSetOperator &lso)
+{
+  bool applied_ic = false;
+  double*** phi = Phi.GetDataPointer();
+
+  // Create a reinitializer (if not available) for one-time use within this function
+  // This is a full-domain reinitializer
+  LevelSetReinitializer *tmp_reinit = NULL; 
+  if(!lso.HasReinitializer())
+    tmp_reinit = new LevelSetReinitializer(comm, dms, lso.GetLevelSetSchemeData(), coordinates, delta_xyz,
+                                           *(lso.GetPointerToInnerGhostNodes()),
+                                           *(lso.GetPointerToOuterGhostNodes()));//they carry level set b.c.
+
+  // The construction and use of EmbeddedBoundaryOperator is a repetition of what has been done in
+  // SpaceOperator::ApplyInitialConditionWithinEnclosure. However, this is a one-time effort. The
+  // overhead is acceptable.
+
+  //create an ad hoc EmbeddedSurfaceData
+  EmbeddedSurfaceData esd;
+  esd.provided_by_another_solver = EmbeddedSurfaceData::NO;
+  esd.surface_thickness          = enclosure.surface_thickness;
+  esd.filename                   = enclosure.surface_filename;
+
+  //create the embedded operator to track the surface
+  EmbeddedBoundaryOperator embed(comm, esd);
+  embed.SetCommAndMeshInfo(dms, coordinates, spo_ghost_nodes_inner, spo_ghost_nodes_outer,
+                           global_mesh);
+  embed.SetupIntersectors();
+
+  //track the surface, and get access to the results
+  double max_dist = embed.TrackSurfaces(5); //compute "phi" for 5 layers
+  auto EBDS = embed.GetPointerToEmbeddedBoundaryData(0);
+
+  double*** color = EBDS->Color_ptr->GetDataPointer();
+  double*** psi   = EBDS->Phi_ptr->GetDataPointer();
+  double*** cpi   = EBDS->ClosestPointIndex_ptr->GetDataPointer();
+  int nLayer = EBDS->Phi_nLayer;
+  assert(nLayer>=2);
+
+  //impose i.c. for phi inside and near enclosures 
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        if(cpi[k][j][i]<0 && color[k][j][i]>=0)
+          continue;
+
+        if(!applied_ic)
+          applied_ic = true;
+
+        // determine phi at [k][j][i]
+        if(color[k][j][i]<0) { //"enclosed" (must be consistent with ID specified in space operator)
+          if(phi[k][j][i]>=0)
+            phi[k][j][i] = -psi[k][j][i];
+          else
+            phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+        } 
+        else if(color[k][j][i] == 0) {//occluded
+          phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
+        } 
+        else { //"outside"
+          if(phi[k][j][i]>=0)
+            phi[k][j][i] = std::min(phi[k][j][i], psi[k][j][i]);
+          else //this is really bad... the user should avoid this...
+            phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+        }
+      }
+
+  int tmp_int = applied_ic ? 1 : 0;
+  MPI_Allreduce(MPI_IN_PLACE, &tmp_int, 1, MPI_INT, MPI_MAX, comm);
+  if(tmp_int>0)
+    applied_ic = true;
+ 
+  if(!applied_ic) {
+    print_warning("Warning: The surface in %s may either have no enclosure, or"
+                  " lie outside the computational domain.\n", enclosure.surface_filename);
+  }
+
+  // Give other enclosed nodes "phi_min" (to avoid large jumps)
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(color[k][j][i]<0 && phi[k][j][i]<-max_dist) //"enclosed" 
+          phi[k][j][i] = -max_dist; 
+        else if(color[k][j][i]>0 && phi[k][j][i]>max_dist)
+          phi[k][j][i] = max_dist;
+      }
+
+  Phi.RestoreDataPointerAndInsert();
+
+  // reinitialize phi here if tmp reinit is created. Otherwise, phi will be reinitialized near
+  // the end of the function "SetInitialCondition"
+  if(tmp_reinit) {
+    lso.ApplyBoundaryConditions(Phi); //need this before reinitialization!
+    tmp_reinit->ReinitializeFullDomain(Phi, 600); //one-time use
+    tmp_reinit->Destroy(); 
+    delete tmp_reinit;
+  }
+
+  //clean-up
+  EBDS->Color_ptr->RestoreDataPointerToLocalVector();
+  EBDS->Phi_ptr->RestoreDataPointerToLocalVector();
+  EBDS->ClosestPointIndex_ptr->RestoreDataPointerToLocalVector();
+
+  embed.Destroy();
+
+  return applied_ic;
+}
+
+
+//---------------------------------------------------------------------
+
+void
+SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
+                                                  SpaceSpaceVariable3D &Phi, LevelSetOperator &lso,
+                                                  vector<pair<int,int> > *surf_and_color)
+{
+  int materialid = lso.GetMaterialID();
+  double*** id  = ID.GetDataPointer();
+  double*** phi = Phi.GetDataPointer();
+
+  // Calculate phi near subdomain boundary
+  int myid;
+  double dist;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        myid = id[k][j][i];
+        dist = global_mesh.GetMinDXYZ(Int3(i,j,k));
+        if(myid == materialid) {
+          if(i-1>=0 && id[k][j][i-1] != myid)
+            dist = std::min(dist, 0.5*(global_mesh.GetX(i)-global_mesh.GetX(i-1)));
+          if(i+1<NX && id[k][j][i+1] != myid)
+            dist = std::min(dist, 0.5*(global_mesh.GetX(i+1)-global_mesh.GetX(i)));
+          if(j-1>=0 && id[k][j-1][i] != myid)
+            dist = std::min(dist, 0.5*(global_mesh.GetY(j)-global_mesh.GetY(j-1)));
+          if(j+1<NY && id[k][j+1][i] != myid)
+            dist = std::min(dist, 0.5*(global_mesh.GetY(j+1)-global_mesh.GetY(j)));
+          if(k-1>=0 && id[k-1][j][i] != myid)
+            dist = std::min(dist, 0.5*(global_mesh.GetZ(k)-global_mesh.GetZ(k-1)));
+          if(k+1<NZ && id[k+1][j][i] != myid)
+            dist = std::min(dist, 0.5*(global_mesh.GetZ(k+1)-global_mesh.GetZ(k)));
+
+          phi[k][j][i] = -dist;
+        }
+        else {
+          if(i-1>=0 && id[k][j][i-1] == materialid)
+            dist = std::min(dist, 0.5*(global_mesh.GetX(i)-global_mesh.GetX(i-1)));
+          if(i+1<NX && id[k][j][i+1] == materialid)
+            dist = std::min(dist, 0.5*(global_mesh.GetX(i+1)-global_mesh.GetX(i)));
+          if(j-1>=0 && id[k][j-1][i] == materialid)
+            dist = std::min(dist, 0.5*(global_mesh.GetY(j)-global_mesh.GetY(j-1)));
+          if(j+1<NY && id[k][j+1][i] == materialid)
+            dist = std::min(dist, 0.5*(global_mesh.GetY(j+1)-global_mesh.GetY(j)));
+          if(k-1>=0 && id[k-1][j][i] == materialid)
+            dist = std::min(dist, 0.5*(global_mesh.GetZ(k)-global_mesh.GetZ(k-1)));
+          if(k+1<NZ && id[k+1][j][i] == materialid)
+            dist = std::min(dist, 0.5*(global_mesh.GetZ(k+1)-global_mesh.GetZ(k)));
+
+          phi[k][j][i] = dist;
+        }
+      }
+
+  ID.RestoreDataPointerToLocalVector();
+  Phi.RestoreDataPointerAndInsert();
+
+  lso.ApplyBoundaryConditions(Phi);
+
+  // Reinitialize Phi
+  if(!lso.HasReinitializer()) {
+    print_error("*** Error: A reinitializer needs to be specified for material %d's level-set.\n",
+                materialid); 
+    exit_mpi();
+  }
+
+  LevelSetSchemeData& iod_ls(lso.GetLevelSetSchemeData());
+
+  if(surf_and_color && !surf_and_color->empty()) {
+    if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::FIXED)
+      print_warning("Warning: Material %d is tracked by both a level set function and an embedded boundary.\n"
+                    "         In this case, it may be better to 'fix' the first layer nodes when "
+                              "reinitializing the level set.\n", materialid);
+  }
+
+  if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
+    assert(lso.HasReinitializer());
+    lso.ConstructNarrowBandInReinitializer(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+  }
+
+  print("  o Set Phi (material id: %d) near subdomain boundary. Going to reinitialize it.\n", materialid);
+  lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/);
+}
 
 //---------------------------------------------------------------------
 

@@ -1641,6 +1641,17 @@ void LevelSetOperator::AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D
 
 //-----------------------------------------------------
 
+void
+ConstructNarrowBandInReinitializer(SpaceVariable3D &Phi,
+                                   SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, SpaceVariable3D &Active,
+                                   vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
+{
+  assert(reinit);
+  reinit->ConstructNarrowBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+}
+
+//-----------------------------------------------------
+
 bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi,
                                     int special_maxIts, bool must_do)
 {

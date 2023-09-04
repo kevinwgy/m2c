@@ -77,6 +77,7 @@ public:
                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo);
   ~LevelSetOperator();
 
+  //! This function is obsolete, after introducing SpaceInitializer (09/2023)
   void SetInitialCondition(SpaceVariable3D &Phi, 
                            std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr,
                            vector<std::pair<int,int> > *surf_and_color = NULL);
@@ -85,6 +86,10 @@ public:
 
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
 
+  void ConstructNarrowBandInReinitializer(SpaceVariable3D &Phi,
+                                          SpaceVariable3D &Level, SpaceVariable3D &UsefulG2, SpaceVariable3D &Active,
+                                          vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
+
   bool Reinitialize(double time, double dt, int time_step,
                     SpaceVariable3D &Phi, int special_maxIts = 0,//!< if >0, will use it instead of iod value
                     bool must_do = false); //!< true: reinitialization is done; false: not this time
@@ -92,6 +97,13 @@ public:
   void ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, vector<Int3> &new_nodes);
 
   int GetMaterialID() {return materialid;}
+
+  bool HasReinitializer() {return reinit!=NULL;}
+
+  LevelSetSchemeData& GetLevelSetSchemeData() {return iod_ls;}
+  
+  vector<GhostPoint>* GetPointerToInnerGhostNodes() {return &ghost_nodes_inner;}
+  vector<GhostPoint>* GetPointerToOuterGhostNodes() {return &ghost_nodes_outer;}
 
   void AXPlusBY(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
 
