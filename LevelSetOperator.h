@@ -77,11 +77,6 @@ public:
                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo);
   ~LevelSetOperator();
 
-  //! This function is obsolete, after introducing SpaceInitializer (09/2023)
-  void SetInitialCondition(SpaceVariable3D &Phi, 
-                           std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr,
-                           vector<std::pair<int,int> > *surf_and_color = NULL);
-
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
 
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
