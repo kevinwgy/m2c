@@ -3582,6 +3582,16 @@ void IoData::finalize()
      !(bc.inlet == ic.default_ic))
     ic.default_ic = bc.inlet;
 
+  //Set dummy_state (except material id)
+  if(fabs(eqs.dummy_state.density-1.0e-6)<1e-12 &&
+     eqs.dummy_state.velocity_x == 0.0 && eqs.dummy_state.velocity_y == 0.0 &&
+     eqs.dummy_state.velocity_z == 0.0 && eqs.dummy_state.pressure   == 0.0 &&
+     eqs.dummy_state.temperature == 0.0 && 
+     eqs.dummy_state.internal_energy_per_mass == 0.0) {//user did not specify dummy_state
+    eqs.dummy_state = ic.default_ic;
+    eqs.dummy_state.materialid = 0; //Not dummy_state's materialid. Shouldn't be used
+  }
+
   //FIX Levelset output (TODO: need a better way...)
   output.levelset[0] = output.levelset0;
   output.levelset[1] = output.levelset1;

@@ -129,7 +129,8 @@ protected:
 
   //! internal function called by UpdateCellsSweptByEmbeddedSurfaces
   void FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
-                                         vector<Intersector*> *intersector,
+                                         vector<Intersector*> *intersector, std::set<Int3> &occlueded,
+                                         std::set<Int3> &imposed_occluded,
                                          vector<std::pair<Int3,bool> > &neighbors);
 
   //! internal function called by ResolveConflictsWithEmbeddedSurfaces

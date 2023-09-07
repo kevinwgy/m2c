@@ -1113,8 +1113,8 @@ Intersector::RefillAfterSurfaceUpdate()
   // fill remaining nodes as FORCED occluded
   imposed_occluded.clear();
   if(total_remaining_nodes>0) {
-    print_warning("Warning: Found %d unresolved nodes after performing %d iterations of refill. Setting them to be occluded.\n",
-                   total_remaining_nodes, max_it);
+    print_warning("Warning: Found %d unresolved nodes after performing %d iterations of refill. "
+                   "Setting them to be occluded.\n", total_remaining_nodes, max_it);
     imposed_occluded = nodes2fill;
     for(auto it = imposed_occluded.begin(); it != imposed_occluded.end(); it++) 
       color[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
@@ -1192,11 +1192,11 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
   }
       
   // Verification
-  for(auto&& ijk : previously_occluded_but_not_now) {
-    if(swept.find(ijk) == swept.end()) {
-      fprintf(stdout,"\033[0;31m*** Error: Conflict between 'swept' and 'occluded': %d %d %d. A software bug.\033[0m\n",
+  if(verbose>=1) {
+    for(auto&& ijk : previously_occluded_but_not_now) {
+      if(swept.find(ijk) == swept.end())
+        fprintf(stdout,"\033[0;35mWarning: Previous occluded node is not swept (%d %d %d). May be an error.\033[0m\n",
               ijk[0], ijk[1], ijk[2]);
-      exit(-1);
     } 
   }
   

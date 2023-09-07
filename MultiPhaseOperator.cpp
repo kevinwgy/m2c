@@ -526,8 +526,9 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
         tag[k][j][i] = 0;
 
 
+
   // --------------------------------------------------------
-  // Step 2: Make sure occluded cells have INACTIVE id
+  // Step 2: Update occluded cells 
   // --------------------------------------------------------
   int has_occ(0);
   for(auto&& ebds : *EBDS) {
@@ -543,18 +544,80 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   MPI_Allreduce(MPI_IN_PLACE, &has_occ, 1, MPI_INT, MPI_MAX, comm);
 
   if(has_occ) {
-    double*** id  = ID.GetDataPointer();
-    for(auto&& ebds : *EBDS) {
-      for(auto&& ijk : *ebds->occluded_ptr) {
-        id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
-        tag[ijk[2]][ijk[1]][ijk[0]] = 1;
+    double*** id = ID.GetDataPointer();
+    Vec5D***  v  = (Vec5D***) V.GetDataPointer();
+    int ls_size = Phi.size();
+    vector<double***> phi(ls_size, NULL);
+    for(int ls=0; ls<ls_size; ls++) 
+      phi[ls] = Phi[ls]->GetDataPointer();
+
+    int i,j,k;
+    int phi_updated = 0;
+    for(int surf=0; surf<(int)EBDS->size(); surf++) {
+      for(auto&& ijk : *(*EBDS)[surf]->occluded_ptr) {
+        i = ijk[0];
+        j = ijk[1];
+        k = ijk[2];
+
+        if(!ID.IsHere(i,j,k,false))
+          continue; //this is an internal ghost of this subdomain
+
+        id[k][j][i]   = INACTIVE_MATERIAL_ID;
+        v[k][j][i][0] = iod.eqs.dummy_state.density;
+        v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
+	v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
+        v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
+        v[k][j][i][4] = iod.eqs.dummy_state.pressure;
+
+        // Fix any issues in phi: phi must be non-negative
+        for(int ls=0; ls<ls_size; ls++) {
+          if(phi[ls][k][j][i]<0) {
+            phi[ls][k][j][i] = phi_ebm[surf][k][j][i];
+            if(phi_updated == 0)
+              phi_updated = 1;
+          }
+        }
+
+        tag[k][j][i] = -1;
       }
-      for(auto&& ijk : *ebds->imposed_occluded_ptr) {
-        id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
-        tag[ijk[2]][ijk[1]][ijk[0]] = 1;
+
+      for(auto&& ijk : *(*EBDS)[surf]->imposed_occluded_ptr) {
+        i = ijk[0];
+        j = ijk[1];
+        k = ijk[2];
+
+        if(!ID.IsHere(i,j,k,false))
+          continue; //this is an internal ghost of this subdomain
+
+        id[k][j][i]   = INACTIVE_MATERIAL_ID;
+        v[k][j][i][0] = iod.eqs.dummy_state.density;
+        v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
+	v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
+        v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
+        v[k][j][i][4] = iod.eqs.dummy_state.pressure;
+
+        // Fix any issues in phi: phi must be non-negative
+        for(int ls=0; ls<ls_size; ls++) {
+          if(phi[ls][k][j][i]<0) {
+            phi[ls][k][j][i] = phi_ebm[surf][k][j][i];
+            if(phi_updated == 0)
+              phi_updated = 1;
+          }
+        }
+
+        tag[k][j][i] = -2;
       }
     }  
     ID.RestoreDataPointerAndInsert();
+    V.RestoreDataPointerAndInsert();
+    MPI_Allreduce(MPI_IN_PLACE, &phi_updated, 1, MPI_INT, MPI_MAX, comm);
+    if(phi_updated>0) {
+      for(int ls=0; ls<ls_size; ls++) 
+        Phi[ls]->RestoreDataPointerAndInsert();
+    } else {
+      for(int ls=0; ls<ls_size; ls++) 
+        Phi[ls]->RestoreDataPointerToLocalVector();
+    }
   }
 
 
@@ -563,11 +626,12 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   // --------------------------------------------------------
   for(auto&& sub : swept)
     for(auto&& ijk : sub) {
-      if(tag[ijk[2]][ijk[1]][ijk[0]] != 0)
+      if(tag[ijk[2]][ijk[1]][ijk[0]]>0)
         fprintf(stdout,"\033[0;35mWarning: Node (%d %d %d) is swept by multiple (>1) embedded surfaces.\n\033[0m",
                 ijk[0], ijk[1], ijk[2]);
 
-      tag[ijk[2]][ijk[1]][ijk[0]] = 1; 
+      else if(tag[ijk[2]][ijk[1]][ijk[0]]==0)
+        tag[ijk[2]][ijk[1]][ijk[0]] = 1; 
     }
 
 
@@ -580,7 +644,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
     if(g.type_projection != GhostPoint::FACE)
       continue;
     int im_i(g.image_ijk[0]), im_j(g.image_ijk[1]), im_k(g.image_ijk[2]);
-    if(tag[im_k][im_j][im_i] != 0)
+    if(tag[im_k][im_j][im_i] > 0)
       ghosts.push_back(i);
   }
 
@@ -642,9 +706,27 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
         j = (*it)[1];
         k = (*it)[2];
 
+        if(tag[k][j][i]==0) {
+          //It is possible (but uncommon) that a swept node is also imposed-occluded.
+          //It should have already been updated in Step 2.
+          it = swept[surf].erase(it);
+          progress++;
+          continue;
+        }
+
+/*
+        bool gotyou = false;
+        if(i==9 && j==45 && k==0)
+          gotyou = true;
+*/
+
         // Preparation: Collect useful neighbors and intersection info
-        FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,neighbors);
+        FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,
+                                          *(*EBDS)[surf]->occluded_ptr,
+                                          *(*EBDS)[surf]->imposed_occluded_ptr,
+                                          neighbors);
  
+          
         // Determine its id: Check the ID of "valid" neighbors
         set<int> tmp_id_s;
         for(auto&& nei : neighbors)
@@ -2156,7 +2238,8 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
 
 void
 MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, [[maybe_unused]] double*** id,
-                                                      vector<Intersector*> *intersector,
+                                                      vector<Intersector*> *intersector, set<Int3> &occluded,
+                                                      set<Int3> &imposed_occluded,
                                                       vector<std::pair<Int3,bool> > &neighbors)
 {
   neighbors.clear();
@@ -2177,6 +2260,12 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
         if(tag[k2][j2][i2] != 0) //swept, and unresolved yet
           continue;
 
+        Int3 ijk2(i2,j2,k2);
+        if(occluded.find(ijk2) != occluded.end())
+          continue; //ignore occluded neighbors
+        if(imposed_occluded.find(ijk2) != imposed_occluded.end())
+          continue; //ignore occluded neighbors
+
         bool connected = true;
         X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
         for(auto&& xter : *intersector) {
@@ -2186,7 +2275,7 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
           }
         }
 
-        neighbors.push_back(std::make_pair(Int3(i2,j2,k2), connected));
+        neighbors.push_back(std::make_pair(ijk2, connected));
       }
 }
 
