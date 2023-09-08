@@ -810,6 +810,9 @@ DONE:
     Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
 
+  ComputeCurvature(Phi, NPhi, KappaPhi);
+
+/*
   phi   = Phi.GetDataPointer();
   coords = (Vec3D***)coordinates.GetDataPointer(); 
   double*** curvature = (double***)KappaPhi.GetDataPointer();
@@ -845,6 +848,7 @@ DONE:
   coordinates.RestoreDataPointerToLocalVector();
   NPhi.RestoreDataPointerAndInsert();
   KappaPhi.RestoreDataPointerAndInsert();
+*/
 }
 
 //-----------------------------------------------------
@@ -1931,6 +1935,10 @@ void LevelSetOperator::ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &N
         normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
                                                  coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
       }
+
+  NPhi.RestoreDataPointerAndInsert();
+  normal = (Vec3D***)NPhi.GetDataPointer();
+  
 
   double mynorm;
   for(int k=k0; k<kmax; k++)

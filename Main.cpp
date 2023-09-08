@@ -237,7 +237,7 @@ int main(int argc, char* argv[])
   std::vector<LevelSetOperator*> lso;
   std::vector<SpaceVariable3D*>  Phi;
   std::vector<SpaceVariable3D*> NPhi; // unit normal, first derivative of Phi
-  std::vector<SpaceVariable3D*> KappaPhi; // curvature, second derivative of Phi
+  std::vector<SpaceVariable3D*> KappaPhi; // curvature, based on the second derivative of Phi
 
   std::set<int> ls_tracker;
   int ls_input_id_min = 9999, ls_input_id_max = -9999;
@@ -289,7 +289,6 @@ int main(int argc, char* argv[])
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           it->first, matid);
 
-    //lso[it->first]->ComputeCurvature(*Phi[it->first], *NPhi[it->first], *KappaPhi[it->first]);
     //NPhi[it->first]->WriteToVTRFile("NPhi.vtr");
     //KappaPhi[it->first]->WriteToVTRFile("KappaPhi.vtr");
   }  
