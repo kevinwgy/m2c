@@ -83,6 +83,10 @@ public:
 
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
 
+  void ApplyBoundaryConditionsNPhi(SpaceVariable3D &NPhi);
+
+  void ApplyBoundaryConditionsKappaPhi(SpaceVariable3D &KappaPhi);
+
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
 
   bool Reinitialize(double time, double dt, int time_step,

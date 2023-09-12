@@ -811,6 +811,8 @@ DONE:
   }
 
   ComputeCurvature(Phi, NPhi, KappaPhi);
+  ApplyBoundaryConditions(NPhi);
+  ApplyBoundaryConditions(KappaPhi);
 
 /*
   phi   = Phi.GetDataPointer();
@@ -1071,6 +1073,262 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
   coordinates.RestoreDataPointerToLocalVector();
 
 }
+
+//-----------------------------------------------------
+// Apply boundary conditions by populating ghost cells of NPhi (unit normal vector of zero levelset contour)
+void LevelSetOperator::ApplyBoundaryConditionsNPhi(SpaceVariable3D &NPhi)
+{
+
+  Vec3D*** normal = (Vec3D***) NPhi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  int NX, NY, NZ;
+  NPhi.GetGlobalSize(&NX, &NY, &NZ);
+
+  double r, r1, r2, f1, f2;
+
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    if(it->bcType == (int)LevelSetSchemeData::ZERO_NEUMANN) {
+      normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+      normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+      normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+
+      if(it->side == GhostPoint::LEFT || it->side == GhostPoint::RIGHT) normal[k][j][i][0] = -1.*normal[im_k][im_j][im_i][0];
+      if(it->side == GhostPoint::BOTTOM || it->side == GhostPoint::TOP) normal[k][j][i][1] = -1.*normal[im_k][im_j][im_i][1];
+      if(it->side == GhostPoint::BACK || it->side == GhostPoint::FRONT) normal[k][j][i][2] = -1.*normal[im_k][im_j][im_i][2];
+    }
+    else if ((it->bcType == (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION) ||
+             (it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE)) {
+
+      //make sure the width of the subdomain is big enough for linear extrapolation
+      if(it->side == GhostPoint::LEFT) {
+        if(i+2<NX) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i+1][0]; 
+          r2 = coords[k][j][i+2][0];  
+          for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j][i+1][dir];
+            f2 = normal[k][j][i+2][dir];
+            normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          }
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::RIGHT) {
+        if(i-2>=0) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i-1][0];  
+          r2 = coords[k][j][i-2][0]; 
+          for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j][i-1][dir];
+            f2 = normal[k][j][i-2][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::BOTTOM) {
+        if(j+2<NY) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j+1][i][1]; 
+          r2 = coords[k][j+2][i][1];
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j+1][i][dir];
+            f2 = normal[k][j+2][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::TOP) {
+        if(j-2>=0) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j-1][i][1];
+          r2 = coords[k][j-2][i][1];
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j-1][i][dir];
+            f2 = normal[k][j-2][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::BACK) {
+        if(k+2<NZ) { 
+          r  = coords[k][j][i][2];
+          r1 = coords[k+1][j][i][2]; 
+          r2 = coords[k+2][j][i][2]; 
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k+1][j][i][dir];
+            f2 = normal[k+2][j][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::FRONT) {
+        if(k-2>=0) {
+          r  = coords[k][j][i][2];
+          r1 = coords[k-1][j][i][2]; 
+          r2 = coords[k-2][j][i][2];
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k-1][j][i][dir];
+            f2 = normal[k-2][j][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+
+      if(it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE) {
+        std::cout << "Error: The NON_NEGATIVE boundary condition for NPhi (interface normal) has not been implemented at the moment. Execution ends" << std::endl;
+        exit_mpi(); 
+      }
+
+    }
+
+  }
+
+  NPhi.RestoreDataPointerAndInsert();
+
+  coordinates.RestoreDataPointerToLocalVector();
+
+}
+
+//-----------------------------------------------------
+
+// Apply boundary conditions by populating ghost cells of KappaPhi (curvature of zero Levelset)
+void LevelSetOperator::ApplyBoundaryConditionsKappaPhi(SpaceVariable3D &KappaPhi)
+{
+
+  double*** curvature = (double***) KappaPhi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  int NX, NY, NZ;
+  KappaPhi.GetGlobalSize(&NX, &NY, &NZ);
+
+  double r, r1, r2, f1, f2;
+
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    if(it->bcType == (int)LevelSetSchemeData::ZERO_NEUMANN) {
+
+      curvature[k][j][i] = curvature[im_k][im_j][im_i];
+
+    }
+    else if ((it->bcType == (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION) ||
+             (it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE)) {
+
+      //make sure the width of the subdomain is big enough for linear extrapolation
+      if(it->side == GhostPoint::LEFT) {
+        if(i+2<NX) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i+1][0];  f1 = curvature[k][j][i+1];
+          r2 = coords[k][j][i+2][0];  f2 = curvature[k][j][i+2];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::RIGHT) {
+        if(i-2>=0) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i-1][0];  f1 = curvature[k][j][i-1];
+          r2 = coords[k][j][i-2][0];  f2 = curvature[k][j][i-2];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::BOTTOM) {
+        if(j+2<NY) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j+1][i][1];  f1 = curvature[k][j+1][i];
+          r2 = coords[k][j+2][i][1];  f2 = curvature[k][j+2][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::TOP) {
+        if(j-2>=0) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j-1][i][1];  f1 = curvature[k][j-1][i];
+          r2 = coords[k][j-2][i][1];  f2 = curvature[k][j-2][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::BACK) {
+        if(k+2<NZ) { 
+          r  = coords[k][j][i][2];
+          r1 = coords[k+1][j][i][2];  f1 = curvature[k+1][j][i];
+          r2 = coords[k+2][j][i][2];  f2 = curvature[k+2][j][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::FRONT) {
+        if(k-2>=0) {
+          r  = coords[k][j][i][2];
+          r1 = coords[k-1][j][i][2];  f1 = curvature[k-1][j][i];
+          r2 = coords[k-2][j][i][2];  f2 = curvature[k-2][j][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+
+      if(it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE) {
+        std::cout << "Error: The NON_NEGATIVE boundary condition for KappaPhi (interface curvature) has not been implemented at the moment. Execution ends" << std::endl;
+        exit_mpi(); 
+ 
+        //int ind(0);
+        //if(it->side == GhostPoint::LEFT || it->side == GhostPoint::RIGHT)  ind = 0;
+        //if(it->side == GhostPoint::BOTTOM || it->side == GhostPoint::TOP)  ind = 1;
+        //if(it->side == GhostPoint::BACK || it->side == GhostPoint::FRONT)  ind = 2;
+        // double d2wall = 0.5*fabs(coords[im_k][im_j][im_i][ind] - coords[k][j][i][ind]); //distance from this ghost node to the wall boundary
+        // phi[k][j][i] = std::max(-d2wall, phi[k][j][i]);
+      }
+
+    }
+
+  }
+
+  KappaPhi.RestoreDataPointerAndInsert();
+
+  coordinates.RestoreDataPointerToLocalVector();
+
+}
+
+
 
 //-----------------------------------------------------
 

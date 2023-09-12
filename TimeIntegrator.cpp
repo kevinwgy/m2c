@@ -199,6 +199,8 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
     lso[i]->ComputeCurvature(*Phi[i], *NPhi[i], *KappaPhi[i]);
+    lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
+    lso[i]->ApplyBoundaryConditionsKappaPhi(*KappaPhi[i]); 
   }
 
   // -------------------------------------------------------------------------------
