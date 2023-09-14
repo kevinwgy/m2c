@@ -100,12 +100,12 @@ ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir,
 
 
   // A Trivial Case
-  if(ul == ur && pl + delta_p == pr) {
-    FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol, rhor, ul, pl, 
-	trans_rare, Vrare_x0, //inputs
-	Vs, id, Vsm, Vsp/*outputs*/);
-    return 0;
-  }
+//  if(ul == ur && pl + delta_p == pr) {
+//    FinalizeSolution(dir, Vm, Vp, rhol, ul, pl, idl, rhor, ur, pr, idr, rhol, rhor, ul, pl, 
+//	trans_rare, Vrare_x0, //inputs
+//	Vs, id, Vsm, Vsp/*outputs*/);
+//    return 0;
+//  }
 
   // -------------------------------
   // Step 1: Initialization
@@ -884,4 +884,19 @@ ExactRiemannSolverInterfaceJump::FinalizeSolution(double *dir, double *Vm, doubl
 
 }
 
+//--------------------------------------------------------------
 void ExactRiemannSolverInterfaceJump::SetLevelSetOperatorInRiemannSolver(std::vector<LevelSetOperator*> lso_) {lso = lso_;}
+
+//--------------------------------------------------------------
+double ExactRiemannSolverInterfaceJump::GetSurfaceTensionCoefficient() { return surface_tension_coefficient;}
+
+
+
+
+
+
+
+
+
+
+

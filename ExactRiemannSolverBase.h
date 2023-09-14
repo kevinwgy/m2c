@@ -35,6 +35,8 @@ public:
 
   virtual ~ExactRiemannSolverBase() {}
 
+  virtual double GetSurfaceTensionCoefficient();
+
   virtual int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
                                      double *Vp, int idp /*"right" state*/,
                                      double curvature, 

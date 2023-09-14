@@ -132,6 +132,8 @@ public:
   void ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
                                  SpaceVariable3D &LocalDt);
 
+  double ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID);
+
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,

@@ -2222,9 +2222,10 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
   } else {//apply the CFL number
     cfl = iod.ts.cfl;      
     dt = cfl*dx_over_char_speed_min;
-    dt = std::min( dt, 0.9*sqrt( pow(0.0025,3.) * (1.+0.001) / (4.*M_PI*1.) ) );
   }
 
+  double dt_surfaceTension = 0.9 * ComputeTimeStepSizeSurfaceTension(V, ID); // 0.9 is a safety coefficient
+  dt = std::min(dt, dt_surfaceTension);
 }
 
 //-----------------------------------------------------
@@ -3568,6 +3569,102 @@ double SpaceOperator::CalculateCurvatureAtCellInterface(int d /*0,1,2*/, double*
     exit_mpi();
   }
   return ans;
+}
+
+//-----------------------------------------------------
+
+double SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID)
+{
+  //------------------------------------
+  // Extract data
+  //------------------------------------
+  Vec5D*** v  = (Vec5D***) V.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+
+  int myid;
+  int neighborid = -1;
+  double my_dx = 0.;  
+  double dt_min_surfaceTension = DBL_MAX;  
+
+  double sigma = riemann.GetSurfaceTensionCoefficient(); //assume same surface tension coefficient everywhere
+
+  // Loop through the domain interior, and the right, top, and front ghost layers. For each pair of cells occupied different fluid materials, calculate the
+  // time step size associated to surface tension
+  for(int k=k0; k<kkmax; k++) {
+    for(int j=j0; j<jjmax; j++) {
+      for(int i=i0; i<iimax; i++) {
+
+	myid = id[k][j][i];
+	my_dx = min(dxyz[k][j][i][0],
+	                min(dxyz[k][j][i][1], dxyz[k][j][i][2]) );
+
+	//**********************************************
+	//cell interfaces perpendicular to x-direction
+	//**********************************************
+	if(k!=kkmax-1 && j!=jjmax-1) {
+
+	  neighborid = id[k][j][i-1];
+
+	  if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k][j][i-1][0],
+                                         min(dxyz[k][j][i-1][1], dxyz[k][j][i-1][2]) );
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j][i-1][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+	  }
+	}
+
+
+        //**********************************************
+        //cell interfaces perpendicular to y-direction
+        //**********************************************
+        if(k!=kkmax-1 && i!=iimax-1) {
+
+          neighborid = id[k][j-1][i];
+
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k][j-1][i][0],
+                                         min(dxyz[k][j-1][i][1], dxyz[k][j-1][i][2]) );
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j-1][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+          }
+        }
+
+
+        //**********************************************
+        //cell interfaces perpendicular to z-direction
+        //**********************************************
+        if(j!=jjmax-1 && i!=iimax-1) {
+
+          neighborid = id[k-1][j][i];
+
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k-1][j][i][0],
+                                         min(dxyz[k-1][j][i][1], dxyz[k-1][j][i][2]) );
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k-1][j][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+          }
+        }
+
+      }
+    }
+  }
+        
+  
+  MPI_Allreduce(MPI_IN_PLACE, &dt_min_surfaceTension, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  //------------------------------------
+  // Restore Spatial Variables
+  //------------------------------------
+  delta_xyz.RestoreDataPointerToLocalVector(); //no changes
+  ID.RestoreDataPointerToLocalVector(); //no changes
+  V.RestoreDataPointerToLocalVector();
+
+  return dt_min_surfaceTension; 
+
 }
 
 
