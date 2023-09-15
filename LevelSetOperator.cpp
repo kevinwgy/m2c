@@ -810,9 +810,13 @@ DONE:
     Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
 
-  ComputeCurvature(Phi, NPhi, KappaPhi);
-  ApplyBoundaryConditions(NPhi);
-  ApplyBoundaryConditions(KappaPhi);
+
+  ComputeNormal(Phi, NPhi);
+  ApplyBoundaryConditionsNPhi(NPhi);
+
+  ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
+  ApplyBoundaryConditionsNPhi(NPhi);
+  ApplyBoundaryConditionsKappaPhi(KappaPhi);
 
 /*
   phi   = Phi.GetDataPointer();
@@ -2173,13 +2177,11 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
   coordinates.RestoreDataPointerToLocalVector();
   NPhi.RestoreDataPointerAndInsert();
 }
+
 //-----------------------------------------------------
-
-void LevelSetOperator::ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi) { // currently only implemented the full domain version
-
+void LevelSetOperator::ComputeNormal(SpaceVariable3D &Phi, SpaceVariable3D &NPhi) { //currently only implemented the full domain version
   double*** phi   = Phi.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  double*** curvature = (double***)KappaPhi.GetDataPointer();
   Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
 
   // Compute and store first direvatives, needed for the computation of second order mixed partial derivatives
@@ -2194,9 +2196,19 @@ void LevelSetOperator::ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &N
                                                  coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
       }
 
+  Phi.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
   NPhi.RestoreDataPointerAndInsert();
-  normal = (Vec3D***)NPhi.GetDataPointer();
-  
+}  
+
+//-----------------------------------------------------
+
+void LevelSetOperator::ComputeUnitNormalAndCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi) { // currently only implemented the full domain version
+
+  double*** phi   = Phi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  double*** curvature = (double***)KappaPhi.GetDataPointer();
+  Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
 
   double mynorm;
   for(int k=k0; k<kmax; k++)

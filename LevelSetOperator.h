@@ -101,7 +101,9 @@ public:
 
   void ComputeNormalDirection(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
 
-  void ComputeCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi);
+  void ComputeNormal(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
+
+  void ComputeUnitNormalAndCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi);
 
   void Destroy();
 
