@@ -91,6 +91,8 @@ public:
 
   int GetMaterialID() {return materialid;}
 
+  bool NarrowBand() {return narrow_band;}
+
   bool HasReinitializer() {return reinit!=NULL;}
 
   LevelSetSchemeData& GetLevelSetSchemeData() {return iod_ls;}

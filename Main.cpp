@@ -468,6 +468,9 @@ int main(int argc, char* argv[])
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
 
+  print("Got here.\n");
+  exit_mpi();
+
   if(concurrent.Coupled()) {
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
                                              spo.GetPointerToInnerGhostNodes(),

@@ -1852,10 +1852,8 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
                               "reinitializing the level set.\n", materialid);
   }
 
-  if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
-    assert(lso.HasReinitializer());
+  if(iod_ls.bandwidth < INT_MAX) //narrow-band level set method
     lso.ConstructNarrowBandInReinitializer(Phi);
-  }
 
   print("  o Set Phi (material id: %d) near subdomain boundary. Going to reinitialize it.\n", materialid);
   lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/);

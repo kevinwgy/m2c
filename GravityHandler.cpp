@@ -94,9 +94,12 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
 
   // Get intersection data (if any)
   vector<Vec3D***> xf;
+  vector<double***> psi;
   if(EBDS)
-    for(auto&& ebds : *EBDS)
+    for(auto&& ebds : *EBDS) {
       xf.push_back((Vec3D***)ebds->XForward_ptr->GetDataPointer());
+      psi.push_back((double***)ebds->Phi_ptr->GetDataPointer());
+    }
 
 
   // Create temporary variables
@@ -164,40 +167,56 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
     exit_mpi();
   }
 
-  
+  // --------------------------------------------------------
+  // Now, Reset color to show the location of each node with
+  // respect to the water surface 
+  // color =  1  : flooded, next to water surface
+  //       = -1  : unflooded, next to water surface
+  //       =  2  : flooded, not next to water surface
+  //       = -2  : unflooded, not next to water surface
+  // Note: color is not "inserted" again, i.e., no subdomain communications
+  // --------------------------------------------------------
+  for(int k=std::max(0,kk0); k<std::min(kkmax,NZ); k++)
+    for(int j=std::max(0,jj0); j<std::min(jjmax,NY); j++)
+      for(int i=std::max(0,ii0); i<std::min(iimax,NX); i++)
+        color[k][j][i] = (color[k][j][i] == flood_color) ? 2 : -2;
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        // go over 7 neighbors 
+        for(int k2=std::max(0,k-1); k2<=k; k2++) 
+          for(int j2=std::max(0,j-1); j2<=j; j2++) 
+            for(int i2=std::max(0,i-1); i2<=i; i2++) {
+              if(color[k][j][i]*color[k2][j2][i2]<0) {//cutting the water surface
+                color[k][j][i]    = color[k][j][i]>0    ? 1 : -1; 
+                color[k2][j2][i2] = color[k2][j2][i2]>0 ? 1 : -1; 
+              }
+            }
+      }
+
   // --------------------------------------------------------
   // Update V, ID, and Phi
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
+
         // first, update phi
         if(phi) {
-          double dxmin_half = 0.5*global_mesh.GetMinDXYZ(Int3(i,j,k));
-          if(color[k][j][i] == flood_color)
-            phi[k][j][i] = -dxmin_half;
+          double phi_mag = 0.5*global_mesh.GetMinDXYZ(Int3(i,j,k));
+          if(fabs(color[k][j][i])==1) {//next to water surface
+            phi_mag = std::min(fabs(phi[k][j][i]), phi_mag);
+            for(auto&& phi_emb : psi) //unsigned distance to embedded surfaces
+              phi_mag = std::min(phi_emb[k][j][i], phi_mag);
+          }
+          if(color[k][j][i]>0) //flooded
+            phi[k][j][i] = -phi_mag;
           else
-            phi[k][j][i] = dxmin_half;
-/*
-          if(fabs(dist[k][j][i])<fabs(phi[k][j][i])) {
-            if(color[k][j][i] == flood_color)
-              phi[k][j][i] = -fabs(dist[k][j][i]); //negative inside the material subdomain
-            else { // does not change the sign
-              if(phi[k][j][i]>=0)
-                phi[k][j][i] = fabs(dist[k][j][i]);
-              else
-                phi[k][j][i] = -fabs(dist[k][j][i]);
-            }
-          }
-          else {
-            if(color[k][j][i] == flood_color)
-              phi[k][j][i] = -fabs(phi[k][j][i]);
-            // if color is not flood_color, it may still be the same (water) material, i.e. inside the subdomain.
-          }
-*/
+            phi[k][j][i] = phi_mag;
         }
 
         // update ID and V
-        if(color[k][j][i] == flood_color) {
+        if(color[k][j][i]>0) { //flooded
           id[k][j][i] = water_matid;
           v[k][j][i][0] = rho0;
           v[k][j][i][1] = v0[0];
@@ -212,8 +231,10 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
 
   // Restore data
   if(xf.size()>0)
-    for(auto&& ebds : *EBDS)
+    for(auto&& ebds : *EBDS) {
       ebds->XForward_ptr->RestoreDataPointerToLocalVector();
+      ebds->Phi_ptr->RestoreDataPointerToLocalVector();
+    }
 
 
   V.RestoreDataPointerAndInsert();
@@ -221,31 +242,37 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
   if(water_lsid>=0)
     Phi[water_lsid]->RestoreDataPointerAndInsert();
 
-  lso[water_lsid]->ApplyBoundaryConditions(*Phi[water_lsid]);
-  lso[water_lsid]->Reinitialize(0.0, 1.0, 0.0, *Phi[water_lsid], 600, true);
-  MPI_Barrier(comm);
-  print("Done Done\n");
+  if(water_lsid>=0) {
+    lso[water_lsid]->ApplyBoundaryConditions(*Phi[water_lsid]);
+    if(!lso[water_lsid]->HasReinitializer()) {
+      print_error("*** Error: GravityHandler requested re-initialization of level set. "
+                  "Reinitializer needs to be activated.\n");
+      exit_mpi();
+    }
+    if(lso[water_lsid]->NarrowBand())
+      lso[water_lsid]->ConstructNarrowBandInReinitializer(*Phi[water_lsid]);
+
+    lso[water_lsid]->Reinitialize(0.0, 1.0, 0.0, *Phi[water_lsid], 1000, true);
+  }
 
   Color.RestoreDataPointerToLocalVector();
-  print("Done Done 2\n");
-  print("Done Done 3\n");
   Dist.RestoreDataPointerToLocalVector();
 
-  print("Done Done 4\n");
   //Destroy locally created objects
   Obs.Destroy();
   Dist.Destroy();
   Color.Destroy();
   floodfiller.Destroy();
 
-  print("Done Done 5\n");
+  MPI_Barrier(comm);
   V.StoreMeshCoordinates(coordinates);
   V.WriteToVTRFile("V.vtr", "V");
   ID.StoreMeshCoordinates(coordinates);
   ID.WriteToVTRFile("ID.vtr", "ID");
-  print("Done Done 6\n");
-  Phi[water_lsid]->StoreMeshCoordinates(coordinates);
-  Phi[water_lsid]->WriteToVTRFile("Phi.vtr", "Phi");
+  if(water_lsid>=0) {
+    Phi[water_lsid]->StoreMeshCoordinates(coordinates);
+    Phi[water_lsid]->WriteToVTRFile("Phi.vtr", "Phi");
+  }
   exit_mpi();
 }
 
