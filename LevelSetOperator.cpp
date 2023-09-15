@@ -2210,7 +2210,6 @@ void LevelSetOperator::ComputeUnitNormalAndCurvature(SpaceVariable3D &Phi, Space
   double*** curvature = (double***)KappaPhi.GetDataPointer();
   Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
 
-  double mynorm;
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
@@ -2223,12 +2222,14 @@ void LevelSetOperator::ComputeUnitNormalAndCurvature(SpaceVariable3D &Phi, Space
         double phi_xy = CentralDifferenceLocal(/* y-direvative of dphi/dx */
                                                normal[k][j-1][i][0], normal[k][j][i][0], normal[k][j+1][i][0],
                                                coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+
         double phi_xz = CentralDifferenceLocal(/* z-direvative of dphi/dx */
                                                normal[k-1][j][i][0], normal[k][j][i][0], normal[k+1][j][i][0], 
                                                coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
         double phi_yz = CentralDifferenceLocal(/* z-direvative of dphi/dy */
                                                normal[k-1][j][i][1], normal[k][j][i][1], normal[k+1][j][i][1],
                                                coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+
         double phi_x = normal[k][j][i][0];
         double phi_y = normal[k][j][i][1];
         double phi_z = normal[k][j][i][2];   
@@ -2236,9 +2237,14 @@ void LevelSetOperator::ComputeUnitNormalAndCurvature(SpaceVariable3D &Phi, Space
         curvature[k][j][i] = phi_x*phi_x*phi_yy - 2.*phi_x*phi_y*phi_xy + phi_y*phi_y*phi_xx
                             +phi_x*phi_x*phi_zz - 2.*phi_x*phi_z*phi_xz + phi_z*phi_z*phi_xx
                             +phi_y*phi_y*phi_zz - 2.*phi_y*phi_z*phi_yz + phi_z*phi_z*phi_yy;  
+      }
 
+
+  double mynorm;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
         mynorm = normal[k][j][i].norm();
-
         if(mynorm!=0.0) {
           curvature[k][j][i] /= (mynorm*mynorm*mynorm); 
           normal[k][j][i] /= mynorm;
