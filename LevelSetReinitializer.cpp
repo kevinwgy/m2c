@@ -10,6 +10,7 @@
 extern int verbose;
 extern double domain_diagonal;
 
+int large_int = 31415927;
 //--------------------------------------------------------------------------
 
 LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm_all_, 
@@ -150,9 +151,6 @@ RETRY_FullDomain:
       break;
     }
   }
-
-  MPI_Barrier(comm);
-  print(" Done.\n");
 
   // apply failsafe
   if(iter==maxIts) {
@@ -1499,17 +1497,12 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
       for(int i=ii0; i<iimax; i++) {
 
         // reset
-        level[k][j][i] = INT_MAX;
+        level[k][j][i] = large_int;
         useful[k][j][i] = 0;
         active[k][j][i] = 0;
 
         if(Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k))
           continue;
-/*
-        if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
-          fprintf(stdout,"(%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
-
-*/
 
         if(phi[k][j][i]==0) {
           level[k][j][i] = 0;
@@ -1518,17 +1511,13 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
           useful_nodes.push_back(Int3(i,j,k));
           active_nodes.push_back(Int3(i,j,k));
         } 
-        else if ( (i-1>=i0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i-1,j,k) && phi[k][j][i]*phi[k][j][i-1]<=0) ||
-                  (i+1<iimax && !Phi.OutsidePhysicalDomainAndUnpopulated(i+1,j,k) && phi[k][j][i]*phi[k][j][i+1]<=0) ||
-                  (j-1>=j0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j-1,k) && phi[k][j][i]*phi[k][j-1][i]<=0) ||
-                  (j+1<jjmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j+1,k) && phi[k][j][i]*phi[k][j+1][i]<=0) ||
-                  (k-1>=k0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k-1) && phi[k][j][i]*phi[k-1][j][i]<=0) ||
-                  (k+1<kkmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k+1) && phi[k][j][i]*phi[k+1][j][i]<=0) ) {
+        else if ((i-1>=ii0  && !Phi.OutsidePhysicalDomainAndUnpopulated(i-1,j,k) && phi[k][j][i]*phi[k][j][i-1]<=0) ||
+                 (i+1<iimax && !Phi.OutsidePhysicalDomainAndUnpopulated(i+1,j,k) && phi[k][j][i]*phi[k][j][i+1]<=0) ||
+                 (j-1>=jj0  && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j-1,k) && phi[k][j][i]*phi[k][j-1][i]<=0) ||
+                 (j+1<jjmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j+1,k) && phi[k][j][i]*phi[k][j+1][i]<=0) ||
+                 (k-1>=kk0  && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k-1) && phi[k][j][i]*phi[k-1][j][i]<=0) ||
+                 (k+1<kkmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k+1) && phi[k][j][i]*phi[k+1][j][i]<=0)) {
 
-/*
-          if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
-            fprintf(stdout,"adding ... (%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
-*/
           level[k][j][i] = 1;
           useful[k][j][i] = 1;
           active[k][j][i] = 1;
@@ -1545,7 +1534,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   level = Level.GetDataPointer();
   for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
-    if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+    if(level[k][j][i]<large_int && useful[k][j][i]==0) {
       useful[k][j][i] = 1;
       active[k][j][i] = 1;
       useful_nodes.push_back(it->ijk);
@@ -1555,7 +1544,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
     //no need to skip corner nodes --- they won't satisfy the if statement anyway
-    if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+    if(level[k][j][i]<large_int && useful[k][j][i]==0) {
       useful[k][j][i] = 1;
       active[k][j][i] = 1;
       useful_nodes.push_back(it->ijk);
@@ -1622,7 +1611,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
 
       //check its neighbors
       if(i-1>=ii0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i-1,j,k)) { //left
-        if(level[k][j][i-1]==INT_MAX) {
+        if(level[k][j][i-1]==large_int) {
           level[k][j][i-1] = band;
           useful[k][j][i-1] = 1;
           useful_nodes.push_back(Int3(i-1,j,k));
@@ -1634,7 +1623,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(i+1<iimax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i+1,j,k)) { //right
-        if(level[k][j][i+1]==INT_MAX) {
+        if(level[k][j][i+1]==large_int) {
           level[k][j][i+1] = band;
           useful[k][j][i+1] = 1;
           useful_nodes.push_back(Int3(i+1,j,k));
@@ -1646,7 +1635,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(j-1>=jj0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j-1,k)) { //bottom
-        if(level[k][j-1][i]==INT_MAX) {
+        if(level[k][j-1][i]==large_int) {
           level[k][j-1][i] = band;
           useful[k][j-1][i] = 1;
           useful_nodes.push_back(Int3(i,j-1,k));
@@ -1658,7 +1647,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(j+1<jjmax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j+1,k)) { //top
-        if(level[k][j+1][i]==INT_MAX) {
+        if(level[k][j+1][i]==large_int) {
           level[k][j+1][i] = band;
           useful[k][j+1][i] = 1;
           useful_nodes.push_back(Int3(i,j+1,k));
@@ -1670,7 +1659,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(k-1>=kk0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j,k-1)) { //back
-        if(level[k-1][j][i]==INT_MAX) {
+        if(level[k-1][j][i]==large_int) {
           level[k-1][j][i] = band;
           useful[k-1][j][i] = 1;
           useful_nodes.push_back(Int3(i,j,k-1));
@@ -1682,7 +1671,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(k+1<kkmax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j,k+1)) { //front
-        if(level[k+1][j][i]==INT_MAX) {
+        if(level[k+1][j][i]==large_int) {
           level[k+1][j][i] = band;
           useful[k+1][j][i] = 1;
           useful_nodes.push_back(Int3(i,j,k+1));
@@ -1700,7 +1689,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
     level = Level.GetDataPointer();
     for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
       int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
-      if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+      if(level[k][j][i]<large_int && useful[k][j][i]==0) {
         useful[k][j][i] = 1;
         useful_nodes.push_back(it->ijk);
         if(band<bandwidth) {
@@ -1711,7 +1700,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
     } 
     for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
       int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
-      if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+      if(level[k][j][i]<large_int && useful[k][j][i]==0) {
         useful[k][j][i] = 1;
         useful_nodes.push_back(it->ijk);
         if(band<bandwidth) {
@@ -1795,7 +1784,7 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   vector<Int3> useful_nodes_backup = useful_nodes;
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-    level[k][j][i] = INT_MAX;
+    level[k][j][i] = large_int;
     useful[k][j][i] = 0;
     active[k][j][i] = 0;
   }

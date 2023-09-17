@@ -203,9 +203,9 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
 
         // first, update phi
         if(phi) {
-          double phi_mag = 0.5*global_mesh.GetMinDXYZ(Int3(i,j,k));
+          double phi_mag = global_mesh.GetMinDXYZ(Int3(i,j,k));
           if(fabs(color[k][j][i])==1) {//next to water surface
-            phi_mag = std::min(fabs(phi[k][j][i]), phi_mag);
+            phi_mag = std::min(fabs(phi[k][j][i]), std::min(fabs(dist[k][j][i]),phi_mag));
             for(auto&& phi_emb : psi) //unsigned distance to embedded surfaces
               phi_mag = std::min(phi_emb[k][j][i], phi_mag);
           }
@@ -249,10 +249,11 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
                   "Reinitializer needs to be activated.\n");
       exit_mpi();
     }
+
     if(lso[water_lsid]->NarrowBand())
       lso[water_lsid]->ConstructNarrowBandInReinitializer(*Phi[water_lsid]);
-
-    lso[water_lsid]->Reinitialize(0.0, 1.0, 0.0, *Phi[water_lsid], 1000, true);
+       
+    lso[water_lsid]->Reinitialize(0.0, 1.0, 0.0, *Phi[water_lsid], 600, true);
   }
 
   Color.RestoreDataPointerToLocalVector();
@@ -264,6 +265,7 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
   Color.Destroy();
   floodfiller.Destroy();
 
+/*
   MPI_Barrier(comm);
   V.StoreMeshCoordinates(coordinates);
   V.WriteToVTRFile("V.vtr", "V");
@@ -274,6 +276,7 @@ GravityHandler::UpdateInitialConditionByFlooding(SpaceVariable3D &V, SpaceVariab
     Phi[water_lsid]->WriteToVTRFile("Phi.vtr", "Phi");
   }
   exit_mpi();
+*/
 }
 
 //------------------------------------------------------------------------

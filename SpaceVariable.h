@@ -150,7 +150,7 @@ public:
   inline bool OutsidePhysicalDomainAndUnpopulated(int i, int j, int k)
   {
     int count = 0;
-    if(i<0 || j>=NX) count++;
+    if(i<0 || i>=NX) count++;
     if(j<0 || j>=NY) count++;
     if(k<0 || k>=NZ) count++;
     if(count>1)
