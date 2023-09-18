@@ -162,7 +162,7 @@ private:
 
   void UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes);
 
-  void CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes);
+  void CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes, SpaceVariable3D &UsefulG2);
 
   void AXPlusBYInBandPlusOne(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
 

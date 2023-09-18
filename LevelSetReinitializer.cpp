@@ -1574,12 +1574,14 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   // -------------------------------------------------- 
   // Step 4: Build useful_nodes_plus1layer
   // -------------------------------------------------- 
-  CreateUsefulNodesPlusOneLayer(useful_nodes);
+  CreateUsefulNodesPlusOneLayer(useful_nodes, UsefulG2);
 /*
   UsefulG2.WriteToVTRFile("useful.vtr");
   Level.WriteToVTRFile("level.vtr");
   exit_mpi();
 */
+
+  mpi_barrier(); //not necessary
 }
 
 //--------------------------------------------------------------------------
@@ -1856,7 +1858,7 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   // -------------------------------------------------- 
   // Step 6: Build useful_nodes_plus1layer
   // -------------------------------------------------- 
-  CreateUsefulNodesPlusOneLayer(useful_nodes);
+  CreateUsefulNodesPlusOneLayer(useful_nodes, UsefulG2);
 
 
 /* DEBUG
@@ -1879,52 +1881,48 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes)
+LevelSetReinitializer::CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes, SpaceVariable3D &UsefulG2)
 {
 
-  useful_nodes_plus1layer = useful_nodes;
-
+  // find the extra layer
+  double*** useful = UsefulG2.GetDataPointer();
+  std::set<Int3> extra_layer;
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
 
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
 
     if(i-1>=ii0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i-1,j,k))  //left
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i-1,j,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i-1,j,k));
+      if(!useful[k][j][i-1])
+        extra_layer.insert(Int3(i-1,j,k));
 
     if(i+1<iimax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i+1,j,k))  //right
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i+1,j,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i+1,j,k));
+      if(!useful[k][j][i+1])
+        extra_layer.insert(Int3(i+1,j,k));
 
     if(j-1>=jj0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j-1,k))  //bottom
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j-1,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j-1,k));
+      if(!useful[k][j-1][i])
+        extra_layer.insert(Int3(i,j-1,k));
 
     if(j+1<jjmax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j+1,k))  //top
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j+1,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j+1,k));
+      if(!useful[k][j+1][i])
+        extra_layer.insert(Int3(i,j+1,k));
 
     if(k-1>=kk0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k-1))  //back
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j,k-1)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j,k-1));
+      if(!useful[k-1][j][i])
+        extra_layer.insert(Int3(i,j,k-1));
 
     if(k+1<kkmax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k+1))  //front
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j,k+1)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j,k+1));
-
+      if(!useful[k+1][j][i])
+        extra_layer.insert(Int3(i,j,k+1));
   }
+
+  useful_nodes_plus1layer.reserve(useful_nodes.size() + extra_layer.size());
+  useful_nodes_plus1layer = useful_nodes;
+  useful_nodes_plus1layer.insert(useful_nodes_plus1layer.end(),
+                                 extra_layer.begin(), extra_layer.end());
+
+  UsefulG2.RestoreDataPointerToLocalVector();
+  
 }
 
 //--------------------------------------------------------------------------
