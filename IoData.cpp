@@ -1409,6 +1409,7 @@ void SchemesData::setup(const char *name, ClassAssigner *father)
 
 ExactRiemannSolverData::ExactRiemannSolverData()
 {
+  surface_tension = 0;
   maxIts_main = 200;
   maxIts_bracket = 100;
   maxIts_shock = 200;
@@ -1428,7 +1429,10 @@ ExactRiemannSolverData::ExactRiemannSolverData()
 void ExactRiemannSolverData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 12, father);
+  ClassAssigner *ca = new ClassAssigner(name, 13, father);
+
+  new ClassInt<ExactRiemannSolverData>(ca, "SurfaceTension", this, 
+                                       &ExactRiemannSolverData::surface_tension);
 
   new ClassInt<ExactRiemannSolverData>(ca, "MaxIts", this, 
                                        &ExactRiemannSolverData::maxIts_main);

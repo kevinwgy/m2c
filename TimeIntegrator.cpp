@@ -199,12 +199,14 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
 
-    lso[i]->ComputeNormal(*Phi[i], *NPhi[i]);
-    lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
+    if (iod.exact_riemann.surface_tension != 0) {
+      lso[i]->ComputeNormal(*Phi[i], *NPhi[i]);
+      lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
 
-    lso[i]->ComputeUnitNormalAndCurvature(*Phi[i], *NPhi[i], *KappaPhi[i]);
-    lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
-    lso[i]->ApplyBoundaryConditionsKappaPhi(*KappaPhi[i]); 
+      lso[i]->ComputeUnitNormalAndCurvature(*Phi[i], *NPhi[i], *KappaPhi[i]);
+      lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
+      lso[i]->ApplyBoundaryConditionsKappaPhi(*KappaPhi[i]); 
+    }
   }
 
   // -------------------------------------------------------------------------------
@@ -302,6 +304,10 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                       double time, double dt, 
                                       int time_step, int subcycle, double dts)
 {
+  if (iod.exact_riemann.surface_tension != 0) {
+    std::cout << "***Error: Surface tension model has not been implemented in RK2 at the moment!" << std::endl;
+    exit_mpi();
+  } 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
@@ -507,6 +513,11 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                       double time, double dt,
                                       int time_step, int subcycle, double dts)
 { 
+
+  if (iod.exact_riemann.surface_tension != 0) {
+    std::cout << "***Error: Surface tension model has not been implemented in RK3 at the moment!" << std::endl;
+    exit_mpi();
+  } 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);

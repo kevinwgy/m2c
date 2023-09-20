@@ -2224,10 +2224,11 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
     dt = cfl*dx_over_char_speed_min;
   }
 
-  double dt_surfaceTension = 0.9 * ComputeTimeStepSizeSurfaceTension(V, ID); // 0.9 is a safety coefficient
-  dt = std::min(dt, dt_surfaceTension);
+  if (iod.exact_riemann.surface_tension != 0) {
+    double dt_surfaceTension = 0.9 * ComputeTimeStepSizeSurfaceTension(V, ID); // 0.9 is a safety coefficient
+    dt = std::min(dt, dt_surfaceTension);
+  }
 }
-
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
@@ -2374,17 +2375,13 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
       phi[i] = (*Phi)[i]->GetDataPointer();
     }
   }
-
-  kappaPhi.assign(KappaPhi->size(), NULL);
-  for(int i=0; i<(int)kappaPhi.size(); i++) {
-    kappaPhi[i] = (*KappaPhi)[i]->GetDataPointer();
-    //std::cout << "kappaPhi[" << i << "] = " << (kappaPhi[i]) << std::endl;
-    //std::cout << "*kappaPhi[" << i << "] = " << *(kappaPhi[i]) << std::endl;
-    //std::cout << "**kappaPhi[" << i << "] = " << **(kappaPhi[i]) << std::endl;
-    //std::cout << "***kappaPhi[" << i << "] = " << ***(kappaPhi[i]) << std::endl;
-    //std::cout << "(kappaPhi[" << i << "])[0][0][0] = " << (kappaPhi[i])[0][0][0] << std::endl;
+  
+  if (iod.exact_riemann.surface_tension != 0) {
+    kappaPhi.assign(KappaPhi->size(), NULL);
+    for(int i=0; i<(int)kappaPhi.size(); i++) {
+      kappaPhi[i] = (*KappaPhi)[i]->GetDataPointer();
+    }
   }
-
 
   //------------------------------------
   // Extract intersection data
@@ -2513,10 +2510,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else { 
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-                double curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
+		double curvature = 0.;
+		if (iod.exact_riemann.surface_tension != 0) 
+		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
                 else//linear reconstruction w/ limitor
                   err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
@@ -2641,11 +2640,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-                double curvature = CalculateCurvatureAtCellInterface(1, phi[0], kappaPhi[0], i, j, k);
-                 
+		double curvature = 0.;
+ 		if (iod.exact_riemann.surface_tension != 0) 
+		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
                 else
                   err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
@@ -2769,11 +2769,12 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-                double curvature = CalculateCurvatureAtCellInterface(2, phi[0], kappaPhi[0], i, j, k);
-                 
+		double curvature = 0.;
+  		if (iod.exact_riemann.surface_tension != 0) 
+		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
                 else
                   err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
@@ -2847,8 +2848,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
     }
   }
 
-  for(int i=0; i<(int)KappaPhi->size(); i++) {
-    (*KappaPhi)[i]->RestoreDataPointerToLocalVector();
+  if (iod.exact_riemann.surface_tension != 0) {
+    for(int i=0; i<(int)KappaPhi->size(); i++) {
+      (*KappaPhi)[i]->RestoreDataPointerToLocalVector();
+    }
   }
 
   if(xf.size()>0) {
@@ -3586,7 +3589,6 @@ double SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, Spac
   int neighborid = -1;
   double my_dx = 0.;  
   double dt_min_surfaceTension = DBL_MAX;  
-
   double sigma = riemann.GetSurfaceTensionCoefficient(); //assume same surface tension coefficient everywhere
 
   // Loop through the domain interior, and the right, top, and front ghost layers. For each pair of cells occupied different fluid materials, calculate the

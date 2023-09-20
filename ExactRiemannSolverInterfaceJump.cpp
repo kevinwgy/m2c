@@ -885,9 +885,6 @@ ExactRiemannSolverInterfaceJump::FinalizeSolution(double *dir, double *Vm, doubl
 }
 
 //--------------------------------------------------------------
-void ExactRiemannSolverInterfaceJump::SetLevelSetOperatorInRiemannSolver(std::vector<LevelSetOperator*> lso_) {lso = lso_;}
-
-//--------------------------------------------------------------
 double ExactRiemannSolverInterfaceJump::GetSurfaceTensionCoefficient() { return surface_tension_coefficient;}
 
 

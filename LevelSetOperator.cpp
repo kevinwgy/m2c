@@ -302,7 +302,6 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, SpaceVariable3D
       for(int i=ii0; i<iimax; i++)
         phi[k][j][i] = domain_diagonal;
 
-
   //TODO: Add this feature later
   if(iod.ic.specified[IcData::LEVELSET] || iod.ic.specified[IcData::MATERIALID]) {
     print_error("*** Error: Currently, cannot read level set and material id from user-specified data file.\n");
@@ -339,7 +338,6 @@ void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, SpaceVariable3D
 
   // cylinder-cone
   for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
-
     if(it->second->initialConditions.materialid != materialid)
       continue; //not the right one
 
@@ -810,51 +808,14 @@ DONE:
     Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
   }
 
+  if (iod.exact_riemann.surface_tension != 0) {
+    ComputeNormal(Phi, NPhi);
+    ApplyBoundaryConditionsNPhi(NPhi);
 
-  ComputeNormal(Phi, NPhi);
-  ApplyBoundaryConditionsNPhi(NPhi);
-
-  ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
-  ApplyBoundaryConditionsNPhi(NPhi);
-  ApplyBoundaryConditionsKappaPhi(KappaPhi);
-
-/*
-  phi   = Phi.GetDataPointer();
-  coords = (Vec3D***)coordinates.GetDataPointer(); 
-  double*** curvature = (double***)KappaPhi.GetDataPointer();
-  Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
-
-  // Compute and store first direvatives, needed for the computation of second order mixed partial derivatives
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-        normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
-                                                 coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
-        normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
-                                                 coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
-        normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
-                                                 coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
-      }
-
-  double mynorm;
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-	                                        
-        curvature[k][j][i] = 10.0; 
-
-        mynorm = normal[k][j][i].norm();
-
-        if(mynorm!=0.0) {
-          normal[k][j][i] /= mynorm;
-        }
-      }
-
-  Phi.RestoreDataPointerToLocalVector();
-  coordinates.RestoreDataPointerToLocalVector();
-  NPhi.RestoreDataPointerAndInsert();
-  KappaPhi.RestoreDataPointerAndInsert();
-*/
+    ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
+    ApplyBoundaryConditionsNPhi(NPhi);
+    ApplyBoundaryConditionsKappaPhi(KappaPhi);
+  }
 }
 
 //-----------------------------------------------------

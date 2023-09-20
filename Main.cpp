@@ -148,9 +148,12 @@ int main(int argc, char* argv[])
 
 
   //! Initialize the exact Riemann problem solver.
+  //std::cout << "Surface Tension from IoData: " << iod.exact_riemann.surface_tension << std::endl;
   ExactRiemannSolverBase *riemann = NULL;
+  if (iod.exact_riemann.surface_tension == 0)
+    riemann = new ExactRiemannSolverBase(vf, iod.exact_riemann);
+  else 
     riemann = new ExactRiemannSolverInterfaceJump(vf, iod.exact_riemann);
-
 
   //! Initialize FluxFcn for the advector flux of the N-S equations
   FluxFcnBase *ff = NULL;
@@ -280,17 +283,15 @@ int main(int argc, char* argv[])
       vector<std::pair<int,int> > surf_and_color;
       for(auto it2 = closures.first; it2 != closures.second; it2++)
         surf_and_color.push_back(it2->second);
-      lso.back()->SetInitialCondition(*Phi.back(), *NPhi.back(), *KappaPhi.back(), 
+      lso[it->first]->SetInitialCondition(*Phi[it->first], *NPhi[it->first], *KappaPhi[it->first], 
                                       embed->GetPointerToEmbeddedBoundaryData(),
                                       &surf_and_color);
-    } else
-      lso.back()->SetInitialCondition(*Phi.back(), *NPhi.back(), *KappaPhi.back());
-
+    } else {
+      //std::cout << "I AM HERE! 1" << std::endl;
+      lso[it->first]->SetInitialCondition(*Phi[it->first], *NPhi[it->first], *KappaPhi[it->first]);
+    }
     print("- Initialized level set function (%d) for tracking the boundary of material %d.\n\n", 
           it->first, matid);
-
-    //NPhi[it->first]->WriteToVTRFile("NPhi.vtr");
-    //KappaPhi[it->first]->WriteToVTRFile("KappaPhi.vtr");
   }  
 
   // check for user effor
@@ -306,8 +307,6 @@ int main(int argc, char* argv[])
           "N-S solver not activated.\033[0m\n", (int)LEVELSET_TEST);
   }
 #endif
-  riemann->SetLevelSetOperatorInRiemannSolver(lso); // update Riemann solver object after initializing lso 
-
  
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
@@ -367,19 +366,6 @@ int main(int argc, char* argv[])
     Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
     heo->InitializeReferenceMap(*Xi);
   }
-       
-/*
-  ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
-  V.StoreMeshCoordinates(spo.GetMeshCoordinates());
-  ID.WriteToVTRFile("ID.vtr","id");
-  V.WriteToVTRFile("V.vtr", "sol");
-  if(Phi.size()>0) {
-    Phi[0]->StoreMeshCoordinates(spo.GetMeshCoordinates());
-    Phi[0]->WriteToVTRFile("Phi0.vtr", "phi0");
-  }
-  print("I am here!\n");
-  exit_mpi();
-*/
 
   //! Initialize output
   Output out(comm, dms, iod, global_mesh, vf, spo.GetMeshCellVolumes(), ion); 

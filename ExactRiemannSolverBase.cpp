@@ -64,6 +64,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
     double *Vsm /*left 'star' solution*/,
     double *Vsp /*right 'star' solution*/)
 {
+  //std::cout << "ExactRiemannSolverBase::ComputeRiemannSolution: this is the base version!" << std::endl;
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
   double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
@@ -3013,12 +3014,6 @@ myLabel:
 }
 
 //----------------------------------------------------------------------------------
-
-
-  void ExactRiemannSolverBase::SetLevelSetOperatorInRiemannSolver(std::vector<LevelSetOperator*> lso_) {
-    std::cout << "ExactRiemannSolverBase::SetLevelSetOperatorInRiemannSolver: This function in the base class should be overrided by the one in the derived class \"ExactRiemannSolverInterfaceJump\". Saying this message indicating something is wrong." << std::endl;
-    exit(-1);
-  }
 
   double ExactRiemannSolverBase::GetSurfaceTensionCoefficient() {
     std::cout << "ExactRiemannSolverBase::GetSurfaceTensionCoefficient: This function in the base class should be overrided by the one in the derived class \"ExactRiemannSolverInterfaceJump\". Saying this message indicating something is wrong." << std::endl;

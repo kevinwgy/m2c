@@ -54,8 +54,6 @@ public:
                                              double *Vs, int &id, /*solution at xi = 0 (i.e. x=0), id = -1 if invalid*/
                                              double *Vsm /*left 'star' solution*/);
 
-  virtual void SetLevelSetOperatorInRiemannSolver(std::vector<LevelSetOperator*> lso_);
-
 #if PRINT_RIEMANN_SOLUTION == 1
   vector<vector<double> > sol1d;
 #endif
