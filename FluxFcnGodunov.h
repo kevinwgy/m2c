@@ -44,10 +44,14 @@ void FluxFcnGodunov::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, do
   Vec3D normal(0.0,0.0,0.0);
   normal[dir] = 1.0;
 
-  //riemann.ComputeRiemannSolution(normal, Vm, id, Vp, id, Vmid, midid, Vsm, Vsp);
-  print_error("*** Error: Godunov flux currently does not support surface tension.\n");
-  exit_mpi(); 
-  
+  double curvature = 0.;
+  if (riemann.surface_tension != 0) {
+    print_error("*** Error: Godunov flux currently does not support surface tension.\n");
+    exit_mpi(); 
+  } else { 
+    riemann.ComputeRiemannSolution(normal, Vm, id, Vp, id, curvature, Vmid, midid, Vsm, Vsp); // curvature not used in the base Riemann solver
+  }
+ 
   if(dir==0) 
     EvaluateFluxFunction_F(Vmid, id, flux);
   else if(dir == 1)

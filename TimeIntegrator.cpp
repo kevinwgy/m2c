@@ -298,14 +298,14 @@ void TimeIntegratorRK2::Destroy()
 
 void
 TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                      vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi,
+                                      vector<SpaceVariable3D*>& Phi,[[maybe_unused]] vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi,
                                       SpaceVariable3D* L, SpaceVariable3D *Xi,
                                       SpaceVariable3D *Dt,
                                       double time, double dt, 
                                       int time_step, int subcycle, double dts)
 {
   if (iod.exact_riemann.surface_tension != 0) {
-    std::cout << "***Error: Surface tension model has not been implemented in RK2 at the moment!" << std::endl;
+    print_error("***Error: Surface tension model has not been implemented in RK2 at the moment!\n");
     exit_mpi();
   } 
 
@@ -507,7 +507,7 @@ void TimeIntegratorRK3::Destroy()
 
 void
 TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                      vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi, 
+                                      vector<SpaceVariable3D*>& Phi, [[maybe_unused]] vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi, 
                                       SpaceVariable3D* L, SpaceVariable3D* Xi,
                                       SpaceVariable3D *Dt,
                                       double time, double dt,
@@ -515,7 +515,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 { 
 
   if (iod.exact_riemann.surface_tension != 0) {
-    std::cout << "***Error: Surface tension model has not been implemented in RK3 at the moment!" << std::endl;
+    print_error("***Error: Surface tension model has not been implemented in RK3 at the moment!\n");
     exit_mpi();
   } 
 

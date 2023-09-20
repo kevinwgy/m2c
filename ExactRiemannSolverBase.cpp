@@ -44,6 +44,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   min_pressure         = iod_riemann.min_pressure;
   failure_threshold    = iod_riemann.failure_threshold;
   pressure_at_failure  = iod_riemann.pressure_at_failure;
+  surface_tension      = iod_riemann.surface_tension;
   integrationPath1.reserve(500);
   integrationPath3.reserve(500);
 }
@@ -59,7 +60,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
 ExactRiemannSolverBase::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
-    double curvature,
+    [[maybe_unused]] double curvature,
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
     double *Vsp /*right 'star' solution*/)

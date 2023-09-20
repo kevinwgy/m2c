@@ -148,7 +148,11 @@ int main(int argc, char* argv[])
 
 
   //! Initialize the exact Riemann problem solver.
-  //std::cout << "Surface Tension from IoData: " << iod.exact_riemann.surface_tension << std::endl;
+  //std::cout << "Surface Tension indicator from IoData: " << iod.exact_riemann.surface_tension << std::endl;
+  if (iod.exact_riemann.surface_tension != 0 && iod.exact_riemann.surface_tension != 1) {
+    print_error("*** Error:iod.exact_riemann.surface_tension has to be 0 or 1.\n");
+    exit_mpi();
+  }
   ExactRiemannSolverBase *riemann = NULL;
   if (iod.exact_riemann.surface_tension == 0)
     riemann = new ExactRiemannSolverBase(vf, iod.exact_riemann);
