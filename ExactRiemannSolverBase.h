@@ -42,10 +42,10 @@ public:
 
   virtual int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
                                      double *Vp, int idp /*"right" state*/,
-                                     double curvature, 
                                      double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
                                      double *Vsm /*left 'star' solution*/,
-                                     double *Vsp /*right 'star' solution*/);
+                                     double *Vsp /*right 'star' solution*/,
+                                     double curvature = 0.0);
 
   virtual void PrintStarRelations(double rhol, double ul, double pl, int idl,
                           double rhor, double ur, double pr, int idr,
@@ -159,10 +159,11 @@ public:
   ExactRiemannSolverNonAdaptive(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_) : ExactRiemannSolverBase(vf_, iod_riemann_) {};
 
   int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
-                                     double *Vp, int idp /*"right" state*/, 
-                                     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
-                                     double *Vsm /*left 'star' solution*/,
-                                     double *Vsp /*right 'star' solution*/);
+                             double *Vp, int idp /*"right" state*/, 
+                             double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
+                             double *Vsm /*left 'star' solution*/,
+                             double *Vsp /*right 'star' solution*/,
+                             double curvature = 0.0);
 
 protected:
   bool ComputeRhoUStar(int wavenumber /*1 or 3*/,

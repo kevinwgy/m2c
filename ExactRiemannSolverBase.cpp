@@ -56,15 +56,17 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
  * 0: no errors
  * 1: riemann solver failed to find a bracketing interval
  */
-  int
+int
 ExactRiemannSolverBase::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
-    [[maybe_unused]] double curvature,
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
-    double *Vsp /*right 'star' solution*/)
+    double *Vsp /*right 'star' solution*/,
+    double curvature)
 {
+  assert(curvature == 0.0); //the base class does not handle curvature!
+
   //std::cout << "ExactRiemannSolverBase::ComputeRiemannSolution: this is the base version!" << std::endl;
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
@@ -2198,14 +2200,17 @@ try_again:
  * 0: no errors
  * 1: riemann solver failed to find a bracketing interval
  */
-  int
+int
 ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
-    double *Vsp /*right 'star' solution*/)
+    double *Vsp /*right 'star' solution*/,
+    double curvature)
 {
+  assert(curvature == 0.0); //the base class does not handle curvature!
+
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
   double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];

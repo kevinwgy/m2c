@@ -44,8 +44,7 @@ void FluxFcnGodunov::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, do
   Vec3D normal(0.0,0.0,0.0);
   normal[dir] = 1.0;
 
-  double curvature = 0.;
-  riemann.ComputeRiemannSolution(normal, Vm, id, Vp, id, curvature, Vmid, midid, Vsm, Vsp); // curvature not used in the base Riemann solver
+  riemann.ComputeRiemannSolution(normal, Vm, id, Vp, id, Vmid, midid, Vsm, Vsp);
  
   if(dir==0) 
     EvaluateFluxFunction_F(Vmid, id, flux);

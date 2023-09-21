@@ -29,10 +29,10 @@ int
 ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
-    double curvature,
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
-    double *Vsp /*right 'star' solution*/)
+    double *Vsp /*right 'star' solution*/,
+    double curvature)
 {
 
   ComputePressureJump(idr, curvature);

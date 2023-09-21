@@ -1537,15 +1537,21 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else { 
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-		double curvature = 0.;
-                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES)
-		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
-                //Solve 1D Riemann problem
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
-                else//linear reconstruction w/ limitor
-                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
-
+                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {//no surface tension
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  else//linear reconstruction w/ limitor
+                    err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                }
+                else {//with surface tension
+		  double curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp, curvature);
+                  else//linear reconstruction w/ limitor
+                    err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp, curvature);
+                }
                 if(err)
                   riemann_errors++;
 
@@ -1667,14 +1673,21 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-		double curvature = 0.;
-                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES)
-		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
-                //Solve 1D Riemann problem
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
-                else
-                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
+                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {//no surface tension
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                }
+                else { 
+		  double curvature = CalculateCurvatureAtCellInterface(1, phi[0], kappaPhi[0], i, j, k);
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp, curvature);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp, curvature);
+                }
 
                 if(err)
                   riemann_errors++;
@@ -1796,14 +1809,21 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-		double curvature = 0.;
-                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES)
-		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
-                //Solve 1D Riemann problem
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
-                else
-                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
+                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {//no surface tension
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                }
+                else {
+		  double curvature = CalculateCurvatureAtCellInterface(2, phi[0], kappaPhi[0], i, j, k);
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp, curvature);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp, curvature);
+                }
 
                 if(err)
                   riemann_errors++;

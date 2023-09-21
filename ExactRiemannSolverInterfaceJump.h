@@ -23,10 +23,10 @@ class ExactRiemannSolverInterfaceJump: public ExactRiemannSolverBase {
 
     int ComputeRiemannSolution(double *dir /*unit normal*/, double *Vm, int idm /*"left" state*/, 
 	double *Vp, int idp /*"right" state*/, 
-        double curvature,
 	double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
 	double *Vsm /*left 'star' solution*/,
-	double *Vsp /*right 'star' solution*/);
+	double *Vsp /*right 'star' solution*/,
+        double curvature);
 
     bool FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,
 	double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
