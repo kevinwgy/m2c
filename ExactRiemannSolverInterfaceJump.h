@@ -13,10 +13,10 @@ class ExactRiemannSolverInterfaceJump: public ExactRiemannSolverBase {
   protected:
     double delta_p; // pressure jump across the contact discontinuity
     int surface_tension_materialid;
-
-  public:
     double surface_tension_coefficient; // In general, it depends on the material property on both sides of the interface and temperature;
                                         // currently, we assume it to be a constant specified from the input file
+
+  public:
     double GetSurfaceTensionCoefficient(); 
 
     ExactRiemannSolverInterfaceJump(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_);

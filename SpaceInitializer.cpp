@@ -1667,7 +1667,7 @@ DONE:
 
 
   // Initialize NPhi and KappaPhi if needed
-  if (iod.exact_riemann.surface_tension != 0) {
+  if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {
     lso.ComputeNormal(Phi, NPhi);
     lso.ApplyBoundaryConditionsNPhi(NPhi);
 
@@ -1878,7 +1878,7 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
 
 
   // Initialize NPhi and KappaPhi if needed
-  if (iod.exact_riemann.surface_tension != 0) {
+  if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {
     lso.ComputeNormal(Phi, NPhi);
     lso.ApplyBoundaryConditionsNPhi(NPhi);
 

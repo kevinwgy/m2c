@@ -25,7 +25,7 @@ ExactRiemannSolverInterfaceJump::ExactRiemannSolverInterfaceJump(std::vector<Var
  * 0: no errors
  * 1: riemann solver failed to find a bracketing interval
  */
-  int
+int
 ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 

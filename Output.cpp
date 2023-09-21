@@ -313,7 +313,7 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
       PetscObjectSetName((PetscObject)(Phi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
       VecView(Phi[it->first]->GetRefToGlobalVec(), viewer);
 
-      if (iod.exact_riemann.surface_tension != 0) {                                                                                                    
+      if (iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {                                                                                                    
 	sprintf(word, "NPhi%d", it->first);
 	PetscObjectSetName((PetscObject)(NPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to NPhi[i].
 	VecView(NPhi[it->first]->GetRefToGlobalVec(), viewer);

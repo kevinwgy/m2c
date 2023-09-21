@@ -154,15 +154,17 @@ int main(int argc, char* argv[])
 
 
   //! Initialize the exact Riemann problem solver.
-  if (iod.exact_riemann.surface_tension != 0 && iod.exact_riemann.surface_tension != 1) {
-    print_error("*** Error:iod.exact_riemann.surface_tension has to be 0 or 1.\n");
-    exit_mpi();
-  }
   ExactRiemannSolverBase *riemann = NULL;
-  if (iod.exact_riemann.surface_tension == 0)
+  if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {
     riemann = new ExactRiemannSolverBase(vf, iod.exact_riemann);
-  else 
+  }
+  else {// with surface tension (an experimental feature)
     riemann = new ExactRiemannSolverInterfaceJump(vf, iod.exact_riemann);
+    if(iod.ts.expl.type != ExplicitData::FORWARD_EULER) {
+      print_error("*** Error: Currently, only the Forward Euler time integrator supports surface tension.\n");
+      exit_mpi();
+    }
+  }
 
   //! Initialize FluxFcn for the advector flux of the N-S equations
   FluxFcnBase *ff = NULL;

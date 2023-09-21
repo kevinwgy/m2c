@@ -199,7 +199,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
 
-    if (iod.exact_riemann.surface_tension != 0) {
+    if (iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {
       lso[i]->ComputeNormal(*Phi[i], *NPhi[i]);
       lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
 
@@ -305,10 +305,6 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                       double time, double dt, 
                                       int time_step, int subcycle, double dts)
 {
-  if (iod.exact_riemann.surface_tension != 0) {
-    print_error("***Error: Surface tension model has not been implemented in RK2 at the moment!\n");
-    exit_mpi();
-  } 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
@@ -515,11 +511,6 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                       double time, double dt,
                                       int time_step, int subcycle, double dts)
 { 
-
-  if (iod.exact_riemann.surface_tension != 0) {
-    print_error("***Error: Surface tension model has not been implemented in RK3 at the moment!\n");
-    exit_mpi();
-  } 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);

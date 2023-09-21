@@ -30,8 +30,9 @@ protected:
   std::vector<std::vector<double> > integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
   std::vector<std::vector<double> > integrationPath3;
 
+  bool surface_tension; // an indicator of whether consider surface tension
+
 public:
-  int surface_tension; // an indicator of whether consider surface tension: 0 (default) - no surface tension; 1 - consider surface tension. 
 
   ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_);
 

@@ -44,7 +44,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   min_pressure         = iod_riemann.min_pressure;
   failure_threshold    = iod_riemann.failure_threshold;
   pressure_at_failure  = iod_riemann.pressure_at_failure;
-  surface_tension      = iod_riemann.surface_tension;
+  surface_tension      = iod_riemann.surface_tension == ExactRiemannSolverData::YES;
   integrationPath1.reserve(500);
   integrationPath3.reserve(500);
 }

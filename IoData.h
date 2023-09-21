@@ -800,7 +800,6 @@ struct SchemesData {
 
 struct ExactRiemannSolverData {
 
-  int surface_tension; // 0 or 1, whether model surface tension 
   int maxIts_main;
   int maxIts_bracket;
   int maxIts_shock;
@@ -809,16 +808,22 @@ struct ExactRiemannSolverData {
   double tol_shock;
   double tol_rarefaction;
 
-  double min_pressure; //this is to guide the finding of bracketing interval (set it to
-                       //be a low (maybe negative) pressure that is *clearly* out of bound
+  double min_pressure; //!< this is to guide the finding of bracketing interval (set it to
+                       //!< be a low (maybe negative) pressure that is *clearly* out of bound
 
-  double failure_threshold; //when to apply a fixed pressure (at failure)
-  double pressure_at_failure; //this is a fixed pressure to be specified as ps when the solver fails to
-                              //find a bracketing interval and the best approximation obtained is poor.
-                              //this is the last resort. Usually it can be set to a very low but physical pressure
+  double failure_threshold; //!< when to apply a fixed pressure (at failure)
+  double pressure_at_failure; //!< this is a fixed pressure to be specified as ps when the solver fails to
+                              //!< find a bracketing interval and the best approximation obtained is poor.
+                              //!< this is the last resort. Usually it can be set to a very low but physical pressure
 
-  double surface_tension_coefficient; // used when surface tension is considered
-  double surface_tension_materialid;
+
+  // ---------------------------------------------------------------------------------------------
+  //! Experimental (Wentao): Extended Exact Riemann solver w/ pressure jump due to surface tension
+  enum YesNo {NO = 0, YES = 1} surface_tension; //!< whether surface tension is modeled
+  double surface_tension_coefficient; //!< used when surface tension is considered
+  int surface_tension_materialid; //!< the material that pressure jump is *added* to
+  // ---------------------------------------------------------------------------------------------
+
 
   ExactRiemannSolverData();
   ~ExactRiemannSolverData() {}
