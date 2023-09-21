@@ -247,7 +247,7 @@ private:
    ***************************************************************************/
   double GetRoot(Vec2D y, double t0, double t1, double f0, double f1, double tol) {
 
-    int maxIts = 1000;
+    int maxIts = 10000;
     double root;
 
     if(f0==0.0)

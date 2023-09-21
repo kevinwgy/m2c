@@ -118,13 +118,14 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 
 void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
                              SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
+                             std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ , std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
                              SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
 {
 
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
-    WriteSolutionSnapshot(time, time_step, V, ID, Phi, L, Xi);
+    WriteSolutionSnapshot(time, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi);
 
   //write solutions at probes
   probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, force_write);
@@ -148,6 +149,7 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
 
 void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, SpaceVariable3D &V, 
                                    SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
+                                   std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ , std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
                                    SpaceVariable3D *L, SpaceVariable3D *Xi)
 {
   //! Post-processing
@@ -310,6 +312,16 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
       sprintf(word, "levelset%d", it->first);
       PetscObjectSetName((PetscObject)(Phi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
       VecView(Phi[it->first]->GetRefToGlobalVec(), viewer);
+
+      if (iod.exact_riemann.surface_tension != 0) {                                                                                                    
+	sprintf(word, "NPhi%d", it->first);
+	PetscObjectSetName((PetscObject)(NPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to NPhi[i].
+	VecView(NPhi[it->first]->GetRefToGlobalVec(), viewer);
+
+	sprintf(word, "KappaPhi%d", it->first);
+	PetscObjectSetName((PetscObject)(KappaPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to KappaPhi[i].
+	VecView(KappaPhi[it->first]->GetRefToGlobalVec(), viewer);
+      }
     }
   }
 

@@ -148,7 +148,7 @@ void TimeIntegratorFE::Destroy()
 
 void
 TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                     vector<SpaceVariable3D*>& Phi,
+                                     vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi,
                                      SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Dt,
                                      double time, double dt, int time_step, int subcycle, double dts)
 {
@@ -176,9 +176,9 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute Rn
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); // compute Rn
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute Rn
+    spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); // compute Rn
 
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
@@ -198,6 +198,15 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i], time, dt); //compute Rn_ls (level set)
     lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
+
+    if (iod.exact_riemann.surface_tension != 0) {
+      lso[i]->ComputeNormal(*Phi[i], *NPhi[i]);
+      lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
+
+      lso[i]->ComputeUnitNormalAndCurvature(*Phi[i], *NPhi[i], *KappaPhi[i]);
+      lso[i]->ApplyBoundaryConditionsNPhi(*NPhi[i]);
+      lso[i]->ApplyBoundaryConditionsKappaPhi(*KappaPhi[i]); 
+    }
   }
 
   // -------------------------------------------------------------------------------
@@ -290,12 +299,16 @@ void TimeIntegratorRK2::Destroy()
 
 void
 TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                      vector<SpaceVariable3D*>& Phi,
+                                      vector<SpaceVariable3D*>& Phi,[[maybe_unused]] vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi,
                                       SpaceVariable3D* L, SpaceVariable3D *Xi,
                                       SpaceVariable3D *Dt,
                                       double time, double dt, 
                                       int time_step, int subcycle, double dts)
 {
+  if (iod.exact_riemann.surface_tension != 0) {
+    print_error("***Error: Surface tension model has not been implemented in RK2 at the moment!\n");
+    exit_mpi();
+  } 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
@@ -319,9 +332,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); // compute R(V(n))
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, NULL, EBDS.get(), Xi); // compute R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -373,9 +386,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get(), Xi1);//compute R(V1) using prev.Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);//compute R(V1) using prev.Phi, "loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V1)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V1)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -496,12 +509,17 @@ void TimeIntegratorRK3::Destroy()
 
 void
 TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                      vector<SpaceVariable3D*>& Phi, 
+                                      vector<SpaceVariable3D*>& Phi, [[maybe_unused]] vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi, 
                                       SpaceVariable3D* L, SpaceVariable3D* Xi,
                                       SpaceVariable3D *Dt,
                                       double time, double dt,
                                       int time_step, int subcycle, double dts)
 { 
+
+  if (iod.exact_riemann.surface_tension != 0) {
+    print_error("***Error: Surface tension model has not been implemented in RK3 at the moment!\n");
+    exit_mpi();
+  } 
 
   bool use_grad_phi = (!lso.empty()) && (iod.multiphase.riemann_normal == MultiPhaseData::LEVEL_SET ||
                       iod.multiphase.riemann_normal == MultiPhaseData::AVERAGE);
@@ -526,9 +544,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, EBDS.get(), Xi); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); // compute R(V(n))
   else //using mesh normal at material interface
-    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, EBDS.get(), Xi); // compute R(V(n))
+    spo.ComputeResidual(V, ID, R, &riemann_solutions, NULL, NULL, NULL, EBDS.get(), Xi); // compute R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -580,9 +598,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
   if(use_grad_phi)
-    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get(), Xi1); //compute R(V1) using prev.Phi, "loose coupling"
+    spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1); //compute R(V1) using prev.Phi, "loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V1)
+    spo.ComputeResidual(V1, ID, R, NULL, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V1)
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -636,9 +654,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   if(use_grad_phi)
-    spo.ComputeResidual(V2, ID, R, NULL, &ls_mat_id, &Phi, EBDS.get(), Xi1); //compute R(V2) using prev.Phi,"loose coupling"
+    spo.ComputeResidual(V2, ID, R, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1); //compute R(V2) using prev.Phi,"loose coupling"
   else //using mesh normal at material interface
-    spo.ComputeResidual(V2, ID, R, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V2)
+    spo.ComputeResidual(V2, ID, R, NULL, NULL, NULL, NULL, EBDS.get(), Xi1); // compute R(V2)
 
   if(laser) {
     laser->ComputeLaserRadiance(V2,ID,*L,time);

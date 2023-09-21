@@ -44,6 +44,7 @@ public:
 
   std::multimap<int, std::pair<int,int> >
   SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
+                      std::vector<SpaceVariable3D*> &NPhi, std::vector<SpaceVariable3D*> &KappaPhi,
                       SpaceOperator &spo, std::vector<LevelSetOperator*> &lso, GravityHandler *ghand = NULL,
                       std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
 
@@ -73,7 +74,8 @@ private:
                           std::vector<double***> &color, Vec5D*** v, double*** id);
 
   void InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
-                     std::vector<SpaceVariable3D*> &Phi, std::vector<LevelSetOperator*> &lso,
+                     std::vector<SpaceVariable3D*> &Phi, std::vector<SpaceVariable3D*> &NPhi,
+                     std::vector<SpaceVariable3D*> &KappaPhi, std::vector<LevelSetOperator*> &lso,
                      std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                      std::vector<std::pair<int,int> > &order,
                      std::multimap<int, std::pair<int,int> > &id2closure);
@@ -82,12 +84,14 @@ private:
                                SpaceVariable3D &delta_xyz,
                                vector<GhostPoint> &spo_ghost_nodes_inner,
                                vector<GhostPoint> &spo_ghost_nodes_outer,
-                               SpaceVariable3D &Phi, LevelSetOperator &lso,
+                               SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi,
+                               LevelSetOperator &lso,
                                vector<std::unique_ptr<EmbeddedBoundaryDataSet> >* EBDS = NULL,
                                vector<std::pair<int,int> > *surf_and_color = NULL);
 
   void InitializePhiByReinitialization(SpaceVariable3D &ID,
-                                       SpaceVariable3D &Phi, LevelSetOperator &lso,
+                                       SpaceVariable3D &Phi, SpaceVariable3D &NPhi,
+                                       SpaceVariable3D &KappaPhi, LevelSetOperator &lso,
                                        std::vector<std::pair<int,int> > *surf_and_color = NULL);
 
   bool InitializePhiWithinEnclosure(UserSpecifiedEnclosureData &enclosure,

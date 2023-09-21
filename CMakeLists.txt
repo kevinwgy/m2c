@@ -81,6 +81,7 @@ FloodFill.cpp
 EmbeddedBoundaryOperator.cpp
 CustomCommunicator.cpp
 ExactRiemannSolverBase.cpp
+ExactRiemannSolverInterfaceJump.cpp
 MultiPhaseOperator.cpp
 SymmetryOperator.cpp
 SmoothingOperator.cpp

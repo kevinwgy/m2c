@@ -44,6 +44,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   min_pressure         = iod_riemann.min_pressure;
   failure_threshold    = iod_riemann.failure_threshold;
   pressure_at_failure  = iod_riemann.pressure_at_failure;
+  surface_tension      = iod_riemann.surface_tension;
   integrationPath1.reserve(500);
   integrationPath3.reserve(500);
 }
@@ -59,10 +60,12 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
 ExactRiemannSolverBase::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
+    [[maybe_unused]] double curvature,
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
     double *Vsp /*right 'star' solution*/)
 {
+  //std::cout << "ExactRiemannSolverBase::ComputeRiemannSolution: this is the base version!" << std::endl;
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
   double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
@@ -3013,4 +3016,7 @@ myLabel:
 
 //----------------------------------------------------------------------------------
 
-
+  double ExactRiemannSolverBase::GetSurfaceTensionCoefficient() {
+    std::cout << "ExactRiemannSolverBase::GetSurfaceTensionCoefficient: This function in the base class should be overrided by the one in the derived class \"ExactRiemannSolverInterfaceJump\". Saying this message indicating something is wrong." << std::endl;
+    exit(-1);
+  }

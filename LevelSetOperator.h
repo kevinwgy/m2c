@@ -79,6 +79,10 @@ public:
 
   void ApplyBoundaryConditions(SpaceVariable3D &Phi);
 
+  void ApplyBoundaryConditionsNPhi(SpaceVariable3D &NPhi);
+
+  void ApplyBoundaryConditionsKappaPhi(SpaceVariable3D &KappaPhi);
+
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
 
   void ConstructNarrowBandInReinitializer(SpaceVariable3D &Phi);
@@ -103,6 +107,10 @@ public:
   void AXPlusBY(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
 
   void ComputeNormalDirection(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
+
+  void ComputeNormal(SpaceVariable3D &Phi, SpaceVariable3D &NPhi);
+
+  void ComputeUnitNormalAndCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi);
 
   void Destroy();
 
@@ -145,6 +153,10 @@ private:
     double c1 = 1.0/(x1-x0) - 1.0/(x2-x1);
     double c2 = (x1-x0)/((x2-x0)*(x2-x1));
     return c0*phi0 + c1*phi1 + c2*phi2;
+  }
+
+  inline double SecondOrderDifference(double phi0, double phi1, double phi2, double x0, double x1, double x2) {
+    return 2.0*phi0 / ((x0-x1)*(x0-x2)) + 2.0*phi1 / ((x1-x0)*(x1-x2)) + 2*phi2 / ((x2-x0)*(x2-x1));
   }
 
 };

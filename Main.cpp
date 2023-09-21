@@ -28,6 +28,7 @@
 #include <HyperelasticityOperator.h>
 #include <PrescribedMotionOperator.h>
 #include <SpecialToolsDriver.h>
+#include <ExactRiemannSolverInterfaceJump.h>
 #include <set>
 #include <string>
 using std::to_string;
@@ -153,8 +154,15 @@ int main(int argc, char* argv[])
 
 
   //! Initialize the exact Riemann problem solver.
-  ExactRiemannSolverBase riemann(vf, iod.exact_riemann);
-
+  if (iod.exact_riemann.surface_tension != 0 && iod.exact_riemann.surface_tension != 1) {
+    print_error("*** Error:iod.exact_riemann.surface_tension has to be 0 or 1.\n");
+    exit_mpi();
+  }
+  ExactRiemannSolverBase *riemann = NULL;
+  if (iod.exact_riemann.surface_tension == 0)
+    riemann = new ExactRiemannSolverBase(vf, iod.exact_riemann);
+  else 
+    riemann = new ExactRiemannSolverInterfaceJump(vf, iod.exact_riemann);
 
   //! Initialize FluxFcn for the advector flux of the N-S equations
   FluxFcnBase *ff = NULL;
@@ -193,7 +201,7 @@ int main(int argc, char* argv[])
   global_mesh.GetSubdomainInfo(comm, dms);
 
   //! Initialize space operator
-  SpaceOperator spo(comm, dms, iod, vf, *ff, riemann, global_mesh);
+  SpaceOperator spo(comm, dms, iod, vf, *ff, *riemann, global_mesh);
 
   //! Track the embedded boundaries
   if(embed) {
@@ -235,6 +243,9 @@ int main(int argc, char* argv[])
   //! Allocate memory for Phi. Initialize LevelSetOperators
   std::vector<LevelSetOperator*> lso;
   std::vector<SpaceVariable3D*>  Phi;
+  std::vector<SpaceVariable3D*> NPhi; // unit normal, first derivative of Phi
+  std::vector<SpaceVariable3D*> KappaPhi; // curvature, based on the second derivative of Phi
+
   std::set<int> ls_tracker;
   int ls_input_id_min = 9999, ls_input_id_max = -9999;
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
@@ -252,6 +263,8 @@ int main(int argc, char* argv[])
   }
   lso.resize(ls_tracker.size(),NULL);
   Phi.resize(ls_tracker.size(),NULL);
+  NPhi.resize(ls_tracker.size(),NULL);
+  KappaPhi.resize(ls_tracker.size(),NULL);
   ls_tracker.clear(); //for re-use
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
@@ -266,6 +279,8 @@ int main(int argc, char* argv[])
     ls_tracker.insert(matid);    
     lso[it->first] = new LevelSetOperator(comm, dms, iod, *it->second, spo);
     Phi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
+    NPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
+    KappaPhi[it->first] = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
   }
   // check for user error
   for(int ls=0; ls<OutputData::MAXLS; ls++)
@@ -295,7 +310,7 @@ int main(int argc, char* argv[])
   //! Initialize V, ID, Phi. 
   SpaceInitializer spinit(comm, dms, iod, global_mesh, spo.GetMeshCoordinates());
   std::multimap<int, std::pair<int,int> >
-  id2closure = spinit.SetInitialCondition(V, ID, Phi, spo, lso, ghand,
+  id2closure = spinit.SetInitialCondition(V, ID, Phi, NPhi, KappaPhi, spo, lso, ghand,
                                           embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
 
   // Boundary conditions are applied to V and Phi. But the ghost nodes of ID have not been populated.
@@ -329,7 +344,7 @@ int main(int argc, char* argv[])
       print("- Initializing the laser radiation solver on a re-partitioned sub-mesh.\n");
       laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
                                         //the following inputs are used for creating a new dms/spo
-                                        *ff, riemann, xcoords, ycoords, zcoords, dx, dy, dz);
+                                        *ff, *riemann, xcoords, ycoords, zcoords, dx, dy, dz);
     } else
       laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
                                         spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
@@ -466,7 +481,7 @@ int main(int argc, char* argv[])
   }
 
   //! write initial condition to file
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, true/*force_write*/);
 
   if(concurrent.Coupled()) {
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
@@ -600,7 +615,7 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      integrator->AdvanceOneTimeStep(V, ID, Phi, L, Xi, LocalDt, t, dt, time_step, subcycle, dts); 
+      integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt, t, dt, time_step, subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 
@@ -649,7 +664,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    out.OutputSolutions(t, dts0, time_step, V, ID, Phi, L, Xi, false/*force_write*/);
+    out.OutputSolutions(t, dts0, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, false/*force_write*/);
 
   }
 
@@ -662,7 +677,7 @@ int main(int argc, char* argv[])
   if(embed)
     embed->OutputResults(t, dt, time_step, true/*force_write*/);
 
-  out.OutputSolutions(t, dts, time_step, V, ID, Phi, L, Xi, true/*force_write*/);
+  out.OutputSolutions(t, dts, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, true/*force_write*/);
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");
@@ -696,6 +711,8 @@ int main(int argc, char* argv[])
   for(int ls = 0; ls<(int)lso.size(); ls++) {
     Phi[ls]->Destroy(); delete Phi[ls];
     lso[ls]->Destroy(); delete lso[ls];
+    NPhi[ls]->Destroy(); delete NPhi[ls];
+    KappaPhi[ls]->Destroy(); delete KappaPhi[ls];
   }
 
   if(heo) {heo->Destroy(); delete heo;}
@@ -722,6 +739,7 @@ int main(int argc, char* argv[])
 
   delete integrator;
   delete ff;
+  delete riemann;
 
   for(int i=0; i<(int)vf.size(); i++)
     delete vf[i];

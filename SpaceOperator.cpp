@@ -1251,8 +1251,11 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
     dt = cfl*dx_over_char_speed_min;
   }
 
+  if (iod.exact_riemann.surface_tension != 0) {
+    double dt_surfaceTension = 0.9 * ComputeTimeStepSizeSurfaceTension(V, ID); // 0.9 is a safety coefficient
+    dt = std::min(dt, dt_surfaceTension);
+  }
 }
-
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
@@ -1349,7 +1352,7 @@ void SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                           vector<SpaceVariable3D*> *Phi,
+                                           vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                            vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
   //------------------------------------
@@ -1392,13 +1395,21 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Extract level set gradient data
   //------------------------------------
-  vector<double***> phi;
+  vector<double***> phi, kappaPhi;
   if(Phi && ls_mat_id) {
     phi.assign(Phi->size(), NULL);
-    for(int i=0; i<(int)phi.size(); i++)
+    for(int i=0; i<(int)phi.size(); i++) {
       phi[i] = (*Phi)[i]->GetDataPointer();
+    }
   }
- 
+  
+  if (iod.exact_riemann.surface_tension != 0) {
+    kappaPhi.assign(KappaPhi->size(), NULL);
+    for(int i=0; i<(int)kappaPhi.size(); i++) {
+      kappaPhi[i] = (*KappaPhi)[i]->GetDataPointer();
+    }
+  }
+
   //------------------------------------
   // Extract intersection data
   //------------------------------------
@@ -1443,7 +1454,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   int err;
 
   bool use_LLF_at_interface = (iod.multiphase.flux == MultiPhaseData::LOCAL_LAX_FRIEDRICHS);
-
+  
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
   Vec3D vwallf(0.0), vwallb(0.0), nwallf(0.0), nwallb(0.0);
@@ -1526,12 +1537,14 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else { 
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
+		double curvature = 0.;
+		if (iod.exact_riemann.surface_tension != 0) 
+		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
                 else//linear reconstruction w/ limitor
-                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -1654,12 +1667,14 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
+		double curvature = 0.;
+ 		if (iod.exact_riemann.surface_tension != 0) 
+		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -1781,12 +1796,14 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
               else {
                 // determine the axis/direction of the 1D Riemann problem
                 Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
+		double curvature = 0.;
+  		if (iod.exact_riemann.surface_tension != 0) 
+		  curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
                 //Solve 1D Riemann problem
                 if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp); //the argument curvature is not used in base version
                 else
-                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
+                  err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, curvature, Vmid, midid, Vsm, Vsp);
 
                 if(err)
                   riemann_errors++;
@@ -1853,8 +1870,15 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
 
   if(Phi && ls_mat_id) {
-    for(int i=0; i<(int)Phi->size(); i++)
+    for(int i=0; i<(int)Phi->size(); i++) {
       (*Phi)[i]->RestoreDataPointerToLocalVector();
+    }
+  }
+
+  if (iod.exact_riemann.surface_tension != 0) {
+    for(int i=0; i<(int)KappaPhi->size(); i++) {
+      (*KappaPhi)[i]->RestoreDataPointerToLocalVector();
+    }
   }
 
   if(xf.size()>0) {
@@ -1995,6 +2019,8 @@ SpaceOperator::GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k
                                              vector<double***> *phi)
 {
   Vec3D dir(0.0,0.0,0.0);
+  //std::cout << "At [" << k << "][" << j << "][" << i << "] = " << curvature << std::endl;
+
   if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
     dir[d] = 1.0;
   else { //LEVEL_SET or AVERAGE
@@ -2377,7 +2403,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                    vector<SpaceVariable3D*> *Phi,
+                                    vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                     vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                     SpaceVariable3D *Xi)
 {
@@ -2389,7 +2415,7 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
-  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, EBDS);
+  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, KappaPhi, EBDS);
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, EBDS, R); //including extra terms from cylindrical symmetry
@@ -2560,7 +2586,119 @@ SpaceOperator::GetNormalForOneSidedRiemann(int d, int forward_or_backward, Vec3D
 }
 
 //-----------------------------------------------------
+double SpaceOperator::CalculateCurvatureAtCellInterface(int d /*0,1,2*/, double*** phi, double*** kappaPhi, int i, int j, int k) {
+  double ans = 0.;
+  if (d == 0) { // x-direction
+    ans = ( kappaPhi[k][j][i-1]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j][i-1]) ) / ( fabs(phi[k][j][i-1]) + fabs(phi[k][j][i]) ); 
+  } else if(d == 1) { // y-direction
+    ans = ( kappaPhi[k][j-1][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j-1][i]) ) / ( fabs(phi[k][j-1][i]) + fabs(phi[k][j][i]) ); 
+  } else if(d == 2) { // z-direction
+    ans = ( kappaPhi[k-1][j][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k-1][j][i]) ) / ( fabs(phi[k-1][j][i]) + fabs(phi[k][j][i]) ); 
+  } else {
+    std::cout << "direction variable should only be 0, 1, or 2" << std::endl;
+    exit_mpi();
+  }
+  return ans;
+}
 
+//-----------------------------------------------------
+
+double SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID)
+{
+  //------------------------------------
+  // Extract data
+  //------------------------------------
+  Vec5D*** v  = (Vec5D***) V.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+
+  int myid;
+  int neighborid = -1;
+  double my_dx = 0.;  
+  double dt_min_surfaceTension = DBL_MAX;  
+  double sigma = riemann.GetSurfaceTensionCoefficient(); //assume same surface tension coefficient everywhere
+
+  // Loop through the domain interior, and the right, top, and front ghost layers. For each pair of cells occupied different fluid materials, calculate the
+  // time step size associated to surface tension
+  for(int k=k0; k<kkmax; k++) {
+    for(int j=j0; j<jjmax; j++) {
+      for(int i=i0; i<iimax; i++) {
+
+	myid = id[k][j][i];
+	my_dx = min(dxyz[k][j][i][0],
+	                min(dxyz[k][j][i][1], dxyz[k][j][i][2]) );
+
+	//**********************************************
+	//cell interfaces perpendicular to x-direction
+	//**********************************************
+	if(k!=kkmax-1 && j!=jjmax-1) {
+
+	  neighborid = id[k][j][i-1];
+
+	  if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k][j][i-1][0],
+                                         min(dxyz[k][j][i-1][1], dxyz[k][j][i-1][2]) );
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j][i-1][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+	  }
+	}
+
+
+        //**********************************************
+        //cell interfaces perpendicular to y-direction
+        //**********************************************
+        if(k!=kkmax-1 && i!=iimax-1) {
+
+          neighborid = id[k][j-1][i];
+
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k][j-1][i][0],
+                                         min(dxyz[k][j-1][i][1], dxyz[k][j-1][i][2]) );
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j-1][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+          }
+        }
+
+
+        //**********************************************
+        //cell interfaces perpendicular to z-direction
+        //**********************************************
+        if(j!=jjmax-1 && i!=iimax-1) {
+
+          neighborid = id[k-1][j][i];
+
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k-1][j][i][0],
+                                         min(dxyz[k-1][j][i][1], dxyz[k-1][j][i][2]) );
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k-1][j][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+          }
+        }
+
+      }
+    }
+  }
+        
+  
+  MPI_Allreduce(MPI_IN_PLACE, &dt_min_surfaceTension, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  //------------------------------------
+  // Restore Spatial Variables
+  //------------------------------------
+  delta_xyz.RestoreDataPointerToLocalVector(); //no changes
+  ID.RestoreDataPointerToLocalVector(); //no changes
+  V.RestoreDataPointerToLocalVector();
+
+  return dt_min_surfaceTension; 
+
+}
+
+
+  
+ 
 
 //-----------------------------------------------------
 

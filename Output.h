@@ -56,7 +56,8 @@ public:
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh
 
   void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
-                       SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
+                       SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
+                       std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ , std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,       
                        SpaceVariable3D *L/*laser radiance*/, 
                        SpaceVariable3D *Xi/*ref map for hyperelasticity*/,
                        bool force_write);
@@ -67,7 +68,9 @@ private:
   void OutputMeshInformation(SpaceVariable3D& coordinates);
 
   void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                             vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L,
+                             vector<SpaceVariable3D*> &Phi, 
+                             std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/, std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
+                             SpaceVariable3D *L,
                              SpaceVariable3D *Xi); //!< write solution to file
 
   void OutputMeshPartition();

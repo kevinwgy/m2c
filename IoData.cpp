@@ -1548,6 +1548,7 @@ void SchemesData::setup(const char *name, ClassAssigner *father)
 
 ExactRiemannSolverData::ExactRiemannSolverData()
 {
+  surface_tension = 0;
   maxIts_main = 200;
   maxIts_bracket = 100;
   maxIts_shock = 200;
@@ -1558,6 +1559,8 @@ ExactRiemannSolverData::ExactRiemannSolverData()
   min_pressure = -1.0e8;
   failure_threshold = 0.2;
   pressure_at_failure = 1.0e-8;
+  surface_tension_coefficient = 0.;
+  surface_tension_materialid = 1;
 }
 
 //------------------------------------------------------------------------------
@@ -1565,7 +1568,10 @@ ExactRiemannSolverData::ExactRiemannSolverData()
 void ExactRiemannSolverData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 10, father);
+  ClassAssigner *ca = new ClassAssigner(name, 13, father);
+
+  new ClassInt<ExactRiemannSolverData>(ca, "SurfaceTension", this, 
+                                       &ExactRiemannSolverData::surface_tension);
 
   new ClassInt<ExactRiemannSolverData>(ca, "MaxIts", this, 
                                        &ExactRiemannSolverData::maxIts_main);
@@ -1597,6 +1603,11 @@ void ExactRiemannSolverData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<ExactRiemannSolverData>(ca, "PrescribedPressureUponFailure", this,
                                           &ExactRiemannSolverData::pressure_at_failure);
 
+  new ClassDouble<ExactRiemannSolverData>(ca, "SurfaceTensionCoefficient", this,
+                                          &ExactRiemannSolverData::surface_tension_coefficient);
+
+  new ClassDouble<ExactRiemannSolverData>(ca, "SurfaceTensionMaterialID", this,
+                                          &ExactRiemannSolverData::surface_tension_materialid);
 }
 
 //------------------------------------------------------------------------------

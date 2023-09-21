@@ -129,10 +129,12 @@ public:
   void ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
                                  SpaceVariable3D &LocalDt);
 
+  double ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID);
+
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
   void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, 
                        RiemannSolutions *riemann_solutions = NULL,
-                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                       vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL, vector<SpaceVariable3D*> *KappaPhi = NULL,
                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr,
                        SpaceVariable3D *Xi = NULL);
 
@@ -170,7 +172,7 @@ private:
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL,
-                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL, vector<SpaceVariable3D*> *KappaPhi = NULL,
                               vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
 
   Vec3D GetNormalForOneSidedRiemann(int d,/*0,1,2*/
@@ -188,6 +190,8 @@ private:
   //! Calculate the gradient of any variable phi at cell interface. 
   Vec3D CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
                                          Vec3D*** dxyz, double*** phi);
+
+  double CalculateCurvatureAtCellInterface(int d/*0,1,2*/, double*** phi, double*** kappaPhi, int i, int j, int k);  
 
   bool TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi, 
                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,

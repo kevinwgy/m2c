@@ -58,6 +58,7 @@ SpaceInitializer::Destroy()
 
 multimap<int, pair<int,int> >
 SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, vector<SpaceVariable3D*> &Phi,
+                                      vector<SpaceVariable3D*> &NPhi, vector<SpaceVariable3D*> &KappaPhi,
                                       SpaceOperator &spo, vector<LevelSetOperator*> &lso,
                                       GravityHandler* ghand,
                                       unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS)
@@ -82,7 +83,7 @@ SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, v
   multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, spo, EBDS.get(), order);
 
   // Step 3:: Apply initial conditions to Phi
-  InitializePhi(ID, spo, Phi, lso, EBDS.get(), order, id2closure);
+  InitializePhi(ID, spo, Phi, NPhi, KappaPhi, lso, EBDS.get(), order, id2closure);
 
   // Step 4:: Apply flooding if specified by user
   if(ghand)
@@ -1162,7 +1163,8 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
 
 void
 SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
-                                vector<SpaceVariable3D*> &Phi, vector<LevelSetOperator*> &lso,
+                                vector<SpaceVariable3D*> &Phi, vector<SpaceVariable3D*> &NPhi,
+                                vector<SpaceVariable3D*> &KappaPhi, vector<LevelSetOperator*> &lso,
                                 vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                                 vector<pair<int,int> > &order,
                                 multimap<int, pair<int,int> > &id2closure)
@@ -1181,7 +1183,8 @@ SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
         InitializePhiByDistance(order, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
                                 *(spo.GetPointerToInnerGhostNodes()),
                                 *(spo.GetPointerToOuterGhostNodes()),
-                                *Phi[it->first], *lso[it->first], EBDS,
+                                *Phi[it->first], *NPhi[it->first], *KappaPhi[it->first],
+                                *lso[it->first], EBDS,
                                 &surf_and_color);
       else //by reinitialization
         InitializePhiByReinitialization(ID, *Phi[it->first], *lso[it->first], &surf_and_color);
@@ -1191,7 +1194,8 @@ SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
         InitializePhiByDistance(order, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(),
                                 *(spo.GetPointerToInnerGhostNodes()),
                                 *(spo.GetPointerToOuterGhostNodes()),
-                                *Phi[it->first], *lso[it->first]);
+                                *Phi[it->first], *NPhi[it->first], *KappaPhi[it->first],
+                                *lso[it->first]);
       else //by reinitialization
         InitializePhiByReinitialization(ID, *Phi[it->first], *lso[it->first]);
     }
@@ -1206,7 +1210,8 @@ SpaceInitializer::InitializePhiByDistance(vector<pair<int,int> > &order,
                                           SpaceVariable3D &delta_xyz,
                                           vector<GhostPoint> &spo_ghost_nodes_inner,
                                           vector<GhostPoint> &spo_ghost_nodes_outer,
-                                          SpaceVariable3D &Phi, LevelSetOperator &lso,
+                                          SpaceVariable3D &Phi, SpaceVariable3D &NPhi,
+                                          SpaceVariable3D &KappaPhi, LevelSetOperator &lso,
                                           vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                                           vector<pair<int,int> > *surf_and_color)
 {
@@ -1658,6 +1663,16 @@ DONE:
     lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //first 3 inputs are not used ("must do"!)
   }
 
+
+  // Initialize NPhi and KappaPhi if needed
+  if (iod.exact_riemann.surface_tension != 0) {
+    ComputeNormal(Phi, NPhi);
+    ApplyBoundaryConditionsNPhi(NPhi);
+
+    ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
+    ApplyBoundaryConditionsNPhi(NPhi);
+    ApplyBoundaryConditionsKappaPhi(KappaPhi);
+  }
 }
 
 //---------------------------------------------------------------------
@@ -1782,7 +1797,8 @@ SpaceInitializer::InitializePhiWithinEnclosure(UserSpecifiedEnclosureData &enclo
 
 void
 SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
-                                                  SpaceVariable3D &Phi, LevelSetOperator &lso,
+                                                  SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi,
+                                                  LevelSetOperator &lso,
                                                   vector<pair<int,int> > *surf_and_color)
 {
   int materialid = lso.GetMaterialID();
@@ -1857,6 +1873,17 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
 
   print("  o Set Phi (material id: %d) near subdomain boundary. Going to reinitialize it.\n", materialid);
   lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/);
+
+
+  // Initialize NPhi and KappaPhi if needed
+  if (iod.exact_riemann.surface_tension != 0) {
+    ComputeNormal(Phi, NPhi);
+    ApplyBoundaryConditionsNPhi(NPhi);
+
+    ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
+    ApplyBoundaryConditionsNPhi(NPhi);
+    ApplyBoundaryConditionsKappaPhi(KappaPhi);
+  }
 }
 
 //---------------------------------------------------------------------
