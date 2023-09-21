@@ -370,6 +370,32 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
   // the 2-wave
   sol1d.push_back(vector<double>{u2 - std::max(1e-6, 0.001*fabs(u2)), rhol2, u2, p2, (double)idl});
   sol1d.push_back(vector<double>{u2, rhor2, u2, p2, (double)idr});
+  // 1- and 3- waves
+  integrationPath1.clear();
+  integrationPath3.clear();
+  std::vector<double> vectL{pl, rhol, ul};
+  std::vector<double> vectR{pr, rhor, ur};
+  integrationPath1.push_back(vectL);
+  integrationPath3.push_back(vectR); 
+ 
+  bool success;
+  double ul2_tmp, ur2_tmp, rhol2_tmp, rhor2_tmp;
+  success = ComputeRhoUStar(1, integrationPath1, rhol, ul, pl, p2, idl/*inputs*/, 
+      rhol2, 0.9*rhol2/*initial guesses for Hugo. eq.*/,
+      rhol2_tmp, ul2_tmp/*outputs*/, 
+      &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+  if (!success) {
+    std::cout <<  "*** Error: ComputeRhoUStar(1) failed when finalizng the solution." << std::endl;
+    exit(-1);
+  } 
+  success = ComputeRhoUStar(3, integrationPath3, rhor, ur, pr,  p2, idr/*inputs*/, 
+      rhor2, 0.9*rhor2/*initial guesses for Hugo. erq.*/,
+      rhor2_tmp, ur2_tmp/*outputs*/,
+      &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+  if (!success) {
+    std::cout <<  "*** Error: ComputeRhoUStar(3) failed when finalizng the solution." << std::endl;
+    exit(-1);
+  } 
 #endif
 
   Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
@@ -520,7 +546,7 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 
 //-----------------------------------------------------
 
-  void
+void
 ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm, 
     double rhol, double ul, double pl, int idl, 
     double rhol2, double u2/*ustar*/, double p2,
@@ -617,7 +643,7 @@ ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm,
   FILE* solFile = fopen("RiemannSolution.txt", "w");
   print(solFile, "## One-Dimensional Riemann Problem.\n");
   print(solFile, "## Initial State: %e %e %e, id %d (left) | wall velocity: %e.\n", 
-      rhol, ul, pl, idl, ustar);
+      rhol, ul, pl, idl, u2);
   print(solFile, "## xi(x/t) | density | velocity | pressure | internal energy per mass | material id\n");
 
   for(auto it = sol1d.begin(); it != sol1d.end(); it++) 

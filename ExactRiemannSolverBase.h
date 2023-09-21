@@ -6,7 +6,6 @@
 #ifndef _EXACT_RIEMANN_SOLVER_BASE_H_
 #define _EXACT_RIEMANN_SOLVER_BASE_H_
 
-#include <LevelSetOperator.h>
 #include <VarFcnBase.h>
 #include <vector>
 

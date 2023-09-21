@@ -6,8 +6,7 @@
 #ifndef _EXACT_RIEMANN_SOLVER_INTERFACE_JUMP_H_
 #define _EXACT_RIEMANN_SOLVER_INTERFACE_JUMP_H_
 
-#include <ExactRiemannSolverBase.h>
-#include<LevelSetOperator.h>
+#include<ExactRiemannSolverBase.h>
 
 /****************************************************************************************
  * A derived class that include the interface pressure jump due to surface tension
