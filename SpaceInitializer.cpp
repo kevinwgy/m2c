@@ -1187,7 +1187,8 @@ SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
                                 *lso[it->first], EBDS,
                                 &surf_and_color);
       else //by reinitialization
-        InitializePhiByReinitialization(ID, *Phi[it->first], *lso[it->first], &surf_and_color);
+        InitializePhiByReinitialization(ID, *Phi[it->first], *NPhi[it->first],
+                                        *KappaPhi[it->first], *lso[it->first], &surf_and_color);
     }
     else {
       if(it->second->init == LevelSetSchemeData::DISTANCE_CALCULATION)
@@ -1197,7 +1198,8 @@ SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
                                 *Phi[it->first], *NPhi[it->first], *KappaPhi[it->first],
                                 *lso[it->first]);
       else //by reinitialization
-        InitializePhiByReinitialization(ID, *Phi[it->first], *lso[it->first]);
+        InitializePhiByReinitialization(ID, *Phi[it->first], *NPhi[it->first],
+                                        *KappaPhi[it->first], *lso[it->first]);
     }
   }
 }
@@ -1666,12 +1668,12 @@ DONE:
 
   // Initialize NPhi and KappaPhi if needed
   if (iod.exact_riemann.surface_tension != 0) {
-    ComputeNormal(Phi, NPhi);
-    ApplyBoundaryConditionsNPhi(NPhi);
+    lso.ComputeNormal(Phi, NPhi);
+    lso.ApplyBoundaryConditionsNPhi(NPhi);
 
-    ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
-    ApplyBoundaryConditionsNPhi(NPhi);
-    ApplyBoundaryConditionsKappaPhi(KappaPhi);
+    lso.ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
+    lso.ApplyBoundaryConditionsNPhi(NPhi);
+    lso.ApplyBoundaryConditionsKappaPhi(KappaPhi);
   }
 }
 
@@ -1877,12 +1879,12 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
 
   // Initialize NPhi and KappaPhi if needed
   if (iod.exact_riemann.surface_tension != 0) {
-    ComputeNormal(Phi, NPhi);
-    ApplyBoundaryConditionsNPhi(NPhi);
+    lso.ComputeNormal(Phi, NPhi);
+    lso.ApplyBoundaryConditionsNPhi(NPhi);
 
-    ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
-    ApplyBoundaryConditionsNPhi(NPhi);
-    ApplyBoundaryConditionsKappaPhi(KappaPhi);
+    lso.ComputeUnitNormalAndCurvature(Phi, NPhi, KappaPhi);
+    lso.ApplyBoundaryConditionsNPhi(NPhi);
+    lso.ApplyBoundaryConditionsKappaPhi(KappaPhi);
   }
 }
 
