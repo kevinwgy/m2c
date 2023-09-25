@@ -5,7 +5,7 @@
 
 #include<HyperelasticityOperator.h>
 #include<EmbeddedBoundaryDataSet.h>
-#include<linear_algebra.h>
+#include<linear_algebra_3d.h>
 #include<Vector5D.h>
 
 //------------------------------------------------------------
