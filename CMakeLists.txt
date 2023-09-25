@@ -126,7 +126,8 @@ GravityHandler.cpp
 Utils.cpp
 MathTools/rbf_interp.cpp
 MathTools/polynomial_equations.cpp
-MathTools/linear_algebra.cpp
+MathTools/linear_algebra_2d.cpp
+MathTools/linear_algebra_3d.cpp
 GeoTools/GeoTools.cpp
 GeoTools/BoundingBoxes.cpp
 GeoTools/Intersections.cpp)

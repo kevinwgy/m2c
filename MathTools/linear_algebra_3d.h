@@ -10,10 +10,6 @@ namespace MathTools {
 
 struct LinearAlgebra {
 
-  static bool 
-  SolveLinearSystem2x2(double a11, double a12, double a21, double a22, double b1, double b2,
-                       double &x1, double &x2);
-
   static double
   CalculateDeterminant3x3(double a11, double a12, double a13, double a21, double a22, double a23,
                           double a31, double a32, double a33);
