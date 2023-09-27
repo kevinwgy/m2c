@@ -1799,7 +1799,8 @@ SpaceInitializer::InitializePhiWithinEnclosure(UserSpecifiedEnclosureData &enclo
 
 void
 SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
-                                                  SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi,
+                                                  SpaceVariable3D &Phi, SpaceVariable3D &NPhi,
+                                                  SpaceVariable3D &KappaPhi,
                                                   LevelSetOperator &lso,
                                                   vector<pair<int,int> > *surf_and_color)
 {

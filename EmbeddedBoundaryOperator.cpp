@@ -50,6 +50,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   iod_embedded_surfaces.assign(surfaces.size(), NULL);
 
   // read surfaces from files
+  int nConcurrent = 0;
   for(auto it = iod_.ebm.embed_surfaces.surfaces.dataMap.begin();
            it != iod_.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
 
@@ -64,14 +65,15 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
     if(index==0) {
       if(surface_from_other_solver) {
         if(it->second->provided_by_another_solver != EmbeddedSurfaceData::YES) {
-          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by another solver?", 
+          print_error("*** Error: Conflict input in EmbeddedSurface[%d]. Should mesh be provided by another solver?", 
                       index); 
           exit_mpi();
         } 
+        nConcurrent++;
         continue; //no file to read
       } else {
         if(it->second->provided_by_another_solver != EmbeddedSurfaceData::NO) {
-          print_error("*** Error: Conflict input about EmbeddedSurface[%d]. Should mesh be provided by user?", index); 
+          print_error("*** Error: Conflict input in EmbeddedSurface[%d]. Should mesh be provided by user?", index); 
           exit_mpi();
         }
       }
@@ -100,7 +102,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   }
 
   print("- Activated the Embedded Boundary Method. Detected %d surface(s) (%d from concurrent program(s)).\n\n",
-        surfaces.size(), surfaces.size() - counter); 
+        surfaces.size(), nConcurrent); 
 
   // set NULL to intersector pointers
   intersector.assign(surfaces.size(), NULL);
@@ -1449,7 +1451,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         else 
           tgs[p] += CalculateTractionAtPoint(xg, normal, v, id); 
 
-        //fprintf(stdout,"tid = %d tgs[%d] = %e %e %e (%e).\n", tid, p, tgs[p][0], tgs[p][1], tgs[p][2], tgs[p].norm());
+        //fprintf(stdout,"tid = %d tgs[%d] = %e %e %e (%e).\n", tid,p,tgs[p][0],tgs[p][1],tgs[p][2],tgs[p].norm());
 
         special_tag[p]++;
       }
@@ -1577,7 +1579,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       while(nFound<numPoints || nFound>maxCand) {
         if(trial_counter>10) {
           fprintf(stdout,"\033[0;31m*** Error: Cannot find candidates for interpolation "
-                         "(ComputeForces, 2D->3D).\033[0m\n");
+                         "(ComputeForces, 2D->3D). xg2d: %e %e.\033[0m\n", xg2d[0], xg2d[1]);
           exit(-1);
         }
         if(nFound<numPoints) 

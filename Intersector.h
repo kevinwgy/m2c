@@ -94,7 +94,7 @@ class Intersector {
   KDTree<MyTriangle, 3> *tree_1; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
 
 
-  //! Infrastructure #1. N(>1) layer of neighbors
+  //! Infrastructure #2. N(>1) layer of neighbors
   SpaceVariable3D BBmin_n, BBmax_n; 
   Vec3D subD_bbmin_n, subD_bbmax_n;
   std::vector<MyTriangle> scope_n;

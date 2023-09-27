@@ -148,7 +148,8 @@ void TimeIntegratorFE::Destroy()
 
 void
 TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                     vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*>& NPhi, vector<SpaceVariable3D*>& KappaPhi,
+                                     vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*>& NPhi,
+                                     vector<SpaceVariable3D*>& KappaPhi,
                                      SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Dt,
                                      double time, double dt, int time_step, int subcycle, double dts)
 {
