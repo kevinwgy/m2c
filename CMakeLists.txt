@@ -26,6 +26,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
+#--------------------------------------------------------
 # find packages 
 if(NOT DEFINED ENV{PETSC_DIR})
   message(FATAL_ERROR "ERROR: Could not find Petsc...")
@@ -33,7 +34,14 @@ endif()
 
 find_package(Eigen3 3.3 REQUIRED)
 
+find_package(Boost 1.71 REQUIRED)
+#--------------------------------------------------------
+
+#-----------------------------------------
+# Special tag(s). Don't turn on unless you know what you are doing
+#
 #add_definitions(-DLEVELSET_TEST=3)
+#-----------------------------------------
 
 # -----------------------------
 # for version control
