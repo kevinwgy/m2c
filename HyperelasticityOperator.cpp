@@ -41,8 +41,21 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
   coordinates_.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates_.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
+  cylindrical_symmetry = false;
+  if(iod.mesh.type == MeshData::CYLINDRICAL) {
+    cylindrical_symmetry = true;
+    if(!global_mesh.IsMesh2D()) {
+      print_error("*** Error: HyperelasticityOperator detected 3D mesh, "
+                  "with cylindrical symmetry requested.\n");
+      exit_mpi();
+    }
+  } else if(iod.mesh.type != MeshData::THREEDIMENSIONAL) {
+    print_error("*** Error: HyperelasticityOperator cannot handle the specified type of domain/mesh.\n");
+    exit_mpi();
+  }
 
-  // Create a HyperelasticitFcn for each material.
+
+  // Create a HyperelasticityFcn for each material.
   // For problems involving multiple materials, it could happen that the user specified
   // hyperelasticity model for only some of the materials, but not all. In this case, we
   // still create a dummy (i.e. base) function for those unspecified materials.
@@ -58,21 +71,33 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
     }
     switch (it->second->hyperelasticity.type) {
       case HyperelasticityModelData::NONE :
-        hyperFcn[matid] = new HyperelasticityFcnBase(*varFcn[matid]);
+        hyperFcn[matid] = cylindrical_symmetry ?
+                          new HyperelasticityFcnBase2D(*varFcn[matid]) :
+                          new HyperelasticityFcnBase(*varFcn[matid]);                       
         break;
       case HyperelasticityModelData::SAINTVENANT_KIRCHHOFF :
-        hyperFcn[matid] = new HyperelasticityFcnSaintVenantKirchhoff(it->second->hyperelasticity,
+        hyperFcn[matid] = cylindrical_symmetry ?
+                          new HyperelasticityFcnSaintVenantKirchhoff2D(it->second->hyperelasticity,
+                                                                       *varFcn[matid]) :
+                          new HyperelasticityFcnSaintVenantKirchhoff(it->second->hyperelasticity,
                                                                      *varFcn[matid]);
         break;
       case HyperelasticityModelData::MODIFIED_SAINTVENANT_KIRCHHOFF :
-        hyperFcn[matid] = new HyperelasticityFcnModifiedSaintVenantKirchhoff(it->second->hyperelasticity,
+        hyperFcn[matid] = cylindrical_symmetry ?
+                          new HyperelasticityFcnModifiedSaintVenantKirchhoff2D(it->second->hyperelasticity,
+                                                                               *varFcn[matid]) :
+                          new HyperelasticityFcnModifiedSaintVenantKirchhoff(it->second->hyperelasticity,
                                                                              *varFcn[matid]);
         break;
       case HyperelasticityModelData::NEO_HOOKEAN :
-        hyperFcn[matid] = new HyperelasticityFcnNeoHookean(it->second->hyperelasticity, *varFcn[matid]);
+        hyperFcn[matid] = cylindrical_symmetry ?
+                          new HyperelasticityFcnNeoHookean(it->second->hyperelasticity, *varFcn[matid]) :
+                          new HyperelasticityFcnNeoHookean2D(it->second->hyperelasticity, *varFcn[matid]);
         break;
       case HyperelasticityModelData::MOONEY_RIVLIN :
-        hyperFcn[matid] = new HyperelasticityFcnMooneyRivlin(it->second->hyperelasticity, *varFcn[matid]);
+        hyperFcn[matid] = cylindrical_symmetry ?
+                          new HyperelasticityFcnMooneyRivlin2D(it->second->hyperelasticity, *varFcn[matid]) :
+                          new HyperelasticityFcnMooneyRivlin(it->second->hyperelasticity, *varFcn[matid]);
         break;
     }
   }
@@ -144,6 +169,12 @@ void
 HyperelasticityOperator::ComputeDeformationGradientAtNodes(SpaceVariable3D &Xi)
 {
 
+  if(cylindrical_symmetry) {
+    print_error("*** Error: HyperelasticityOperator::ComputeDeformationGradientAtNodes does not support"
+                "cylindrical symmetry.\n");
+    exit_mpi();
+  }
+
   // NOTE: This function computes deformation gradient (F) ONLY WITHIN THE PHYSICAL DOMAIN,
   //       NOT in the ghost boundary layer.
 
@@ -156,7 +187,7 @@ HyperelasticityOperator::ComputeDeformationGradientAtNodes(SpaceVariable3D &Xi)
   // dxi/dy
   grad.CalculateFirstDerivativeAtNodes(1 /*dy*/, Xi, deriv_dofs, Var2, deriv_dofs);
   // dxi/dz
-  grad.CalculateFirstDerivativeAtNodes(2 /*dy*/, Xi, deriv_dofs, Var2, deriv_dofs);
+  grad.CalculateFirstDerivativeAtNodes(2 /*dz*/, Xi, deriv_dofs, Var3, deriv_dofs);
 
 
   // ------------------------------------
@@ -209,9 +240,22 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
                                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                                   SpaceVariable3D &R)
 {
-
   if(EBDS)
     print_warning("Warning: AddHyperelasticityFluxes: Not able to account for embedded surfaces.\n");
+
+  if(cylindrical_symmetry)
+    AddFluxes2DCylindrical(V,ID,Xi,EBDS,R);
+  else
+    AddFluxes3D(V,ID,Xi,EBDS,R);
+}
+
+//------------------------------------------------------------
+
+void
+HyperelasticityOperator::AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
+                                     vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                     SpaceVariable3D &R)
+{
 
   std::vector<int> i123{1,2,3}, i012{0,1,2};
 
@@ -248,7 +292,7 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
 
   int myid = 0;
   double gradxi[9], f[9]; //nabla xi and deformation gradient
-  double dx = 0.0, dy = 0.0, dz = 0.0, detf;
+  double dx = 0.0, dy = 0.0, dz = 0.0;
   Vec5D flux;
   bool invertible;
   for(int k=k0; k<kkmax; k++)
@@ -273,15 +317,153 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
             gradxi[6+dim] = dxidz_i[k][j][i][dim];
 
           invertible = MathTools::LinearAlgebra::
-                       CalculateMatrixInverseAndDeterminant3x3(gradxi, f, &detf);
+                       CalculateMatrixInverseAndDeterminant3x3(gradxi, f);
           if(!invertible)
-            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d-1/2,%d,%d) is not invertible."
-                           " determinant = %e.\033[0m\n", i,j,k, detf);
+            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d-1/2,%d,%d)"
+                           " is not invertible.\033[0m\n", i,j,k);
 
           hyperFcn[myid]->EvaluateHyperelasticFluxFunction_F(flux, f, v[k][j][i], true);//TODO: multi-material
           flux *= dy*dz;
           res[k][j][i]   += flux;
           res[k][j][i-1] -= flux;
+        }
+
+
+        //*****************************************
+        //calculate flux function G_{i,j-1/2,k}
+        //*****************************************
+        if(i!=iimax-1 && k!=kkmax-1) {
+
+          for(int dim=0; dim<3; dim++)
+            gradxi[dim]   = dxidx_j[k][j][i][dim];
+          for(int dim=0; dim<3; dim++)
+            gradxi[3+dim] = dxidy_j[k][j][i][dim];
+          for(int dim=0; dim<3; dim++)
+            gradxi[6+dim] = dxidz_j[k][j][i][dim];
+
+          invertible = MathTools::LinearAlgebra::
+                       CalculateMatrixInverseAndDeterminant3x3(gradxi, f);
+          if(!invertible)
+            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d-1/2,%d)"
+                           " is not invertible.\033[0m\n", i,j,k);
+
+          hyperFcn[myid]->EvaluateHyperelasticFluxFunction_G(flux, f, v[k][j][i], true);//TODO: multi-material
+          flux *= dx*dz;
+          res[k][j][i]   += flux;
+          res[k][j-1][i] -= flux;
+        }
+
+        //*****************************************
+        //calculate flux function H_{i,j,k-1/2}
+        //*****************************************
+        if(i!=iimax-1 && j!=jjmax-1) {
+
+          for(int dim=0; dim<3; dim++)
+            gradxi[dim]   = dxidx_k[k][j][i][dim];
+          for(int dim=0; dim<3; dim++)
+            gradxi[3+dim] = dxidy_k[k][j][i][dim];
+          for(int dim=0; dim<3; dim++)
+            gradxi[6+dim] = dxidz_k[k][j][i][dim];
+
+          invertible = MathTools::LinearAlgebra::
+                       CalculateMatrixInverseAndDeterminant3x3(gradxi, f);
+          if(!invertible)
+            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d-1/2)"
+                           " is not invertible.\033[0m\n", i,j,k);
+
+          hyperFcn[myid]->EvaluateHyperelasticFluxFunction_H(flux, f, v[k][j][i], true);//TODO: multi-material!
+          flux *= dx*dy;
+          res[k][j][i]   += flux;
+          res[k-1][j][i] -= flux;
+        }
+
+      }
+
+  V_i_minus_half.RestoreDataPointerToLocalVector();
+  V_j_minus_half.RestoreDataPointerToLocalVector();
+  V_k_minus_half.RestoreDataPointerToLocalVector();
+  dXidx_i_minus_half.RestoreDataPointerToLocalVector();
+  dXidx_j_minus_half.RestoreDataPointerToLocalVector();
+  dXidx_k_minus_half.RestoreDataPointerToLocalVector();
+  dXidy_i_minus_half.RestoreDataPointerToLocalVector();
+  dXidy_j_minus_half.RestoreDataPointerToLocalVector();
+  dXidy_k_minus_half.RestoreDataPointerToLocalVector();
+  dXidz_i_minus_half.RestoreDataPointerToLocalVector();
+  dXidz_j_minus_half.RestoreDataPointerToLocalVector();
+  dXidz_k_minus_half.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerToLocalVector();
+
+  R.RestoreDataPointerToLocalVector(); //NOTE: although R has been updated, there is no need of
+                                       //      cross-subdomain communications. So, no need to
+                                       //      update the global vec.
+}
+
+//------------------------------------------------------------
+
+void
+HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
+                                                vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                                SpaceVariable3D &R)
+{
+
+  std::vector<int> i12{1,2}, i01{0,1};
+
+  //1. Calculate the x (the "z" cylindrical coord) and y ("r") velocities at cell interfaces by interpolation
+  interpolator.InterpolateAtCellInterfaces(0/*x-dir ("z")*/, V, i12, V_i_minus_half, i01);
+  interpolator.InterpolateAtCellInterfaces(1/*y-dir ("r")*/, V, i12, V_j_minus_half, i01);
+
+  //2. Calculate Xi derivatives at cell interfaces
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 0, Xi, i01, dXidx_i_minus_half, i01);
+  grad.CalculateFirstDerivativeAtCellInterfaces(0, 1, Xi, i01, dXidx_j_minus_half, i01);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 0, Xi, i01, dXidy_i_minus_half, i01);
+  grad.CalculateFirstDerivativeAtCellInterfaces(1, 1, Xi, i01, dXidy_j_minus_half, i01);
+
+  //3. Loop through cell interfaces and calculate fluxes
+  Vec3D*** dxidx_i = (Vec3D***)dXidx_i_minus_half.GetDataPointer();
+  Vec3D*** dxidx_j = (Vec3D***)dXidx_j_minus_half.GetDataPointer();
+  Vec3D*** dxidy_i = (Vec3D***)dXidy_i_minus_half.GetDataPointer();
+  Vec3D*** dxidy_j = (Vec3D***)dXidy_j_minus_half.GetDataPointer();
+
+  Vec5D*** v    = (Vec5D***)V.GetDataPointer();
+  Vec5D*** res  = (Vec5D***)R.GetDataPointer();
+  double*** id  = (double***)ID.GetDataPointer();
+
+  int myid = 0;
+  double gradxi[4], f[4]; //nabla xi and deformation gradient
+  double dx = 0.0, dy = 0.0;
+  Vec5D flux;
+  bool invertible;
+  for(int k=k0; k<kkmax; k++)
+    for(int j=j0; j<jjmax; j++)
+      for(int i=i0; i<iimax; i++) {
+
+        myid = id[k][j][i];
+        dx   = global_mesh.dx_glob[i];
+        dy   = global_mesh.dy_glob[j];
+
+        //*****************************************
+        //calculate flux function F_{i-1/2,j,k}
+        //*****************************************
+        if(k!=kkmax-1 && j!=jjmax-1) {
+
+          for(int dim=0; dim<2; dim++)
+            gradxi[dim]   = dxidx_i[k][j][i][dim];
+          for(int dim=0; dim<2; dim++)
+            gradxi[2+dim] = dxidy_i[k][j][i][dim];
+
+          invertible = MathTools::LinearAlgebra::
+                       CalculateMatrixInverseAndDeterminant2x2(gradxi, f);
+          if(!invertible)
+            fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d-1/2,%d,%d)"
+                           " is not invertible.\033[0m\n", i,j,k);
+
+          hyperFcn[myid]->EvaluateHyperelasticFluxFunction_F(flux, f, v[k][j][i], true);//TODO: multi-material
+          flux *= dy*dz;
+          res[k][j][i]   += flux;
+          res[k][j][i-1] -= flux;
+
+          I AM HERE!
         }
 
 

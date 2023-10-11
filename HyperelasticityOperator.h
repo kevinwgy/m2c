@@ -15,6 +15,9 @@ class EmbeddedBoundaryDataSet;
  * class HyperelasticityOperator is responsible for
  * computing the elastic and hyperelastic stresses for
  * solid and solid-like materials.
+ * Note: This class treats 3D domains and 2D (or 2D + cylindrical
+ *       symmetry) domains separately. This is different
+ *       from how convection and viscosity fluxes are calculated.
  *********************************************************/
 
 class HyperelasticityOperator
@@ -24,6 +27,8 @@ class HyperelasticityOperator
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
+
+  bool cylindrical_symmetry;
 
   //! global mesh
   GlobalMeshInfo& global_mesh;
@@ -92,6 +97,17 @@ public:
   void AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                 SpaceVariable3D &R);
+
+private:
+
+  void AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
+                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                   SpaceVariable3D &R);
+
+  void AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
+                              vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                              SpaceVariable3D &R);
+
 };
 
 #endif
