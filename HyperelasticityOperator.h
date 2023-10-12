@@ -15,8 +15,8 @@ class EmbeddedBoundaryDataSet;
  * class HyperelasticityOperator is responsible for
  * computing the elastic and hyperelastic stresses for
  * solid and solid-like materials.
- * Note: This class treats 3D domains and 2D (or 2D + cylindrical
- *       symmetry) domains separately. This is different
+ * Note: This class treats 3D domains and 2D + cylindrical
+ *       symmetry separately. This is slightly different
  *       from how convection and viscosity fluxes are calculated.
  *********************************************************/
 
@@ -51,7 +51,7 @@ class HyperelasticityOperator
   //! Deformation gradient (dim = 9, i.e. 3x3 matrix)
   SpaceVariable3D F;
 
-  //! Volumetric deformation (sqrt(|F^T*F|))
+  //! Volumetric deformation (sqrt(|F^T*F|), rho0/rho)
   SpaceVariable3D J;
 
   //! Internal variables (for temporary use), dim = 3

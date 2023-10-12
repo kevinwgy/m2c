@@ -50,7 +50,7 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
       exit_mpi();
     }
   } else if(iod.mesh.type != MeshData::THREEDIMENSIONAL) {
-    print_error("*** Error: HyperelasticityOperator cannot handle the specified type of domain/mesh.\n");
+    print_error("*** Error: HyperelasticityOperator cannot handle user-specified domain/mesh type.\n");
     exit_mpi();
   }
 
@@ -72,31 +72,31 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
     switch (it->second->hyperelasticity.type) {
       case HyperelasticityModelData::NONE :
         hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnBase2D(*varFcn[matid]) :
+                          new HyperelasticityFcnBase2DCyl(*varFcn[matid]) :
                           new HyperelasticityFcnBase(*varFcn[matid]);                       
         break;
       case HyperelasticityModelData::SAINTVENANT_KIRCHHOFF :
         hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnSaintVenantKirchhoff2D(it->second->hyperelasticity,
+                          new HyperelasticityFcnSaintVenantKirchhoff2DCyl(it->second->hyperelasticity,
                                                                        *varFcn[matid]) :
                           new HyperelasticityFcnSaintVenantKirchhoff(it->second->hyperelasticity,
                                                                      *varFcn[matid]);
         break;
       case HyperelasticityModelData::MODIFIED_SAINTVENANT_KIRCHHOFF :
         hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnModifiedSaintVenantKirchhoff2D(it->second->hyperelasticity,
+                          new HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl(it->second->hyperelasticity,
                                                                                *varFcn[matid]) :
                           new HyperelasticityFcnModifiedSaintVenantKirchhoff(it->second->hyperelasticity,
                                                                              *varFcn[matid]);
         break;
       case HyperelasticityModelData::NEO_HOOKEAN :
         hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnNeoHookean(it->second->hyperelasticity, *varFcn[matid]) :
-                          new HyperelasticityFcnNeoHookean2D(it->second->hyperelasticity, *varFcn[matid]);
+                          new HyperelasticityFcnNeoHookean2DCyl(it->second->hyperelasticity, *varFcn[matid]) :
+                          new HyperelasticityFcnNeoHookean(it->second->hyperelasticity, *varFcn[matid]);
         break;
       case HyperelasticityModelData::MOONEY_RIVLIN :
         hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnMooneyRivlin2D(it->second->hyperelasticity, *varFcn[matid]) :
+                          new HyperelasticityFcnMooneyRivlin2DCyl(it->second->hyperelasticity, *varFcn[matid]) :
                           new HyperelasticityFcnMooneyRivlin(it->second->hyperelasticity, *varFcn[matid]);
         break;
     }
