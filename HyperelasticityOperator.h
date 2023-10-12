@@ -51,8 +51,8 @@ class HyperelasticityOperator
   //! Deformation gradient (dim = 9, i.e. 3x3 matrix)
   SpaceVariable3D F;
 
-  //! Determinant of deformation gradient
-  SpaceVariable3D DetF;
+  //! Volumetric deformation (sqrt(|F^T*F|))
+  SpaceVariable3D J;
 
   //! Internal variables (for temporary use), dim = 3
   SpaceVariable3D Var1, Var2, Var3;
@@ -99,6 +99,10 @@ public:
                                 SpaceVariable3D &R);
 
 private:
+
+  void ComputeDeformGradAtNodes3D(SpaceVariable3D &Xi); //!< Only within the physical domain
+
+  void ComputeDeformGradAtNodes2DCylindrical(SpaceVariable3D &Xi); //!< Only within the physical domain
 
   void AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                    vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
