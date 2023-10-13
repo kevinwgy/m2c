@@ -20,7 +20,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_F(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStressTensor(F, sigma, V);
+  GetCauchyStressTensor(F, V, sigma);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
@@ -49,7 +49,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStressTensor(F, sigma, V);
+  GetCauchyStressTensor(F, V, sigma);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
@@ -78,7 +78,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStressTensor(F, sigma, V);
+  GetCauchyStressTensor(F, V, sigma);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure

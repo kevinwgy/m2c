@@ -3,15 +3,15 @@
  * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
  ************************************************************************/
 
-#include<HyperelasticityFcn.h>
-#include<linear_algebra_3d.h>
+#include<HyperelasticityFcn2DCyl.h>
+#include<linear_algebra_2d.h>
 #include<cassert>
 
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_F(double* flux, double* F, double* V,
-                                                           bool deviatoric_only)
+HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_F(double* flux, double* F, double* V,
+                                                                bool deviatoric_only)
 {
   if(type == NONE) {
     for(int i=0; i<5; i++)
@@ -19,8 +19,10 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_F(double* flux, double*
     return;
   }
 
-  double sigma[6];
-  GetCauchyStressTensor(F, sigma, V);
+  I AM HERE!!!
+  double sigma[3];
+  GetCauchyStressTensor(F, V, sigma, sigma_phiphi);
+
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
@@ -49,7 +51,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStressTensor(F, sigma, V);
+  GetCauchyStressTensor(F, V, sigma);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
@@ -78,7 +80,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double*
   }
 
   double sigma[6];
-  GetCauchyStressTensor(F, sigma, V);
+  GetCauchyStressTensor(F, V, sigma);
 
   if(deviatoric_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure

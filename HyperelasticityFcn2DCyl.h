@@ -3,20 +3,27 @@
  * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
  ************************************************************************/
 
-#ifndef _HYPERELASTICITY_FCN_H_
-#define _HYPERELASTICITY_FCN_H_
+#ifndef _HYPERELASTICITY_FCN_2DCYL_H_
+#define _HYPERELASTICITY_FCN_2DCYL_H_
 
-#include<VarFcnBase.h>
+#include<HypervelocityFcn.h>
 
 /****************************************************
- * Class HyperelasticityFcnBase and the derived classes are
- * responsible for calculating the hyperelastic stress tensor.
- * Each material has a separate 'HyperelasticityFcn'
+ * Class HyperelasticityFcnBase2DCyl and the derived classes
+ * are children of HyperelasticityFcnBase. These classes are
+ * designed for problems with cylindrical symmetry solved on
+ * a 2D mesh. The "x" and "y" coordinates of the 2D mesh
+ * correspond to the "z" and "r" cylindrical coordinates,
+ * respectively. These functions compute the fluxes associated
+ * with "\sigma_{2D}$ --- see KW's notes. There are additional
+ * source terms, which need to be added somewhere else.
  *
- * Note 1: The input 'F' is assumed to be the *elastic* deformation
- *         gradient. This may not be the same as the complete
- *         deformation gradient, when there is plasticity 
- *         (or other things). 
+ * Note 1: The input matrix F (deformation gradient) is constructed
+ *       as follows:
+ *       F[0] = dz/dZ;   F[3] = 0.0;   F[6] = dz/dR;
+ *       F[1] = 0.0;     F[4] = r/R;   F[7] = 0.0;
+ *       F[2] = dr/dZ;   F[5] = 0.0;   F[8] = dr/dR;
+ *
  * Note 2: When combining EOS and hyperelasticity models, a
  *         method is to compute pressure from EOS, and *only*
  *         the deviatoric stress from hyperelasticity. In this
@@ -26,33 +33,26 @@
  *         tensor and the deviatoric part.
  * Note 3: Matrices follow the 'column-major' / 'column-first'
  *         convention. For example, A[1] is the A(2,1) entry.
- * Note 4: The Cauchy stress tensor is symmetric, so only 6
- *         entries are stored: sigma[0] = sigma_xx,
- *         sigma[1] = sigma_xy, sigma[2] = sigma_xz,
- *         sigma[3] = sigma_yy, sigma[4] = sigma_yz,
- *         sigma[5] = sigma_zz
+ * Note 4: The Cauchy stress tensor (\sigma_{2D}) is symmetric, so
+ *         only 3 entries are stored: sigma[0] = sigma_zz,
+ *         sigma[1] = sigma_zr, sigma[2] = sigma_rr
  ****************************************************/
 
 //---------------------------------------------------------------------------------
 //
-class HyperelasticityFcnBase {
+class HyperelasticityFcnBase2DCyl : public HyperelasticityFcnBase {
 
 protected:
 
-  VarFcnBase &vf;
-
-  double M3x3[9], N3x3[9]; //!< for temporary use
+  double M2x2[4], N2x2[4]; //!< for temporary use
 
 public:
 
-  enum Type {NONE = 0, SAINTVENANT_KIRCHHOFF = 1, MODIFIED_SAINTVENANT_KIRCHHOFF = 2,
-             NEO_HOOKEAN = 3, MOONEY_RIVLIN = 4} type;
+  HyperelasticityFcnBase2DCyl(VarFcnBase &vf_) : HyperelasticityFcnBase(vf_) {}
+  virtual ~HyperelasticityFcnBase2DCyl() {}
 
-  HyperelasticityFcnBase(VarFcnBase &vf_) : vf(vf_), type(NONE) {}
-  virtual ~HyperelasticityFcnBase() {}
-
-  virtual void GetCauchyStressTensor([[maybe_unused]] double *F, [[maybe_unused]] double *V, double *sigma) { //!< V: state var.
-    for(int i=0; i<6; i++)
+  virtual void GetCauchyStressTensor([[maybe_unused]] double *F, [[maybe_unused]] double *V, double *sigma) {
+    for(int i=0; i<3; i++)
       sigma[i] = 0.0;
   }
 
@@ -66,20 +66,20 @@ public:
 
 protected:
 
-  void ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma); //!< sigma[0-5] (because of symmetry)
+  void ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma); //!< sigma[0-2] (because of symmetry)
 
 };
 
 //---------------------------------------------------------------------------------
 
-class HyperelasticityFcnSaintVenantKirchhoff : public HyperelasticityFcnBase {
+class HyperelasticityFcnSaintVenantKirchhoff2DCyl : public HyperelasticityFcnBase2DCyl {
 
   double lambda, mu; //first and second Lame constants
 
 public:
 
-  HyperelasticityFcnSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBase &vf_);
-  ~HyperelasticityFcnSaintVenantKirchhoff() {}
+  HyperelasticityFcnSaintVenantKirchhoff2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
+  ~HyperelasticityFcnSaintVenantKirchhoff2DCyl() {}
   
   void GetCauchyStressTensor(double *F, double *V, double *sigma);
 
@@ -87,14 +87,14 @@ public:
 
 //---------------------------------------------------------------------------------
 
-class HyperelasticityFcnModifiedSaintVenantKirchhoff : public HyperelasticityFcnBase {
+class HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl : public HyperelasticityFcnBase2DCyl {
 
   double kappa, mu; //bulk modulus and the second Lame constant (i.e. shear modulus)
 
 public:
 
-  HyperelasticityFcnModifiedSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBase &vf_);
-  ~HyperelasticityFcnModifiedSaintVenantKirchhoff() {}
+  HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
+  ~HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl() {}
   
   void GetCauchyStressTensor(double *F, double *V, double *sigma);
 
@@ -102,14 +102,14 @@ public:
 
 //---------------------------------------------------------------------------------
 
-class HyperelasticityFcnNeoHookean: public HyperelasticityFcnBase {
+class HyperelasticityFcnNeoHookean2DCyl: public HyperelasticityFcnBase2DCyl {
 
   double kappa, mu; //bulk modulus and the second Lame constant (i.e. shear modulus)
 
 public:
 
-  HyperelasticityFcnNeoHookean(HyperelasticityModelData &hyper, VarFcnBase &vf_);
-  ~HyperelasticityFcnNeoHookean() {}
+  HyperelasticityFcnNeoHookean2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
+  ~HyperelasticityFcnNeoHookean2DCyl() {}
   
   void GetCauchyStressTensor(double *F, double *V, double *sigma);
 
@@ -117,14 +117,14 @@ public:
 
 //---------------------------------------------------------------------------------
 
-class HyperelasticityFcnMooneyRivlin: public HyperelasticityFcnBase {
+class HyperelasticityFcnMooneyRivlin2DCyl: public HyperelasticityFcnBase2DCyl {
 
   double kappa, C01, C10; //kappa: bulk modulus, C01+C10 = mu/2
 
 public:
 
-  HyperelasticityFcnMooneyRivlin(HyperelasticityModelData &hyper, VarFcnBase &vf_);
-  ~HyperelasticityFcnMooneyRivlin() {}
+  HyperelasticityFcnMooneyRivlin2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
+  ~HyperelasticityFcnMooneyRivlin2DCyl() {}
   
   void GetCauchyStressTensor(double *F, double *V, double *sigma);
 
