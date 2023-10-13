@@ -49,7 +49,7 @@ LinearAlgebra::CalculateDeterminant3x3(double *A) //column first, i.e. A[0] is A
 double
 LinearAlgebra::CalculateFirstPrincipalInvariant3x3(double *A) //column first, i.e. A[0] is A(1,1), A[1] = A(2,1), ...
 {
-  return A[0] + A[4] + A[8];
+  return CalculateMatrixTrace3x3(A);
 }
 
 //---------------------------------------------------------------------------------

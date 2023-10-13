@@ -19,30 +19,28 @@ HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_F(double* flux, do
     return;
   }
 
-  I AM HERE!!!
-  double sigma[3];
+  double sigma[3], sigma_phiphi;
   GetCauchyStressTensor(F, V, sigma, sigma_phiphi);
 
-
   if(deviatoric_only) {
-    double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
+    double p = -1.0/3.0*(sigma[0] + sigma[2] + sigma_phiphi); //hydrostatic pressure
     sigma[0] += p;
-    sigma[3] += p;
-    sigma[5] += p;
+    sigma[2] += p;
+    sigma_phiphi += p;
   }
 
   flux[0] = 0.0;
   flux[1] = sigma[0]; //xx
   flux[2] = sigma[1]; //xy
-  flux[3] = sigma[2]; //xz
-  flux[4] = V[1]*sigma[0] + V[2]*sigma[1] + V[3]*sigma[2];
+  flux[3] = 0.0;
+  flux[4] = V[1]*sigma[0] + V[2]*sigma[1];
 }
 
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double* F, double* V,
-                                                           bool deviatoric_only)
+HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_G(double* flux, double* F, double* V,
+                                                                bool deviatoric_only)
 {
   if(type == NONE) {
     for(int i=0; i<5; i++)
@@ -50,76 +48,45 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double*
     return;
   }
 
-  double sigma[6];
-  GetCauchyStressTensor(F, V, sigma);
+  double sigma[3], sigma_phiphi;
+  GetCauchyStressTensor(F, V, sigma, sigma_phiphi);
 
   if(deviatoric_only) {
-    double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
+    double p = -1.0/3.0*(sigma[0] + sigma[2] + sigma_phiphi); //hydrostatic pressure
     sigma[0] += p;
-    sigma[3] += p;
-    sigma[5] += p;
+    sigma[2] += p;
+    sigma_phiphi += p;
   }
 
   flux[0] = 0.0;
   flux[1] = sigma[1]; //xy
-  flux[2] = sigma[3]; //yy
-  flux[3] = sigma[4]; //yz
-  flux[4] = V[1]*sigma[1] + V[2]*sigma[3] + V[3]*sigma[4];
+  flux[2] = sigma[2]; //yy
+  flux[3] = 0.0;
+  flux[4] = V[1]*sigma[1] + V[2]*sigma[2];
 }
 
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double* F, double* V,
-                                                           bool deviatoric_only)
+HyperelasticityFcnBase2DCyl::ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma)
 {
-  if(type == NONE) {
-    for(int i=0; i<5; i++)
-      flux[i] = 0.0;
-    return;
-  }
+  //Note: This function takes P2D, F2D, J (not J2D!), and outputs sigma_2D (2x2 matrix, dim=3 by symm)
+  
+  assert(J>0.0);
+  MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(1.0/J, F, M2x2); //M = 1/J*F
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct2x2(M2x2, P, N2x2); //N = M*P 
+  MathTools::LinearAlgebra::CalculateABTranspose2x2(N2x2, F, M2x2); //M = N*F'
 
-  double sigma[6];
-  GetCauchyStressTensor(F, V, sigma);
-
-  if(deviatoric_only) {
-    double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
-    sigma[0] += p;
-    sigma[3] += p;
-    sigma[5] += p;
-  }
-
-  flux[0] = 0.0;
-  flux[1] = sigma[2]; //xz
-  flux[2] = sigma[4]; //yz
-  flux[3] = sigma[5]; //zz
-  flux[4] = V[1]*sigma[2] + V[2]*sigma[4] + V[3]*sigma[5];
-}
-
-
-//----------------------------------------------------------------------
-
-void
-HyperelasticityFcnBase::ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma)
-{
-  assert(J!=0.0);
-  MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(1.0/J, F, M3x3); //M = 1/J*F
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(M3x3, P, N3x3); //N = M*P 
-  MathTools::LinearAlgebra::CalculateABTranspose3x3(N3x3, F, M3x3); //M = N*F'
-
-  sigma[0] = M3x3[0];
-  sigma[1] = M3x3[1];
-  sigma[2] = M3x3[2];
-  sigma[3] = M3x3[4];
-  sigma[4] = M3x3[5];
-  sigma[5] = M3x3[8];
+  sigma[0] = M2x2[0];
+  sigma[1] = M2x2[1];
+  sigma[2] = M2x2[3];
 }
 
 //----------------------------------------------------------------------
 
-HyperelasticityFcnSaintVenantKirchhoff::
-HyperelasticityFcnSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBase &vf_)
-    : HyperelasticityFcnBase(vf_)
+HyperelasticityFcnSaintVenantKirchhoff2DCyl::
+HyperelasticityFcnSaintVenantKirchhoff2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_)
+    : HyperelasticityFcnBase2DCyl(vf_)
 {
   type = SAINTVENANT_KIRCHHOFF;
 
@@ -136,34 +103,40 @@ HyperelasticityFcnSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBa
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnSaintVenantKirchhoff::GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma)
+HyperelasticityFcnSaintVenantKirchhoff2DCyl::
+GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, double &sigma_phiphi)
 {
+  // Note: F = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"; also, column-first
+  F2x2[0] = F[0];  F2x2[2] = F[6];
+  F2x2[1] = F[2];  F2x2[3] = F[8];
+  double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,M3x3); //M(C) = F'F: right Cauchy-Green def. tensor
-  M3x3[0] -= 1.0;
-  M3x3[4] -= 1.0;
-  M3x3[8] -= 1.0;     //M = M - I
-  MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(0.5, M3x3, M3x3); //M(E) = 1/2(C-I): Green strain
-  double lambda_trace = lambda*MathTools::LinearAlgebra::CalculateMatrixTrace3x3(M3x3);
+  MathTools::LinearAlgebra::CalculateATransposeA2x2(F2x2,M2x2); //M2x2 = C2D = F2D'F2D
+  M2x2[0] -= 1.0;
+  M2x2[3] -= 1.0;
+  MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(0.5, M2x2, M2x2); //M2x2=E2D=1/2(C2D-I), Green strain
+  double lambda_trace = lambda*(MathTools::LinearAlgebra::CalculateMatrixTrace2x2(M2x2) +
+                                0.5*(r_over_R_2 - 1.0));
 
-  //calculates the second Piola-Kirchhoff stress tensor: P = lambda*tr(E)*I + 2*mu*E
-  MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(2.0*mu, M3x3, M3x3);
-  M3x3[0] += lambda_trace;
-  M3x3[4] += lambda_trace;
-  M3x3[8] += lambda_trace;
+  //calculates the second Piola-Kirchhoff stress tensor: P2D = lambda*tr(E)*I2D + 2*mu*E2D
+  MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(2.0*mu, M2x2, M2x2);
+  M2x2[0] += lambda_trace;
+  M2x2[3] += lambda_trace;
   
-  //convert to sigma (dim:6)
-  double J = MathTools::LinearAlgebra::CalculateDeterminant3x3(F);
+  //convert to sigma2D (dim:3)
+  double J = MathTools::LinearAlgebra::CalculateDeterminant2x2(F);
   assert(J>0.0);
-  ConvertPK2ToCauchy(M3x3, F, J, sigma);
+  ConvertPK2ToCauchy(M2x2, F2x2, J, sigma);
+
+  *sigma_phiphi = 1.0/J*r_over_R_2*(lambda_trace + mu*(r_over_R_2 - 1.0));
 
 }
 
 //----------------------------------------------------------------------
 
-HyperelasticityFcnModifiedSaintVenantKirchhoff::
-HyperelasticityFcnModifiedSaintVenantKirchhoff(HyperelasticityModelData &hyper, VarFcnBase &vf_)
-    : HyperelasticityFcnBase(vf_)
+HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl::
+HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_)
+    : HyperelasticityFcnBase2DCyl(vf_)
 {
   type = MODIFIED_SAINTVENANT_KIRCHHOFF;
 
@@ -179,38 +152,42 @@ HyperelasticityFcnModifiedSaintVenantKirchhoff(HyperelasticityModelData &hyper, 
 
 //----------------------------------------------------------------------
 
-
 void
-HyperelasticityFcnModifiedSaintVenantKirchhoff::GetCauchyStressTensor(double *F, 
-                                                                      [[maybe_unused]] double *V, double *sigma)
+HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl::
+GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, double &sigma_phiphi)
 {
+  // Note: F = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"; also, column-first
+  F2x2[0] = F[0];  F2x2[2] = F[6];
+  F2x2[1] = F[2];  F2x2[3] = F[8];
+  double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
-  MathTools::LinearAlgebra::CalculateATransposeA3x3(F,N3x3); //N(C) = F'F: right Cauchy-Green def. tensor
-  for(int i=0; i<9; i++)
-    M3x3[i] = N3x3[i];  //M = N
-  M3x3[0] -= 1.0;
-  M3x3[4] -= 1.0;
-  M3x3[8] -= 1.0;     //M = M - I
-  MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(0.5, M3x3, M3x3); //M(E) = 1/2(C-I): Green strain
+  MathTools::LinearAlgebra::CalculateATransposeA2x2(F,N2x2); //N = C2D = F2D'F2D
+  for(int i=0; i<3; i++)
+    M2x2[i] = N2x2[i];  //M = N = C2D
+  M2x2[0] -= 1.0;
+  M2x2[3] -= 1.0;     //M = C2D - I2D
+  MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(0.5, M2x2, M2x2); //M = E2D 
 
   //calculates Cinv
-  double Cinv[9], J;
-  MathTools::LinearAlgebra::CalculateMatrixInverseAndDeterminant3x3(N3x3, Cinv, &J);
-  J = sqrt(J);
+  double Cinv[4], J;
+  MathTools::LinearAlgebra::CalculateMatrixInverseAndDeterminant2x2(N2x2, Cinv, &J);
+  J = r_over_R*sqrt(J);
 
-  //calculates the second Piola-Kirchhoff stress tensor: P = lambda*tr(E)*I + 2*mu*E
-  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B3x3(kappa, Cinv, 2.0*mu, M3x3, N3x3);
+  //calculates the second Piola-Kirchhoff stress tensor
+  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B2x2(kappa, Cinv, 2.0*mu, M2x2, N2x2);
   
-  //convert to sigma (dim:6)
-  ConvertPK2ToCauchy(N3x3, F, J, sigma);
+  //convert to sigma_2D (dim:3)
+  ConvertPK2ToCauchy(N2x2, F2x2, J, sigma);
 
+  //get sigma_phiphi
+  *sigma_phiphi = 1.0/J*(kappa + mu*r_over_R_2*(r_over_R_2 - 1));
 }
 
 //----------------------------------------------------------------------
 
-HyperelasticityFcnNeoHookean::
-HyperelasticityFcnNeoHookean(HyperelasticityModelData &hyper, VarFcnBase &vf_)
-    : HyperelasticityFcnBase(vf_)
+HyperelasticityFcnNeoHookean2DCyl::
+HyperelasticityFcnNeoHookean2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_)
+    : HyperelasticityFcnBase2DCyl(vf_)
 {
   type = NEO_HOOKEAN;
 
@@ -227,14 +204,19 @@ HyperelasticityFcnNeoHookean(HyperelasticityModelData &hyper, VarFcnBase &vf_)
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma)
+HyperelasticityFcnNeoHookean2DCyl::
+GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, double &sigma_phiphi)
 {
+  // Note: F = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"; also, column-first
+  F2x2[0] = F[0];  F2x2[2] = F[6];
+  F2x2[1] = F[2];  F2x2[3] = F[8];
+  double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
-  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
+  MathTools::LinearAlgebra::CalculateAATranspose2x2(F2x2,N2x2); //N = B2D = F2D*F2D': left Cauchy-Green
 
-  // calculate I1, I2, I3 (principal invariants)
-  double I1 = MathTools::LinearAlgebra::CalculateFirstPrincipalInvariant3x3(N3x3);
-  double I3 = MathTools::LinearAlgebra::CalculateThirdPrincipalInvariant3x3(N3x3);
+  // calculate I1, I3 (principal invariants)
+  double I1 = MathTools::LinearAlgebra::CalculateFirstPrincipalInvariant2x2(N2x2) + r_over_R_2;
+  double I3 = r_over_R_2*MathTools::LinearAlgebra::CalculateSecondPrincipalInvariant2x2(N2x2);
   assert(I1>0.0);
   assert(I3>0.0);
 
@@ -245,26 +227,23 @@ HyperelasticityFcnNeoHookean::GetCauchyStressTensor(double *F, [[maybe_unused]] 
   double factor1 = mu/J*Jf;
   double factor2 = kappa*(J-1.0) - 1.0/(3.0*J)*(mu*I1);
 
-  MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(factor1, N3x3, N3x3);
+  MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(factor1, N2x2, N2x2);
 
-  N3x3[0] += factor2;
-  N3x3[4] += factor2;
-  N3x3[8] += factor2;
+  N2x2[0] += factor2;
+  N2x2[3] += factor2;
 
-  sigma[0] = N3x3[0];
-  sigma[1] = N3x3[1];
-  sigma[2] = N3x3[2];
-  sigma[3] = N3x3[4];
-  sigma[4] = N3x3[5];
-  sigma[5] = N3x3[8];
+  sigma[0] = N2x2[0];
+  sigma[1] = N2x2[1];
+  sigma[2] = N2x2[3];
 
+  sigma_phiphi = factor1*r_over_R_2 + factor2;
 }
 
 //----------------------------------------------------------------------
 
-HyperelasticityFcnMooneyRivlin::
-HyperelasticityFcnMooneyRivlin(HyperelasticityModelData &hyper, VarFcnBase &vf_)
-    : HyperelasticityFcnBase(vf_)
+HyperelasticityFcnMooneyRivlin2DCyl::
+HyperelasticityFcnMooneyRivlin2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_)
+    : HyperelasticityFcnBase2DCyl(vf_)
 {
   type = MOONEY_RIVLIN;
 
@@ -283,16 +262,23 @@ HyperelasticityFcnMooneyRivlin(HyperelasticityModelData &hyper, VarFcnBase &vf_)
 //----------------------------------------------------------------------
 
 void
-HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma)
+HyperelasticityFcnMooneyRivlin2DCyl::
+GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, double &sigma_phiphi)
 {
+  // Note: F = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"; also, column-first
+  F2x2[0] = F[0];  F2x2[2] = F[6];
+  F2x2[1] = F[2];  F2x2[3] = F[8];
+  double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
-  MathTools::LinearAlgebra::CalculateAATranspose3x3(F,N3x3); //N(B) = FF': left Cauchy-Green def. tensor
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(N3x3,N3x3,M3x3); //M = B*B
+  MathTools::LinearAlgebra::CalculateAATranspose2x2(F,N2x2); //N = B2D = F2D*F2D': left Cauchy-Green
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct2x2(N2x2,N2x2,M2x2); //M = B2D*B2D
 
   // calculate I1, I2, I3 (principal invariants)
-  double I1 = MathTools::LinearAlgebra::CalculateFirstPrincipalInvariant3x3(N3x3);
-  double I2 = MathTools::LinearAlgebra::CalculateSecondPrincipalInvariant3x3(N3x3);
-  double I3 = MathTools::LinearAlgebra::CalculateThirdPrincipalInvariant3x3(N3x3);
+  double N2x2_trc = MathTools::LinearAlgebra::CalculateMatrixTrace2x2(N2x2);
+  double N2x2_det = MathTools::LinearAlgebra::CalculateDeterminant2x2(N2x2);
+  double I1 = N2x2_trc + r_over_R_2;
+  double I2 = N2x2_det + r_over_R_2*N2x2_trc;
+  double I3 = r_over_R_2*N2x2_det;
   assert(I1>0.0);
   assert(I2>0.0);
   assert(I3>0.0);
@@ -306,19 +292,16 @@ HyperelasticityFcnMooneyRivlin::GetCauchyStressTensor(double *F, [[maybe_unused]
   double factor3 = -2.0/J*Jf*Jf*C01;
   double factor2 = kappa*(J-1.0) - 2.0/(3.0*J)*(C10*I1 + 2.0*C01*I2);
 
-  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B3x3(factor1, N3x3, factor3, M3x3, N3x3);
+  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B2x2(factor1, N2x2, factor3, M2x2, N2x2);
 
-  N3x3[0] += factor2;
-  N3x3[4] += factor2;
-  N3x3[8] += factor2;
+  N2x2[0] += factor2;
+  N2x2[3] += factor2;
 
-  sigma[0] = N3x3[0];
-  sigma[1] = N3x3[1];
-  sigma[2] = N3x3[2];
-  sigma[3] = N3x3[4];
-  sigma[4] = N3x3[5];
-  sigma[5] = N3x3[8];
+  sigma[0] = N2x2[0];
+  sigma[1] = N2x2[1];
+  sigma[2] = N2x2[4];
 
+  sigma_phiphi = factor1*r_over_R_2 + factor3*r_over_R_2*r_over_R_2 + factor2;
 }
 
 

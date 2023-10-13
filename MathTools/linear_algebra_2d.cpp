@@ -46,7 +46,7 @@ LinearAlgebra::CalculateDeterminant2x2(double *A) //column first, i.e. A[0] is A
 double
 LinearAlgebra::CalculateFirstPrincipalInvariant2x2(double *A) //column first, i.e. A[0] is A(1,1), A[1] = A(2,1), ...
 {
-  return A[0] + A[3]; //trace
+  return CalculateMatrixTrace2x2(A);
 }
 
 //---------------------------------------------------------------------------------

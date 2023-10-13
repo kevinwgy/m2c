@@ -1,7 +1,7 @@
 /************************************************************************
  * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
  * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
- ************************************************************************/
+ *j**********************************************************************/
 
 #include<HyperelasticityFcn.h>
 #include<linear_algebra_3d.h>
@@ -100,7 +100,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double*
 void
 HyperelasticityFcnBase::ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma)
 {
-  assert(J!=0.0);
+  assert(J>0.0);
   MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(1.0/J, F, M3x3); //M = 1/J*F
   MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(M3x3, P, N3x3); //N = M*P 
   MathTools::LinearAlgebra::CalculateABTranspose3x3(N3x3, F, M3x3); //M = N*F'

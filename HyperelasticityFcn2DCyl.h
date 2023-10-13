@@ -14,9 +14,10 @@
  * designed for problems with cylindrical symmetry solved on
  * a 2D mesh. The "x" and "y" coordinates of the 2D mesh
  * correspond to the "z" and "r" cylindrical coordinates,
- * respectively. These functions compute the fluxes associated
- * with "\sigma_{2D}$ --- see KW's notes. There are additional
- * source terms, which need to be added somewhere else.
+ * respectively. This class contains functions that
+ * compute the fluxes associated with "\sigma_{2D}$ 
+ * --- see KW's notes. This class also contains functions that
+ * compute the source terms associated with the hoop stress. 
  *
  * Note 1: The input matrix F (deformation gradient) is constructed
  *       as follows:
@@ -44,16 +45,19 @@ class HyperelasticityFcnBase2DCyl : public HyperelasticityFcnBase {
 
 protected:
 
-  double M2x2[4], N2x2[4]; //!< for temporary use
+  double F2x2[4], M2x2[4], N2x2[4]; //!< for temporary use
 
 public:
 
   HyperelasticityFcnBase2DCyl(VarFcnBase &vf_) : HyperelasticityFcnBase(vf_) {}
   virtual ~HyperelasticityFcnBase2DCyl() {}
 
-  virtual void GetCauchyStressTensor([[maybe_unused]] double *F, [[maybe_unused]] double *V, double *sigma) {
+  virtual void GetCauchyStressTensor([[maybe_unused]] double *F, [[maybe_unused]] double *V, 
+                                     double *sigma, double &sigma_phiphi) {
     for(int i=0; i<3; i++)
       sigma[i] = 0.0;
+
+    sigma_phiphi = 0.0; //hoop stress
   }
 
   //! compute the flux function
@@ -61,12 +65,13 @@ public:
                                           bool deviatoric_only = true);
   void EvaluateHyperelasticFluxFunction_G(double* flux/*output*/, double* F, double* V/*state var.*/,
                                           bool deviatoric_only = true);
-  void EvaluateHyperelasticFluxFunction_H(double* flux/*output*/, double* F, double* V/*state var.*/,
-                                          bool deviatoric_only = true);
+  void EvaluateHyperelasticSourceTerm(double* source/*output*/, double* F, double* V/*state var.*/,
+                                      bool deviatoric_only = true);
 
 protected:
 
-  void ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma); //!< sigma[0-2] (because of symmetry)
+  //! PK2->Cauchy. Input: P2D, F2D, J (not J2D). Output: sigma_2D[0,1,2] (2x2 matrix, w/ symmetry)
+  void ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma); //!< sigma[0-2] (by symmetry)
 
 };
 
@@ -81,7 +86,7 @@ public:
   HyperelasticityFcnSaintVenantKirchhoff2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
   ~HyperelasticityFcnSaintVenantKirchhoff2DCyl() {}
   
-  void GetCauchyStressTensor(double *F, double *V, double *sigma);
+  void GetCauchyStressTensor(double *F, double *V, double *sigma, double &sigma_phiphi);
 
 };
 
@@ -96,7 +101,7 @@ public:
   HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
   ~HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl() {}
   
-  void GetCauchyStressTensor(double *F, double *V, double *sigma);
+  void GetCauchyStressTensor(double *F, double *V, double *sigma, double &sigma_phiphi);
 
 };
 
@@ -111,7 +116,7 @@ public:
   HyperelasticityFcnNeoHookean2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
   ~HyperelasticityFcnNeoHookean2DCyl() {}
   
-  void GetCauchyStressTensor(double *F, double *V, double *sigma);
+  void GetCauchyStressTensor(double *F, double *V, double *sigma, double &sigma_phiphi);
 
 };
 
@@ -126,7 +131,7 @@ public:
   HyperelasticityFcnMooneyRivlin2DCyl(HyperelasticityModelData &hyper, VarFcnBase &vf_);
   ~HyperelasticityFcnMooneyRivlin2DCyl() {}
   
-  void GetCauchyStressTensor(double *F, double *V, double *sigma);
+  void GetCauchyStressTensor(double *F, double *V, double *sigma, double &sigma_phiphi);
 
 };
 

@@ -503,7 +503,7 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
   double*** id = (double***)ID.GetDataPointer();
 
   int myid = 0;
-  double gradxi[4], f2[4], f[9]; //nabla xi and deformation gradient
+  double gradxi[4], f2[4], f[9] = {0.0}; //nabla xi and deformation gradient
   double dx = 0.0, dy = 0.0, r0;
   Vec5D flux;
   bool invertible;
@@ -535,9 +535,9 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
           // Note: f = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"!
           r0 = (global_mesh.GetDx(i-1)*xi[k][j][i][1] + global_mesh.GetDx(i)*xi[k][j][i-1][1])
              / (global_mesh.GetDx(i-1) + global_mesh.GetDx(i));
-          f[0] = f2[0];    f[3] = 0.0;     f[6] = f2[2];
-          f[1] = 0.0;      f[4] = r/r0;    f[7] = 0.0;
-          f[2] = f2[1];    f[5] = 0.0;     f[8] = f2[3];
+          f[0] = f2[0];                    f[6] = f2[2];
+                           f[4] = r/r0;    
+          f[2] = f2[1];                    f[8] = f2[3];
 
           hyperFcn[myid]->EvaluateHyperelasticFluxFunction_F(flux, f, v[k][j][i], true);//TODO: multi-material
           flux *= dy*dz;
@@ -566,9 +566,9 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
           // Note: f = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"!
           r0 = (global_mesh.GetDy(j-1)*xi[k][j][i][1] + global_mesh.GetDy(j)*xi[k][j-1][i][1])
              / (global_mesh.GetDy(j-1) + global_mesh.GetDy(j));
-          f[0] = f2[0];    f[3] = 0.0;     f[6] = f2[2];
-          f[1] = 0.0;      f[4] = r/r0;    f[7] = 0.0;
-          f[2] = f2[1];    f[5] = 0.0;     f[8] = f2[3];
+          f[0] = f2[0];                    f[6] = f2[2];
+                           f[4] = r/r0;    
+          f[2] = f2[1];                    f[8] = f2[3];
 
           hyperFcn[myid]->EvaluateHyperelasticFluxFunction_G(flux, f, v[k][j][i], true);//TODO: multi-material
           flux *= dx*dz;
