@@ -118,6 +118,7 @@ NonIdealSahaEquationSolver.cpp
 AtomicIonizationData.cpp
 EmbeddedBoundaryFormula.cpp
 HyperelasticityFcn.cpp
+HyperelasticityFcn2DCyl.cpp
 HyperelasticityOperator.cpp
 ReferenceMapOperator.cpp
 PrescribedMotionOperator.cpp

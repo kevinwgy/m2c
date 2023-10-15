@@ -3,7 +3,7 @@
  * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
  ************************************************************************/
 
-#include <linear_algebra_2d.h>
+#include <linear_algebra.h>
 #include <Eigen/Dense>
 #include <cassert>
 

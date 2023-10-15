@@ -6,7 +6,7 @@
 #ifndef _HYPERELASTICITY_FCN_2DCYL_H_
 #define _HYPERELASTICITY_FCN_2DCYL_H_
 
-#include<HypervelocityFcn.h>
+#include<HyperelasticityFcn.h>
 
 /****************************************************
  * Class HyperelasticityFcnBase2DCyl and the derived classes

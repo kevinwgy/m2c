@@ -4,7 +4,7 @@
  *j**********************************************************************/
 
 #include<HyperelasticityFcn.h>
-#include<linear_algebra_3d.h>
+#include<linear_algebra.h>
 #include<cassert>
 
 //----------------------------------------------------------------------

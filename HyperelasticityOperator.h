@@ -6,7 +6,7 @@
 #ifndef _VISCOELASTICITY_OPERATOR_H_
 #define _VISCOELASTICITY_OPERATOR_H_
 #include<ReferenceMapOperator.h>
-#include<HyperelasticityFcn.h>
+#include<HyperelasticityFcn2DCyl.h>
 #include<Interpolator.h>
 
 class EmbeddedBoundaryDataSet;

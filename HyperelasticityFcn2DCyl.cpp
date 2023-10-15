@@ -4,7 +4,7 @@
  ************************************************************************/
 
 #include<HyperelasticityFcn2DCyl.h>
-#include<linear_algebra_2d.h>
+#include<linear_algebra.h>
 #include<cassert>
 
 //----------------------------------------------------------------------
@@ -128,7 +128,7 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   assert(J>0.0);
   ConvertPK2ToCauchy(M2x2, F2x2, J, sigma);
 
-  *sigma_phiphi = 1.0/J*r_over_R_2*(lambda_trace + mu*(r_over_R_2 - 1.0));
+  sigma_phiphi = 1.0/J*r_over_R_2*(lambda_trace + mu*(r_over_R_2 - 1.0));
 
 }
 
@@ -180,7 +180,7 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   ConvertPK2ToCauchy(N2x2, F2x2, J, sigma);
 
   //get sigma_phiphi
-  *sigma_phiphi = 1.0/J*(kappa + mu*r_over_R_2*(r_over_R_2 - 1));
+  sigma_phiphi = 1.0/J*(kappa + mu*r_over_R_2*(r_over_R_2 - 1));
 }
 
 //----------------------------------------------------------------------
@@ -299,7 +299,7 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
 
   sigma[0] = N2x2[0];
   sigma[1] = N2x2[1];
-  sigma[2] = N2x2[4];
+  sigma[2] = N2x2[3];
 
   sigma_phiphi = factor1*r_over_R_2 + factor3*r_over_R_2*r_over_R_2 + factor2;
 }

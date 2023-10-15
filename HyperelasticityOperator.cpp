@@ -5,7 +5,7 @@
 
 #include<HyperelasticityOperator.h>
 #include<EmbeddedBoundaryDataSet.h>
-#include<linear_algebra_3d.h>
+#include<linear_algebra.h>
 #include<Vector5D.h>
 
 //------------------------------------------------------------
@@ -71,34 +71,46 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
     }
     switch (it->second->hyperelasticity.type) {
       case HyperelasticityModelData::NONE :
-        hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnBase2DCyl(*varFcn[matid]) :
-                          new HyperelasticityFcnBase(*varFcn[matid]);                       
+        if(cylindrical_symmetry)
+          hyperFcn[matid] = new HyperelasticityFcnBase2DCyl(*varFcn[matid]);
+        else
+          hyperFcn[matid] = new HyperelasticityFcnBase(*varFcn[matid]);                       
         break;
       case HyperelasticityModelData::SAINTVENANT_KIRCHHOFF :
-        hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnSaintVenantKirchhoff2DCyl(it->second->hyperelasticity,
-                                                                       *varFcn[matid]) :
-                          new HyperelasticityFcnSaintVenantKirchhoff(it->second->hyperelasticity,
-                                                                     *varFcn[matid]);
+        if(cylindrical_symmetry)
+          hyperFcn[matid] = new HyperelasticityFcnSaintVenantKirchhoff2DCyl
+                                    (it->second->hyperelasticity, *varFcn[matid]);
+        else
+          hyperFcn[matid] = new HyperelasticityFcnSaintVenantKirchhoff
+                                    (it->second->hyperelasticity, *varFcn[matid]);
         break;
       case HyperelasticityModelData::MODIFIED_SAINTVENANT_KIRCHHOFF :
-        hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl(it->second->hyperelasticity,
-                                                                               *varFcn[matid]) :
-                          new HyperelasticityFcnModifiedSaintVenantKirchhoff(it->second->hyperelasticity,
-                                                                             *varFcn[matid]);
+        if(cylindrical_symmetry)
+          hyperFcn[matid] = new HyperelasticityFcnModifiedSaintVenantKirchhoff2DCyl
+                                    (it->second->hyperelasticity, *varFcn[matid]);
+        else
+          hyperFcn[matid] = new HyperelasticityFcnModifiedSaintVenantKirchhoff
+                                    (it->second->hyperelasticity, *varFcn[matid]);
         break;
       case HyperelasticityModelData::NEO_HOOKEAN :
-        hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnNeoHookean2DCyl(it->second->hyperelasticity, *varFcn[matid]) :
-                          new HyperelasticityFcnNeoHookean(it->second->hyperelasticity, *varFcn[matid]);
+        if(cylindrical_symmetry)
+          hyperFcn[matid] = new HyperelasticityFcnNeoHookean2DCyl
+                                    (it->second->hyperelasticity, *varFcn[matid]);
+        else
+          hyperFcn[matid] = new HyperelasticityFcnNeoHookean
+                                    (it->second->hyperelasticity, *varFcn[matid]);
         break;
       case HyperelasticityModelData::MOONEY_RIVLIN :
-        hyperFcn[matid] = cylindrical_symmetry ?
-                          new HyperelasticityFcnMooneyRivlin2DCyl(it->second->hyperelasticity, *varFcn[matid]) :
-                          new HyperelasticityFcnMooneyRivlin(it->second->hyperelasticity, *varFcn[matid]);
+        if(cylindrical_symmetry)
+          hyperFcn[matid] = new HyperelasticityFcnMooneyRivlin2DCyl
+                                    (it->second->hyperelasticity, *varFcn[matid]);
+        else
+          hyperFcn[matid] = new HyperelasticityFcnMooneyRivlin
+                                    (it->second->hyperelasticity, *varFcn[matid]);
         break;
+      default :
+        print_error("*** Error: HyperelasticityOperator detected unknown model type.\n");
+        exit_mpi();
     }
   }
 
@@ -262,7 +274,7 @@ HyperelasticityOperator::ComputeDeformGradAtNodes2DCylindrical(SpaceVariable3D &
   // ------------------------------------
   double*** f    = F.GetDataPointer(); //column-first (aka. column-major)
   double*** Jloc = J.GetDataPointer();
-  Vec3D*** xi    = Xi.GetDataPointer();
+  Vec3D*** xi    = (Vec3D***)Xi.GetDataPointer();
   Vec3D*** dXidx = (Vec3D***)Var1.GetDataPointer();  
   Vec3D*** dXidy = (Vec3D***)Var2.GetDataPointer();  
 
@@ -287,9 +299,10 @@ HyperelasticityOperator::ComputeDeformGradAtNodes2DCylindrical(SpaceVariable3D &
  
         // Note: f = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"!
         r0 = xi[k][j][i][1];
-        f[0] = f2[0];    f[3] = 0.0;     f[6] = f2[2];
-        f[1] = 0.0;      f[4] = r/r0;    f[7] = 0.0;
-        f[2] = f2[1];    f[5] = 0.0;     f[8] = f2[3];
+        double* floc(&f[k][j][i]);
+        floc[0] = f2[0];   floc[3] = 0.0;    floc[6] = f2[2];
+        floc[1] = 0.0;     floc[4] = r/r0;   floc[7] = 0.0;
+        floc[2] = f2[1];   floc[5] = 0.0;    floc[8] = f2[3];
 
         Jloc[k][j][i] = 1.0/Jloc2*r/r0; // we want the determinant of F, not grad-xi!
 
@@ -315,9 +328,6 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
                                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                                   SpaceVariable3D &R)
 {
-  if(EBDS)
-    print_warning("Warning: AddHyperelasticityFluxes: Not able to account for embedded surfaces.\n");
-
   if(cylindrical_symmetry)
     AddFluxes2DCylindrical(V,ID,Xi,EBDS,R);
   else
@@ -326,11 +336,14 @@ HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVaria
 
 //------------------------------------------------------------
 
+//TODO: I AM HERE! CHECK! FLUX SHOULD BE ON THE LEFT HAND SIDE!
 void
 HyperelasticityOperator::AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                                      vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                      SpaceVariable3D &R)
 {
+  if(EBDS)
+    print_warning("Warning: AddHyperelasticityFluxes: Not able to account for embedded surfaces.\n");
 
   std::vector<int> i123{1,2,3}, i012{0,1,2};
 
@@ -375,9 +388,9 @@ HyperelasticityOperator::AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, Sp
       for(int i=i0; i<iimax; i++) {
 
         myid = id[k][j][i];
-        dx   = global_mesh.dx_glob[i];
-        dy   = global_mesh.dy_glob[j];
-        dz   = global_mesh.dz_glob[k];
+        dx   = global_mesh.GetDx(i);
+        dy   = global_mesh.GetDy(j);
+        dz   = global_mesh.GetDz(k);
 
         //*****************************************
         //calculate flux function F_{i-1/2,j,k}
@@ -478,6 +491,8 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
                                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                                 SpaceVariable3D &R)
 {
+  if(EBDS)
+    print_warning("Warning: AddHyperelasticityFluxes: Not able to account for embedded surfaces.\n");
 
   std::vector<int> i12{1,2}, i01{0,1};
 
@@ -504,7 +519,7 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
 
   int myid = 0;
   double gradxi[4], f2[4], f[9] = {0.0}; //nabla xi and deformation gradient
-  double dx = 0.0, dy = 0.0, r0;
+  double dx = 0.0, dy = 0.0, dz = 0.0, r0;
   Vec5D flux;
   bool invertible;
   for(int k=k0; k<kkmax; k++) {
@@ -513,8 +528,9 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
       for(int i=i0; i<iimax; i++) {
 
         myid = id[k][j][i];
-        dx   = global_mesh.dx_glob[i];
-        dy   = global_mesh.dy_glob[j];
+        dx   = global_mesh.GetDx(i);
+        dy   = global_mesh.GetDy(j);
+        dz   = global_mesh.GetDz(k);
 
         //*****************************************
         //calculate flux function F_{i-1/2,j,k}
@@ -533,8 +549,8 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
                            " is not invertible.\033[0m\n", i,j,k);
 
           // Note: f = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"!
-          r0 = (global_mesh.GetDx(i-1)*xi[k][j][i][1] + global_mesh.GetDx(i)*xi[k][j][i-1][1])
-             / (global_mesh.GetDx(i-1) + global_mesh.GetDx(i));
+          r0 = (global_mesh.GetDx(i-1)*xi[k][j][i][1] + dx*xi[k][j][i-1][1])
+             / (global_mesh.GetDx(i-1) + dx);
           f[0] = f2[0];                    f[6] = f2[2];
                            f[4] = r/r0;    
           f[2] = f2[1];                    f[8] = f2[3];
@@ -564,8 +580,8 @@ HyperelasticityOperator::AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariabl
                            " is not invertible.\033[0m\n", i,j,k);
 
           // Note: f = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"!
-          r0 = (global_mesh.GetDy(j-1)*xi[k][j][i][1] + global_mesh.GetDy(j)*xi[k][j-1][i][1])
-             / (global_mesh.GetDy(j-1) + global_mesh.GetDy(j));
+          r0 = (global_mesh.GetDy(j-1)*xi[k][j][i][1] + dy*xi[k][j-1][i][1])
+             / (global_mesh.GetDy(j-1) + dy);
           f[0] = f2[0];                    f[6] = f2[2];
                            f[4] = r/r0;    
           f[2] = f2[1];                    f[8] = f2[3];
