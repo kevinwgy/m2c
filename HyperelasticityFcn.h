@@ -58,11 +58,11 @@ public:
 
   //! compute the flux function
   void EvaluateHyperelasticFluxFunction_F(double* flux/*output*/, double* F, double* V/*state var.*/,
-                                          bool deviatoric_only = true);
+                                          bool deviator_only = true);
   void EvaluateHyperelasticFluxFunction_G(double* flux/*output*/, double* F, double* V/*state var.*/,
-                                          bool deviatoric_only = true);
+                                          bool deviator_only = true);
   void EvaluateHyperelasticFluxFunction_H(double* flux/*output*/, double* F, double* V/*state var.*/,
-                                          bool deviatoric_only = true);
+                                          bool deviator_only = true);
 
 protected:
 

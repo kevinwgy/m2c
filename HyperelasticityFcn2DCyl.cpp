@@ -11,7 +11,7 @@
 
 void
 HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_F(double* flux, double* F, double* V,
-                                                                bool deviatoric_only)
+                                                                bool deviator_only)
 {
   if(type == NONE) {
     for(int i=0; i<5; i++)
@@ -22,7 +22,7 @@ HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_F(double* flux, do
   double sigma[3], sigma_phiphi;
   GetCauchyStressTensor(F, V, sigma, sigma_phiphi);
 
-  if(deviatoric_only) {
+  if(deviator_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[2] + sigma_phiphi); //hydrostatic pressure
     sigma[0] += p;
     sigma[2] += p;
@@ -40,7 +40,7 @@ HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_F(double* flux, do
 
 void
 HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_G(double* flux, double* F, double* V,
-                                                                bool deviatoric_only)
+                                                                bool deviator_only)
 {
   if(type == NONE) {
     for(int i=0; i<5; i++)
@@ -51,7 +51,7 @@ HyperelasticityFcnBase2DCyl::EvaluateHyperelasticFluxFunction_G(double* flux, do
   double sigma[3], sigma_phiphi;
   GetCauchyStressTensor(F, V, sigma, sigma_phiphi);
 
-  if(deviatoric_only) {
+  if(deviator_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[2] + sigma_phiphi); //hydrostatic pressure
     sigma[0] += p;
     sigma[2] += p;

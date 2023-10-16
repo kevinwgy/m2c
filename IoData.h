@@ -516,6 +516,8 @@ struct HyperelasticityModelData {
   enum Type {NONE = 0, SAINTVENANT_KIRCHHOFF = 1, MODIFIED_SAINTVENANT_KIRCHHOFF = 2,
              NEO_HOOKEAN = 3, MOONEY_RIVLIN = 4} type;
 
+  enum StressOption {FULL = 0, DEVIATOR_ONLY = 1} stress_option;
+
   double youngs_modulus; 
   double poissons_ratio;
 

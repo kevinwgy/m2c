@@ -374,7 +374,8 @@ int main(int argc, char* argv[])
     }
   if(activate_heo) {
     heo = new HyperelasticityOperator(comm, dms, iod, vf, spo.GetMeshCoordinates(),
-                                      spo.GetMeshDeltaXYZ(), global_mesh, *interp, *grad,
+                                      spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
+                                      global_mesh, *interp, *grad,
                                       *(spo.GetPointerToInnerGhostNodes()),
                                       *(spo.GetPointerToOuterGhostNodes()));
     spo.SetHyperelasticityOperatorPointer(heo);

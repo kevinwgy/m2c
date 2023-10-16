@@ -11,7 +11,7 @@
 
 void
 HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_F(double* flux, double* F, double* V,
-                                                           bool deviatoric_only)
+                                                           bool deviator_only)
 {
   if(type == NONE) {
     for(int i=0; i<5; i++)
@@ -22,7 +22,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_F(double* flux, double*
   double sigma[6];
   GetCauchyStressTensor(F, V, sigma);
 
-  if(deviatoric_only) {
+  if(deviator_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
     sigma[0] += p;
     sigma[3] += p;
@@ -40,7 +40,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_F(double* flux, double*
 
 void
 HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double* F, double* V,
-                                                           bool deviatoric_only)
+                                                           bool deviator_only)
 {
   if(type == NONE) {
     for(int i=0; i<5; i++)
@@ -51,7 +51,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double*
   double sigma[6];
   GetCauchyStressTensor(F, V, sigma);
 
-  if(deviatoric_only) {
+  if(deviator_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
     sigma[0] += p;
     sigma[3] += p;
@@ -69,7 +69,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_G(double* flux, double*
 
 void
 HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double* F, double* V,
-                                                           bool deviatoric_only)
+                                                           bool deviator_only)
 {
   if(type == NONE) {
     for(int i=0; i<5; i++)
@@ -80,7 +80,7 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double*
   double sigma[6];
   GetCauchyStressTensor(F, V, sigma);
 
-  if(deviatoric_only) {
+  if(deviator_only) {
     double p = -1.0/3.0*(sigma[0] + sigma[3] + sigma[5]); //hydrostatic pressure
     sigma[0] += p;
     sigma[3] += p;

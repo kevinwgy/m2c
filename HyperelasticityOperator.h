@@ -25,10 +25,14 @@ class HyperelasticityOperator
   MPI_Comm& comm;
   IoData &iod;
 
+  SpaceVariable3D &coordinates; //!< mesh coords.
+  SpaceVariable3D &volume; //!< volume of control volumes
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
   bool cylindrical_symmetry;
+
+  vector<bool> deviator_only; //!< For each material, only apply the stress deviator?
 
   //! global mesh
   GlobalMeshInfo& global_mesh;
@@ -59,9 +63,6 @@ class HyperelasticityOperator
 
 
   //! internal variables -- storing data at cell interfaces
-  SpaceVariable3D V_i_minus_half;//!< velocity (dim = 3)
-  SpaceVariable3D V_j_minus_half;//!< velocity (dim = 3)
-  SpaceVariable3D V_k_minus_half;//!< velocity (dim = 3)
   SpaceVariable3D dXidx_i_minus_half;  //!< dxi_x/dx, dxi_y/dx, dxi_z/dx at i +/- 1/2 (dim = 3)
   SpaceVariable3D dXidx_j_minus_half;  //!< dxi_x/dx, dxi_y/dx, dxi_z/dx at j +/- 1/2 (dim = 3)
   SpaceVariable3D dXidx_k_minus_half;  //!< dxi_x/dx, dxi_y/dx, dxi_z/dx at k +/- 1/2 (dim = 3)
@@ -78,7 +79,7 @@ public:
   HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                           vector<VarFcnBase*> &varFcn_,
                           SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
-                          GlobalMeshInfo &global_mesh_,
+                          SpaceVariable3D &volume_, GlobalMeshInfo &global_mesh_,
                           InterpolatorBase &interpolator_, GradientCalculatorBase &grad_,
                           std::vector<GhostPoint> &ghost_nodes_inner_,
                           std::vector<GhostPoint> &ghost_nodes_outer_);
@@ -111,6 +112,10 @@ private:
   void AddFluxes2DCylindrical(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                               vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                               SpaceVariable3D &R);
+
+  void AddCylindricalSourceTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
+                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                 SpaceVariable3D &R);
 
 };
 
