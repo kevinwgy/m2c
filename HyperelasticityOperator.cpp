@@ -725,6 +725,35 @@ HyperelasticityOperator::AddCylindricalSourceTerms(SpaceVariable3D &V, SpaceVari
 
 //------------------------------------------------------------
 
+void
+HyperelasticityOperator::PrescribeVelocityForTesting([[maybe_unused]] SpaceVariable3D &V,
+                                                     [[maybe_unused]] double time, [[maybe_unused]] double dt)
+{
+
+#if HYPERELASTICITY_TEST == 1
+
+  assert(cylindrical_symmetry);
+  Vec5D*** v = (Vec5D***)V.GetDataPointer(); 
+  double pi = acos(-1.0);
+  double dmax = 0.5, Rmax = 1.0;
+  for(int k=k0; k<kmax; k++) {
+    for(int j=j0; j<jmax; j++) {
+      double r = global_mesh.GetY(j);
+      for(int i=i0; i<imax; i++) {
+        v[k][j][i][1] = dmax*sin(pi*r/Rmax);
+        v[k][j][i][2] = 0.0; //r-velocity
+        v[k][j][i][3] = 0.0; //unused
+      }
+    }
+  }
+  V.RestoreDataPointerAndInsert();
+
+#endif
+
+}
+
+//------------------------------------------------------------
+
 
 //------------------------------------------------------------
 

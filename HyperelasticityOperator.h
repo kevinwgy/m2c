@@ -99,6 +99,10 @@ public:
                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                 SpaceVariable3D &R);
 
+  //! Test cases
+  void PrescribeVelocityForTesting(SpaceVariable3D &V, [[maybe_unused]] double time,
+                                   [[maybe_unused]] double dt);
+
 private:
 
   void ComputeDeformGradAtNodes3D(SpaceVariable3D &Xi); //!< Only within the physical domain

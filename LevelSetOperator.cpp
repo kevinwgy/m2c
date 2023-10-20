@@ -1394,8 +1394,10 @@ void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, ve
 
 //-----------------------------------------------------
 
-void LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariable3D &V, [[maybe_unused]] SpaceVariable3D &Phi,
-                                                        [[maybe_unused]] double time, [[maybe_unused]] double dt)
+void
+LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariable3D &V,
+                                                   [[maybe_unused]] SpaceVariable3D &Phi,
+                                                   [[maybe_unused]] double time, [[maybe_unused]] double dt)
 {
  
 #if LEVELSET_TEST == 1
