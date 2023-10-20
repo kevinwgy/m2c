@@ -112,6 +112,10 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
   MathTools::LinearAlgebra::CalculateATransposeA2x2(F2x2,M2x2); //M2x2 = C2D = F2D'F2D
+
+  double J = r_over_R*sqrt(MathTools::LinearAlgebra::CalculateDeterminant2x2(M2x2)); //J = r/R*sqrt(|C2D|)
+  assert(J>0.0);
+
   M2x2[0] -= 1.0;
   M2x2[3] -= 1.0;
   MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(0.5, M2x2, M2x2); //M2x2=E2D=1/2(C2D-I), Green strain
@@ -124,8 +128,6 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   M2x2[3] += lambda_trace;
   
   //convert to sigma2D (dim:3)
-  double J = MathTools::LinearAlgebra::CalculateDeterminant2x2(F);
-  assert(J>0.0);
   ConvertPK2ToCauchy(M2x2, F2x2, J, sigma);
 
   sigma_phiphi = 1.0/J*r_over_R_2*(lambda_trace + mu*(r_over_R_2 - 1.0));
@@ -161,7 +163,7 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   F2x2[1] = F[2];  F2x2[3] = F[8];
   double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
-  MathTools::LinearAlgebra::CalculateATransposeA2x2(F,N2x2); //N = C2D = F2D'F2D
+  MathTools::LinearAlgebra::CalculateATransposeA2x2(F2x2,N2x2); //N = C2D = F2D'F2D
   for(int i=0; i<3; i++)
     M2x2[i] = N2x2[i];  //M = N = C2D
   M2x2[0] -= 1.0;
@@ -270,7 +272,7 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   F2x2[1] = F[2];  F2x2[3] = F[8];
   double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
-  MathTools::LinearAlgebra::CalculateAATranspose2x2(F,N2x2); //N = B2D = F2D*F2D': left Cauchy-Green
+  MathTools::LinearAlgebra::CalculateAATranspose2x2(F2x2,N2x2); //N = B2D = F2D*F2D': left Cauchy-Green
   MathTools::LinearAlgebra::CalculateMatrixMatrixProduct2x2(N2x2,N2x2,M2x2); //M = B2D*B2D
 
   // calculate I1, I2, I3 (principal invariants)
