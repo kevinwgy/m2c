@@ -91,7 +91,7 @@ public:
 
   void ApplyBoundaryConditionsToReferenceMap(SpaceVariable3D &Xi);
 
-  void ComputeReferenceMapResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, SpaceVariable3D &R);
+  void ComputeReferenceMapResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, SpaceVariable3D &R, double time);
 
   void ComputeDeformationGradientAtNodes(SpaceVariable3D &Xi); //!< Only within the physical domain
 
@@ -100,8 +100,7 @@ public:
                                 SpaceVariable3D &R);
 
   //! Test cases
-  void PrescribeVelocityForTesting(SpaceVariable3D &V, [[maybe_unused]] double time,
-                                   [[maybe_unused]] double dt);
+  void PrescribeVelocityForTesting(SpaceVariable3D &V, double time);
 
 private:
 

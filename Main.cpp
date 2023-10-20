@@ -300,11 +300,14 @@ int main(int argc, char* argv[])
 
 
 #ifdef LEVELSET_TEST
-  if(!lso.empty()) {
-    print("\n");
-    print("\033[0;32m- Testing the Level Set Solver using a prescribed velocity field (%d). "
-          "N-S solver not activated.\033[0m\n", (int)LEVELSET_TEST);
+  print("\n");
+  if(lso.empty()) {
+    print_error("*** Error: Activated LEVELSET_TEST (%d), but LevelSetOperator is not specified.\n",
+                (int)LEVELSET_TEST);
+    exit_mpi();
   }
+  print("\033[0;32m- Testing the Level Set Solver using a prescribed velocity field (%d). "
+        "N-S solver not activated.\033[0m\n", (int)LEVELSET_TEST);
 #endif
   
 
@@ -382,6 +385,18 @@ int main(int argc, char* argv[])
     Xi = new SpaceVariable3D(comm, &(dms.ghosted1_3dof));
     heo->InitializeReferenceMap(*Xi);
   }
+
+
+#ifdef HYPERELASTICITY_TEST 
+  print("\n");
+  if(!heo || !Xi) {
+    print_error("*** Error: Activated HYPERELASTICITY_TEST (%d), but HyperelasticityOperator and/or "
+                "ReferenceMapOperator are not defined.\n", (int)HYPERELASTICITY_TEST);
+    exit_mpi();
+  }
+  print("\033[0;32m- Testing the Hyperelasticity Solver using a prescribed velocity field (%d).\033[0m\n",
+        (int)HYPERELASTICITY_TEST);
+#endif
 
 
   //! Create prescribed motion operator (if needed)
@@ -618,7 +633,8 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt, t, dt, time_step, subcycle, dts); 
+      integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt, t, dt, time_step,
+                                     subcycle, dts); 
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 

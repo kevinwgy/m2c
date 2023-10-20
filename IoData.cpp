@@ -1008,7 +1008,7 @@ void HyperelasticityModelData::setup(const char *name, ClassAssigner *father)
            "NeoHookean", HyperelasticityModelData::NEO_HOOKEAN,
            "MooneyRivlin", HyperelasticityModelData::MOONEY_RIVLIN);
 
-  new ClassToken<HyperelasticityModelData>(ca, "CauchyStress", this,
+  new ClassToken<HyperelasticityModelData>(ca, "StressTensor", this,
            reinterpret_cast<int HyperelasticityModelData::*>(&HyperelasticityModelData::stress_option), 2,
            "Full",     HyperelasticityModelData::FULL,
            "DeviatorOnly", HyperelasticityModelData::DEVIATOR_ONLY);

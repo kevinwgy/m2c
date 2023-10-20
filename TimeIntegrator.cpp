@@ -173,7 +173,8 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
-  spo.ComputeResidual(V, ID, Rn, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); //compute Rn
+  spo.ComputeResidual(V, ID, Rn, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(),
+                      Xi); //compute Rn
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
   spo.PrimitiveToConservative(V, ID, Un); // get Un
@@ -189,7 +190,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Forward Euler step for the level set equation(s): Phi(n+1) = Phi(n) + dt*R(Phi(n))
   // -------------------------------------------------------------------------------
   for(int i=0; i<(int)Phi.size(); i++) {
-    lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i], time, dt); //compute Rn_ls (level set)
+    lso[i]->ComputeResidual(V, *Phi[i], *Rn_ls[i], time-dt); //compute Rn_ls (level set)
     lso[i]->AXPlusBY(1.0, *Phi[i], dt, *Rn_ls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
 
@@ -208,7 +209,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // -------------------------------------------------------------------------------
   if(Xi) {
     assert(heo);
-    heo->ComputeReferenceMapResidual(V, *Xi, *Rn_xi);
+    heo->ComputeReferenceMapResidual(V, *Xi, *Rn_xi, time-dt);
     if(local_time_stepping)
       AddFluxWithLocalTimeStep(*Xi, 1.0, Dt, *Rn_xi);
     else
@@ -320,7 +321,8 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); //->R(V(n))
+  spo.ComputeResidual(V, ID, R, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(),
+                      Xi); //->R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -345,7 +347,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR LS ****************** 
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<(int)Phi.size(); i++) {
-    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
+    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time-dt); //compute R(Phi(n))
     lso[i]->AXPlusBY(0.0, *Phi1[i], 1.0, *Phi[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi1[i], dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
@@ -357,7 +359,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Forward Euler step for the reference map equation: Xi1 = Xi(n) + dt*R(Xi(n))
   if(Xi) {
     assert(heo);
-    heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
+    heo->ComputeReferenceMapResidual(V, *Xi, *Rxi, time-dt);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
     if(local_time_stepping)
       AddFluxWithLocalTimeStep(*Xi1, 1.0, Dt, *Rxi);
@@ -372,7 +374,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   //compute R(V1) using prev.Phi, "loose coupling"
-  spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
+  spo.ComputeResidual(V1, ID, R, time, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -393,7 +395,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR LS ******************
   // Step 2 for the level set equations: Phi(n+1) = 0.5*Phi(n) + 0.5*Phi1 + 0.5*dt*R(Phi1)
   for(int i=0; i<(int)Phi.size(); i++) {
-    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
+    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time);
     lso[i]->AXPlusBY(0.5, *Phi[i], 0.5, *Phi1[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi[i], 0.5*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
@@ -405,7 +407,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Step 2 for the reference map equation: Xi(n+1) = 0.5*Xi(n) + 0.5*Xi1 + 0.5*dt*R(Xi1)
   if(Xi) {
     assert(heo);
-    heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
+    heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi, time);
     Xi->AXPlusBY(0.5, 0.5, *Xi1); 
     if(local_time_stepping)
       AddFluxWithLocalTimeStep(*Xi, 0.5, Dt, *Rxi);
@@ -521,7 +523,8 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi); //->R(V(n))
+  spo.ComputeResidual(V, ID, R, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(),
+                      Xi); //->R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -546,7 +549,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 1 FOR LS ******************
   // Forward Euler step for the level set equation(s): Phi1 = Phi(n) + dt*R(Phi(n))
   for(int i=0; i<(int)Phi.size(); i++) {
-    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time, dt); //compute R(Phi(n))
+    lso[i]->ComputeResidual(V, *Phi[i], *Rls[i], time-dt); //compute R(Phi(n))
     lso[i]->AXPlusBY(0.0, *Phi1[i], 1.0, *Phi[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi1[i], dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
@@ -558,7 +561,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Forward Euler step for the reference map equation: Xi1 = Xi(n) + dt*R(Xi(n))
   if(Xi) {
     assert(heo);
-    heo->ComputeReferenceMapResidual(V, *Xi, *Rxi);
+    heo->ComputeReferenceMapResidual(V, *Xi, *Rxi, time-dt);
     Xi1->AXPlusBY(0.0, 1.0, *Xi); //Xi1 = Xi(n)
     if(local_time_stepping)
       AddFluxWithLocalTimeStep(*Xi1, 1.0, Dt, *Rxi);
@@ -573,7 +576,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
   //compute R(V1) using prev.Phi, "loose coupling"
-  spo.ComputeResidual(V1, ID, R, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
+  spo.ComputeResidual(V1, ID, R, time, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -600,7 +603,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR LS ******************
   // Step 2: Phi2 = 0.75*Phi(n) + 0.25*Phi1 + 0.25*dt*R(Phi1)
   for(int i=0; i<(int)Phi.size(); i++) {
-    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time, dt);
+    lso[i]->ComputeResidual(V1, *Phi1[i], *Rls[i], time);
     lso[i]->AXPlusBY(0.25, *Phi1[i], 0.75, *Phi[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi1[i], 0.25*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi1[i]);
@@ -612,7 +615,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Step 2: Xi2 = 0.75*Xi(n) + 0.25*Xi1 + 0.25*dt*R(Xi1)
   if(Xi) {
     assert(heo);
-    heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi);
+    heo->ComputeReferenceMapResidual(V1, *Xi1, *Rxi, time);
     Xi1->AXPlusBY(0.25, 0.75, *Xi);  //re-use Xi1 to store Xi2
     if(local_time_stepping)
       AddFluxWithLocalTimeStep(*Xi1, 0.25, Dt, *Rxi);
@@ -627,10 +630,10 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   //compute R(V2) using prev.Phi,"loose coupling"
-  spo.ComputeResidual(V2, ID, R, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
+  spo.ComputeResidual(V2, ID, R, time-0.5*dt, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
 
   if(laser) {
-    laser->ComputeLaserRadiance(V2,ID,*L,time);
+    laser->ComputeLaserRadiance(V2,ID,*L,time-0.5*dt);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
   U1.AXPlusBY(2.0/3.0, 1.0/3.0, Un); //U2 = 1/3*U(n) + 2/3*U2;
@@ -648,7 +651,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 3 FOR LS ******************
   // Step 3: Phi(n+1) = 1/3*Phi(n) + 2/3*Phi2 + 2/3*dt*R(Phi2)
   for(int i=0; i<(int)Phi.size(); i++) {
-    lso[i]->ComputeResidual(V2, *Phi1[i], *Rls[i], time, dt);
+    lso[i]->ComputeResidual(V2, *Phi1[i], *Rls[i], time-0.5*dt);
     lso[i]->AXPlusBY(1.0/3.0, *Phi[i], 2.0/3.0, *Phi1[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->AXPlusBY(1.0, *Phi[i], 2.0/3.0*dt, *Rls[i]); //in case of narrow-band, go over only useful nodes
     lso[i]->ApplyBoundaryConditions(*Phi[i]);
@@ -660,7 +663,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Step 3: Xi(n+1) = 1/3*Xi(n) + 2/3*Xi2 + 2/3*dt*R(Xi2)
   if(Xi) {
     assert(heo);
-    heo->ComputeReferenceMapResidual(V2, *Xi1, *Rxi);
+    heo->ComputeReferenceMapResidual(V2, *Xi1, *Rxi, time-0.5*dt);
     Xi->AXPlusBY(1.0/3.0, 2.0/3.0, *Xi1); 
     if(local_time_stepping)
       AddFluxWithLocalTimeStep(*Xi, 2.0/3.0, Dt, *Rxi);

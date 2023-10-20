@@ -2492,6 +2492,7 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
+                                    [[maybe_unused]] double time,
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                     vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                     vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
@@ -2515,6 +2516,10 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
 
   if(heo) {
     assert(Xi);
+#ifdef HYPERELASTICITY_TEST
+    heo->PrescribeVelocityForTesting(V, time);
+#endif
+
     heo->AddHyperelasticityFluxes(V, ID, *Xi, EBDS, R);
   }
 
@@ -2545,8 +2550,6 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
                                        //      cross-subdomain communications. So, no need to 
                                        //      update the global vec.
 
-
-  
 
   volume.RestoreDataPointerToLocalVector();
 }

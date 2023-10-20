@@ -68,11 +68,13 @@ public:
 
   //! Integrate the ODE system for one time-step. Implemented in derived classes
   virtual void AdvanceOneTimeStep([[maybe_unused]] SpaceVariable3D &V, [[maybe_unused]] SpaceVariable3D &ID, 
-                                  [[maybe_unused]] vector<SpaceVariable3D*> &Phi, [[maybe_unused]] vector<SpaceVariable3D*> &NPhi,
+                                  [[maybe_unused]] vector<SpaceVariable3D*> &Phi,
+                                  [[maybe_unused]] vector<SpaceVariable3D*> &NPhi,
                                   [[maybe_unused]] vector<SpaceVariable3D*> &KappaPhi,
                                   [[maybe_unused]] SpaceVariable3D *L, [[maybe_unused]] SpaceVariable3D *Xi,
                                   [[maybe_unused]] SpaceVariable3D *LocalDt,
-                                  [[maybe_unused]] double time, [[maybe_unused]] double dt, [[maybe_unused]] int time_step,
+                                  [[maybe_unused]] double time, [[maybe_unused]] double dt,
+                                  [[maybe_unused]] int time_step,
                                   [[maybe_unused]] int subcycle, [[maybe_unused]] double dts) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
@@ -120,7 +122,8 @@ public:
   ~TimeIntegratorFE();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi, vector<SpaceVariable3D*> &KappaPhi,
+                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
+                          vector<SpaceVariable3D*> &KappaPhi,
                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
@@ -157,7 +160,8 @@ public:
   ~TimeIntegratorRK2();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi, vector<SpaceVariable3D*> &KappaPhi,
+                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
+                          vector<SpaceVariable3D*> &KappaPhi,
                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
@@ -195,7 +199,8 @@ public:
   ~TimeIntegratorRK3();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi, vector<SpaceVariable3D*> &KappaPhi,
+                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
+                          vector<SpaceVariable3D*> &KappaPhi,
                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 

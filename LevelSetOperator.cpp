@@ -766,11 +766,11 @@ void LevelSetOperator::ApplyBoundaryConditionsKappaPhi(SpaceVariable3D &KappaPhi
 //-----------------------------------------------------
 
 void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R,
-                                       [[maybe_unused]] double time, [[maybe_unused]] double dt)
+                                       [[maybe_unused]] double time)
 {
 
 #ifdef LEVELSET_TEST
-  PrescribeVelocityFieldForTesting(V, Phi, time, dt);
+  PrescribeVelocityFieldForTesting(V, Phi, time);
 #endif
 
   if(iod_ls.solver == LevelSetSchemeData::FINITE_VOLUME)
@@ -1397,7 +1397,7 @@ void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, ve
 void
 LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariable3D &V,
                                                    [[maybe_unused]] SpaceVariable3D &Phi,
-                                                   [[maybe_unused]] double time, [[maybe_unused]] double dt)
+                                                   [[maybe_unused]] double time)
 {
  
 #if LEVELSET_TEST == 1
@@ -1430,8 +1430,8 @@ LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariabl
         double T = 8.0;
         double x = coords[k][j][i][0], y = coords[k][j][i][1];
         double pi = 2.0*acos(0);
-        v[k][j][i][1] =  2.0*pow(sin(pi*x),2)*sin(pi*y)*cos(pi*y)*cos(pi*(time-0.5*dt)/T);
-        v[k][j][i][2] = -2.0*sin(pi*x)*cos(pi*x)*pow(sin(pi*y),2)*cos(pi*(time-0.5*dt)/T);
+        v[k][j][i][1] =  2.0*pow(sin(pi*x),2)*sin(pi*y)*cos(pi*y)*cos(pi*time/T);
+        v[k][j][i][2] = -2.0*sin(pi*x)*cos(pi*x)*pow(sin(pi*y),2)*cos(pi*time/T);
         v[k][j][i][3] = 0.0; 
 
       }
@@ -1442,7 +1442,7 @@ LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariabl
 
   // merging and separation of two circles
   double aa = 1.75, rr = 1.5;
-  double s = (time-0.5*dt)<1.0 ? 1.0 : -1.0;
+  double s = time<1.0 ? 1.0 : -1.0;
   SpaceVariable3D NPhi(comm, &(dms.ghosted1_3dof)); //inefficient, but OK just for testing level set 
 
   if(!narrow_band) {

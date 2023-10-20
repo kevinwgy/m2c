@@ -83,7 +83,7 @@ public:
 
   void ApplyBoundaryConditionsKappaPhi(SpaceVariable3D &KappaPhi);
 
-  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time, double dt);
+  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R, double time);
 
   void ConstructNarrowBandInReinitializer(SpaceVariable3D &Phi);
 
@@ -115,7 +115,7 @@ public:
   void Destroy();
 
   //! for debugging/testing the level set solver (Euler / N-S solver not activated)
-  void PrescribeVelocityFieldForTesting(SpaceVariable3D &V, SpaceVariable3D &Phi, double time, double dt);
+  void PrescribeVelocityFieldForTesting(SpaceVariable3D &V, SpaceVariable3D &Phi, double time);
 
 private:
   // functions for internal use within the class
