@@ -740,7 +740,7 @@ HyperelasticityOperator::PrescribeVelocityForTesting([[maybe_unused]] SpaceVaria
     for(int j=j0; j<jmax; j++) {
       double r = global_mesh.GetY(j);
       for(int i=i0; i<imax; i++) {
-        v[k][j][i][1] = dmax*sin(pi*r/Rmax);
+        v[k][j][i][1] = r<=Rmax ? dmax*sin(pi*r/Rmax) : 0.0;
         v[k][j][i][2] = 0.0; //r-velocity
         v[k][j][i][3] = 0.0; //unused
       }
