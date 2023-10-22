@@ -95,6 +95,9 @@ public:
 
   void ComputeDeformationGradientAtNodes(SpaceVariable3D &Xi); //!< Only within the physical domain
 
+  void ComputePrincipalStresses(SpaceVariable3D &Xi, SpaceVariable3D &V, SpaceVariable3D &ID,
+                                SpaceVariable3D &PS);
+
   void AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                 SpaceVariable3D &R);
@@ -107,6 +110,12 @@ private:
   void ComputeDeformGradAtNodes3D(SpaceVariable3D &Xi); //!< Only within the physical domain
 
   void ComputeDeformGradAtNodes2DCylindrical(SpaceVariable3D &Xi); //!< Only within the physical domain
+
+  void ComputePrincipalStresses3D(SpaceVariable3D &Xi, SpaceVariable3D &V, SpaceVariable3D &ID,
+                                  SpaceVariable3D &PS);
+
+  void ComputePrincipalStresses2DCylindrical(SpaceVariable3D &Xi, SpaceVariable3D &V,
+                                             SpaceVariable3D &ID, SpaceVariable3D &PS);
 
   void AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                    vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,

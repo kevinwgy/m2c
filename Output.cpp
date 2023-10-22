@@ -11,15 +11,16 @@
 //--------------------------------------------------------------------------
 
 Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-               vector<VarFcnBase*> &vf_, 
-               SpaceVariable3D &cell_volume, IonizationOperator* ion_) : 
+               std::vector<VarFcnBase*> &vf_, 
+               SpaceVariable3D &cell_volume, IonizationOperator* ion_,
+               HyperelasticityOperator* heo_) : 
     comm(comm_), 
     iod(iod_), global_mesh(global_mesh_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
     probe_output(comm_, iod_.output, vf_, ion_),
     matvol_output(comm_, iod_, cell_volume),
-    ion(ion_),
+    ion(ion_), heo(heo_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
 {
   iFrame = 0;
@@ -66,8 +67,8 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
   for(auto&& plane : iod.output.planePlots.dataMap) {
     int plane_number = plane.first;
     if(plane_number<0 || plane_number>=numPlanes) {
-      print_error("*** Error: Detected error in plane output. Plane number = %d (should be between 0 and %d)\n",
-                  plane_number, numPlanes-1); 
+      print_error("*** Error: Detected error in plane output. Plane number = %d "
+                  "(should be between 0 and %d)\n", plane_number, numPlanes-1); 
       exit_mpi();
     }
     plane_outputs[plane_number] = new PlaneOutput(comm, iod.output, *plane.second, vf, global_mesh, ion);
@@ -79,6 +80,12 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     exit_mpi();
   }
 
+  // check hyperelasticity requests
+  if(iod.output.principal_elastic_stresses==OutputData::ON && !heo) {
+    print_error("*** Error: User requested elasticity outputs without specifying a "
+                "hyperelasticity model.\n");
+    exit_mpi();
+  }
 }
 
 //--------------------------------------------------------------------------
@@ -94,7 +101,8 @@ Output::~Output()
 
 //--------------------------------------------------------------------------
 
-void Output::InitializeOutput(SpaceVariable3D &coordinates)
+void
+Output::InitializeOutput(SpaceVariable3D &coordinates)
 {
   scalar.StoreMeshCoordinates(coordinates);
   vector3.StoreMeshCoordinates(coordinates);
@@ -116,10 +124,12 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 
 //--------------------------------------------------------------------------
 
-void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
-                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
-                             std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ , std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
-                             SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
+void
+Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
+                        SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
+                        std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/,
+                        std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
+                        SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
 {
 
   //write solution snapshot
@@ -145,12 +155,15 @@ void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariabl
   terminal.PrintSolutionSnapshot(time, dt, time_step, V, ID, Phi, L, force_write);
 
 }
+
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, SpaceVariable3D &V, 
-                                   SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
-                                   std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ , std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
-                                   SpaceVariable3D *L, SpaceVariable3D *Xi)
+void
+Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, SpaceVariable3D &V, 
+                              SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
+                              std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ ,
+                              std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
+                              SpaceVariable3D *L, SpaceVariable3D *Xi)
 {
   //! Post-processing
   if(iod.output.ionization_output_requested())
@@ -223,7 +236,8 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
   }
 
 
-  //KW: Looks like "VecView" may have a problem depending on the order. I had to move "molar_fractions" up here.
+  //KW: Looks like "VecView" may have a problem depending on the order.
+  //    I had to move "molar_fractions" up here.
   bool molar_fractions_requested = false;
   for(int j=0; j<OutputData::MAXSPECIES; j++)
     if(iod.output.molar_fractions[j]==OutputData::ON) {
@@ -239,7 +253,8 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
 
       auto it = AlphaRJ.find(j);
       if(it == AlphaRJ.end()) {
-        print_error("*** Error: User requested output of molar fractions for species %d, but it does not exist.\n", j);
+        print_error("*** Error: User requested output of molar fractions for species %d, "
+                    "but it does not exist.\n", j);
         exit_mpi();
       }
 
@@ -391,6 +406,12 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
     VecView(Ne.GetRefToGlobalVec(), viewer);
   }
 
+  V.RestoreDataPointerToLocalVector(); //no changes made to V.
+  ID.RestoreDataPointerToLocalVector();
+
+
+  // ---------------------------------------
+  // outputs related to hyperelasticity (may use V and ID instead of "v" and "id")
   if(iod.output.reference_map==OutputData::ON) {
     if(Xi == NULL) {
       print_error("*** Error: Cannot output reference map. Solver is not activated.\n");
@@ -400,6 +421,18 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
     VecView(Xi->GetRefToGlobalVec(), viewer);
   }
 
+  if(iod.output.principal_elastic_stresses==OutputData::ON) {
+    if(Xi == NULL) {
+      print_error("*** Error: Cannot output elastic stresses. Ref. map is not provided.\n");
+      exit_mpi();
+    }
+    assert(heo);
+    heo->ComputePrincipalStresses(Xi, V, ID, vector3);
+    PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "PrincipalElasticStresses");
+    VecView(vector3.GetRefToGlobalVec(), viewer);
+  }
+
+  // ---------------------------------------
 
   MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
 
@@ -420,8 +453,6 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
 
   // clean up
   PetscViewerDestroy(&viewer);
-  V.RestoreDataPointerToLocalVector(); //no changes made to V.
-  ID.RestoreDataPointerToLocalVector();
 
   // bookkeeping
   iFrame++;
@@ -433,7 +464,8 @@ void Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, 
 
 //--------------------------------------------------------------------------
 
-void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
+void
+Output::OutputMeshInformation(SpaceVariable3D& coordinates)
 {
   if(iod.output.mesh_filename[0] == 0)
     return; //nothing to do
@@ -506,7 +538,8 @@ void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
 
 //--------------------------------------------------------------------------
 
-void Output::OutputMeshPartition()
+void
+Output::OutputMeshPartition()
 {
   if(iod.output.mesh_partition[0] == 0)
     return; //nothing to do
@@ -536,7 +569,8 @@ void Output::OutputMeshPartition()
 
 //--------------------------------------------------------------------------
 
-void Output::FinalizeOutput()
+void
+Output::FinalizeOutput()
 {
   scalar.Destroy();
   vector3.Destroy(); 

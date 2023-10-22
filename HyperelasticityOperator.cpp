@@ -331,6 +331,133 @@ HyperelasticityOperator::ComputeDeformGradAtNodes2DCylindrical(SpaceVariable3D &
 }
 
 //------------------------------------------------------------
+
+void
+HyperelasticityOperator::ComputePrincipalStresses(SpaceVariable3D &Xi, SpaceVariable3D &V,
+                                                  SpaceVariable3D &ID, SpaceVariable3D &PS)
+{
+  if(cylindrical_symmetry)
+    ComputePrincipalStresses2DCylindrical(Xi,V,ID,PS);
+  else
+    ComputePrincipalStresses3D(Xi,V,ID,PS);
+}
+
+//------------------------------------------------------------
+
+void
+HyperelasticityOperator::ComputePrincipalStresses3D(SpaceVariable3D &Xi, SpaceVariable3D &V,
+                                                    SpaceVariable3D &ID, SpaceVariable3D &PS)
+{
+
+  ComputeDeformGradAtNodes3D(Xi); //fill F
+
+  double*** f  = F.GetDataPointer();
+  double*** id = ID.GetDataPointer();
+  Vec5D*** v   = (Vec5D***)V.GetDataPointer();
+  Vec3D*** ps  = (Vec3D***)PS.GetDataPointer();
+
+
+  int myid = 0;
+  double sigma6[6], sigma9[9]; //Cauchy stress tensor, column-first, symmetric
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        double* floc(&f[k][j][i]);
+        myid = id[k][j][i];
+
+        if(myid == INACTIVE_MATERIAL_ID) {
+          ps[k][j][i] = 0.0;
+          continue;
+        }
+
+        assert(myid>=0 && myid<(int)hyperFcn.size());
+
+        hyperFcn[myid]->GetCauchyStressTensor(floc, v[k][j][i], sigma6);
+
+        // Get a general 3x3 matrix
+        sigma9[0] = sigma6[0];  sigma9[3] = sigma6[1];  sigma9[6] = sigma6[2];
+        sigma9[1] = sigma6[1];  sigma9[4] = sigma6[3];  sigma9[7] = sigma6[4];
+        sigma9[2] = sigma6[2];  sigma9[5] = sigma6[4];  sigma9[8] = sigma6[5];
+
+        XXX I AM HERE --> Check LinearAlgebra::CalculateEigenSymmetricMatrix3x3 before use! XXX
+
+      }
+}
+
+//------------------------------------------------------------
+
+
+  Vec3D*** xi    = (Vec3D***)Xi.GetDataPointer();
+  Vec3D*** dXidx = (Vec3D***)Var1.GetDataPointer();  
+  Vec3D*** dXidy = (Vec3D***)Var2.GetDataPointer();  
+  double*** id   = (double***)ID.GetDataPointer();
+  Vec5D*** v     = (Vec5D***)V.GetDataPointer();
+  Vec5D*** res   = (Vec5D***)R.GetDataPointer();
+  double*** cv   = (double***)volume.GetDataPointer();
+
+  int myid = 0;
+  double gradxi[4]; //local values of Jacobian of Xi
+  double f2[4], f[9] = {0.0}; //deform. grad
+  double sigma[3], sigma_phiphi; //"sigma_2D" and \sigma_{\phi\phi}
+  double Jloc2, r0, mycv;
+  bool invertible = false;
+  for(int k=k0; k<kmax; k++) {
+    for(int j=j0; j<jmax; j++) {
+      double r =  global_mesh.GetY(j);
+      for(int i=i0; i<imax; i++) {
+
+        myid = id[k][j][i];
+
+        if(myid == INACTIVE_MATERIAL_ID)
+          continue;
+        assert(myid>=0 && myid<(int)hyperFcn.size());
+
+        for(int dim=0; dim<2; dim++)
+          gradxi[dim]   = dXidx[k][j][i][dim];
+        for(int dim=0; dim<2; dim++)
+          gradxi[2+dim] = dXidy[k][j][i][dim];
+
+        invertible = MathTools::LinearAlgebra::
+                     CalculateMatrixInverseAndDeterminant2x2(gradxi, f2, &Jloc2);
+        if(!invertible || Jloc2<=0.0)
+          fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d) is invalid."
+                         " determinant = %e.\033[0m\n", i,j,k, Jloc2);
+ 
+        // Note: f = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"!
+        r0 = xi[k][j][i][1];
+        f[0] = f2[0];                f[6] = f2[2];
+                       f[4] = r/r0;  
+        f[2] = f2[1];                f[8] = f2[3];
+
+        // Get sigma_2D and sigma_phiphi
+        dynamic_cast<HyperelasticityFcnBase2DCyl*>
+            (hyperFcn[myid])->GetCauchyStressTensor(f, v[k][j][i], sigma, sigma_phiphi);
+        if(deviator_only[myid]) {                                                   
+          double p = -1.0/3.0*(sigma[0] + sigma[2] + sigma_phiphi); //hydrostatic pressure
+          sigma[0] += p;
+          sigma[2] += p;
+          sigma_phiphi += p;                 
+        }
+        
+        mycv = cv[k][j][i];
+        res[k][j][i][1] -= mycv/r*sigma[1]; //1/r*sigma_rz*cv
+        res[k][j][i][2] -= mycv/r*(sigma[2] - sigma_phiphi); //1/r*(sigma_rr-sigma_phiphi)*cv
+        res[k][j][i][4] -= mycv/r*(sigma[2]*v[k][j][i][2] + sigma[1]*v[k][j][i][1]);
+
+      }
+    }
+  }
+
+  Xi.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+  Var1.RestoreDataPointerToLocalVector();
+  Var2.RestoreDataPointerToLocalVector();
+
+
+//------------------------------------------------------------
 //Note: Fluxes are added on the left-hand-side of the Navier-Stokes equations
 void
 HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,

@@ -9,6 +9,7 @@
 #include <PlaneOutput.h>
 #include <MaterialVolumeOutput.h>
 #include <TerminalVisualization.h>
+#include <HyperelasticityOperator.h>
 #include <stdio.h>
 
 /** Class Output is responsible  for writing solutions to files. It uses PETSc functionalities
@@ -27,6 +28,9 @@ class Output
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
 
+  //! Hyperelasticity solver (Used here optionally, as a post-processor)
+  HyperelasticityOperator *heo;
+  
   //! These variables will temporarily hold solutions before they are printed to file
   SpaceVariable3D scalar;   
   SpaceVariable3D vector3;
@@ -49,15 +53,16 @@ class Output
 public:
 
   Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-         vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
-         IonizationOperator* ion_ = NULL);
+         std::vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
+         IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL);
   ~Output();
 
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh
 
   void OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V,
                        SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
-                       std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ , std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,       
+                       std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ ,
+                       std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,       
                        SpaceVariable3D *L/*laser radiance*/, 
                        SpaceVariable3D *Xi/*ref map for hyperelasticity*/,
                        bool force_write);
@@ -68,8 +73,9 @@ private:
   void OutputMeshInformation(SpaceVariable3D& coordinates);
 
   void WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                             vector<SpaceVariable3D*> &Phi, 
-                             std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/, std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
+                             std::vector<SpaceVariable3D*> &Phi, 
+                             std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/,
+                             std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
                              SpaceVariable3D *L,
                              SpaceVariable3D *Xi); //!< write solution to file
 

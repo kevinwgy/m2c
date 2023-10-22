@@ -2790,6 +2790,8 @@ OutputData::OutputData()
   delta_internal_energy = OFF;
   laser_radiance = OFF;
   reference_map = OFF;
+  principal_elastic_stresses = OFF;
+
   levelset0 = OFF;
   levelset1 = OFF;
   levelset2 = OFF;
@@ -2823,7 +2825,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 25+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 26+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2832,87 +2834,90 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<OutputData>(ca, "TimeInterval", this, &OutputData::frequency_dt);
 
   new ClassToken<OutputData>(ca, "Density", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::density), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::density), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "Velocity", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::velocity), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::velocity), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "Pressure", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::pressure), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::pressure), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "MaterialID", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::materialid), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::materialid), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "Temperature", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::temperature), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "DeltaTemperature", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::delta_temperature), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::delta_temperature), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "InternalEnergyPerUnitMass", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::internal_energy), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::internal_energy), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "DeltaInternalEnergyPerUnitMass", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::delta_internal_energy), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::delta_internal_energy), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LaserRadiance", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "ReferenceMap", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::reference_map), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::reference_map), 2,
+                             "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "PrincipalElasticStresses", this,
+                             reinterpret_cast<int OutputData::*>(&OutputData::principal_elastic_stresses), 2,
+                             "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "LevelSet0", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset0), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::levelset0), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LevelSet1", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset1), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::levelset1), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LevelSet2", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset2), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::levelset2), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LevelSet3", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset3), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::levelset3), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LevelSet4", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::levelset4), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::levelset4), 2,
+                             "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "MeanCharge", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::mean_charge), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::mean_charge), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "HeavyParticlesDensity", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::heavy_particles_density), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::heavy_particles_density), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "ElectronDensity", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::electron_density), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::electron_density), 2,
+                             "Off", 0, "On", 1);
 
   new ClassInt<OutputData>(ca, "MaxChargeNumber", this, &OutputData::max_charge_number);
 
   new ClassToken<OutputData>(ca, "MolarFractionsElement0", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions0), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions0), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "MolarFractionsElement1", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions1), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions1), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "MolarFractionsElement2", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions2), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions2), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "MolarFractionsElement3", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions3), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions3), 2,
+                             "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "MolarFractionsElement4", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions4), 2,
-                               "Off", 0, "On", 1);
+                             reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions4), 2,
+                             "Off", 0, "On", 1);
 
   new ClassStr<OutputData>(ca, "MeshInformation", this, &OutputData::mesh_filename);
 
   new ClassStr<OutputData>(ca, "MeshPartition", this, &OutputData::mesh_partition);
 
   new ClassToken<OutputData>(ca, "VerboseScreenOutput", this,
-                               reinterpret_cast<int OutputData::*>(&OutputData::verbose), 3,
-                               "Low", 0, "Medium", 1, "High", 2);
+                             reinterpret_cast<int OutputData::*>(&OutputData::verbose), 3,
+                             "Low", 0, "Medium", 1, "High", 2);
 
   probes.setup("Probes", ca);
 
