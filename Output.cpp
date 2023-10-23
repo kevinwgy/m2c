@@ -427,7 +427,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
       exit_mpi();
     }
     assert(heo);
-    heo->ComputePrincipalStresses(Xi, V, ID, vector3);
+    heo->ComputePrincipalStresses(*Xi, V, ID, vector3);
     PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "PrincipalElasticStresses");
     VecView(vector3.GetRefToGlobalVec(), viewer);
   }

@@ -65,7 +65,9 @@ struct LinearAlgebra {
    *  vectors are the right eigenvectors --- the i-th column (i=1,2,3) is
    *  the unit eigenvector corresponding to the i-th eigenvalue.
    *  Note: The eigenvalues are SORTED FROM LOWEST TO HIGHEST.
-   *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES! */
+   *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES!
+   *        Matrix A is assumed to be double[9], storing a symmetric matrix.
+   *        The Eigen library only uses the lower-triangular part of A. */
   static bool
   CalculateEigenSymmetricMatrix3x3(double *A, double *values, double *vectors = NULL);
 
@@ -162,7 +164,9 @@ struct LinearAlgebra {
    *  vectors are the right eigenvectors --- the i-th column (i=1,2) is
    *  the unit eigenvector corresponding to the i-th eigenvalue.
    *  Note: The eigenvalues are SORTED FROM LOWEST TO HIGHEST.
-   *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES! */
+   *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES!
+   *        The input A is assumed to be double[4], storing a symmetric matrix.
+   *        The Eigen library only uses the lower-triangular part of A.*/
   static bool
   CalculateEigenSymmetricMatrix2x2(double *A, double *values, double *vectors = NULL);
 

@@ -111,7 +111,9 @@ LinearAlgebra::SolveLinearSystem2x2(double a11, double a12, double a21, double a
  *  the unit eigenvector corresponding to the i-th eigenvalue.
  *  Returns whether eigen decomposition is successful.
  *  Note: The eigenvalues are SORTED FROM LOWEST TO HIGHEST. 
- *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES! */
+ *        They are sorted using ther actual values, NOT THE ABSOLUTE VALUES!
+ *        The input A is assumed to be double[4], storing a symmetric matrix.
+ *        The Eigen library only uses the lower-triangular part of A.*/
 bool
 LinearAlgebra::CalculateEigenSymmetricMatrix2x2(double *A, double *values, double *vectors)
 {

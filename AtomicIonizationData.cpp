@@ -305,7 +305,7 @@ AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T, double
 */
 
 
-  //fprintf(stderr,"I[%d] = %e, nsize = %d, E[%d][%d] = %e, Ieff-E = %e | %e.\n", r, I[r], nsize, r, 
+  //fprintf(stdout,"I[%d] = %e, nsize = %d, E[%d][%d] = %e, Ieff-E = %e | %e.\n", r, I[r], nsize, r, 
   //        nsize-1, E[r][nsize-1],
   //        I[r]-deltaI-E[r][nsize-1], I[r]-deltaI-E[r][std::min(nsize, (int)E[r].size()-1)]);
 
