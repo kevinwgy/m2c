@@ -418,7 +418,7 @@ int main(int argc, char* argv[])
 */
 
   //! Initialize output
-  Output out(comm, dms, iod, global_mesh, vf, spo.GetMeshCellVolumes(), ion); 
+  Output out(comm, dms, iod, global_mesh, vf, spo.GetMeshCellVolumes(), ion, heo); 
   out.InitializeOutput(spo.GetMeshCoordinates());
 
 

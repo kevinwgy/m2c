@@ -239,7 +239,7 @@ HyperelasticityOperator::ComputeDeformGradAtNodes3D(SpaceVariable3D &Xi)
           gradxi[6+dim] = dXidz[k][j][i][dim];
 
         invertible = MathTools::LinearAlgebra::
-                     CalculateMatrixInverseAndDeterminant3x3(gradxi, &f[k][j][i], &Jloc[k][j][i]);
+                     CalculateMatrixInverseAndDeterminant3x3(gradxi, &f[k][j][9*i], &Jloc[k][j][i]);
         if(!invertible)
           fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d) is not invertible."
                          " determinant = %e.\033[0m\n", i,j,k, Jloc[k][j][i]);
@@ -305,10 +305,10 @@ HyperelasticityOperator::ComputeDeformGradAtNodes2DCylindrical(SpaceVariable3D &
         if(!invertible)
           fprintf(stdout,"\033[0;35mWarning: Jacobian of ref. map at (%d,%d,%d) is not invertible."
                          " determinant = %e.\033[0m\n", i,j,k, Jloc2);
- 
+
         // Note: f = [dz/dZ  0  dz/dR;  0  r/R  0;  dr/dZ  0  dr/dR]; //"x = z", "y = r"!
         r0 = xi[k][j][i][1];
-        double* floc(&f[k][j][i]);
+        double* floc(&f[k][j][9*i]);
         floc[0] = f2[0];   floc[3] = 0.0;    floc[6] = f2[2];
         floc[1] = 0.0;     floc[4] = r/r0;   floc[7] = 0.0;
         floc[2] = f2[1];   floc[5] = 0.0;    floc[8] = f2[3];
@@ -369,7 +369,7 @@ HyperelasticityOperator::ComputePrincipalStresses3D(SpaceVariable3D &Xi, SpaceVa
         }
         assert(myid>=0 && myid<(int)hyperFcn.size());
 
-        double* floc(&f[k][j][i]);
+        double* floc(&f[k][j][9*i]);
         hyperFcn[myid]->GetCauchyStressTensor(floc, v[k][j][i], sigma6);
 
         // Get a general 3x3 matrix
@@ -422,7 +422,7 @@ HyperelasticityOperator::ComputePrincipalStresses2DCylindrical(SpaceVariable3D &
         assert(myid>=0 && myid<(int)hyperFcn.size());
 
         // Get sigma_2D and sigma_phiphi
-        double* floc(&f[k][j][i]);
+        double* floc(&f[k][j][9*i]);
         dynamic_cast<HyperelasticityFcnBase2DCyl*>
             (hyperFcn[myid])->GetCauchyStressTensor(floc, v[k][j][i], sigma2d, sigma_phiphi);
 
