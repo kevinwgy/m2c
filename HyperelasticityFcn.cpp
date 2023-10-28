@@ -100,17 +100,19 @@ HyperelasticityFcnBase::EvaluateHyperelasticFluxFunction_H(double* flux, double*
 void
 HyperelasticityFcnBase::ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma)
 {
+  //Note: (Danger!) Should not use M3x3 and N3x3 in this function. They could be active elsewhere!
+  
   assert(J>0.0);
-  MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(1.0/J, F, M3x3); //M = 1/J*F
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(M3x3, P, N3x3); //N = M*P 
-  MathTools::LinearAlgebra::CalculateABTranspose3x3(N3x3, F, M3x3); //M = N*F'
+  MathTools::LinearAlgebra::CalculateCTimesMatrixA3x3(1.0/J, F, MM3x3); //M = 1/J*F
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct3x3(MM3x3, P, NN3x3); //N = M*P 
+  MathTools::LinearAlgebra::CalculateABTranspose3x3(NN3x3, F, MM3x3); //M = N*F'
 
-  sigma[0] = M3x3[0];
-  sigma[1] = M3x3[1];
-  sigma[2] = M3x3[2];
-  sigma[3] = M3x3[4];
-  sigma[4] = M3x3[5];
-  sigma[5] = M3x3[8];
+  sigma[0] = MM3x3[0];
+  sigma[1] = MM3x3[1];
+  sigma[2] = MM3x3[2];
+  sigma[3] = MM3x3[4];
+  sigma[4] = MM3x3[5];
+  sigma[5] = MM3x3[8];
 }
 
 //----------------------------------------------------------------------

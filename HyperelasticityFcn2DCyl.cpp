@@ -71,15 +71,16 @@ void
 HyperelasticityFcnBase2DCyl::ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma)
 {
   //Note: This function takes P2D, F2D, J (not J2D!), and outputs sigma_2D (2x2 matrix, dim=3 by symm)
-  
+  //Note: (Danger!) Do NOT use F2x2, M2x2, N2x2 --- they could be "active" elsewhere
+  double MM2x2[4], NN2x2[4];
   assert(J>0.0);
-  MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(1.0/J, F, M2x2); //M = 1/J*F
-  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct2x2(M2x2, P, N2x2); //N = M*P 
-  MathTools::LinearAlgebra::CalculateABTranspose2x2(N2x2, F, M2x2); //M = N*F'
+  MathTools::LinearAlgebra::CalculateCTimesMatrixA2x2(1.0/J, F, MM2x2); //MM2x2 = 1/J*F
+  MathTools::LinearAlgebra::CalculateMatrixMatrixProduct2x2(MM2x2, P, NN2x2); //NN2x2 = MM2x2*P 
+  MathTools::LinearAlgebra::CalculateABTranspose2x2(NN2x2, F, MM2x2); //MM2x2 = NN2x2*F'
 
-  sigma[0] = M2x2[0];
-  sigma[1] = M2x2[1];
-  sigma[2] = M2x2[3];
+  sigma[0] = MM2x2[0];
+  sigma[1] = MM2x2[1];
+  sigma[2] = MM2x2[3];
 }
 
 //----------------------------------------------------------------------
@@ -164,7 +165,7 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   double r_over_R = F[4], r_over_R_2 = r_over_R*r_over_R;
 
   MathTools::LinearAlgebra::CalculateATransposeA2x2(F2x2,N2x2); //N = C2D = F2D'F2D
-  for(int i=0; i<3; i++)
+  for(int i=0; i<4; i++)
     M2x2[i] = N2x2[i];  //M = N = C2D
   M2x2[0] -= 1.0;
   M2x2[3] -= 1.0;     //M = C2D - I2D

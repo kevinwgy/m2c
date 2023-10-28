@@ -42,6 +42,7 @@ protected:
   VarFcnBase &vf;
 
   double M3x3[9], N3x3[9]; //!< for temporary use
+  double MM3x3[9], NN3x3[9]; //!< for ConvertPK2ToCauchy only
 
 public:
 

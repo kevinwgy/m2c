@@ -45,7 +45,8 @@ class HyperelasticityFcnBase2DCyl : public HyperelasticityFcnBase {
 
 protected:
 
-  double F2x2[4], M2x2[4], N2x2[4]; //!< for temporary use
+  double F2x2[4], M2x2[4], N2x2[4]; //!< for temporary use (avoid overriding!)
+  double MM2x2[4], NN2x2[4]; //!< for ConvertPK2ToCauchy only.
 
 public:
 

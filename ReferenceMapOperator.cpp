@@ -184,7 +184,33 @@ ReferenceMapOperator::TagExternalGhostNodes()
 void
 ReferenceMapOperator::SetInitialCondition(SpaceVariable3D &Xi)
 {
+
+#if HYPERELASTICITY_TEST == 1
+  // assume time t = 1.0
+  double time = 1.0;
+  double pi = acos(-1.0);
+  double dmax = 0.5, Rmax = 1.0;
+  double z, r;
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** xi     = (Vec3D***)Xi.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+        z = coords[k][j][i][0];        
+        r = coords[k][j][i][1];        
+        xi[k][j][i][0] = r<=Rmax ? z - dmax*sin(pi*r/(2.0*Rmax))*time : z;
+        xi[k][j][i][1] = r;
+        xi[k][j][i][2] = coords[k][j][i][2];
+      }
+
+  Xi.RestoreDataPointerAndInsert();
+  coordinates.RestoreDataPointerToLocalVector();
+  return;
+#endif
+
+  // ------------------------------------------
   Xi.AXPlusBY(0.0, 1.0, coordinates, true); //also populating ghost nodes
+  // ------------------------------------------
 }
 
 //-------------------------------------------------------------------
