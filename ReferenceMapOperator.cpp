@@ -190,18 +190,33 @@ ReferenceMapOperator::SetInitialCondition(SpaceVariable3D &Xi)
   double time = 1.0;
   double pi = acos(-1.0);
   double dmax = 0.5, Rmax = 1.0;
-  double z, r;
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   Vec3D*** xi     = (Vec3D***)Xi.GetDataPointer();
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) {
-        z = coords[k][j][i][0];        
-        r = coords[k][j][i][1];        
-        xi[k][j][i][0] = r<=Rmax ? z - dmax*sin(pi*r/(2.0*Rmax))*time : z;
-        xi[k][j][i][1] = r;
-        xi[k][j][i][2] = coords[k][j][i][2];
-      }
+  double z, r;
+
+  if(iod.mesh.type == MeshData::CYLINDRICAL) {
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
+          z = coords[k][j][i][0];        
+          r = coords[k][j][i][1];        
+          xi[k][j][i][0] = r<=Rmax ? z - dmax*sin(pi*r/(2.0*Rmax))*time : z;
+          xi[k][j][i][1] = r;
+          xi[k][j][i][2] = coords[k][j][i][2];
+        }
+  }
+  else { //true 3D
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
+          z = coords[k][j][i][2];
+          r = sqrt(coords[k][j][i][0]*coords[k][j][i][0] +
+                   coords[k][j][i][1]*coords[k][j][i][1]);        
+          xi[k][j][i][0] = coords[k][j][i][0];
+          xi[k][j][i][1] = coords[k][j][i][1];
+          xi[k][j][i][2] = r<=Rmax ? z - dmax*sin(pi*r/(2.0*Rmax))*time : z;
+        }
+  }
 
   Xi.RestoreDataPointerAndInsert();
   coordinates.RestoreDataPointerToLocalVector();

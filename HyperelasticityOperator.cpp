@@ -864,21 +864,33 @@ HyperelasticityOperator::PrescribeVelocityForTesting([[maybe_unused]] SpaceVaria
 {
 
 #if HYPERELASTICITY_TEST == 1
-
-  assert(cylindrical_symmetry);
-  Vec5D*** v = (Vec5D***)V.GetDataPointer(); 
   double pi = acos(-1.0);
   double dmax = 0.5, Rmax = 1.0;
-  for(int k=k0; k<kmax; k++) {
-    for(int j=j0; j<jmax; j++) {
-      double r = global_mesh.GetY(j);
-      for(int i=i0; i<imax; i++) {
-        v[k][j][i][1] = r<=Rmax ? dmax*sin(pi*r/(2.0*Rmax)) : 0.0;
-        v[k][j][i][2] = 0.0; //r-velocity
-        v[k][j][i][3] = 0.0; //unused
+  Vec5D*** v = (Vec5D***)V.GetDataPointer(); 
+
+  if(cylindrical_symmetry) {
+    for(int k=k0; k<kmax; k++) {
+      for(int j=j0; j<jmax; j++) {
+        double r = global_mesh.GetY(j);
+        for(int i=i0; i<imax; i++) {
+          v[k][j][i][1] = r<=Rmax ? dmax*sin(pi*r/(2.0*Rmax)) : 0.0;
+          v[k][j][i][2] = 0.0; //r-velocity
+          v[k][j][i][3] = 0.0; //unused
+        }
       }
     }
   }
+  else { //true 3D
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          double r = sqrt(pow(global_mesh.GetX(i),2) + pow(global_mesh.GetY(j),2));
+          v[k][j][i][1] = 0.0; //x-velocity
+          v[k][j][i][2] = 0.0; //y-velocity
+          v[k][j][i][3] = r<=Rmax ? dmax*sin(pi*r/(2.0*Rmax)) : 0.0; //z-velocity
+        }
+  }
+
   V.RestoreDataPointerAndInsert();
 
 #endif

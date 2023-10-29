@@ -292,8 +292,8 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   I2 *= Jf*Jf;
 
   double factor1 = 2.0/J*Jf*(C10+I1*C01);
-  double factor3 = -2.0/J*Jf*Jf*C01;
   double factor2 = kappa*(J-1.0) - 2.0/(3.0*J)*(C10*I1 + 2.0*C01*I2);
+  double factor3 = -2.0/J*Jf*Jf*C01;
 
   MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B2x2(factor1, N2x2, factor3, M2x2, N2x2);
 
