@@ -175,15 +175,16 @@ GetCauchyStressTensor(double *F, [[maybe_unused]] double *V, double *sigma, doub
   double Cinv[4], J;
   MathTools::LinearAlgebra::CalculateMatrixInverseAndDeterminant2x2(N2x2, Cinv, &J);
   J = r_over_R*sqrt(J);
+  assert(J>0.0);
 
   //calculates the second Piola-Kirchhoff stress tensor
-  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B2x2(kappa, Cinv, 2.0*mu, M2x2, N2x2);
+  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B2x2(kappa*log(J), Cinv, 2.0*mu, M2x2, N2x2);
   
   //convert to sigma_2D (dim:3)
   ConvertPK2ToCauchy(N2x2, F2x2, J, sigma);
 
   //get sigma_phiphi
-  sigma_phiphi = 1.0/J*(kappa + mu*r_over_R_2*(r_over_R_2 - 1));
+  sigma_phiphi = 1.0/J*(kappa*log(J) + mu*r_over_R_2*(r_over_R_2 - 1));
 }
 
 //----------------------------------------------------------------------

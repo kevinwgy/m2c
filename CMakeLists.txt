@@ -41,7 +41,7 @@ find_package(Boost 1.71 REQUIRED)
 # Special tag(s). Don't turn on unless you know what they mean.
 #
 #add_definitions(-DLEVELSET_TEST=3)
-add_definitions(-DHYPERELASTICITY_TEST=1)
+#add_definitions(-DHYPERELASTICITY_TEST=1)
 #-----------------------------------------
 
 # -----------------------------

@@ -196,10 +196,11 @@ HyperelasticityFcnModifiedSaintVenantKirchhoff::GetCauchyStressTensor(double *F,
   //calculates Cinv
   double Cinv[9], J;
   MathTools::LinearAlgebra::CalculateMatrixInverseAndDeterminant3x3(N3x3, Cinv, &J);
+  assert(J>0);
   J = sqrt(J);
 
-  //calculates the second Piola-Kirchhoff stress tensor: P = lambda*tr(E)*I + 2*mu*E
-  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B3x3(kappa, Cinv, 2.0*mu, M3x3, N3x3);
+  //calculates the second Piola-Kirchhoff stress tensor: P = kappa*ln(J)*inv(C) + 2*mu*E
+  MathTools::LinearAlgebra::CalculateMatrixC1APlusC2B3x3(kappa*log(J), Cinv, 2.0*mu, M3x3, N3x3);
   
   //convert to sigma (dim:6)
   ConvertPK2ToCauchy(N3x3, F, J, sigma);

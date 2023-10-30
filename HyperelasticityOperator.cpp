@@ -386,6 +386,19 @@ HyperelasticityOperator::ComputePrincipalStresses3D(SpaceVariable3D &Xi, SpaceVa
         }
 
         std::swap(ps[k][j][i][0], ps[k][j][i][2]); // should be in descending order
+/*
+        if(k==75) {
+          double r = sqrt(global_mesh.GetX(i)*global_mesh.GetX(i)+global_mesh.GetY(j)*global_mesh.GetY(j));
+          if(fabs(r-0.205)<1e-4)         
+            fprintf(stdout,"At (x,y,z) = (%e,%e,%e), r = %e, phi = %e, F = [%e %e %e; %e %e %e; %e %e %e;]. "
+                    "sigma6 = %e %e %e %e %e %e. ps = %e %e %e.\n",
+                    global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k), r,
+                    atan(global_mesh.GetY(j)/global_mesh.GetX(i)), floc[0], floc[3], floc[6],
+                    floc[1], floc[4], floc[7], floc[2], floc[5], floc[8],
+                    sigma6[0], sigma6[1], sigma6[2], sigma6[3], sigma6[4], sigma6[5],
+                    ps[k][j][i][0], ps[k][j][i][1], ps[k][j][i][2]);
+        }
+*/
       }
 
   F.RestoreDataPointerToLocalVector();
@@ -440,7 +453,7 @@ HyperelasticityOperator::ComputePrincipalStresses2DCylindrical(SpaceVariable3D &
         }
 
         std::swap(ps[k][j][i][0], ps[k][j][i][2]); // should be in descending order
-
+/*
         if(i==75 && j==20)
           fprintf(stdout,"At (z,r) = (%e,%e), F = [%e %e %e; %e %e %e; %e %e %e;]. sigma2d = [%e %e; %e %e]"
                   ". sigma_phiphi = %e. ps = %e %e %e.\n",
@@ -448,7 +461,7 @@ HyperelasticityOperator::ComputePrincipalStresses2DCylindrical(SpaceVariable3D &
                   floc[1], floc[4], floc[7], floc[2], floc[5], floc[8],
                   sigma2d[0], sigma2d[1], sigma2d[1], sigma2d[2], sigma_phiphi,
                   ps[k][j][i][0], ps[k][j][i][1], ps[k][j][i][2]);
-
+*/
 
       }
 

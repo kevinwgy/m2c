@@ -498,13 +498,8 @@ int main(int argc, char* argv[])
     embed->OutputResults(t, dt, time_step, true/*force_write*/); //!< write displacement and nodal loads to file
   }
 
-  print("I am here.\n");
-
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, true/*force_write*/);
-
-  print("Done.\n");
-  exit_mpi();
 
   if(concurrent.Coupled()) {
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
