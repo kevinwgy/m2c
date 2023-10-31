@@ -10,6 +10,7 @@
 #include<Interpolator.h>
 
 class EmbeddedBoundaryDataSet;
+class Vec5D;
 
 /*********************************************************
  * class HyperelasticityOperator is responsible for
@@ -98,8 +99,13 @@ public:
   void ComputePrincipalStresses(SpaceVariable3D &Xi, SpaceVariable3D &V, SpaceVariable3D &ID,
                                 SpaceVariable3D &PS);
 
-  //! "F" must have been populated (by calling ComputeDeformationGradientAtNodes)
-  Vec3D ComputePrincipalStressesAtOneNode(Int3 &ijk, Vec5D &v, int id);
+  //! This is a function customized for "probe output". Be careful if you use it elsewhere!
+  void ComputePrincipalStressesAtProbes(SpaceVariable3D &Xi, SpaceVariable3D &ID,
+           std::vector<Int3> &ijk, std::vector<std::pair<int, std::array<bool,8> > > &ijk_valid,
+           std::vector<Vec3D> &trilinear_coords, Vec5D*** v, std::vector<Vec3D> &sol);
+           
+  //! "f" is the 3x3 (i.e. double[9]) deformation gradient
+  Vec3D ComputePrincipalStressesAtPoint(double *f, Vec5D &v, int id);
 
   void AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
@@ -120,11 +126,9 @@ private:
   void ComputePrincipalStresses2DCylindrical(SpaceVariable3D &Xi, SpaceVariable3D &V,
                                              SpaceVariable3D &ID, SpaceVariable3D &PS);
 
-  //! "F" must have been populated (by calling ComputeDeformationGradientAtNodes)
-  Vec3D ComputePrincipalStressesAtOneNode3D(Int3 &ijk, Vec5D &v, int id);
+  Vec3D ComputePrincipalStressesAtPoint3D(double *f, Vec5D &v, int id);
 
-  //! "F" must have been populated (by calling ComputeDeformationGradientAtNodes)
-  Vec3D ComputePrincipalStressesAtOneNode2DCylindrical(Int3 &ijk, Vec5D &v, int id);
+  Vec3D ComputePrincipalStressesAtPoint2DCylindrical(double *f, Vec5D &v, int id);
 
   void AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                    vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,

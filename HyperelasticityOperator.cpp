@@ -6,6 +6,7 @@
 #include<HyperelasticityOperator.h>
 #include<EmbeddedBoundaryDataSet.h>
 #include<linear_algebra.h>
+#include<trilinear_interpolation.h>
 #include<Vector5D.h>
 
 extern int INACTIVE_MATERIAL_ID;
@@ -473,94 +474,163 @@ HyperelasticityOperator::ComputePrincipalStresses2DCylindrical(SpaceVariable3D &
 
 //------------------------------------------------------------
 
-Vec3D
-HyperelasticityOperator::ComputePrincipalStressesAtOneNode(Int3 &ijk, Vec5D &v, int id)
+void
+HyperelasticityOperator::ComputePrincipalStressesAtProbes(SpaceVariable3D &Xi, SpaceVariable3D &ID,
+           std::vector<Int3> &ijk, std::vector<std::pair<int, std::array<bool,8> > > &ijk_valid,
+           std::vector<Vec3D> &trilinear_coords, Vec5D*** v, vector<Vec3D> &sol)
 {
-  if(cylindrical_symmetry)
-    ComputePrincipalStressesAtOneNode2DCylindrical(ijk, v, id);
-  else
-    ComputePrincipalStressesAtOneNode3D(ijk, v, id);
-}
 
-//------------------------------------------------------------
-
-Vec3D
-HyperelasticityOperator::ComputePrincipalStressesAtOneNode3D(Int3 &ijk, Vec5D &v, int id)
-{
-  if(id == INACTIVE_MATERIAL_ID)
-    return Vec3D(0.0);
-
-  assert(id>=0 && id<(int)hyperFcn.size());
-
-  Vec3D ps(0.0);
-
-  double*** f  = F.GetDataPointer();
-
-  int i = ijk[0], j = ijk[1], k = ijk[2];
-  if(coordinates.IsHere(i,j,k) {
-    double* floc(&f[k][j][9*i]);
-    double sigma6[6], sigma9[9]; //Cauchy stress tensor, column-first, symmetric
-    hyperFcn[id]->GetCauchyStressTensor(floc, v, sigma6);
-
-    // Get a general 3x3 matrix
-    sigma9[0] = sigma6[0];  sigma9[3] = sigma6[1];  sigma9[6] = sigma6[2];
-    sigma9[1] = sigma6[1];  sigma9[4] = sigma6[3];  sigma9[7] = sigma6[4];
-    sigma9[2] = sigma6[2];  sigma9[5] = sigma6[4];  sigma9[8] = sigma6[5];
-
-    success = MathTools::LinearAlgebra::CalculateEigenSymmetricMatrix3x3(sigma9, ps);
-    if(!success) {
-      fprintf(stdout,"\033[0;31m*** Error: Unable to calculate matrix "
-                     "eigenvalues in HyperelasticityOperator (1P3D).\n");
-      exit(-1);
-    }
-
-    std::swap(ps[0], ps[2]); // should be in descending order
+  int nProbes = ijk.size();
+  if(nProbes == 0) {
+    sol.clear();
+    return; //no probes
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, (double*)ps, 3, MPI_DOUBLE, MPI_MAX, comm);
+  ComputeDeformationGradientAtNodes(Xi); // fill "F"
+
+  double*** id = ID.GetDataPointer();
+  double*** f  = F.GetDataPointer();
+  
+  sol.assign(nProbes, 0.0);
+  int dim = 5;
+  for(int iProbe=0; iProbe<nProbes; iProbe++) {
+    int i = ijk[iProbe][0], j = ijk[iProbe][1], k = ijk[iProbe][2];
+
+    if(!coordinates.IsHere(i,j,k,true))
+      continue;
+
+    //this probe node is in the current subdomain (including ghost)
+    // c000
+    Vec3D c000 = 0.0;
+    if(ijk_valid[iProbe].second[0])
+      c000 = ComputePrincipalStressesAtPoint(&f[k][j][i*9], v[k][j][i*dim], id[k][j][i]);
+    // c100
+    Vec3D c100 = 0.0;
+    if(ijk_valid[iProbe].second[1])
+      c100 = ComputePrincipalStressesAtPoint(&f[k][j][(i+1)*9], v[k][j][(i+1)*dim], id[k][j][i+1]);
+    // c010
+    Vec3D c010 = 0.0;
+    if(ijk_valid[iProbe].second[2])
+      c010 = ComputePrincipalStressesAtPoint(&f[k][j+1][i*9], v[k][j+1][i*dim], id[k][j+1][i]);
+    // c110
+    Vec3D c110 = 0.0;
+    if(ijk_valid[iProbe].second[3])
+      c110 = ComputePrincipalStressesAtPoint(&f[k][j+1][(i+1)*9], v[k][j+1][(i+1)*dim], id[k][j+1][i+1]);
+    // c001
+    Vec3D c001 = 0.0;
+    if(ijk_valid[iProbe].second[4])
+      c001 = ComputePrincipalStressesAtPoint(&f[k+1][j][i*9], v[k+1][j][i*dim], id[k+1][j][i]);
+    // c101
+    Vec3D c101 = 0.0;
+    if(ijk_valid[iProbe].second[5])
+      c101 = ComputePrincipalStressesAtPoint(&f[k+1][j][(i+1)*9], v[k+1][j][(i+1)*dim], id[k+1][j][i+1]);
+    // c011
+    Vec3D c011 = 0.0;
+    if(ijk_valid[iProbe].second[6])
+      c011 = ComputePrincipalStressesAtPoint(&f[k+1][j+1][i*9], v[k+1][j+1][i*dim], id[k+1][j+1][i]);
+    // c111
+    Vec3D c111 = 0.0;
+    if(ijk_valid[iProbe].second[7])
+      c111 = ComputePrincipalStressesAtPoint(&f[k+1][j+1][(i+1)*9], v[k+1][j+1][(i+1)*dim],
+                                             id[k+1][j+1][i+1]);
+
+    if(ijk_valid[iProbe].first<8) {//fill invalid slots with average value
+      Vec3D c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid[iProbe].first;
+      if(!ijk_valid[iProbe].second[0])  c000 = c_avg;
+      if(!ijk_valid[iProbe].second[1])  c100 = c_avg;
+      if(!ijk_valid[iProbe].second[2])  c010 = c_avg;
+      if(!ijk_valid[iProbe].second[3])  c110 = c_avg;
+      if(!ijk_valid[iProbe].second[4])  c001 = c_avg;
+      if(!ijk_valid[iProbe].second[5])  c101 = c_avg;
+      if(!ijk_valid[iProbe].second[6])  c011 = c_avg;
+      if(!ijk_valid[iProbe].second[7])  c111 = c_avg;
+    }
+
+    sol[iProbe] = MathTools::trilinear_interpolation(trilinear_coords[iProbe], c000, c100, c010, c110,
+                                                     c001, c101, c011, c111);
+  }
+  MPI_Allreduce(MPI_IN_PLACE, (double*)sol.data(), 3*sol.size(), MPI_DOUBLE, MPI_SUM, comm);
 
   F.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+
 }
 
 //------------------------------------------------------------
 
 Vec3D
-HyperelasticityOperator::ComputePrincipalStressesAtOnePoint2DCylindrical(Int3 &ijk, Vec5D &v, 
-                                                                         int id)
+HyperelasticityOperator::ComputePrincipalStressesAtPoint(double *f, Vec5D &v, int id)
 {
+  if(cylindrical_symmetry)
+    return ComputePrincipalStressesAtPoint2DCylindrical(f, v, id);
+
+  return ComputePrincipalStressesAtPoint3D(f, v, id);
+}
+
+//------------------------------------------------------------
+
+Vec3D
+HyperelasticityOperator::ComputePrincipalStressesAtPoint3D(double *f, Vec5D &v, int id)
+{
+  Vec3D ps(0.0);
+
   if(id == INACTIVE_MATERIAL_ID)
-    return Vec3D(0.0);
+    return ps;
 
   assert(id>=0 && id<(int)hyperFcn.size());
-  int i = ijk[0], j = ijk[1], k = ijk[2];
-  assert(coordinates.Ishere(i,j,k)); //must be in this subdomain (otherwise this function won't work)
 
+  double sigma6[6], sigma9[9]; //Cauchy stress tensor, column-first, symmetric
+  hyperFcn[id]->GetCauchyStressTensor(f, v, sigma6);
+
+  // Get a general 3x3 matrix
+  sigma9[0] = sigma6[0];  sigma9[3] = sigma6[1];  sigma9[6] = sigma6[2];
+  sigma9[1] = sigma6[1];  sigma9[4] = sigma6[3];  sigma9[7] = sigma6[4];
+  sigma9[2] = sigma6[2];  sigma9[5] = sigma6[4];  sigma9[8] = sigma6[5];
+
+  bool success = MathTools::LinearAlgebra::CalculateEigenSymmetricMatrix3x3(sigma9, ps);
+  if(!success) {
+    fprintf(stdout,"\033[0;31m*** Error: Unable to calculate matrix "
+                   "eigenvalues in HyperelasticityOperator (1P3D).\n");
+    exit(-1);
+  }
+
+  std::swap(ps[0], ps[2]); // should be in descending order
+
+  return ps;
+}
+
+//------------------------------------------------------------
+
+Vec3D
+HyperelasticityOperator::ComputePrincipalStressesAtPoint2DCylindrical(double *f, Vec5D &v, int id)
+{
   Vec3D ps(0.0);
-  double*** f  = F.GetDataPointer();
 
-I AM HERE CHECK WHICH SUBDOMAIN CALLS THIS FUNCTION (OR ALL)
+  if(id == INACTIVE_MATERIAL_ID)
+    return ps;
+
+  assert(id>=0 && id<(int)hyperFcn.size());
+
   // Get sigma_2D and sigma_phiphi
-  double* floc(&f[k][j][9*i]);
   double sigma2d[3], sigma9[9] = {0.0}, sigma_phiphi; //"sigma_2D" and \sigma_{\phi\phi}
   dynamic_cast<HyperelasticityFcnBase2DCyl*>
-      (hyperFcn[myid])->GetCauchyStressTensor(floc, v[k][j][i], sigma2d, sigma_phiphi);
+      (hyperFcn[id])->GetCauchyStressTensor(f, v, sigma2d, sigma_phiphi);
 
   // Get a general 3x3 matrix
   sigma9[0] = sigma2d[0];                             sigma9[6] = sigma2d[1];
                            sigma9[4] = sigma_phiphi; 
   sigma9[2] = sigma2d[1];                             sigma9[8] = sigma2d[2];
 
-  success = MathTools::LinearAlgebra::
-            CalculateEigenSymmetricMatrix3x3(sigma9, ps[k][j][i]);
+  bool success = MathTools::LinearAlgebra::CalculateEigenSymmetricMatrix3x3(sigma9, ps);
   if(!success) {
     fprintf(stdout,"\033[0;31m*** Error: Unable to calculate matrix "
                    "eigenvalues in HyperelasticityOperator (1P2DCyl).\n");
     exit(-1);
   }
 
-  std::swap(ps[0], ps[1]); // should be in descending order
+  std::swap(ps[0], ps[2]); // should be in descending order
 
-  MPI_Allreduce(MPI_IN_PLACE, (double*)ps, 3, MPI_DOUBLE, MPI_MAX, comm);
+  return ps;
 }
 
 //------------------------------------------------------------

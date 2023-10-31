@@ -12,9 +12,8 @@ using std::array;
 
 // This constructor is for explicitly specified probe nodes (i.e. not a line)
 ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_,
-                         GlobalMeshInfo &global_mesh_, IonizationOperator* ion_,
-                         HyperelasticityOperator *heo_) : 
-             comm(comm_), iod_output(iod_output_), vf(vf_), global_mesh(global_mesh_),
+                         IonizationOperator* ion_, HyperelasticityOperator *heo_) : 
+             comm(comm_), iod_output(iod_output_), vf(vf_), 
              ion(ion_), heo(heo_)
 {
   iFrame = 0;
@@ -654,7 +653,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print_error("*** Error: Requested reference map probe, but ReferenceMapOperator is not constructed.\n");
       exit_mpi();
     }
-    Vec3D*** xi  = (Vec3D***)Xi->GetDataPointer();
+    double*** xi  = (double***)Xi->GetDataPointer();
     for(int iNode=0; iNode<numNodes; iNode++) {
       Vec3D sol;
       sol[0] = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], xi, 3, 0);
@@ -671,17 +670,15 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
   if(file[Probes::PRINCIPAL_ELASTIC_STRESSES]) {
     print(file[Probes::PRINCIPAL_ELASTIC_STRESSES], "%8d    %16.8e    ", time_step, time);
     assert(heo && Xi); //this is a just a redundant check
-    heo->ComputeDeformationGradient(Xi); //TODO: not efficient as it computes F everywhere. To be improved!
-    double*** id  = (double***)ID.GetDataPointer();
+    vector<Vec3D> sol; //to be filled
+    heo->ComputePrincipalStressesAtProbes(*Xi, ID, ijk, ijk_valid, trilinear_coords, (Vec5D***)v, sol);
+    assert(numNodes = (int)sol.size());
     for(int iNode=0; iNode<numNodes; iNode++) {
-      Vec3D sol = CalculatePrincipalElasticStressesAtProbe(ijk[iNode], ijk_valid[iNode],
-                      trilinear_coords[iNode], v, id); //may add ID later (if needed)
       print(file[Probes::PRINCIPAL_ELASTIC_STRESSES], "%16.8e    %16.8e    %16.8e   ",
-            sol[0], sol[1], sol[2]);
+            sol[iNode][0], sol[iNode][1], sol[iNode][2]);
     }
     print(file[Probes::PRINCIPAL_ELASTIC_STRESSES],"\n");
     fflush(file[Probes::PRINCIPAL_ELASTIC_STRESSES]);
-    ID.RestoreDataPointerToLocalVector();
   }
 
 
@@ -1046,96 +1043,6 @@ ProbeOutput::CalculateIonizationAtProbe(Int3& ijk, pair<int, array<bool,8> >& ij
       rho  =  v[k+1][j+1][(i+1)*dim];
       p    =  v[k+1][j+1][(i+1)*dim+4];
       c111 = ion->ComputeIonizationAtOnePoint(myid, rho, p);
-    }
-
-
-    if(ijk_valid.first<8) {//fill invalid slots with average value
-      Vec3D c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid.first;
-      if(!ijk_valid.second[0])  c000 = c_avg;
-      if(!ijk_valid.second[1])  c100 = c_avg;
-      if(!ijk_valid.second[2])  c010 = c_avg;
-      if(!ijk_valid.second[3])  c110 = c_avg;
-      if(!ijk_valid.second[4])  c001 = c_avg;
-      if(!ijk_valid.second[5])  c101 = c_avg;
-      if(!ijk_valid.second[6])  c011 = c_avg;
-      if(!ijk_valid.second[7])  c111 = c_avg;
-    }
-
-    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
-  }
-
-  MPI_Allreduce(MPI_IN_PLACE, (double*)sol, 3, MPI_DOUBLE, MPI_SUM, comm);
-  return sol;
-}
-
-//-------------------------------------------------------------------------
-
-Vec3D
-ProbeOutput::CalculatePrincipalElasticStressesAtProbe(Int3& ijk, pair<int, std::array<bool,8> >& ijk_valid,
-                                                      Vec3D &trilinear_coords, double ***v, double ***id)
-{
-  Vec3D sol(0.0);
-
-  int i = ijk[0], j = ijk[1], k = ijk[2];
-  int dim = 5;
-  int myid;
-
-  if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
-
-    // c000
-    Vec3D c000 = 0.0;
-    if(ijk_valid.second[0]) {
-      myid = id[k][j][i]; 
-      c000 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j][i*dim]), myid);
-    }
-
-    // c100
-    Vec3D c100 = 0.0;
-    if(ijk_valid.second[1]) {
-      myid = id[k][j][i+1];
-      c100 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j][(i+1)*dim]), myid);
-    }
-
-    // c010
-    Vec3D c010 = 0.0;
-    if(ijk_valid.second[2]) {
-      myid = id[k][j+1][i];
-      c010 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j+1][i*dim]), myid);
-    }
-
-    // c110
-    Vec3D c110 = 0.0;
-    if(ijk_valid.second[3]) {
-      myid = id[k][j+1][i+1];
-      c110 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j+1][(i+1)*dim]), myid);
-    }
-
-    // c001
-    Vec3D c001 = 0.0;
-    if(ijk_valid.second[4]) {
-      myid = id[k+1][j][i];
-      c001 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k+1][j][i*dim]), myid);
-    }
-
-    // c101
-    Vec3D c101 = 0.0;
-    if(ijk_valid.second[5]) {
-      myid = id[k+1][j][i+1];
-      c101 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k+1][j][(i+1)*dim]), myid);
-    }
-
-    // c011
-    Vec3D c011 = 0.0;
-    if(ijk_valid.second[6]) {
-      myid = id[k+1][j+1][i];
-      c011 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k+1][j+1][i*dim]), myid);
-    }
-
-    // c111
-    Vec3D c111 = 0.0;
-    if(ijk_valid.second[7]) {
-      myid = id[k+1][j+1][i+1];
-      c111 = heo->ComputePrincipalStressesAtOneNode(xyz, (Vec5D*)(&v[k+1][j+1][(i+1)*dim]), myid);
     }
 
 

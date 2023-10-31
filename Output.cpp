@@ -18,7 +18,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     iod(iod_), global_mesh(global_mesh_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
-    probe_output(comm_, iod_.output, vf_, global_mesh_, ion_, heo_),
+    probe_output(comm_, iod_.output, vf_, ion_, heo_),
     matvol_output(comm_, iod_, cell_volume),
     ion(ion_), heo(heo_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
