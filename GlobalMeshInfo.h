@@ -78,7 +78,9 @@ public:
   double GetDz(Int3 ijk);
 
   Vec3D GetXYZ(Int3 ijk);
+  Vec3D GetXYZ(int i, int j, int k);
   Vec3D GetDXYZ(Int3 ijk);
+  Vec3D GetDXYZ(int i, int j, int k);
 
   bool IsMesh2D() {return two_dimensional_mesh;}
 

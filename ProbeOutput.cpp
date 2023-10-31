@@ -12,8 +12,10 @@ using std::array;
 
 // This constructor is for explicitly specified probe nodes (i.e. not a line)
 ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_,
-                         IonizationOperator* ion_) : 
-             comm(comm_), iod_output(iod_output_), vf(vf_), ion(ion_)
+                         GlobalMeshInfo &global_mesh_, IonizationOperator* ion_,
+                         HyperelasticityOperator *heo_) : 
+             comm(comm_), iod_output(iod_output_), vf(vf_), global_mesh(global_mesh_),
+             ion(ion_), heo(heo_)
 {
   iFrame = 0;
 
@@ -155,6 +157,25 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     file[Probes::IONIZATION] = fopen(filename, "w");
     delete [] filename;
   }
+
+  if (iod_output.probes.reference_map[0] != 0) {
+    char *filename = new char[spn + strlen(iod_output.probes.reference_map)];
+    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.reference_map);
+    file[Probes::REFERENCE_MAP] = fopen(filename, "w");
+    delete [] filename;
+  }
+
+  if (iod_output.probes.principal_elastic_stresses[0] != 0) {
+    if(!heo) {
+      print_error("*** Error: Requested elasticity result at probe(s), without specifying a hyperelasticity model.\n");
+      exit_mpi();
+    }
+    char *filename = new char[spn + strlen(iod_output.probes.principal_elastic_stresses)];
+    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.principal_elastic_stresses);
+    file[Probes::PRINCIPAL_ELASTIC_STRESSES] = fopen(filename, "w");
+    delete [] filename;
+  }
+
 
   for(int i=0; i<Probes::SIZE; i++)
     if(file[i]) { //write header
@@ -441,7 +462,8 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
 
 void 
 ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                                   std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, bool force_write)
+                                   std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, 
+                                   SpaceVariable3D *Xi, bool force_write)
 {
 
   if(numNodes <= 0) //nothing to be done
@@ -625,6 +647,43 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     fflush(file[Probes::IONIZATION]);
     ID.RestoreDataPointerToLocalVector();
   }
+
+  if(file[Probes::REFERENCE_MAP]) {
+    print(file[Probes::REFERENCE_MAP], "%8d    %16.8e    ", time_step, time);
+    if(Xi == NULL) {
+      print_error("*** Error: Requested reference map probe, but ReferenceMapOperator is not constructed.\n");
+      exit_mpi();
+    }
+    Vec3D*** xi  = (Vec3D***)Xi->GetDataPointer();
+    for(int iNode=0; iNode<numNodes; iNode++) {
+      Vec3D sol;
+      sol[0] = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], xi, 3, 0);
+      sol[1] = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], xi, 3, 1);
+      sol[2] = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], xi, 3, 2);
+      print(file[Probes::REFERENCE_MAP], "%16.8e    %16.8e    %16.8e    ", sol[0], sol[1], sol[2]);
+    }
+    print(file[Probes::REFERENCE_MAP],"\n");
+    fflush(file[Probes::REFERENCE_MAP]);
+    Xi->RestoreDataPointerToLocalVector();
+  }
+
+
+  if(file[Probes::PRINCIPAL_ELASTIC_STRESSES]) {
+    print(file[Probes::PRINCIPAL_ELASTIC_STRESSES], "%8d    %16.8e    ", time_step, time);
+    assert(heo && Xi); //this is a just a redundant check
+    heo->ComputeDeformationGradient(Xi); //TODO: not efficient as it computes F everywhere. To be improved!
+    double*** id  = (double***)ID.GetDataPointer();
+    for(int iNode=0; iNode<numNodes; iNode++) {
+      Vec3D sol = CalculatePrincipalElasticStressesAtProbe(ijk[iNode], ijk_valid[iNode],
+                      trilinear_coords[iNode], v, id); //may add ID later (if needed)
+      print(file[Probes::PRINCIPAL_ELASTIC_STRESSES], "%16.8e    %16.8e    %16.8e   ",
+            sol[0], sol[1], sol[2]);
+    }
+    print(file[Probes::PRINCIPAL_ELASTIC_STRESSES],"\n");
+    fflush(file[Probes::PRINCIPAL_ELASTIC_STRESSES]);
+    ID.RestoreDataPointerToLocalVector();
+  }
+
 
   MPI_Barrier(comm);
 
@@ -1011,4 +1070,97 @@ ProbeOutput::CalculateIonizationAtProbe(Int3& ijk, pair<int, array<bool,8> >& ij
 
 //-------------------------------------------------------------------------
 
+Vec3D
+ProbeOutput::CalculatePrincipalElasticStressesAtProbe(Int3& ijk, pair<int, std::array<bool,8> >& ijk_valid,
+                                                      Vec3D &trilinear_coords, double ***v, double ***id)
+{
+  Vec3D sol(0.0);
+
+  int i = ijk[0], j = ijk[1], k = ijk[2];
+  int dim = 5;
+  int myid;
+
+  if(i!=INT_MIN && j!=INT_MIN && k!=INT_MIN) {//this probe node is in the current subdomain
+
+    // c000
+    Vec3D c000 = 0.0;
+    if(ijk_valid.second[0]) {
+      myid = id[k][j][i]; 
+      c000 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j][i*dim]), myid);
+    }
+
+    // c100
+    Vec3D c100 = 0.0;
+    if(ijk_valid.second[1]) {
+      myid = id[k][j][i+1];
+      c100 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j][(i+1)*dim]), myid);
+    }
+
+    // c010
+    Vec3D c010 = 0.0;
+    if(ijk_valid.second[2]) {
+      myid = id[k][j+1][i];
+      c010 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j+1][i*dim]), myid);
+    }
+
+    // c110
+    Vec3D c110 = 0.0;
+    if(ijk_valid.second[3]) {
+      myid = id[k][j+1][i+1];
+      c110 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k][j+1][(i+1)*dim]), myid);
+    }
+
+    // c001
+    Vec3D c001 = 0.0;
+    if(ijk_valid.second[4]) {
+      myid = id[k+1][j][i];
+      c001 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k+1][j][i*dim]), myid);
+    }
+
+    // c101
+    Vec3D c101 = 0.0;
+    if(ijk_valid.second[5]) {
+      myid = id[k+1][j][i+1];
+      c101 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k+1][j][(i+1)*dim]), myid);
+    }
+
+    // c011
+    Vec3D c011 = 0.0;
+    if(ijk_valid.second[6]) {
+      myid = id[k+1][j+1][i];
+      c011 = heo->ComputePrincipalStressesAtOneNode(ijk, (Vec5D*)(&v[k+1][j+1][i*dim]), myid);
+    }
+
+    // c111
+    Vec3D c111 = 0.0;
+    if(ijk_valid.second[7]) {
+      myid = id[k+1][j+1][i+1];
+      c111 = heo->ComputePrincipalStressesAtOneNode(xyz, (Vec5D*)(&v[k+1][j+1][(i+1)*dim]), myid);
+    }
+
+
+    if(ijk_valid.first<8) {//fill invalid slots with average value
+      Vec3D c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid.first;
+      if(!ijk_valid.second[0])  c000 = c_avg;
+      if(!ijk_valid.second[1])  c100 = c_avg;
+      if(!ijk_valid.second[2])  c010 = c_avg;
+      if(!ijk_valid.second[3])  c110 = c_avg;
+      if(!ijk_valid.second[4])  c001 = c_avg;
+      if(!ijk_valid.second[5])  c101 = c_avg;
+      if(!ijk_valid.second[6])  c011 = c_avg;
+      if(!ijk_valid.second[7])  c111 = c_avg;
+    }
+
+    sol = MathTools::trilinear_interpolation(trilinear_coords, c000, c100, c010, c110, c001, c101, c011, c111);
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, (double*)sol, 3, MPI_DOUBLE, MPI_SUM, comm);
+  return sol;
+}
+
+//-------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------
 

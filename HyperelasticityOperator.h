@@ -98,6 +98,9 @@ public:
   void ComputePrincipalStresses(SpaceVariable3D &Xi, SpaceVariable3D &V, SpaceVariable3D &ID,
                                 SpaceVariable3D &PS);
 
+  //! "F" must have been populated (by calling ComputeDeformationGradientAtNodes)
+  Vec3D ComputePrincipalStressesAtOneNode(Int3 &ijk, Vec5D &v, int id);
+
   void AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                                 vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                 SpaceVariable3D &R);
@@ -116,6 +119,12 @@ private:
 
   void ComputePrincipalStresses2DCylindrical(SpaceVariable3D &Xi, SpaceVariable3D &V,
                                              SpaceVariable3D &ID, SpaceVariable3D &PS);
+
+  //! "F" must have been populated (by calling ComputeDeformationGradientAtNodes)
+  Vec3D ComputePrincipalStressesAtOneNode3D(Int3 &ijk, Vec5D &v, int id);
+
+  //! "F" must have been populated (by calling ComputeDeformationGradientAtNodes)
+  Vec3D ComputePrincipalStressesAtOneNode2DCylindrical(Int3 &ijk, Vec5D &v, int id);
 
   void AddFluxes3D(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,
                    vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,

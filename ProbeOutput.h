@@ -9,6 +9,7 @@
 #include <VarFcnBase.h>
 #include <SpaceVariable.h>
 #include <IonizationOperator.h>
+#include <HyperelasticityOperator.h>
 
 /** This class is responsible for interpolating solutions at probe locations and outputing
  *  the interpolated solutions to files. It is owned by class Output
@@ -23,8 +24,14 @@ class ProbeOutput {
   OutputData &iod_output;
   std::vector<VarFcnBase*> &vf;
 
-  //post-processor
+  //! global mesh
+  GlobalMeshInfo &global_mesh;
+
+  //! post-processor
   IonizationOperator* ion;
+
+  //! post-processor
+  HyperelasticityOperator* heo;
 
   int numNodes;
   int frequency;
@@ -46,10 +53,11 @@ class ProbeOutput {
 
 public:
   //! Constructor 1: write probe info to file. 
-  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_, IonizationOperator* ion_);
+  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_,
+              GlobalMeshInfo &global_mesh_, IonizationOperator* ion_, HyperelasticityOperator *heo_);
   //! Constructor 2: Probe is part of line_plot 
-  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_, IonizationOperator* ion_,
-              int line_number); 
+  ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<VarFcnBase*> &vf_, 
+              IonizationOperator* ion_, int line_number); 
 
   ~ProbeOutput();
 
@@ -57,10 +65,11 @@ public:
 
   void WriteSolutionAtProbes(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
            std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D* L /*laser radiance*/,
+           SpaceVariable3D *Xi, //!< reference map (optional)
            bool force_write); //!< write probe solution to file
 
-  void WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-           std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D* L /* laser radiance*/,
+  void WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V,
+           SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D* L /* laser radiance*/,
            bool force_write);
 
 public:
@@ -77,6 +86,9 @@ public:
 
   Vec3D CalculateIonizationAtProbe(Int3& ijk, std::pair<int, std::array<bool,8> >& ijk_valid,
                                    Vec3D &trilinear_coords, double ***v, double ***id);
+
+  Vec3D CalculatePrincipalElasticStressesAtProbe(Int3& ijk, std::pair<int, std::array<bool,8> >& ijk_valid,
+                                                 Vec3D &trilinear_coords, double ***v, double ***id);
 
 };
 

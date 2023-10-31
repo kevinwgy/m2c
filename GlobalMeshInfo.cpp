@@ -284,9 +284,25 @@ GlobalMeshInfo::GetXYZ(Int3 ijk)
 //------------------------------------------------------------------
 
 Vec3D
+GlobalMeshInfo::GetXYZ(int i, int j, int k)
+{
+  return Vec3D(GetX(i), GetY(j), GetZ(k));
+}
+
+//------------------------------------------------------------------
+
+Vec3D
 GlobalMeshInfo::GetDXYZ(Int3 ijk)
 {
   return Vec3D(GetDx(ijk[0]), GetDy(ijk[1]), GetDz(ijk[2]));
+}
+
+//------------------------------------------------------------------
+
+Vec3D
+GlobalMeshInfo::GetDXYZ(int i, int j, int k)
+{
+  return Vec3D(GetDx(i), GetDy(j), GetDz(k));
 }
 
 //------------------------------------------------------------------

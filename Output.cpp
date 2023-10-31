@@ -18,7 +18,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     iod(iod_), global_mesh(global_mesh_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
-    probe_output(comm_, iod_.output, vf_, ion_),
+    probe_output(comm_, iod_.output, vf_, global_mesh_, ion_, heo_),
     matvol_output(comm_, iod_, cell_volume),
     ion(ion_), heo(heo_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
@@ -138,7 +138,7 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
     WriteSolutionSnapshot(time, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi);
 
   //write solutions at probes
-  probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, force_write);
+  probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, Xi, force_write);
 
   //write solutions along lines
   for(int i=0; i<(int)line_outputs.size(); i++)

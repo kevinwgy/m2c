@@ -472,6 +472,98 @@ HyperelasticityOperator::ComputePrincipalStresses2DCylindrical(SpaceVariable3D &
 }
 
 //------------------------------------------------------------
+
+Vec3D
+HyperelasticityOperator::ComputePrincipalStressesAtOneNode(Int3 &ijk, Vec5D &v, int id)
+{
+  if(cylindrical_symmetry)
+    ComputePrincipalStressesAtOneNode2DCylindrical(ijk, v, id);
+  else
+    ComputePrincipalStressesAtOneNode3D(ijk, v, id);
+}
+
+//------------------------------------------------------------
+
+Vec3D
+HyperelasticityOperator::ComputePrincipalStressesAtOneNode3D(Int3 &ijk, Vec5D &v, int id)
+{
+  if(id == INACTIVE_MATERIAL_ID)
+    return Vec3D(0.0);
+
+  assert(id>=0 && id<(int)hyperFcn.size());
+
+  Vec3D ps(0.0);
+
+  double*** f  = F.GetDataPointer();
+
+  int i = ijk[0], j = ijk[1], k = ijk[2];
+  if(coordinates.IsHere(i,j,k) {
+    double* floc(&f[k][j][9*i]);
+    double sigma6[6], sigma9[9]; //Cauchy stress tensor, column-first, symmetric
+    hyperFcn[id]->GetCauchyStressTensor(floc, v, sigma6);
+
+    // Get a general 3x3 matrix
+    sigma9[0] = sigma6[0];  sigma9[3] = sigma6[1];  sigma9[6] = sigma6[2];
+    sigma9[1] = sigma6[1];  sigma9[4] = sigma6[3];  sigma9[7] = sigma6[4];
+    sigma9[2] = sigma6[2];  sigma9[5] = sigma6[4];  sigma9[8] = sigma6[5];
+
+    success = MathTools::LinearAlgebra::CalculateEigenSymmetricMatrix3x3(sigma9, ps);
+    if(!success) {
+      fprintf(stdout,"\033[0;31m*** Error: Unable to calculate matrix "
+                     "eigenvalues in HyperelasticityOperator (1P3D).\n");
+      exit(-1);
+    }
+
+    std::swap(ps[0], ps[2]); // should be in descending order
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, (double*)ps, 3, MPI_DOUBLE, MPI_MAX, comm);
+
+  F.RestoreDataPointerToLocalVector();
+}
+
+//------------------------------------------------------------
+
+Vec3D
+HyperelasticityOperator::ComputePrincipalStressesAtOnePoint2DCylindrical(Int3 &ijk, Vec5D &v, 
+                                                                         int id)
+{
+  if(id == INACTIVE_MATERIAL_ID)
+    return Vec3D(0.0);
+
+  assert(id>=0 && id<(int)hyperFcn.size());
+  int i = ijk[0], j = ijk[1], k = ijk[2];
+  assert(coordinates.Ishere(i,j,k)); //must be in this subdomain (otherwise this function won't work)
+
+  Vec3D ps(0.0);
+  double*** f  = F.GetDataPointer();
+
+I AM HERE CHECK WHICH SUBDOMAIN CALLS THIS FUNCTION (OR ALL)
+  // Get sigma_2D and sigma_phiphi
+  double* floc(&f[k][j][9*i]);
+  double sigma2d[3], sigma9[9] = {0.0}, sigma_phiphi; //"sigma_2D" and \sigma_{\phi\phi}
+  dynamic_cast<HyperelasticityFcnBase2DCyl*>
+      (hyperFcn[myid])->GetCauchyStressTensor(floc, v[k][j][i], sigma2d, sigma_phiphi);
+
+  // Get a general 3x3 matrix
+  sigma9[0] = sigma2d[0];                             sigma9[6] = sigma2d[1];
+                           sigma9[4] = sigma_phiphi; 
+  sigma9[2] = sigma2d[1];                             sigma9[8] = sigma2d[2];
+
+  success = MathTools::LinearAlgebra::
+            CalculateEigenSymmetricMatrix3x3(sigma9, ps[k][j][i]);
+  if(!success) {
+    fprintf(stdout,"\033[0;31m*** Error: Unable to calculate matrix "
+                   "eigenvalues in HyperelasticityOperator (1P2DCyl).\n");
+    exit(-1);
+  }
+
+  std::swap(ps[0], ps[1]); // should be in descending order
+
+  MPI_Allreduce(MPI_IN_PLACE, (double*)ps, 3, MPI_DOUBLE, MPI_MAX, comm);
+}
+
+//------------------------------------------------------------
 //Note: Fluxes are added on the left-hand-side of the Navier-Stokes equations
 void
 HyperelasticityOperator::AddHyperelasticityFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &Xi,

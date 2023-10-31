@@ -2970,6 +2970,7 @@ Probes::Probes() {
   levelset3 = "";
   levelset4 = "";
   ionization_result = "";
+  principal_elastic_stresses = "";
 
 }
 
@@ -2978,7 +2979,7 @@ Probes::Probes() {
 void Probes::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 18, father);
+  ClassAssigner *ca = new ClassAssigner(name, 20, father);
 
   new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
   new ClassDouble<Probes>(ca, "TimeInterval", this, &Probes::frequency_dt);
@@ -2997,6 +2998,8 @@ void Probes::setup(const char *name, ClassAssigner *father)
   new ClassStr<Probes>(ca, "LevelSet3", this, &Probes::levelset3);
   new ClassStr<Probes>(ca, "LevelSet4", this, &Probes::levelset4);
   new ClassStr<Probes>(ca, "IonizationResult", this, &Probes::ionization_result);
+  new ClassStr<Probes>(ca, "ReferenceMap", this, &Probes::reference_map);
+  new ClassStr<Probes>(ca, "PrincipalElasticStresses", this, &Probes::principal_elastic_stresses);
 
   myNodes.setup("Node", ca);
 
