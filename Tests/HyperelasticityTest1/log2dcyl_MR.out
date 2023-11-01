@@ -1,0 +1,50 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: 612a857+ | Branch: main | Tag: 
+Computation started at: 2023-10-31.21:37:59 EDT
+Using 2 processor cores (including concurrent programs).
+Command: /home/kevinw3/tinkercliffs/zoey5/m2c input2dcyl_MR.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+
+- Mesh Statistics:
+  X-Direction: [0.000000e+00, 1.500000e+00], 150 nodes/cells, dx_min = 1.000000e-02, dx_max = 1.000000e-02.
+  Y-Direction: [0.000000e+00, 1.500000e+00], 150 nodes/cells, dy_min = 1.000000e-02, dy_max = 1.000000e-02.
+  Z-Direction: [-1.000000e-03, 1.000000e-03], 1 nodes/cells, dz_min = 2.000000e-03, dz_max = 2.000000e-03.
+  Total number of nodes/cells: 22500.
+  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 300
+  o Number of ghost nodes outside computational domain: 47424
+
+
+- Initializing the state variables (V) and material id. (ID).
+
+[0;32m- Testing the Hyperelasticity Solver using a prescribed velocity field (1).[0m
+
+- [Probe] Node 0: Coords = (7.550000e-01, 2.050000e-01, 0.000000e+00).
+
+----------------------------
+--       Main Loop        --
+----------------------------
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 0.000000e+00)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 0.070000 sec.
+
