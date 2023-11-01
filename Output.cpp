@@ -205,6 +205,9 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     exit_mpi();
   }
 
+  // count the number of solution fields outputed
+  int numSol = 0;
+
   // Write solution snapshot
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id = (double***)ID.GetDataPointer();
@@ -221,6 +224,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "density");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.velocity==OutputData::ON) {
@@ -233,6 +237,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     vector3.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "velocity");
     VecView(vector3.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
@@ -264,6 +269,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
       PetscObjectSetName((PetscObject)(AlphaR->GetRefToGlobalVec()), word);
       VecView(AlphaR->GetRefToGlobalVec(), viewer);
     } 
+    numSol++;
   }
 
   if(iod.output.pressure==OutputData::ON) {
@@ -275,6 +281,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "pressure");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.internal_energy==OutputData::ON) {
@@ -286,6 +293,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "internal_energy");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.delta_internal_energy==OutputData::ON) {
@@ -298,6 +306,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "delta_internal_energy");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.materialid==OutputData::ON) {
@@ -314,7 +323,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "materialid");
     VecView(scalar.GetRefToGlobalVec(), viewer);
-
+    numSol++;
   }
 
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
@@ -327,15 +336,18 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
       sprintf(word, "levelset%d", it->first);
       PetscObjectSetName((PetscObject)(Phi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
       VecView(Phi[it->first]->GetRefToGlobalVec(), viewer);
+      numSol++;
 
       if (iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {                                                                                                    
 	sprintf(word, "NPhi%d", it->first);
 	PetscObjectSetName((PetscObject)(NPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to NPhi[i].
 	VecView(NPhi[it->first]->GetRefToGlobalVec(), viewer);
+        numSol++;
 
 	sprintf(word, "KappaPhi%d", it->first);
 	PetscObjectSetName((PetscObject)(KappaPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to KappaPhi[i].
 	VecView(KappaPhi[it->first]->GetRefToGlobalVec(), viewer);
+        numSol++;
       }
     }
   }
@@ -353,6 +365,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "temperature");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
@@ -369,6 +382,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "delta_temperature");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
@@ -379,6 +393,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     }
     PetscObjectSetName((PetscObject)(L->GetRefToGlobalVec()), "laser_radiance");
     VecView(L->GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
@@ -386,24 +401,28 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     SpaceVariable3D& Zav(ion->GetReferenceToZav());
     PetscObjectSetName((PetscObject)(Zav.GetRefToGlobalVec()), "mean_charge_number");
     VecView(Zav.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.heavy_particles_density==OutputData::ON) {
     SpaceVariable3D& Nh(ion->GetReferenceToNh());
     PetscObjectSetName((PetscObject)(Nh.GetRefToGlobalVec()), "heavy_particles_density");
     VecView(Nh.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.electron_density==OutputData::ON) {
     SpaceVariable3D& Ne(ion->GetReferenceToNe());
     PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
     VecView(Ne.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.electron_density==OutputData::ON) {
     SpaceVariable3D& Ne(ion->GetReferenceToNe());
     PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
     VecView(Ne.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   V.RestoreDataPointerToLocalVector(); //no changes made to V.
@@ -419,6 +438,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     }
     PetscObjectSetName((PetscObject)(Xi->GetRefToGlobalVec()), "reference_map");
     VecView(Xi->GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.principal_elastic_stresses==OutputData::ON) {
@@ -430,18 +450,26 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     heo->ComputePrincipalStresses(*Xi, V, ID, vector3);
     PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "PrincipalElasticStresses");
     VecView(vector3.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   // ---------------------------------------
 
   MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
 
+  // clean up
+  PetscViewerDestroy(&viewer);
+
+  if(numSol==0)
+    return; //actually, we did not write any solution snapshot
+
   // Add a line to the pvd file to record the new solutio snapshot
   char f1[256];
   sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
   pvdfile  = fopen(f1,"r+");
   if(!pvdfile) {
-    print_error("*** Error: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
+    print_error("*** Error: Cannot open file '%s%s.pvd' for output.\n",
+                iod.output.prefix, iod.output.solution_filename_base);
     exit_mpi();
   }
   fseek(pvdfile, -27, SEEK_END); //!< overwrite the previous end of file script
@@ -451,14 +479,10 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
   mpi_barrier();
   fclose(pvdfile); pvdfile = NULL;
 
-  // clean up
-  PetscViewerDestroy(&viewer);
-
   // bookkeeping
   iFrame++;
   last_snapshot_time = time;
    
-  //print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
   print("- Wrote solution at %e to %s.\n", time, fname);
 }
 

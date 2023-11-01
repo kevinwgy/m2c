@@ -387,6 +387,7 @@ HyperelasticityOperator::ComputePrincipalStresses3D(SpaceVariable3D &Xi, SpaceVa
         }
 
         std::swap(ps[k][j][i][0], ps[k][j][i][2]); // should be in descending order
+
 /*
         if(k==75) {
           double r = sqrt(global_mesh.GetX(i)*global_mesh.GetX(i)+global_mesh.GetY(j)*global_mesh.GetY(j));
@@ -499,51 +500,80 @@ HyperelasticityOperator::ComputePrincipalStressesAtProbes(SpaceVariable3D &Xi, S
     if(!coordinates.IsHere(i,j,k,true))
       continue;
 
+    //NOTE: Unlike other space variables, "Xi" is only populated within the physical domain.
+    //      Therefore, we should calculate stresses only at nodes within the physical domain
+
     //this probe node is in the current subdomain (including ghost)
     // c000
     Vec3D c000 = 0.0;
-    if(ijk_valid[iProbe].second[0])
+    vector<bool> valid(8,false);
+    int valid_count = 0;
+    if(ijk_valid[iProbe].second[0] && coordinates.IsHereOrInternalGhost(i,j,k)) {
+      valid[0] = true;
+      valid_count++;
       c000 = ComputePrincipalStressesAtPoint(&f[k][j][i*9], v[k][j][i*dim], id[k][j][i]);
+    }
     // c100
     Vec3D c100 = 0.0;
-    if(ijk_valid[iProbe].second[1])
+    if(ijk_valid[iProbe].second[1] && coordinates.IsHereOrInternalGhost(i+1,j,k)) {
+      valid[1] = true;
+      valid_count++;
       c100 = ComputePrincipalStressesAtPoint(&f[k][j][(i+1)*9], v[k][j][(i+1)*dim], id[k][j][i+1]);
+    }
     // c010
     Vec3D c010 = 0.0;
-    if(ijk_valid[iProbe].second[2])
+    if(ijk_valid[iProbe].second[2] && coordinates.IsHereOrInternalGhost(i,j+1,k)) {
+      valid[2] = true;
+      valid_count++;
       c010 = ComputePrincipalStressesAtPoint(&f[k][j+1][i*9], v[k][j+1][i*dim], id[k][j+1][i]);
+    }
     // c110
     Vec3D c110 = 0.0;
-    if(ijk_valid[iProbe].second[3])
+    if(ijk_valid[iProbe].second[3] && coordinates.IsHereOrInternalGhost(i+1,j+1,k)) {
+      valid[3] = true;
+      valid_count++;
       c110 = ComputePrincipalStressesAtPoint(&f[k][j+1][(i+1)*9], v[k][j+1][(i+1)*dim], id[k][j+1][i+1]);
+    }
     // c001
     Vec3D c001 = 0.0;
-    if(ijk_valid[iProbe].second[4])
+    if(ijk_valid[iProbe].second[4] && coordinates.IsHereOrInternalGhost(i,j,k+1)) {
+      valid[4] = true;
+      valid_count++;
       c001 = ComputePrincipalStressesAtPoint(&f[k+1][j][i*9], v[k+1][j][i*dim], id[k+1][j][i]);
+    }
     // c101
     Vec3D c101 = 0.0;
-    if(ijk_valid[iProbe].second[5])
+    if(ijk_valid[iProbe].second[5] && coordinates.IsHereOrInternalGhost(i+1,j,k+1)) {
+      valid[5] = true;
+      valid_count++;
       c101 = ComputePrincipalStressesAtPoint(&f[k+1][j][(i+1)*9], v[k+1][j][(i+1)*dim], id[k+1][j][i+1]);
+    }
     // c011
     Vec3D c011 = 0.0;
-    if(ijk_valid[iProbe].second[6])
+    if(ijk_valid[iProbe].second[6] && coordinates.IsHereOrInternalGhost(i,j+1,k+1)) {
+      valid[6] = true;
+      valid_count++;
       c011 = ComputePrincipalStressesAtPoint(&f[k+1][j+1][i*9], v[k+1][j+1][i*dim], id[k+1][j+1][i]);
+    }
     // c111
     Vec3D c111 = 0.0;
-    if(ijk_valid[iProbe].second[7])
+    if(ijk_valid[iProbe].second[7] && coordinates.IsHereOrInternalGhost(i+1,j+1,k+1)) {
+      valid[7] = true;
+      valid_count++;
       c111 = ComputePrincipalStressesAtPoint(&f[k+1][j+1][(i+1)*9], v[k+1][j+1][(i+1)*dim],
                                              id[k+1][j+1][i+1]);
+    }
 
-    if(ijk_valid[iProbe].first<8) {//fill invalid slots with average value
-      Vec3D c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/ijk_valid[iProbe].first;
-      if(!ijk_valid[iProbe].second[0])  c000 = c_avg;
-      if(!ijk_valid[iProbe].second[1])  c100 = c_avg;
-      if(!ijk_valid[iProbe].second[2])  c010 = c_avg;
-      if(!ijk_valid[iProbe].second[3])  c110 = c_avg;
-      if(!ijk_valid[iProbe].second[4])  c001 = c_avg;
-      if(!ijk_valid[iProbe].second[5])  c101 = c_avg;
-      if(!ijk_valid[iProbe].second[6])  c011 = c_avg;
-      if(!ijk_valid[iProbe].second[7])  c111 = c_avg;
+    if(valid_count<8) {//fill invalid slots with average value
+      Vec3D c_avg = (c000+c100+c010+c110+c001+c101+c011+c111)/valid_count;
+      if(!valid[0])  c000 = c_avg;
+      if(!valid[1])  c100 = c_avg;
+      if(!valid[2])  c010 = c_avg;
+      if(!valid[3])  c110 = c_avg;
+      if(!valid[4])  c001 = c_avg;
+      if(!valid[5])  c101 = c_avg;
+      if(!valid[6])  c011 = c_avg;
+      if(!valid[7])  c111 = c_avg;
     }
 
     sol[iProbe] = MathTools::trilinear_interpolation(trilinear_coords[iProbe], c000, c100, c010, c110,

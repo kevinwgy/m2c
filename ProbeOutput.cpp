@@ -40,6 +40,7 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
     print("\n- [Probe] Node %d: Coords = (%e, %e, %e).\n", 
           it->first, locations[pid][0], locations[pid][1], locations[pid][2]);
+    mpi_barrier();
   }
 
   for(int i=0; i<Probes::SIZE; i++) {
@@ -182,8 +183,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
         print(file[i], "## Probe %d: %e, %e, %e\n", iNode, locations[iNode][0], locations[iNode][1], 
                        locations[iNode][2]);
       print(file[i], "## Time step  |  Time  |  Solutions at probe nodes (0, 1, 2, etc.)\n");
+      mpi_barrier();
       fflush(file[i]);
-      MPI_Barrier(comm);
     }
 
 }
@@ -208,6 +209,7 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   print("\n- [Line Plot] (%e, %e, %e) --> (%e, %e, %e), %d points.\n", 
         line->x0, line->y0, line->z0, line->x1, line->y1, line->z1, line->numPoints);
+  mpi_barrier();
 
   locations.clear();
   if(numNodes > 1) {
@@ -480,6 +482,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::DENSITY], "%16.8e    ", sol);
     }
     print(file[Probes::DENSITY],"\n");
+    mpi_barrier();
     fflush(file[Probes::DENSITY]);
   }
 
@@ -490,6 +493,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::VELOCITY_X], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_X],"\n");
+    mpi_barrier();
     fflush(file[Probes::VELOCITY_X]);
   }
 
@@ -500,6 +504,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::VELOCITY_Y], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Y],"\n");
+    mpi_barrier();
     fflush(file[Probes::VELOCITY_Y]);
   }
 
@@ -510,6 +515,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::VELOCITY_Z], "%16.8e    ", sol);
     }
     print(file[Probes::VELOCITY_Z],"\n");
+    mpi_barrier();
     fflush(file[Probes::VELOCITY_Z]);
   }
 
@@ -520,6 +526,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::PRESSURE], "%16.8e    ", sol);
     }
     print(file[Probes::PRESSURE],"\n");
+    mpi_barrier();
     fflush(file[Probes::PRESSURE]);
   }
 
@@ -531,6 +538,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::TEMPERATURE], "%16.8e    ", sol);
     }
     print(file[Probes::TEMPERATURE],"\n");
+    mpi_barrier();
     fflush(file[Probes::TEMPERATURE]);
     ID.RestoreDataPointerToLocalVector();
   }
@@ -543,6 +551,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::DELTA_TEMPERATURE], "%16.8e    ", sol);
     }
     print(file[Probes::DELTA_TEMPERATURE],"\n");
+    mpi_barrier();
     fflush(file[Probes::DELTA_TEMPERATURE]);
     ID.RestoreDataPointerToLocalVector();
   }
@@ -555,6 +564,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::MATERIALID], "%16.8e    ", sol);
     }
     print(file[Probes::MATERIALID],"\n");
+    mpi_barrier();
     fflush(file[Probes::MATERIALID]);
     ID.RestoreDataPointerToLocalVector();
   }
@@ -571,6 +581,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::LASERRADIANCE], "%16.8e    ", sol);
     }
     print(file[Probes::LASERRADIANCE],"\n");
+    mpi_barrier();
     fflush(file[Probes::LASERRADIANCE]);
     L->RestoreDataPointerToLocalVector();
   }
@@ -583,6 +594,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::LEVELSET0], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET0],"\n");
+    mpi_barrier();
     fflush(file[Probes::LEVELSET0]);
     Phi[0]->RestoreDataPointerToLocalVector(); //no changes made
   }
@@ -595,6 +607,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::LEVELSET1], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET1],"\n");
+    mpi_barrier();
     fflush(file[Probes::LEVELSET1]);
     Phi[1]->RestoreDataPointerToLocalVector(); //no changes made
   }
@@ -607,6 +620,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::LEVELSET2], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET2],"\n");
+    mpi_barrier();
     fflush(file[Probes::LEVELSET2]);
     Phi[2]->RestoreDataPointerToLocalVector(); //no changes made
   }
@@ -619,6 +633,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::LEVELSET3], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET3],"\n");
+    mpi_barrier();
     fflush(file[Probes::LEVELSET3]);
     Phi[3]->RestoreDataPointerToLocalVector(); //no changes made
   }
@@ -631,6 +646,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::LEVELSET4], "%16.8e    ", sol);
     }
     print(file[Probes::LEVELSET4],"\n");
+    mpi_barrier();
     fflush(file[Probes::LEVELSET4]);
     Phi[4]->RestoreDataPointerToLocalVector(); //no changes made
   }
@@ -643,6 +659,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::IONIZATION], "%16.8e    %16.8e    ", sol[0], sol[1]);
     }
     print(file[Probes::IONIZATION],"\n");
+    mpi_barrier();
     fflush(file[Probes::IONIZATION]);
     ID.RestoreDataPointerToLocalVector();
   }
@@ -662,6 +679,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
       print(file[Probes::REFERENCE_MAP], "%16.8e    %16.8e    %16.8e    ", sol[0], sol[1], sol[2]);
     }
     print(file[Probes::REFERENCE_MAP],"\n");
+    mpi_barrier();
     fflush(file[Probes::REFERENCE_MAP]);
     Xi->RestoreDataPointerToLocalVector();
   }
@@ -678,6 +696,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
             sol[iNode][0], sol[iNode][1], sol[iNode][2]);
     }
     print(file[Probes::PRINCIPAL_ELASTIC_STRESSES],"\n");
+    mpi_barrier();
     fflush(file[Probes::PRINCIPAL_ELASTIC_STRESSES]);
   }
 

@@ -2970,6 +2970,7 @@ Probes::Probes() {
   levelset3 = "";
   levelset4 = "";
   ionization_result = "";
+  reference_map = "";
   principal_elastic_stresses = "";
 
 }
