@@ -40,6 +40,7 @@ struct SourceGeometry {
   Vec3D  dir;   //!< central axis 
   double R;     //!< radius of curvature (infinite for parallel laser)
   Vec3D  O;     //!< origin of the sector (relevant only for angle != 0)
+  double depth; //!< depth of the layer in front of source that will get source radiance
   inline void GetDirection(Vec3D& x, Vec3D& d) { //!< calc. laser dir at x (assuming x is inside/near laser domain)
     if(angle==0) {d = dir; return;}
     if(angle>0)  {d = O - x; d /= d.norm(); return;}
@@ -180,6 +181,9 @@ private:
   void CalculateGlobalMeshInfo();
 
   void CalculateLaserInfo();
+
+  double SpecifySourceDepth(vector<double> *x_ptr = NULL, vector<double> *y_ptr = NULL,
+                            vector<double> *dx_ptr = NULL, vector<double> *dy_ptr = NULL);
 
   //! Create/partion a new sub-mesh for laser calculation
   void SetupLoadBalancing(SpaceVariable3D &coordinates_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,

@@ -80,6 +80,10 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
   // Calculate laser info ("source" and "laser_range")
   CalculateLaserInfo();
 
+  // Specify a "source_depth" in which source radiance will be imposed
+  source.depth = iod.laser.source_depth>0.0 ? iod.laser.source_depth
+               : SpecifySourceDepth(); //only look at x and y directions (Not perfect)
+
   // Calculate distance from each node to source
   CalculateDistanceToSource(Phi); 
 
@@ -115,6 +119,10 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
   // Calculate laser info ("source" and "laser_range")
   CalculateLaserInfo();
+
+  // Specify a "source_depth" in which source radiance will be imposed
+  source.depth = iod.laser.source_depth>0.0 ? iod.laser.source_depth
+               : SpecifySourceDepth(&x,&y,&dx,&dy); //only look at x and y directions (Not perfect)
 
   //-------------------------------------------------------------------------
   // Create new mesh
@@ -191,9 +199,10 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
     x1 = source.x0 + laser_range*source.dir;
     r0 = r1 = source.radius;
   } else if (source.angle > 0) { //focusing laser
-    x0 = source.x0;
+    double cosine = cos(source.angle);
+    x0 = source.x0 - source.R*(1.0/cosine - cosine)*source.dir;
     r0 = source.R*tan(source.angle);
-    x1 = source.x0 + (source.R - (source.R - laser_range)*cos(source.angle))*source.dir;
+    x1 = source.x0 + (source.R - (source.R - laser_range)*cosine)*source.dir;
     r1 = (source.R - laser_range)*sin(source.angle);
   } else { // diverging laser
     double theta = -source.angle;
@@ -415,10 +424,10 @@ LaserAbsorptionSolver::CheckForInputErrors()
     print_error("*** Error: Laser direction is not specified.\n");
     error ++;
   }
-  if(laser.source_depth<=0.0) {//the user did not specify a (valid) depth
-    print_error("*** Error: 'source_depth' in Laser Absorption is not specified.\n");
-    error ++;
-  }
+  //if(laser.source_depth<=0.0) {//the user did not specify a (valid) depth
+  //  print_error("*** Error: 'source_depth' in Laser Absorption is not specified.\n");
+  //  error ++;
+  //}
   if(laser.focusing_angle_degrees<=-90 || laser.focusing_angle_degrees>=90) {
     print_error("*** Error: 'focusing_angle_degrees' in Laser Absorption must be between -90 and 90.\n");
     error ++;
@@ -534,6 +543,68 @@ LaserAbsorptionSolver::CalculateLaserInfo()
   print("- Laser radiation solver activated. Focusing angle: %f degrees; Source radius: %f; Range: %f\n",
         laser.focusing_angle_degrees, laser.source_radius, laser_range);
 
+}
+
+//--------------------------------------------------------------------------
+
+double
+LaserAbsorptionSolver::SpecifySourceDepth(vector<double> *x_ptr, vector<double> *y_ptr,
+                                          vector<double> *dx_ptr, vector<double> *dy_ptr)
+{
+  // Only look at x and y. For 2D simulations, dz is not meaningful.
+  double x0 = source.x0[0];
+  double y0 = source.x0[1];
+
+  double multiplier = 4.0;
+  double dx0, dy0;
+
+  if(x_ptr && y_ptr && dx_ptr && dy_ptr) {//use these
+
+    auto itx = std::lower_bound(x_ptr->begin(), x_ptr->end(), x0);
+    int index = itx==x_ptr->end() ? itx - x_ptr->begin() - 1 //could be "slightly" outside (or a user error)
+                              : itx - x_ptr->begin();
+    dx0 = (*dx_ptr)[index];
+    
+    auto ity = std::lower_bound(y_ptr->begin(), y_ptr->end(), y0);
+    index = ity==y_ptr->end() ? ity - y_ptr->begin() - 1 //could be "slightly" outside (or a user error)
+                              : ity - y_ptr->begin();
+    dy0 = (*dy_ptr)[index];
+
+  }
+  else {// use coordinates and delta_xyz
+
+    assert(coordinates);
+    assert(delta_xyz);
+    dx0 = dy0 = -1.0;
+
+    Vec3D*** coords = (Vec3D***)coordinates->GetDataPointer();
+    Vec3D*** dxyz   = (Vec3D***)delta_xyz->GetDataPointer();
+
+    for(int i=i0; i<iimax; i++) 
+      if(coords[k0][j0][i-1][0]<x0 && coords[k0][j0][i][0]>=x0) {
+        dx0 = dxyz[k0][j0][i][0];
+        break;
+      }
+    for(int j=j0; j<jjmax; j++) 
+      if(coords[k0][j-1][i0][1]<y0 && coords[k0][j][i0][1]>=y0) {
+        dy0 = dxyz[k0][j][i0][1];
+        break;
+      }
+
+    MPI_Allreduce(MPI_IN_PLACE, &dx0, 1, MPI_DOUBLE, MPI_MAX, comm);
+    MPI_Allreduce(MPI_IN_PLACE, &dy0, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+    if(dx0<0 || dy0<0) {
+      print_error("*** Error: Laser SourceCenter appears to be outside domain.\n");
+      exit_mpi();
+    }
+  }
+
+  double depth = multiplier*std::max(dx0,dy0);
+
+  print("  o Setting SourceDepth = %e in the laser radiation solver.\n", depth);
+
+  return depth;
 }
 
 //--------------------------------------------------------------------------
@@ -769,7 +840,7 @@ LaserAbsorptionSolver::BuildSortedNodeList()
   level = 0;
   nNodesOnLevel = 0;
   for(auto it = sortedNodes.begin(); it != sortedNodes.end(); it++) {
-    if(it->phi <= iod.laser.source_depth) {
+    if(it->phi <= source.depth) {
       int i(it->i), j(it->j), k(it->k);
       it->level = level;
       tag[k][j][i] = 1; //computed 
@@ -1095,8 +1166,12 @@ LaserAbsorptionSolver::SetupLaserGhostNodes()
         
           // verify that it is next to a symmetry boundary (of the laser)
           if(fabs(it->outward_normal*source.dir)>1.0e-12) {
-            fprintf(stdout,"*** Error: Detected ghost node (%d,%d,%d)(%e,%e,%e) within the laser domain. Reduce laser range.\n",
+            fprintf(stdout,"*** Error: Detected ghost node (%d,%d,%d)(%e,%e,%e) within the laser domain. "
+                    "Reduce laser range.\n",
                     i,j,k, x[0],x[1],x[2]);   
+            //fprintf(stdout,"outward_normal = %e %e %e. dir = %e %e %e. prod = %e.\n",
+            //        it->outward_normal[0], it->outward_normal[1], it->outward_normal[2],
+            //        source.dir[0], source.dir[1], source.dir[2], fabs(it->outward_normal*source.dir));
             exit(-1);
           }
 
@@ -1647,7 +1722,12 @@ LaserAbsorptionSolver::InitializeLaserDomainAndGhostNodes(double*** l, double***
       if(level[k][j+1][i]>=0 && level[k][j+1][i]<lvl) {sum += l[k][j+1][i]; count++;}
       if(level[k-1][j][i]>=0 && level[k-1][j][i]<lvl) {sum += l[k-1][j][i]; count++;}
       if(level[k+1][j][i]>=0 && level[k+1][j][i]<lvl) {sum += l[k+1][j][i]; count++;}
-      assert(count>0);
+      //assert(count>0);
+      if(count==0) {
+        fprintf(stdout,"\033[0;31m*** Error: Unable to initialize laser domain and ghost nodes. "
+                "Try increasing SourceDepth.\033[0m\n");
+        exit(-1);
+      }
       l[k][j][i] = sum/count;
 
       if(l[k][j][i]<lmin) {

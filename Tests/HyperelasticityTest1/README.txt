@@ -8,7 +8,7 @@ one or multiple probe locations. There are eight input files in this folder, cor
 3D and 2D-Cylindrical domains and in each case, four different hyperelasticity models 
 (S.Venant-Kirchhoff, Modified S.Venant-Kirchhoff, Neo-Hookean, and Mooney-Rivlin). 
 
-A simple shear is prescibed. The problem setup and exact solutions are given in the KW's notes.
+A simple shear is prescibed. The problem setup and exact solutions are given in KW's notes.
 
 The log files and results (in the "results" folder) are generated using the following version
 of the M2C code:
