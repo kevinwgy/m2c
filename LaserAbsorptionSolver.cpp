@@ -591,6 +591,9 @@ LaserAbsorptionSolver::SpecifySourceDepth(vector<double> *x_ptr, vector<double> 
         break;
       }
 
+    coordinates->RestoreDataPointerToLocalVector();
+    delta_xyz->RestoreDataPointerToLocalVector();
+ 
     MPI_Allreduce(MPI_IN_PLACE, &dx0, 1, MPI_DOUBLE, MPI_MAX, comm);
     MPI_Allreduce(MPI_IN_PLACE, &dy0, 1, MPI_DOUBLE, MPI_MAX, comm);
 
