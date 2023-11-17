@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include<IonizationOperator.h>
+#include<NonIdealSahaEquationSolver.h>
 #include<Vector5D.h>
 
 extern int verbose;
@@ -29,6 +30,20 @@ IonizationOperator::IonizationOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
     }
     print("- Initializing Saha Equation solver for material %d.\n", it->first);
     saha[it->first] = new SahaEquationSolver(*(it->second), iod, varFcn_[it->first], &comm_);
+    switch (it->second->type) {
+      case MaterialIonizationModel::SAHA_IDEAL :
+        print("- Initializing ideal Saha Equation solver for material %d.\n", it->first);
+        saha[it->first] = new SahaEquationSolver(*(it->second), iod, varFcn_[it->first], &comm_);
+        break;
+      case MaterialIonizationModel::SAHA_NONIDEAL :
+        print("- Initializing non-ideal Saha Equation solver for material %d.\n", it->first);
+        saha[it->first] = new NonIdealSahaEquationSolver(*(it->second), iod, varFcn_[it->first], &comm_);
+        break;
+      default :
+        print_error("*** Error: Cannot initialize ionization solver for material %d. Unknown type.\n",
+                    it->first);
+        exit_mpi();
+    }
   }
   for(int i=0; i<(int)saha.size(); i++) { //create dummy solvers for materials w/o ionization model
     if(saha[i] == NULL)

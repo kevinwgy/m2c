@@ -40,6 +40,7 @@ private:
   double q; 
   double qprime;
   double cv; //!< specific heat at constant volume
+  double bigC; // Constant of integration. Maybe set to 0;
 
   double gam1;    //!< gamma-1
   double invgam1; //!< 1/(gamma-1)
@@ -58,12 +59,12 @@ public:
   inline double GetDpdrho(double rho, double e) {double V = 1.0/rho; return gam1*V*V*(e-q)/((V-b)*(V-b));}
   inline double GetBigGamma(double rho, [[maybe_unused]] double e) {return gam1/(1.0 - b*rho);}
 
-  inline double GetTemperature(double rho, double e) {return invcv*(e - q - pc*(1.0/rho - b));}
+  inline double GetTemperature(double rho, double e) {double V = 1.0/rho; return invcv*(V-b)*((e - q)/(V-b) - pc - pow((bigC/(V-b)),gam)/gam1);}
 
   inline double GetReferenceTemperature() {return 0.0;}
   inline double GetReferenceInternalEnergyPerUnitMass() {return 0.0;}
 
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {return cv*T+pc*(1.0/rho-b)+q;}
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {double V = 1.0/rho; return (cv*T/(V-b) + pc + pow((bigC/(V-b)),gam)/gam1) * (V-b) + q;}
   
   inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) {
     double V = 1.0/rho;  return ((h+gam_pc*V)*(V-b)+V*gam1*q)/(gam*V-b);}
@@ -105,7 +106,7 @@ VarFcnNASG::VarFcnNASG(MaterialModelData &data) : VarFcnBase(data) {
   b      = data.nasgModel.volumeConstant;
 
   cv     = data.nasgModel.cv;
-
+  bigC   = data.nasgModel.integrationConstant;
   gam1 = gam -1.0;
   invgam1 = 1.0/gam1;
   gam_pc = gam*pc;

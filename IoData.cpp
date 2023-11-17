@@ -686,7 +686,7 @@ NobleAbelStiffenedGasModelData::NobleAbelStiffenedGasModelData()
   entropyConstant   = 0.0;
 
   cv = 0.0;
-
+  integrationConstant = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -694,7 +694,7 @@ NobleAbelStiffenedGasModelData::NobleAbelStiffenedGasModelData()
 void NobleAbelStiffenedGasModelData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "SpecificHeatRatio", this,
                       &NobleAbelStiffenedGasModelData::specificHeatRatio);
@@ -709,7 +709,8 @@ void NobleAbelStiffenedGasModelData::setup(const char *name, ClassAssigner *fath
 
   new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "SpecificHeatAtConstantVolume", this,
                       &NobleAbelStiffenedGasModelData::cv);
-
+  new ClassDouble<NobleAbelStiffenedGasModelData>(ca, "IntegrationConstant", this,
+                      &NobleAbelStiffenedGasModelData::integrationConstant);
 }
 
 
