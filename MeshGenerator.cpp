@@ -128,7 +128,7 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
          *std::min_element(dy.begin(), dy.end()), *std::max_element(dy.begin(), dy.end()));
   print("  Z-Direction: [%e, %e], %d nodes/cells, dz_min = %e, dz_max = %e.\n", z0, zmax, z.size(), 
          *std::min_element(dz.begin(), dz.end()), *std::max_element(dz.begin(), dz.end()));
-  print("  Total number of nodes/cells: %d.\n", x.size()*y.size()*z.size());
+  print("  Total number of nodes/cells: %lld.\n", (long long)x.size()*y.size()*z.size());
 
   if(iod_mesh.type == MeshData::CYLINDRICAL) 
     print("  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.\n");

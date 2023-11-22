@@ -234,11 +234,11 @@ void SpaceVariable3D::Setup(MPI_Comm &comm_, DM *dm_)
   internal_ghost_k0   = ghost_k0<0    ?   k0 : ghost_k0;
   internal_ghost_kmax = ghost_kmax>NZ ? kmax : ghost_kmax;
 
-  numNodes0 = nx*ny*nz;
-  numNodes1 = (internal_ghost_imax-internal_ghost_i0)
+  numNodes0 = (long long)nx*ny*nz;
+  numNodes1 = (long long)(internal_ghost_imax-internal_ghost_i0)
             * (internal_ghost_jmax-internal_ghost_j0)
             * (internal_ghost_kmax-internal_ghost_k0);
-  numNodes2 = ghost_nx*ghost_ny*ghost_nz;
+  numNodes2 = (long long)ghost_nx*ghost_ny*ghost_nz;
 }
 
 //---------------------------------------------------------
@@ -535,6 +535,39 @@ SpaceVariable3D::CalculateGlobalMax(int mydof, bool workOnGhost)
 
   return global_max;  
 }
+
+//---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateVectorOneNorm()
+{
+  double norm(0.0);
+  VecNorm(globalVec, NORM_1, &norm);
+  return norm;
+}
+
+//---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateVectorTwoNorm()
+{
+  double norm(0.0);
+  VecNorm(globalVec, NORM_2, &norm);
+  return norm;
+}
+
+//---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateVectorInfNorm()
+{
+  double norm(0.0);
+  VecNorm(globalVec, NORM_INFINITY, &norm);
+  return norm;
+}
+
+//---------------------------------------------------------
+
 
 //---------------------------------------------------------
 

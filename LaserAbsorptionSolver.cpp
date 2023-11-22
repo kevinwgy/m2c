@@ -257,7 +257,7 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
   // -------------------------------------------------------------
   // Step 3. Determine the processor cores used for laser computation
   // -------------------------------------------------------------
-  int N = xsub.size()*ysub.size()*zsub.size();
+  long long N = (long long)xsub.size()*ysub.size()*zsub.size();
   int min_size_per_core = iod.laser.min_cells_per_core; 
 
   int ns_mpi_rank, ns_mpi_size;
@@ -269,7 +269,7 @@ LaserAbsorptionSolver::SetupLoadBalancing(SpaceVariable3D &coordinates_,
     active_core = true;
   } 
   else { //use a subset of the cores
-    int Ncores = N/min_size_per_core;
+    long long Ncores = N/min_size_per_core;
     int color;
     if(ns_mpi_rank<Ncores) {
       active_core = true;

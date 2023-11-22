@@ -70,9 +70,9 @@ class SpaceVariable3D {
   int        internal_ghost_imax, internal_ghost_jmax, internal_ghost_kmax; //!< include internal ghosts
   int        ghost_nx, ghost_ny, ghost_nz; //!< width of the ghosted subdomain in x, y and z directions
 
-  int        numNodes0; //number of interior nodes
-  int        numNodes1; //number of interior nodes + internal ghost nodes
-  int        numNodes2; //number of interior nodes + internal & external ghost nodes
+  long long  numNodes0; //number of interior nodes
+  long long  numNodes1; //number of interior nodes + internal ghost nodes
+  long long  numNodes2; //number of interior nodes + internal & external ghost nodes
 
 public:
   SpaceVariable3D(MPI_Comm &comm_, DM *dm_);
@@ -143,9 +143,9 @@ public:
 
   double CalculateGlobalMax(int mydof = 0, bool workOnGhost = false);
 
-  inline int NumInternalNodes() {return numNodes0;}
-  inline int NumNodesIncludingInternalGhosts() {return numNodes1;}
-  inline int NumNodesIncludingGhosts() {return numNodes2;}
+  inline long long NumInternalNodes() {return numNodes0;}
+  inline long long NumNodesIncludingInternalGhosts() {return numNodes1;}
+  inline long long NumNodesIncludingGhosts() {return numNodes2;}
 
   inline bool OutsidePhysicalDomainAndUnpopulated(int i, int j, int k)
   {
@@ -187,6 +187,11 @@ public:
                 std::vector<int>& Yindices, bool workOnGhost = false); //!< customized version
   void SetConstantValue(double a, bool workOnGhost = false); //!< set value to a
   
+  //! calculate norms using PETSc functions
+  double CalculateVectorOneNorm();
+  double CalculateVectorTwoNorm();
+  double CalculateVectorInfNorm();
+
 };
 
 #endif
