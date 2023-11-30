@@ -133,6 +133,8 @@ ClosestTriangle.cpp
 SteadyStateOperator.cpp
 GhostFluidOperator.cpp
 GravityHandler.cpp
+LinearOperator.cpp
+LinearSystemSolver.cpp
 Utils.cpp
 MathTools/rbf_interp.cpp
 MathTools/polynomial_equations.cpp

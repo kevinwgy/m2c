@@ -3555,6 +3555,107 @@ void SpecialToolsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+PETScKSPOptionsData::PETScKSPOptionsData()
+{
+  // solver options
+  ksp = KSP_DEFAULT;
+  pc  = PC_DEFAULT;
+
+  // tolerances
+  rtol   = -1.0; //a negative number means PETSc default will be used
+  abstol = -1.0;
+  dtol   = -1.0;
+  maxits = -1;
+  options_file = "";
+}
+
+//------------------------------------------------------------------------------
+
+void PETScKSPOptionsData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+
+  new ClassToken<PETScKSPOptionsData> (ca, "Type", this,
+     reinterpret_cast<int PETScKSPOptionsData::*>(&PETScKSPOptionsData::ksp), 3,
+     "Default", 0, "GMRes", 1, "FlexibleGMRes", 2);
+
+  new ClassToken<PETScKSPOptionsData> (ca, "Preconditioner", this,
+     reinterpret_cast<int PETScKSPOptionsData::*>(&PETScKSPOptionsData::pc), 6,
+     "Default", 0, "None", 1, "Jacobi", 2, "IncompleteLU", 3, "IncompleteCholesky", 4,
+     "MultiGrid", 5);
+
+  new ClassDouble<PETScKSPOptionsData>(ca, "RelativeErrorTolerance", this,
+                                       &PETScKSPOptionsData::rtol);
+
+  new ClassDouble<PETScKSPOptionsData>(ca, "AbsoluteErrorTolerance", this,
+                                       &PETScKSPOptionsData::abstol);
+
+  new ClassDouble<PETScKSPOptionsData>(ca, "DivergenceTolerance", this,
+                                       &PETScKSPOptionsData::dtol);
+
+  new ClassInt<PETScKSPOptionsData>(ca, "MaxIts", this, &PETScKSPOptionsData::maxits);
+
+  new ClassStr<PETScKSPOptionsData>(ca, "PETScOptionsFile", this, &PETScKSPOptionsData::options_file);
+
+}
+
+//------------------------------------------------------------------------------
+
+PoissonEquationData::PoissonEquationData()
+{
+  bc_x0 = DIRICHLET;
+  bc_y0 = DIRICHLET;
+  bc_z0 = DIRICHLET;
+  bc_xmax = DIRICHLET;
+  bc_ymax = DIRICHLET;
+  bc_zmax = DIRICHLET;
+
+  bc_x0_val = 0.0;
+  bc_y0_val = 0.0;
+  bc_z0_val = 0.0;
+  bc_xmax_val = 0.0;
+  bc_ymax_val = 0.0;
+  bc_zmax_val = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+void PoissonEquationData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 12, father);
+
+  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionX0", this,
+      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_x0), 2,
+      "Dirichlet", 0, "Neumann", 1);
+  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionY0", this,
+      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_y0), 2,
+      "Dirichlet", 0, "Neumann", 1);
+  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionZ0", this,
+      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_z0), 2,
+      "Dirichlet", 0, "Neumann", 1);
+  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionXmax", this,
+      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_xmax), 2,
+      "Dirichlet", 0, "Neumann", 1);
+  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionYmax", this,
+      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_ymax), 2,
+      "Dirichlet", 0, "Neumann", 1);
+  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionZmax", this,
+      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_zmax), 2,
+      "Dirichlet", 0, "Neumann", 1);
+
+  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueX0", this, &PoissonEquationData::bc_x0_val);
+  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueY0", this, &PoissonEquationData::bc_y0_val);
+  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueZ0", this, &PoissonEquationData::bc_z0_val);
+  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueXmax", this, &PoissonEquationData::bc_xmax_val);
+  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueYmax", this, &PoissonEquationData::bc_ymax_val);
+  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueZmax", this, &PoissonEquationData::bc_zmax_val);
+
+}
+
+//------------------------------------------------------------------------------
+
 IoData::IoData(int argc, char** argv)
 {
   //Should NOT call functions in Utils (e.g., print(), exit_mpi()) because the
@@ -3681,6 +3782,9 @@ void IoData::setupCmdFileVariables()
 
   terminal_visualization.setup("TerminalVisualization");
 
+  petsc_ksp_options.setup("LinearSystemSolver");
+
+  poisson.setup("PoissonEquation");
 }
 
 //------------------------------------------------------------------------------

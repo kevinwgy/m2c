@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include <SpaceVariable.h>
+#include <petscviewer.h>
 #include <Utils.h>
 #include <bits/stdc++.h> //min_element, max_element
 
@@ -336,6 +337,29 @@ void SpaceVariable3D::WriteToVTRFile(const char *filename, const char *varname)
   VecView(globalVec, viewer);
   PetscViewerDestroy(&viewer);
   MPI_Barrier(*comm); 
+}
+
+//---------------------------------------------------------
+
+void SpaceVariable3D::WriteToCGNSFile(const char *filename, const char *varname)
+{
+  if(!dm)
+    return;
+
+  if(varname)
+    SetOutputVariableName(varname);
+
+  PetscViewer viewer;
+  PetscViewerCreate(*comm, &viewer);
+// Not available yet!
+//  PetscViewerSetType(viewer, PETSCVIEWERCGNS);
+  PetscViewerFileSetMode(viewer, FILE_MODE_WRITE);
+  PetscViewerFileSetName(viewer, filename);
+
+  VecView(globalVec, viewer);
+
+  PetscViewerDestroy(&viewer);
+  MPI_Barrier(*comm);
 }
 
 //---------------------------------------------------------
