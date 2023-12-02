@@ -986,6 +986,35 @@ void ANEOSBirchMurnaghanDebyeModelData::setup(const char *name, ClassAssigner *f
 
 //------------------------------------------------------------------------------
 
+HomoIncompressibleModelData::HomoIncompressibleModelData() 
+{
+  rho0 = 0.0;
+  p0   = 0.0;
+  c    = 0.0;
+  T0   = 273.0; //Kelvin
+  e0   = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+void HomoIncompressibleModelData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+
+  new ClassDouble<HomoIncompressibleModelData>(ca, "Density",
+          this, &HomoIncompressibleModelData::rho0);
+  new ClassDouble<HomoIncompressibleModelData>(ca, "ReferencePressure",
+          this, &HomoIncompressibleModelData::p0);
+  new ClassDouble<HomoIncompressibleModelData>(ca, "SpecificHeat",
+          this, &HomoIncompressibleModelData::c);
+  new ClassDouble<HomoIncompressibleModelData>(ca, "ReferenceTemperature",
+          this, &HomoIncompressibleModelData::T0);
+  new ClassDouble<HomoIncompressibleModelData>(ca, "ReferenceSpecificInternalEnergy",
+          this, &HomoIncompressibleModelData::e0);
+}
+
+//------------------------------------------------------------------------------
+
 HyperelasticityModelData::HyperelasticityModelData()
 {
   type = NONE;
@@ -1041,23 +1070,25 @@ MaterialModelData::MaterialModelData()
 Assigner *MaterialModelData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 16, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 17, nullAssigner);
 
   new ClassToken<MaterialModelData>(ca, "EquationOfState", this,
-                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 7,
+                                 reinterpret_cast<int MaterialModelData::*>(&MaterialModelData::eos), 8,
                                  "StiffenedGas", MaterialModelData::STIFFENED_GAS, 
                                  "NobleAbelStiffenedGas", MaterialModelData::NOBLE_ABEL_STIFFENED_GAS, 
                                  "MieGruneisen", MaterialModelData::MIE_GRUNEISEN,
                                  "ExtendedMieGruneisen", MaterialModelData::EXTENDED_MIE_GRUNEISEN,
                                  "Tillotson", MaterialModelData::TILLOTSON,
                                  "JonesWilkinsLee", MaterialModelData::JWL,
-                                 "ANEOSBirchMurnaghanDebye", MaterialModelData::ANEOS_BIRCH_MURNAGHAN_DEBYE);
+                                 "ANEOSBirchMurnaghanDebye", MaterialModelData::ANEOS_BIRCH_MURNAGHAN_DEBYE,
+                                 "HomogeneousIncompressible", MaterialModelData::HOMOGENEOUS_INCOMPRESSIBLE);
   new ClassDouble<MaterialModelData>(ca, "DensityCutOff", this, &MaterialModelData::rhomin);
   new ClassDouble<MaterialModelData>(ca, "PressureCutOff", this, &MaterialModelData::pmin);
   new ClassDouble<MaterialModelData>(ca, "DensityUpperLimit", this, &MaterialModelData::rhomax);
   new ClassDouble<MaterialModelData>(ca, "PressureUpperLimit", this, &MaterialModelData::pmax);
 
-  new ClassDouble<MaterialModelData>(ca, "DensityPrescribedAtFailure", this, &MaterialModelData::failsafe_density);
+  new ClassDouble<MaterialModelData>(ca, "DensityPrescribedAtFailure", this,
+                                     &MaterialModelData::failsafe_density);
 
   sgModel.setup("StiffenedGasModel", ca);
   nasgModel.setup("NobleAbelStiffenedGasModel", ca);
@@ -1066,6 +1097,7 @@ Assigner *MaterialModelData::getAssigner()
   tillotModel.setup("TillotsonModel", ca);
   jwlModel.setup("JonesWilkinsLeeModel", ca);
   abmdModel.setup("ANEOSBirchMurnaghanDebyeModel", ca);
+  incompModel.setup("HomogeneousIncompressibleModel", ca);
 
   viscosity.setup("ViscosityModel", ca);
   

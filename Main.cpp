@@ -15,6 +15,7 @@
 #include <VarFcnTillot.h>
 #include <VarFcnJWL.h>
 #include <VarFcnANEOSEx1.h>
+#include <VarFcnHomoIncomp.h>
 #include <VarFcnDummy.h>
 #include <FluxFcnGenRoe.h>
 #include <FluxFcnLLF.h>
@@ -80,6 +81,8 @@ int main(int argc, char* argv[])
   //! Initialize VarFcn (EOS, etc.) 
   std::set<int> vf_tracker;
   std::vector<VarFcnBase *> vf;
+  bool incompressible = false; // whether the flow is incompressible
+  int num_incompressible = 0;
   for(int i=0; i<(int)iod.eqs.materials.dataMap.size(); i++)
     vf.push_back(NULL); //allocate space for the VarFcn pointers
 
@@ -104,8 +107,12 @@ int main(int argc, char* argv[])
       vf[matid] = new VarFcnJWL(*it->second);
     else if(it->second->eos == MaterialModelData::ANEOS_BIRCH_MURNAGHAN_DEBYE)
       vf[matid] = new VarFcnANEOSEx1(*it->second);
-    else {
-      print_error("*** Error: Unable to initialize variable functions (VarFcn) for the specified material model.\n");
+    else if(it->second->eos == MaterialModelData::HOMOGENEOUS_INCOMPRESSIBLE) {
+      vf[matid] = new VarFcnHomoIncomp(*it->second);
+      num_incompressible++;
+    } else {
+      print_error("*** Error: Unable to initialize variable functions (VarFcn) for the "
+                  "specified material model.\n");
       exit_mpi();
     }
   }
@@ -115,6 +122,14 @@ int main(int argc, char* argv[])
   }
   vf_tracker.clear();   
 
+  if(num_incompressible>0 && num_incompressible<(int)iod.eqs.materials.dataMap.size()) {
+    print_error("*** Error: Currently, M2C does not support compressible and incompressible materials "
+                "in a single simulation.");
+    exit_mpi();
+  }
+  else if (num_incompressible == (int)iod.eqs.materials.dataMap.size())
+    incompressible = true;
+    
   vf.push_back(new VarFcnDummy(iod.eqs.dummy_state)); //for "inactive" nodes, e.g., occluded or inside a solid body
   INACTIVE_MATERIAL_ID = vf.size() - 1;
 
