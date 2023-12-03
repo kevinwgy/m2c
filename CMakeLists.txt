@@ -108,6 +108,7 @@ Output.cpp
 SpaceInitializer.cpp
 Reconstructor.cpp
 SpaceOperator.cpp
+IncompressibleOperator.cpp
 MeshGenerator.cpp
 MeshMatcher.cpp
 LevelSetOperator.cpp
@@ -124,6 +125,7 @@ HyperelasticityOperator.cpp
 ReferenceMapOperator.cpp
 PrescribedMotionOperator.cpp
 TimeIntegrator.cpp
+TimeIntegratorSemImp.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
 LagrangianOutput.cpp

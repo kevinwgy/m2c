@@ -22,9 +22,9 @@ private:
 public:
 
   VarFcnHomoIncomp(MaterialModelData &data) : VarFcnBase(data),
-                                    rho0(data.incompModel.rho0), p0(data.incompModel.p0),
-                                    c(data.incompModel.c), T0(data.incompModel.T0),
-                                    e0(data.incompModel.e0) {
+                                              rho0(data.incompModel.rho0), p0(data.incompModel.p0),
+                                              c(data.incompModel.c), T0(data.incompModel.T0),
+                                              e0(data.incompModel.e0) {
     type = HOMOGENEOUS_INCOMPRESSIBLE;
     invc = c==0.0 ? 0.0 : 1.0/c;
   } 
@@ -32,14 +32,14 @@ public:
 
   //! ----- EOS-Specific Functions -----
   inline double GetPressure([[maybe_unused]] double rho, [[maybe_unused]] double e) {
-    fprintf(stdout,"\033[0;31m*** Error: GetPressure undefined for incompressible material.\033[0m\n"); 
+    fprintf(stdout,"\033[0;31m*** Error: GetPressure undefined for incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double GetReferencePressure() {return p0;}
 
   inline double GetInternalEnergyPerUnitMass([[maybe_unused]] double rho, [[maybe_unused]] double p) {
     fprintf(stdout,"\033[0;31m*** Error: GetInternalEnergyPerUnitMass undefined for incompressible "
-            "material.\033[0m\n"); 
+            "materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double GetReferenceInternalEnergyPerUnitMass() {return e0;}
@@ -47,11 +47,11 @@ public:
   inline double GetDensity([[maybe_unused]] double p, [[maybe_unused]] double e) {return rho0;}
 
   inline double GetDpdrho([[maybe_unused]] double rho, [[maybe_unused]] double e) {
-    fprintf(stdout,"\033[0;31m*** Error: GetDpdrho undefined for incompressible material.\033[0m\n"); 
+    fprintf(stdout,"\033[0;31m*** Error: GetDpdrho undefined for incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {
-    fprintf(stdout,"\033[0;31m*** Error: GetBigGamma undefined for incompressible material.\033[0m\n"); 
+    fprintf(stdout,"\033[0;31m*** Error: GetBigGamma undefined for incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double GetTemperature([[maybe_unused]] double rho, double e) {return T0 + invc*(e-e0);}
@@ -64,7 +64,7 @@ public:
   inline double GetInternalEnergyPerUnitMassFromEnthalpy([[maybe_unused]] double rho,
                                                          [[maybe_unused]] double h) {
     fprintf(stdout,"\033[0;31m*** Error: GetInternalEnergyPerUnitMassFromEnthalpy undefined for"
-            " incompressible material.\033[0m\n"); 
+            " incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   bool CheckState(double rho, double p, bool silence = false) {
@@ -83,7 +83,7 @@ public:
 
   bool CheckState(double *V, bool silence = false) {
     if(!std::isfinite(V[0]) || !std::isfinite(V[1]) || !std::isfinite(V[2]) || !std::isfinite(V[3]) || 
-       !std::isfinite(V[4])){
+       !std::isfinite(V[4])) {
       if(!silence)
         fprintf(stdout, "\033[0;31m*** Error: CheckState failed. V = %e %e %e %e %e.\033[0m\n",
                 V[0], V[1], V[2], V[3], V[4]);
@@ -97,35 +97,35 @@ public:
   //! Overwrite the calculations done in the base class
   inline void ConservativeToPrimitive([[maybe_unused]] double *U, [[maybe_unused]] double *V) {
     fprintf(stdout,"\033[0;31m*** Error: ConservativeToPrimitive undefined for"
-            " incompressible material.\033[0m\n"); 
+            " incompressible materials.\033[0m\n"); 
     exit(-1);;}
 
   inline void PrimitiveToConservative([[maybe_unused]] double *V, [[maybe_unused]] double *U) {
     fprintf(stdout,"\033[0;31m*** Error: PrimitiveToConservative undefined for"
-            " incompressible material.\033[0m\n"); 
+            " incompressible materials.\033[0m\n"); 
     exit(-1);}
 
   inline double ComputeSoundSpeed([[maybe_unused]] double rho, [[maybe_unused]] double e) {
-    fprintf(stdout,"\033[0;31m*** Error: ComputeSoundSpeed undefined for incompressible material.\033[0m\n"); 
+    fprintf(stdout,"\033[0;31m*** Error: ComputeSoundSpeed undefined for incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double ComputeSoundSpeedSquare([[maybe_unused]] double rho, [[maybe_unused]] double e) {
     fprintf(stdout,"\033[0;31m*** Error: ComputeSoundSpeedSquare undefined for"
-            " incompressible material.\033[0m\n"); 
+            " incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double ComputeMachNumber([[maybe_unused]] double *V) {
-    fprintf(stdout,"\033[0;31m*** Error: ComputeMachNumber undefined for incompressible material.\033[0m\n"); 
+    fprintf(stdout,"\033[0;31m*** Error: ComputeMachNumber undefined for incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double ComputeEnthalpyPerUnitMass([[maybe_unused]] double rho, [[maybe_unused]] double p) {
     fprintf(stdout,"\033[0;31m*** Error: ComputeEnthalpyPerUnitMass undefined for "
-                   "incompressible material.\033[0m\n"); 
+                   "incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   inline double ComputeTotalEnthalpyPerUnitMass([[maybe_unused]] double *V) {
     fprintf(stdout,"\033[0;31m*** Error: ComputeTotalEnthalpyPerUnitMass undefined for "
-                   "incompressible material.\033[0m\n"); 
+                   "incompressible materials.\033[0m\n"); 
     exit(-1); return 0.0;}
 
   bool ClipDensityAndPressure(double *V, double *U) {

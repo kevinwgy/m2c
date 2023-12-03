@@ -1731,22 +1731,46 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-ExplicitData::ExplicitData()
+ExplicitTsData::ExplicitTsData()
 {
   type = RUNGE_KUTTA_2;
 }
 
 //------------------------------------------------------------------------------
 
-void ExplicitData::setup(const char *name, ClassAssigner *father)
+void ExplicitTsData::setup(const char *name, ClassAssigner *father)
 {
 
- ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
 
-  new ClassToken<ExplicitData>
+  new ClassToken<ExplicitTsData>
     (ca, "Type", this,
-     reinterpret_cast<int ExplicitData::*>(&ExplicitData::type), 3,
+     reinterpret_cast<int ExplicitTsData::*>(&ExplicitTsData::type), 3,
      "ForwardEuler", 0, "RungeKutta2", 1, "RungeKutta3", 2);
+
+}
+
+//------------------------------------------------------------------------------
+
+SemiImplicitTsData::SemiImplicitTsData()
+{
+  type = SIMPLEC;
+}
+
+//------------------------------------------------------------------------------
+
+void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
+{
+
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+
+  new ClassToken<SemiImplicitTsData>
+    (ca, "Type", this,
+     reinterpret_cast<int SemiImplicitTsData::*>(&SemiImplicitTsData::type), 4,
+     "SIMPLE", 0, "SIMPLER", 1, "SIMPLEC", 2, "PISO", 3);
+
+  new ClassDouble<SemiImplicitTsData>(ca, "E", this, &SemiImplicitTsData::E);
+  new ClassDouble<SemiImplicitTsData>(ca, "AlphaP", this, &SemiImplicitTsData::alphaP);
 
 }
 
@@ -1771,11 +1795,12 @@ TsData::TsData()
 void TsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 8, father);
+  ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
   new ClassToken<TsData>(ca, "Type", this,
                          reinterpret_cast<int TsData::*>(&TsData::type), 2,
-                         "Explicit", 0, "Implicit", 1);
+                         "Explicit", 0, "SemiImplicit", 1);
+
   new ClassInt<TsData>(ca, "MaxIts", this, &TsData::maxIts);
   new ClassDouble<TsData>(ca, "TimeStep", this, &TsData::timestep);
   new ClassDouble<TsData>(ca, "CFL", this, &TsData::cfl);
@@ -1788,6 +1813,9 @@ void TsData::setup(const char *name, ClassAssigner *father)
 
 
   expl.setup("Explicit", ca);
+
+  semi_impl.setup("SemiImplicit", ca);
+
 }
 
 //------------------------------------------------------------------------------

@@ -891,13 +891,32 @@ struct MultiPhaseData {
 
 //------------------------------------------------------------------------------
 
-struct ExplicitData {
+struct ExplicitTsData {
 
-//!time-integration scheme used
+  //! time-integration scheme used
   enum Type {FORWARD_EULER = 0, RUNGE_KUTTA_2 = 1, RUNGE_KUTTA_3 = 2} type;
 
-  ExplicitData();
-  ~ExplicitData() {}
+  ExplicitTsData();
+  ~ExplicitTsData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct SemiImplicitTsData {
+
+  //! time-integration scheme used
+  enum Type {SIMPLE = 0, SIMPLER = 1, SIMPLEC = 2, PISO = 3} type;
+
+  double Efactor; //!< control the relaxation in the solution of momentum equations
+  double alphaP;  //!< relaxation in the solution of the pressure correction equaitons
+
+  //TODO: Add more...
+  
+  SemiImplicitTsData();
+  ~SemiImplicitTsData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 
@@ -907,7 +926,7 @@ struct ExplicitData {
 
 struct TsData {
 
-  enum Type {EXPLICIT = 0, IMPLICIT = 1} type;
+  enum Type {EXPLICIT = 0, SEMI_IMPLICIT = 1} type; //!< expl<->compressible; semi_impl<->incompressible
   int maxIts;
   double timestep;
   double cfl;
@@ -917,7 +936,9 @@ struct TsData {
   double convergence_tolerance; //!< tolerance for residual.
   enum YesNo {NO = 0, YES = 1} local_dt; //!< each control volume applies its own time step size
 
-  ExplicitData expl;
+  ExplicitTsData expl; //!< for compressible flows
+
+  SemiImplicitTsData semi_impl; //!< for incompressible flows
 
   TsData();
   ~TsData() {}

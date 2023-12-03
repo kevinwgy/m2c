@@ -135,7 +135,6 @@ int main(int argc, char* argv[])
 
 
 
-
   /********************************************************
    *                   Special Tools                      *
    *******************************************************/
@@ -147,7 +146,6 @@ int main(int argc, char* argv[])
     return 0;
   }
   /*******************************************************/
-
 
 
 
@@ -168,6 +166,12 @@ int main(int argc, char* argv[])
   }
 
 
+  // -------------------------------------------------------------------------------------------------
+  //! Note: If incompresible == true, riemann and some other classes are not needed. But to avoid too
+  //!       many if-statements which complicate the code, we still construct these classes.
+  // -------------------------------------------------------------------------------------------------
+
+
   //! Initialize the exact Riemann problem solver.
   ExactRiemannSolverBase *riemann = NULL;
   if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {
@@ -175,8 +179,9 @@ int main(int argc, char* argv[])
   }
   else {// with surface tension (an experimental feature)
     riemann = new ExactRiemannSolverInterfaceJump(vf, iod.exact_riemann);
-    if(iod.ts.expl.type != ExplicitData::FORWARD_EULER) {
-      print_error("*** Error: Currently, only the Forward Euler time integrator supports surface tension.\n");
+    if(incompressible || iod.ts.expl.type != ExplicitTsData::FORWARD_EULER) {
+      print_error("*** Error: Currently, only the Forward Euler time integrator for compressible flows "
+                  "supports surface tension.\n");
       exit_mpi();
     }
   }
@@ -219,6 +224,11 @@ int main(int argc, char* argv[])
 
   //! Initialize space operator
   SpaceOperator spo(comm, dms, iod, vf, *ff, *riemann, global_mesh);
+
+  //! Initialize incompressible flow space operator
+  IncompressibleOperator* inco = NULL;
+  if(incompressible)
+    inco = new IncompressibleOperator(...)
 
   //! Track the embedded boundaries
   if(embed) {
@@ -336,6 +346,7 @@ int main(int argc, char* argv[])
   // Boundary conditions are applied to V and Phi. But the ghost nodes of ID have not been populated.
   // ------------------------------------------------------------------------
 
+  I AM HERE. Cleanup V in the case of incompressible. Should only take V from user
 
   if(embed) //even if id2closure is empty, we must still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
@@ -439,20 +450,29 @@ int main(int argc, char* argv[])
 
   //! Initialize time integrator
   TimeIntegratorBase *integrator = NULL;
-  if(iod.ts.type == TsData::EXPLICIT) {
-    if(iod.ts.expl.type == ExplicitData::FORWARD_EULER)
+  if(!incompressible) { //compressible
+    if(iod.ts.type != TsData::EXPLICIT) {
+      print_error("*** Error: Compressible flows require an explicit time-integrator.\n");
+      exit_mpi();
+    }
+    if(iod.ts.expl.type == ExplicitTsData::FORWARD_EULER)
       integrator = new TimeIntegratorFE(comm, iod, dms, spo, lso, mpo, laser, embed, heo, pmo);
-    else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_2)
+    else if(iod.ts.expl.type == ExplicitTsData::RUNGE_KUTTA_2)
       integrator = new TimeIntegratorRK2(comm, iod, dms, spo, lso, mpo, laser, embed, heo, pmo);
-    else if(iod.ts.expl.type == ExplicitData::RUNGE_KUTTA_3)
+    else if(iod.ts.expl.type == ExplicitTsData::RUNGE_KUTTA_3)
       integrator = new TimeIntegratorRK3(comm, iod, dms, spo, lso, mpo, laser, embed, heo, pmo);
     else {
       print_error("*** Error: Unable to initialize time integrator for the specified (explicit) method.\n");
       exit_mpi();
     }
-  } else {
-    print_error("*** Error: Unable to initialize time integrator for the specified method.\n");
-    exit_mpi();
+  } 
+  else { //incompressible
+    if(iod.ts.type != TsData::SEMI_IMPLICIT) {
+      print_error("*** Error: Incompressible flows require a semi-implicit time-integrator.\n");
+      exit_mpi();
+    }
+    
+    I AM HERE
   }
 
 
@@ -760,6 +780,9 @@ int main(int argc, char* argv[])
   integrator->Destroy();
   mpo.Destroy();
   spo.Destroy();
+
+  if(inco) {inco->Destroy(); delete inco;}
+
   if(grad) {
     grad->Destroy();
     delete grad;
