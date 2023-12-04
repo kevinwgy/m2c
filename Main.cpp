@@ -22,12 +22,10 @@
 #include <FluxFcnHLLC.h>
 #include <FluxFcnGodunov.h>
 #include <GravityHandler.h>
-#include <TimeIntegrator.h>
+#include <TimeIntegratorSemiImp.h>
 #include <SpaceInitializer.h>
-#include <IncompressibleOperator.h>
 #include <GradientCalculatorCentral.h>
 #include <IonizationOperator.h>
-#include <HyperelasticityOperator.h>
 #include <PrescribedMotionOperator.h>
 #include <SpecialToolsDriver.h>
 #include <ExactRiemannSolverInterfaceJump.h>
@@ -249,8 +247,10 @@ int main(int argc, char* argv[])
 
   //! Initialize incompressible flow space operator
   IncompressibleOperator* inco = NULL;
-  if(incompressible)
-    inco = new IncompressibleOperator(comm, dms, iod, vf, global_mesh, spo, interp);
+  if(incompressible) {
+    assert(interp);
+    inco = new IncompressibleOperator(comm, dms, iod, vf, spo, *interp);
+  }
 
   //! Setup viscosity operator in spo (if viscosity model is not NONE)
   spo.SetupViscosityOperator(interp, grad, embed!=NULL);

@@ -125,7 +125,7 @@ HyperelasticityOperator.cpp
 ReferenceMapOperator.cpp
 PrescribedMotionOperator.cpp
 TimeIntegrator.cpp
-TimeIntegratorSemImp.cpp
+TimeIntegratorSemiImp.cpp
 SpecialToolsDriver.cpp
 DynamicLoadCalculator.cpp
 LagrangianOutput.cpp

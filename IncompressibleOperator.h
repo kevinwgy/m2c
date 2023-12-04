@@ -38,8 +38,8 @@ class IncompressibleOperator
 public:
 
   IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
-                         std::vector<VarFcnBase*> &varFcn_, SpaceOperator &spo_;
-                         InterpolatorBase &interpolator_);
+                         std::vector<VarFcnBase*> &varFcn_, SpaceOperator &spo_,
+                         InterpolatorBase &interp_);
   ~IncompressibleOperator();
 
   void Destroy();

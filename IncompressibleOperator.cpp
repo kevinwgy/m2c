@@ -10,7 +10,7 @@ using std::vector;
 
 IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                                vector<VarFcnBase*> &varFcn_, SpaceOperator &spo_, 
-                                               InterpolatorBase &interpolator_)
+                                               InterpolatorBase &interp_)
                       : vf(varFcn_), spo(spo_), interpolator(interp_), gfo(NULL)
 {
   // Get i0, j0, etc.
@@ -49,7 +49,7 @@ IncompressibleOperator::CheckInputs(IoData &iod)
   // -----------------------------
   // Check material models 
   // -----------------------------
-  for(auto&& mat : iod.eqs.materials.dataMap()) {
+  for(auto&& mat : iod.eqs.materials.dataMap) {
     if(mat.second->viscosity.type != ViscosityModelData::NONE &&
        mat.second->viscosity.type != ViscosityModelData::CONSTANT) {
       print_error("*** Error: The incompressible flow solver only supports a constant diffusivity for "
