@@ -910,7 +910,7 @@ struct SemiImplicitTsData {
   //! time-integration scheme used
   enum Type {SIMPLE = 0, SIMPLER = 1, SIMPLEC = 2, PISO = 3} type;
 
-  double Efactor; //!< control the relaxation in the solution of momentum equations
+  double E;       //!< control the relaxation in the solution of momentum equations
   double alphaP;  //!< relaxation in the solution of the pressure correction equaitons
 
   //TODO: Add more...
@@ -926,7 +926,8 @@ struct SemiImplicitTsData {
 
 struct TsData {
 
-  enum Type {EXPLICIT = 0, SEMI_IMPLICIT = 1} type; //!< expl<->compressible; semi_impl<->incompressible
+  enum Type {EXPLICIT = 0, SEMI_IMPLICIT = 1} type;
+
   int maxIts;
   double timestep;
   double cfl;

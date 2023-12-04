@@ -24,6 +24,7 @@
 #include <GravityHandler.h>
 #include <TimeIntegrator.h>
 #include <SpaceInitializer.h>
+#include <IncompressibleOperator.h>
 #include <GradientCalculatorCentral.h>
 #include <IonizationOperator.h>
 #include <HyperelasticityOperator.h>
@@ -225,11 +226,6 @@ int main(int argc, char* argv[])
   //! Initialize space operator
   SpaceOperator spo(comm, dms, iod, vf, *ff, *riemann, global_mesh);
 
-  //! Initialize incompressible flow space operator
-  IncompressibleOperator* inco = NULL;
-  if(incompressible)
-    inco = new IncompressibleOperator(...)
-
   //! Track the embedded boundaries
   if(embed) {
     // determine whether force should be "spread out" to a 3D structure
@@ -250,6 +246,12 @@ int main(int argc, char* argv[])
   if(true) //may add more choices later
     grad = new GradientCalculatorCentral(comm, dms, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), *interp);
   
+
+  //! Initialize incompressible flow space operator
+  IncompressibleOperator* inco = NULL;
+  if(incompressible)
+    inco = new IncompressibleOperator(comm, dms, iod, vf, global_mesh, spo, interp);
+
   //! Setup viscosity operator in spo (if viscosity model is not NONE)
   spo.SetupViscosityOperator(interp, grad, embed!=NULL);
 
@@ -346,8 +348,6 @@ int main(int argc, char* argv[])
   // Boundary conditions are applied to V and Phi. But the ghost nodes of ID have not been populated.
   // ------------------------------------------------------------------------
 
-  I AM HERE. Cleanup V in the case of incompressible. Should only take V from user
-
   if(embed) //even if id2closure is empty, we must still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
@@ -364,6 +364,11 @@ int main(int argc, char* argv[])
   }
   mpo.UpdateMaterialIDAtGhostNodes(ID); //ghost nodes (outside domain) get the ID of their image nodes
 
+  if(incompressible) {
+    assert(inco);
+    inco->FinalizeInitialCondition(V, ID); //set rho specified in Incompressible model and p=0
+    inco->ApplyBoundaryConditions(V);
+  }
 
   //! Initialize laser radiation solver (if needed)
   LaserAbsorptionSolver* laser = NULL;
@@ -471,8 +476,20 @@ int main(int argc, char* argv[])
       print_error("*** Error: Incompressible flows require a semi-implicit time-integrator.\n");
       exit_mpi();
     }
-    
-    I AM HERE
+    assert(inco);
+    if(iod.ts.semi_impl.type == SemiImplicitTsData::SIMPLE)
+      integrator = new TimeIntegratorSIMPLE(comm, iod, dms, spo, *inco, lso, mpo, laser, embed, heo, pmo);
+    else if(iod.ts.semi_impl.type == SemiImplicitTsData::SIMPLER)
+      integrator = new TimeIntegratorSIMPLER(comm, iod, dms, spo, *inco, lso, mpo, laser, embed, heo, pmo);
+    else if(iod.ts.semi_impl.type == SemiImplicitTsData::SIMPLEC)
+      integrator = new TimeIntegratorSIMPLEC(comm, iod, dms, spo, *inco, lso, mpo, laser, embed, heo, pmo);
+    else if(iod.ts.semi_impl.type == SemiImplicitTsData::SIMPLEC)
+      integrator = new TimeIntegratorPISO(comm, iod, dms, spo, *inco, lso, mpo, laser, embed, heo, pmo);
+    else {
+      print_error("*** Error: Unable to initialize time integrator for the specified (semi-implicit)"
+                  " method.\n");
+      exit_mpi();
+    }
   }
 
 
@@ -583,7 +600,10 @@ int main(int argc, char* argv[])
                                  embed->GetPointerToIntersectors()); //update V, ID, Phi
     spo.ClipDensityAndPressure(V,ID);
     if(boundary_swept) {
-      spo.ApplyBoundaryConditions(V);
+      if(inco) //incompressible flow
+        inco->ApplyBoundaryConditions(V);
+      else
+        spo.ApplyBoundaryConditions(V);
       for(int i=0; i<(int)Phi.size(); i++) 
         lso[i]->ApplyBoundaryConditions(*Phi[i]);
     }

@@ -1755,6 +1755,9 @@ void ExplicitTsData::setup(const char *name, ClassAssigner *father)
 SemiImplicitTsData::SemiImplicitTsData()
 {
   type = SIMPLEC;
+
+  E = 5.0; // Van Doormaal and Raithby (1984) says 4-10 is common.
+  alphaP = 0.8; // recommended in Patankar's book (Section 6.7-2)
 }
 
 //------------------------------------------------------------------------------
@@ -1779,7 +1782,7 @@ void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
 TsData::TsData()
 {
 
-  type = EXPLICIT;
+  type   = EXPLICIT;
   maxIts = INT_MAX;
   timestep = -1.0;
   cfl = 0.5;
@@ -1797,8 +1800,7 @@ void TsData::setup(const char *name, ClassAssigner *father)
 
   ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
-  new ClassToken<TsData>(ca, "Type", this,
-                         reinterpret_cast<int TsData::*>(&TsData::type), 2,
+  new ClassToken<TsData>(ca, "Type", this, reinterpret_cast<int TsData::*>(&TsData::type), 2,
                          "Explicit", 0, "SemiImplicit", 1);
 
   new ClassInt<TsData>(ca, "MaxIts", this, &TsData::maxIts);
@@ -1810,7 +1812,6 @@ void TsData::setup(const char *name, ClassAssigner *father)
   new ClassToken<TsData>(ca, "LocalTimeStepping", this,
                          reinterpret_cast<int TsData::*>(&TsData::local_dt), 2,
                          "Off", 0, "On", 1);
-
 
   expl.setup("Explicit", ca);
 
