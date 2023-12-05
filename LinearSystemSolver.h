@@ -22,7 +22,7 @@ class LinearSystemSolver : public LinearOperator {
 
 public:
 
-  LinearSystemSolver(MPI_Comm &comm_, DM &dm_, PETScKSPOptionsData &ksp_input);
+  LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input);
   ~LinearSystemSolver(); 
   void Destroy();
 
@@ -34,7 +34,7 @@ public:
 
 private:
 
-  void SetTolerances(PETScKSPOptionsData &ksp_input);
+  void SetTolerances(LinearSolverData &lin_input);
 
 };
 

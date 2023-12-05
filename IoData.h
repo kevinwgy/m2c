@@ -905,6 +905,28 @@ struct ExplicitTsData {
 
 //------------------------------------------------------------------------------
 
+struct LinearSolverData {
+
+  enum KSPType {KSP_DEFAULT = 0, GMRES = 1, FLEXIBLE_GMRES = 2} ksp;
+  enum PCType {PC_DEFAULT = 0, PC_NONE = 1, JACOBI = 2, INCOMPLETE_LU = 3, INCOMPLETE_CHOLESKY = 4,
+               MG = 5} pc;
+
+  double rtol; //!< relative error tolerance (in terms of residual norm)
+  double abstol; //!< absolute error tolerance (in terms of residual norm)
+  double dtol; //!< divergence tolerance (in terms of residual norm)
+  int maxits; //!< max. iterations
+
+  const char *options_file; //!< additional options can be specified through a file
+
+  LinearSolverData();
+  ~LinearSolverData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+
+//------------------------------------------------------------------------------
+
 struct SemiImplicitTsData {
 
   //! time-integration scheme used
@@ -917,6 +939,8 @@ struct SemiImplicitTsData {
   int maxIts; //!< maximum number of (sub-)iterations within each time step
   double convergence_tolerance; //!< relative error tolerance within each time step
 
+  LinearSolverData velocity_linear_solver;
+  LinearSolverData pressure_linear_solver;
   
   SemiImplicitTsData();
   ~SemiImplicitTsData() {}
@@ -983,6 +1007,7 @@ struct DiskData {
 
 struct RectangleData {
 
+  //! a and b follow right-hand-rule. For example, for a rectangle in the z-x plane, a~z, b~x
   double cen_x, cen_y, cen_z, a, b;
   double normal_x, normal_y, normal_z;
   StateVariable state;
@@ -1672,45 +1697,6 @@ struct SpecialToolsData {
 
 //------------------------------------------------------------------------------
 
-struct PETScKSPOptionsData {
-
-  enum KSPType {KSP_DEFAULT = 0, GMRES = 1, FLEXIBLE_GMRES = 2} ksp;
-  enum PCType {PC_DEFAULT = 0, PC_NONE = 1, JACOBI = 2, INCOMPLETE_LU = 3, INCOMPLETE_CHOLESKY = 4,
-               MG = 5} pc;
-
-  double rtol; //!< relative error tolerance (in terms of residual norm)
-  double abstol; //!< absolute error tolerance (in terms of residual norm)
-  double dtol; //!< divergence tolerance (in terms of residual norm)
-  int maxits; //!< max. iterations
-
-  const char *options_file; //!< additional options can be specified through a file
-
-  PETScKSPOptionsData();
-  ~PETScKSPOptionsData() {}
-
-  void setup(const char *, ClassAssigner * = 0);
-};
-
-//------------------------------------------------------------------------------
-
-struct PoissonEquationData {
-
-  enum BoundaryType {DIRICHLET = 0, NEUMANN = 1} bc_x0, bc_y0, bc_z0, bc_xmax, bc_ymax, bc_zmax;
-  double bc_x0_val;
-  double bc_y0_val;
-  double bc_z0_val;
-  double bc_xmax_val;
-  double bc_ymax_val;
-  double bc_zmax_val;
-
-  PoissonEquationData();
-  ~PoissonEquationData() {}
-
-  void setup(const char *, ClassAssigner * = 0);
-};
-
-//------------------------------------------------------------------------------
-
 class IoData {
 
   char *cmdFileName;
@@ -1747,10 +1733,6 @@ public:
   SpecialToolsData special_tools;
 
   TerminalVisualizationData terminal_visualization;
-
-  PETScKSPOptionsData petsc_ksp_options;
-
-  PoissonEquationData poisson;
 
 public:
 

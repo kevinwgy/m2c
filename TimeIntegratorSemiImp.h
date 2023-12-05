@@ -8,6 +8,7 @@
 
 #include <TimeIntegrator.h>
 #include <IncompressibleOperator.h>
+#include <LinearSystemSolver.h>
 
 /********************************************************************
  * SIMPLE (Semi-Implicit Method for Pressure-Linked Equations) 
@@ -20,8 +21,14 @@ protected:
 
   IncompressibleOperator &inco;
 
-  SpaceVariable3D Vstar, Pprime;
+  SpaceVariable3D VXstar, VYstar, VZstar, Pprime;
   SpaceVariable3D B; //!< generally used as the right-hand-side of linear systems
+
+  vector<RowEntries> vlin_rows;
+  vector<RowEntries> plin_rows;
+
+  LinearSystemSolver vlin_solver; //!< solves the velocity linear systems
+  LinearSystemSolver plin_solver; //!< solves the pressure linear system
 
 public:
 

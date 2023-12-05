@@ -4,7 +4,10 @@
  ************************************************************************/
 
 #include<IncompressibleOperator.h>
+#include<GeoTools.h>
 using std::vector;
+
+using namespace GeoTools;
 
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
@@ -67,6 +70,25 @@ IncompressibleOperator::CheckInputs(IoData &iod)
       exit_mpi();
     }
   } 
+
+
+  // -----------------------------
+  // Check mesh 
+  // -----------------------------
+
+  if(iod.mesh.type == MeshData::CYLINDRICAL || iod.mesh.type == MeshData::SPHERICAL) {
+    print_error("*** Error: The incompressible flow solver does not support cylindrical or spherical "
+                "symmetry at this moment.\n");
+    exit_mpi();
+  }
+  if(iod.mesh.bc_x0 == MeshData::OVERSET || iod.mesh.bc_xmax == MeshData::OVERSET ||
+     iod.mesh.bc_y0 == MeshData::OVERSET || iod.mesh.bc_ymax == MeshData::OVERSET ||
+     iod.mesh.bc_z0 == MeshData::OVERSET || iod.mesh.bc_zmax == MeshData::OVERSET) {
+    print_error("*** Error: The incompressible flow solver does not support the overset method "
+                "at this moment.\n");
+    exit_mpi();
+  }
+
 
   // -----------------------------
   // Check solver
@@ -256,6 +278,8 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 
 
     // Impose boundary conditions for velocity
+    // Treating the six sides separately might seem clumsy. But in some cases imposing a boundary
+    // condition requires populating two entries. 
     if(it->side == GhostPoint::LEFT) {
       if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
         v[k][j][im_i][1] = v0[0];
@@ -398,16 +422,340 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
   }
 
 /*
-  I AM HERE
   // update overset ghosts (if any)
   for(auto&& g : ghost_overset)
     v[g.first[2]][g.first[1]][g.first[0]] = g.second;
-
-
-  ApplyBoundaryConditionsGeometricEntities(v);
 */
 
+  ApplyBoundaryConditionsGeometricEntities(v);
+
   V.RestoreDataPointerAndInsert();
+
+}
+
+//--------------------------------------------------------------------------
+
+void
+IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
+{
+
+  // Very similar to the same function in SpaceOperator, but handles staggered grids
+  // Only applies velocity boundary conditions
+
+  map<int, DiskData* >& disks(iod.bc.multiBoundaryConditions.diskMap.dataMap);
+  map<int, RectangleData* >& rectangles(iod.bc.multiBoundaryConditions.rectangleMap.dataMap);
+
+  if(!disks.size() && !rectangles.size())
+    return;
+
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
+
+  if(ii0==-1) { 
+    if (iod.mesh.bc_x0 == MeshData::INLET    || iod.mesh.bc_x0 == MeshData::OUTLET ||
+        iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::STICKWALL) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_x == iod.mesh.x0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_x == iod.mesh.x0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+         }
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=kk0; k<kkmax; k++)
+          for(int j=jj0; j<jjmax; j++) {
+
+            if(global_mesh.OutsidePhysicalDomainAndUnpopulated(ii0,j,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
+              if(IsPointInDisk(global_mesh.GetY(j), global_mesh.GetZ(k),
+                               mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
+                v[k][j][ii0+1][1] = mydisks[p]->state.velocity_x;
+                v[k][j][ii0][2]   = mydisks[p]->state.velocity_y;
+                v[k][j][ii0][3]   = mydisks[p]->state.velocity_z;
+              }
+            }
+
+            for(int p=0; p<(int)myrects.size(); p++) {
+              if(IsPointInRectangle(global_mesh.GetY(j), global_mesh.GetZ(k),
+                                    myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
+                v[k][j][ii0+1][1] = myrects[p]->state.velocity_x;
+                v[k][j][ii0][2]   = myrects[p]->state.velocity_y;
+                v[k][j][ii0][3]   = myrects[p]->state.velocity_z;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  if(iimax==NX+1) { 
+    if (iod.mesh.bc_xmax == MeshData::INLET    || iod.mesh.bc_xmax == MeshData::OUTLET ||
+        iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::STICKWALL) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_x == iod.mesh.xmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        } 
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_x == iod.mesh.xmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[0])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+         }
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=kk0; k<kkmax; k++)
+          for(int j=jj0; j<jjmax; j++) {
+
+            if(global_mesh.OutsidePhysicalDomainAndUnpopulated(iimax-1,j,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
+              if(IsPointInDisk(global_mesh.GetY(j), global_mesh.GetZ(k),
+                               mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
+                v[k][j][iimax-1][1] = mydisks[p]->state.velocity_x;
+                v[k][j][iimax-1][2] = mydisks[p]->state.velocity_y;
+                v[k][j][iimax-1][3] = mydisks[p]->state.velocity_z;
+              }
+            }
+
+            for(int p=0; p<(int)myrects.size(); p++) {
+              if(IsPointInRectangle(global_mesh.GetY(j), global_mesh.GetZ(k),
+                                    myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
+                v[k][j][iimax-1][1] = myrects[p]->state.velocity_x;
+                v[k][j][iimax-1][2] = myrects[p]->state.velocity_y;
+                v[k][j][iimax-1][3] = myrects[p]->state.velocity_z;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  
+  if(jj0==-1) { 
+    if (iod.mesh.bc_y0 == MeshData::INLET    || iod.mesh.bc_y0 == MeshData::OUTLET ||
+        iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::STICKWALL) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_y == iod.mesh.y0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_y == iod.mesh.y0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=kk0; k<kkmax; k++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(global_mesh.OutsidePhysicalDomainAndUnpopulated(i,jj0,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
+              if(IsPointInDisk(global_mesh.GetZ(k), global_mesh.GetX(i),
+                               mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
+                v[k][jj0][i][1]   = mydisks[p]->state.velocity_x;
+                v[k][jj0+1][i][2] = mydisks[p]->state.velocity_y;
+                v[k][jj0][i][3]   = mydisks[p]->state.velocity_z;
+              }
+            }
+
+            for(int p=0; p<(int)myrects.size(); p++) {
+              if(IsPointInRectangle(global_mesh.GetZ(k), global_mesh.GetX(i),
+                                    myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
+                v[k][jj0][i][1]   = myrects[p]->state.velocity_x;
+                v[k][jj0+1][i][2] = myrects[p]->state.velocity_y;
+                v[k][jj0][i][3]   = myrects[p]->state.velocity_z;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  if(jjmax==NY+1) { 
+    if (iod.mesh.bc_ymax == MeshData::INLET    || iod.mesh.bc_ymax == MeshData::OUTLET ||
+        iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::STICKWALL) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_y == iod.mesh.ymax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_y == iod.mesh.ymax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[1])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int k=kk0; k<kkmax; k++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(global_mesh.OutsidePhysicalDomainAndUnpopulated(i,jjmax-1,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
+              if(IsPointInDisk(global_mesh.GetZ(k), global_mesh.GetX(i),
+                               mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
+                v[k][jjmax-1][i][1] = mydisks[p]->state.velocity_x;
+                v[k][jjmax-1][i][2] = mydisks[p]->state.velocity_y;
+                v[k][jjmax-1][i][3] = mydisks[p]->state.velocity_z;
+              }
+            }
+
+            for(int p=0; p<(int)myrects.size(); p++) {
+              if(IsPointInRectangle(global_mesh.GetZ(k), global_mesh.GetX(i),
+                                    myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
+                v[k][jjmax-1][i][1] = myrects[p]->state.velocity_x;
+                v[k][jjmax-1][i][2] = myrects[p]->state.velocity_y;
+                v[k][jjmax-1][i][3] = myrects[p]->state.velocity_z;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  
+  if(kk0==-1) { 
+    if (iod.mesh.bc_z0 == MeshData::INLET    || iod.mesh.bc_z0 == MeshData::OUTLET ||
+        iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::STICKWALL) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_z == iod.mesh.z0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_z == iod.mesh.z0) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int j=jj0; j<jjmax; j++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(global_mesh.OutsidePhysicalDomainAndUnpopulated(i,j,kk0))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
+              if(IsPointInDisk(global_mesh.GetX(i), global_mesh.GetY(j),
+                               mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
+                v[kk0][j][i][1]   = mydisks[p]->state.velocity_x;
+                v[kk0][j][i][2]   = mydisks[p]->state.velocity_y;
+                v[kk0+1][j][i][3] = mydisks[p]->state.velocity_z;
+              }
+            }
+
+            for(int p=0; p<(int)myrects.size(); p++) {
+              if(IsPointInRectangle(global_mesh.GetX(i), global_mesh.GetY(j),
+                                    myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
+                v[kk0][j][i][1]   = myrects[p]->state.velocity_x;
+                v[kk0][j][i][2]   = myrects[p]->state.velocity_y;
+                v[kk0+1][j][i][3] = myrects[p]->state.velocity_z;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
+
+  if(kkmax==NZ+1) { 
+    if (iod.mesh.bc_zmax == MeshData::INLET    || iod.mesh.bc_zmax == MeshData::OUTLET ||
+        iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::STICKWALL) {
+
+      vector<DiskData* > mydisks;
+      for(auto it=disks.begin(); it!=disks.end(); it++)
+        if(it->second->cen_z == iod.mesh.zmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            mydisks.push_back(it->second); 
+        }
+
+      vector<RectangleData* > myrects;
+      for(auto it=rectangles.begin(); it!=rectangles.end(); it++)       
+        if(it->second->cen_z == iod.mesh.zmax) {
+          Vec3D n(it->second->normal_x, it->second->normal_y, it->second->normal_z);
+          if(fabs(n[2])/n.norm()>1-1e-8)
+            myrects.push_back(it->second); 
+        }
+
+      if(mydisks.size() || myrects.size()) {
+
+        for(int j=jj0; j<jjmax; j++)
+          for(int i=ii0; i<iimax; i++) {
+
+            if(global_mesh.OutsidePhysicalDomainAndUnpopulated(i,j,kkmax-1))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
+              if(IsPointInDisk(global_mesh.GetX(i), global_mesh.GetY(j),
+                               mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
+                v[kkmax-1][j][i][1] = mydisks[p]->state.velocity_x;
+                v[kkmax-1][j][i][2] = mydisks[p]->state.velocity_y;
+                v[kkmax-1][j][i][3] = mydisks[p]->state.velocity_z;
+              }
+            }
+
+            for(int p=0; p<(int)myrects.size(); p++) {
+              if(IsPointInRectangle(global_mesh.GetX(i), global_mesh.GetY(j),
+                                    myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
+                v[kkmax-1][j][i][1] = myrects[p]->state.velocity_x;
+                v[kkmax-1][j][i][2] = myrects[p]->state.velocity_y;
+                v[kkmax-1][j][i][3] = myrects[p]->state.velocity_z;
+              }
+            }
+
+          }
+      }
+
+    }
+  }
 
 }
 

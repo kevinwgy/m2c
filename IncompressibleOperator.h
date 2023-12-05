@@ -64,6 +64,8 @@ private:
   void ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
                                  SpaceVariable3D &LocalDt);
 
+  void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
+
 };
 
 #endif

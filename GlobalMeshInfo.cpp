@@ -19,7 +19,13 @@ GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double>
   assert(y_glob.size() == dy_glob.size());
   assert(z_glob.size() == dz_glob.size());
 
-  two_dimensional_mesh = (z_glob.size()==1);
+  one_dimensional_mesh = (y_glob.size()==1) && (z_glob.size()==1);
+
+  two_dimensional_mesh = (!one_dimensional_mesh) && (z_glob.size()==1);
+
+  NX = x_glob.size();
+  NY = y_glob.size();
+  NZ = z_glob.size();
 }
 
 //------------------------------------------------------------------

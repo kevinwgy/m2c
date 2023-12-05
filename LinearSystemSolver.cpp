@@ -9,27 +9,27 @@
 
 //-----------------------------------------------------
 
-LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, PETScKSPOptionsData &ksp_input)
+LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input)
                   : LinearOperator(comm_, dm_)
 {
 
   KSPCreate(comm, &ksp);
   KSPSetInitialGuessNonzero(ksp, PETSC_TRUE); //!< initial guess is passed to KSPSolve
 
-  SetTolerances(ksp_input);
+  SetTolerances(lin_input);
 
-  if(ksp_input.ksp == PETScKSPOptionsData::KSP_DEFAULT) {
+  if(lin_input.ksp == LinearSolverData::KSP_DEFAULT) {
     /* nothing to do */
-  } else if(ksp_input.ksp == PETScKSPOptionsData::GMRES) {
+  } else if(lin_input.ksp == LinearSolverData::GMRES) {
     KSPSetType(ksp, KSPGMRES);
-  } else if(ksp_input.ksp == PETScKSPOptionsData::FLEXIBLE_GMRES) {
+  } else if(lin_input.ksp == LinearSolverData::FLEXIBLE_GMRES) {
     KSPSetType(ksp, KSPFGMRES);
   } else {
     print_error("*** Error: Detected unknown PETSc KSP type.\n");
     exit_mpi();
   }
 
-  if(ksp_input.pc == PETScKSPOptionsData::PC_DEFAULT) {
+  if(lin_input.pc == LinearSolverData::PC_DEFAULT) {
     /* nothing to do*/
   } 
   else {
@@ -38,15 +38,15 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, PETScKSPOptions
     KSPGetPC(ksp, &pc);
     //PCFactorSetMatSolverType(pc, MATSOLVERMUMPS);
 
-    if(ksp_input.pc == PETScKSPOptionsData::PC_NONE)
+    if(lin_input.pc == LinearSolverData::PC_NONE)
       PCSetType(pc, PCNONE);
-    else if(ksp_input.pc == PETScKSPOptionsData::JACOBI)
+    else if(lin_input.pc == LinearSolverData::JACOBI)
       PCSetType(pc, PCJACOBI);
-    else if(ksp_input.pc == PETScKSPOptionsData::INCOMPLETE_LU)
+    else if(lin_input.pc == LinearSolverData::INCOMPLETE_LU)
       PCSetType(pc, PCILU);
-    else if(ksp_input.pc == PETScKSPOptionsData::INCOMPLETE_CHOLESKY)
+    else if(lin_input.pc == LinearSolverData::INCOMPLETE_CHOLESKY)
       PCSetType(pc, PCICC);
-    else if(ksp_input.pc == PETScKSPOptionsData::MG)
+    else if(lin_input.pc == LinearSolverData::MG)
       PCSetType(pc, PCMG);
     else { 
       print_error("*** Error: Detected unknown PETSc KSP preconditioner type.\n");
@@ -54,8 +54,8 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, PETScKSPOptions
     }
   }
 
-  if(strcmp(ksp_input.options_file, ""))
-    PetscOptionsInsert(NULL, NULL, NULL, ksp_input.options_file);
+  if(strcmp(lin_input.options_file, ""))
+    PetscOptionsInsert(NULL, NULL, NULL, lin_input.options_file);
 
   KSPSetFromOptions(ksp); //overrides any options specified above
 
@@ -84,12 +84,12 @@ LinearSystemSolver::Destroy()
 //-----------------------------------------------------
 
 void
-LinearSystemSolver::SetTolerances(PETScKSPOptionsData &ksp_input) 
+LinearSystemSolver::SetTolerances(LinearSolverData &lin_input) 
 {
-  double relative_error = ksp_input.rtol;
-  double absolute_error = ksp_input.abstol;
-  double divergence_tol = ksp_input.dtol;
-  int    max_iterations = ksp_input.maxits;
+  double relative_error = lin_input.rtol;
+  double absolute_error = lin_input.abstol;
+  double divergence_tol = lin_input.dtol;
+  int    max_iterations = lin_input.maxits;
 
   KSPSetTolerances(ksp,
                    relative_error>0 ? relative_error : PETSC_DEFAULT,

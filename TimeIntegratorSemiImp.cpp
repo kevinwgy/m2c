@@ -15,8 +15,11 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                                            LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                                            HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_)
                     : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_, pmo_),
-                      inco(inco_), Vstar(comm_, &(dms_.ghosted1_1dof)),
-                      Pprime(comm_, &(dms_.ghosted1_1dof)), B(comm_, &(dms_.ghosted1_1dof))
+                      inco(inco_), VXstar(comm_, &(dms_.ghosted1_1dof)),
+                      VYstar(comm_, &(dms_.ghosted1_1dof)), VZstar(comm_, &(dms_.ghosted1_1dof)),
+                      Pprime(comm_, &(dms_.ghosted1_1dof)), B(comm_, &(dms_.ghosted1_1dof)),
+                      vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver),
+                      plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver)
 {
 
 
@@ -32,9 +35,14 @@ TimeIntegratorSIMPLE::~TimeIntegratorSIMPLE()
 void
 TimeIntegratorSIMPLE::Destroy()
 {
-  Vstar.Destroy();
+  VXstar.Destroy();
+  VYstar.Destroy();
+  VZstar.Destroy();
   Pprime.Destroy();
   B.Destroy();
+
+  vlin_solver.Destroy();
+  plin_solver.Destroy();
 
   TimeIntegratorBase::Destroy();
 }
@@ -48,18 +56,58 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
                                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                                          double time, double dt, int time_step, int subcycle, double dts)
 {
-  print_error("*** Error: TimeIntegratorSIMPLE::AdvanceOneTimeStep has not been implemented yet.\n");
+
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
   int maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   for(int iter = 0; iter < maxIter; iter++) {
 
-    // build velocity equation
+    Vec5D***   v = (Vec5D***)V.GetDataPointer();
+    double*** id = ID.GetDataPointer();
 
-    //  
+    ExtractVariableComponents(v, VXstar, VYstar, VZstar, Pprime);
+
+    //-----------------------------------------------------
+    // Step 1: Solve the momentum equations for u*, v*, w*
+    //-----------------------------------------------------
+
+    // Solve the x-momentum equation
+    inco.BuildVelocityEquationSIMPLE(0, v, id, vlin_rows, B, iod.ts.semi_impl);
+    vlin_solver.SetLinearOperator(vlin_rows);
+    vlin_solver.Solve(B, VXstar);
+
+    // Solve the y-momentum equation
+    if(!global_mesh.IsMesh1D()) {
+      inco.BuildVelocityEquationSIMPLE(1, v, id, vlin_rows, B, iod.ts.semi_impl);
+      vlin_solver.SetLinearOperator(vlin_rows);
+      vlin_solver.Solve(B, VYstar);
+    }
+
+    // Solve the z-momentum equation
+    if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
+      inco.BuildVelocityEquationSIMPLE(2, v, id, vlin_rows, B, iod.ts.semi_impl);
+      vlin_solver.SetLinearOperator(vlin_rows);
+      vlin_solver.Solve(B, VZstar);
+    }
+
+    
+    //-----------------------------------------------------
+    // Step 2: Solve the p' equation
+    //-----------------------------------------------------
+    inco.BuildPressureEquationSIMPLE(v, id, VXstar, VYstar, VZstar, plin_rows, B, iod.ts.semi_impl);
+    plin_solver.SetLinearOperator(plin_rows);
+    plin_solver.Solve(B, Pprime);
 
 
+    //-----------------------------------------------------
+    // Step 3: Update p, u, v, w, and compute relative error
+    //-----------------------------------------------------
+    double err = UpdateStates(v, id, VXstar, VYstar, VZstar, Pprime); 
 
+    I AM HERE!
 
+    if(err<tol)
+      break; 
   }
 
 }

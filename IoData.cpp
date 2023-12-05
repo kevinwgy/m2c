@@ -1768,7 +1768,7 @@ SemiImplicitTsData::SemiImplicitTsData()
 void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 5, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   new ClassToken<SemiImplicitTsData>
     (ca, "Type", this,
@@ -1781,6 +1781,10 @@ void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
   new ClassInt<SemiImplicitTsData>(ca, "MaxIts", this, &SemiImplicitTsData::maxIts);
   new ClassDouble<SemiImplicitTsData>(ca, "ConvergenceTolerance", this,
                                       &SemiImplicitTsData::convergence_tolerance);
+
+  velocity_linear_solver.setup("LinearSolverForVelocity", ca);
+
+  pressure_linear_solver.setup("LinearSolverForPressure", ca);
 
 }
 
@@ -1855,8 +1859,8 @@ Assigner *RectangleData::getAssigner()
   new ClassDouble<RectangleData> (ca, "Normal_x", this, &RectangleData::normal_x);
   new ClassDouble<RectangleData> (ca, "Normal_y", this, &RectangleData::normal_y);
   new ClassDouble<RectangleData> (ca, "Normal_z", this, &RectangleData::normal_z);
-  new ClassDouble<RectangleData> (ca, "Dimension1", this, &RectangleData::a);
-  new ClassDouble<RectangleData> (ca, "Dimension2", this, &RectangleData::b);
+  new ClassDouble<RectangleData> (ca, "Dimension1", this, &RectangleData::a); // right-hand rule
+  new ClassDouble<RectangleData> (ca, "Dimension2", this, &RectangleData::b); // right-hand rule
   
   state.setup("BoundaryState", ca);
   
@@ -3623,7 +3627,7 @@ void SpecialToolsData::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
-PETScKSPOptionsData::PETScKSPOptionsData()
+LinearSolverData::LinearSolverData()
 {
   // solver options
   ksp = KSP_DEFAULT;
@@ -3639,86 +3643,32 @@ PETScKSPOptionsData::PETScKSPOptionsData()
 
 //------------------------------------------------------------------------------
 
-void PETScKSPOptionsData::setup(const char *name, ClassAssigner *father)
+void LinearSolverData::setup(const char *name, ClassAssigner *father)
 {
 
   ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
-  new ClassToken<PETScKSPOptionsData> (ca, "Type", this,
-     reinterpret_cast<int PETScKSPOptionsData::*>(&PETScKSPOptionsData::ksp), 3,
+  new ClassToken<LinearSolverData> (ca, "Type", this,
+     reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::ksp), 3,
      "Default", 0, "GMRes", 1, "FlexibleGMRes", 2);
 
-  new ClassToken<PETScKSPOptionsData> (ca, "Preconditioner", this,
-     reinterpret_cast<int PETScKSPOptionsData::*>(&PETScKSPOptionsData::pc), 6,
+  new ClassToken<LinearSolverData> (ca, "Preconditioner", this,
+     reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::pc), 6,
      "Default", 0, "None", 1, "Jacobi", 2, "IncompleteLU", 3, "IncompleteCholesky", 4,
      "MultiGrid", 5);
 
-  new ClassDouble<PETScKSPOptionsData>(ca, "RelativeErrorTolerance", this,
-                                       &PETScKSPOptionsData::rtol);
+  new ClassDouble<LinearSolverData>(ca, "RelativeErrorTolerance", this,
+                                       &LinearSolverData::rtol);
 
-  new ClassDouble<PETScKSPOptionsData>(ca, "AbsoluteErrorTolerance", this,
-                                       &PETScKSPOptionsData::abstol);
+  new ClassDouble<LinearSolverData>(ca, "AbsoluteErrorTolerance", this,
+                                       &LinearSolverData::abstol);
 
-  new ClassDouble<PETScKSPOptionsData>(ca, "DivergenceTolerance", this,
-                                       &PETScKSPOptionsData::dtol);
+  new ClassDouble<LinearSolverData>(ca, "DivergenceTolerance", this,
+                                       &LinearSolverData::dtol);
 
-  new ClassInt<PETScKSPOptionsData>(ca, "MaxIts", this, &PETScKSPOptionsData::maxits);
+  new ClassInt<LinearSolverData>(ca, "MaxIts", this, &LinearSolverData::maxits);
 
-  new ClassStr<PETScKSPOptionsData>(ca, "PETScOptionsFile", this, &PETScKSPOptionsData::options_file);
-
-}
-
-//------------------------------------------------------------------------------
-
-PoissonEquationData::PoissonEquationData()
-{
-  bc_x0 = DIRICHLET;
-  bc_y0 = DIRICHLET;
-  bc_z0 = DIRICHLET;
-  bc_xmax = DIRICHLET;
-  bc_ymax = DIRICHLET;
-  bc_zmax = DIRICHLET;
-
-  bc_x0_val = 0.0;
-  bc_y0_val = 0.0;
-  bc_z0_val = 0.0;
-  bc_xmax_val = 0.0;
-  bc_ymax_val = 0.0;
-  bc_zmax_val = 0.0;
-}
-
-//------------------------------------------------------------------------------
-
-void PoissonEquationData::setup(const char *name, ClassAssigner *father)
-{
-
-  ClassAssigner *ca = new ClassAssigner(name, 12, father);
-
-  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionX0", this,
-      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_x0), 2,
-      "Dirichlet", 0, "Neumann", 1);
-  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionY0", this,
-      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_y0), 2,
-      "Dirichlet", 0, "Neumann", 1);
-  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionZ0", this,
-      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_z0), 2,
-      "Dirichlet", 0, "Neumann", 1);
-  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionXmax", this,
-      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_xmax), 2,
-      "Dirichlet", 0, "Neumann", 1);
-  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionYmax", this,
-      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_ymax), 2,
-      "Dirichlet", 0, "Neumann", 1);
-  new ClassToken<PoissonEquationData> (ca, "BoundaryConditionZmax", this,
-      reinterpret_cast<int PoissonEquationData::*>(&PoissonEquationData::bc_zmax), 2,
-      "Dirichlet", 0, "Neumann", 1);
-
-  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueX0", this, &PoissonEquationData::bc_x0_val);
-  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueY0", this, &PoissonEquationData::bc_y0_val);
-  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueZ0", this, &PoissonEquationData::bc_z0_val);
-  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueXmax", this, &PoissonEquationData::bc_xmax_val);
-  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueYmax", this, &PoissonEquationData::bc_ymax_val);
-  new ClassDouble<PoissonEquationData>(ca, "BoundaryValueZmax", this, &PoissonEquationData::bc_zmax_val);
+  new ClassStr<LinearSolverData>(ca, "PETScOptionsFile", this, &LinearSolverData::options_file);
 
 }
 
@@ -3850,9 +3800,6 @@ void IoData::setupCmdFileVariables()
 
   terminal_visualization.setup("TerminalVisualization");
 
-  petsc_ksp_options.setup("LinearSystemSolver");
-
-  poisson.setup("PoissonEquation");
 }
 
 //------------------------------------------------------------------------------

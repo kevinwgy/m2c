@@ -41,12 +41,16 @@ private:
   std::vector<std::vector<int> > subD_neighbors_7; //!< 19 - 12 edges 
   std::vector<std::vector<int> > subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)
 
-  bool two_dimensional_mesh; //!< set to true if z has only one element
+  bool one_dimensional_mesh; //!< set to true if y and z have only one element
+
+  bool two_dimensional_mesh; //!< set to true if (only) z has only one element
 
 public:
 
   std::vector<double> x_glob, y_glob, z_glob;
   std::vector<double> dx_glob, dy_glob, dz_glob;
+
+  int NX, NY, NZ;
 
   std::vector<Vec3D> subD_xyz_min, subD_xyz_max; //!< actual boundaries of subs, up to cell boundaries
   std::vector<Int3> subD_ijk_min, subD_ijk_max; //!< Note: "max" is max index + 1 
@@ -82,11 +86,29 @@ public:
   Vec3D GetDXYZ(Int3 ijk);
   Vec3D GetDXYZ(int i, int j, int k);
 
+  bool IsMesh1D() {return one_dimensional_mesh;}
+
   bool IsMesh2D() {return two_dimensional_mesh;}
 
   //! If mesh is 2D, only consider dx and dy
   double GetMinDXYZ(Int3 ijk);
   double GetMaxDXYZ(Int3 ijk);
+
+  //! Duplicate of function in SpaceVariable (checking nodes/cells)
+  inline bool OutsidePhysicalDomain(int i, int j, int k) {
+    return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
+
+  //! Duplicate of function in SpaceVariable (checking nodes/cells)
+  inline bool OutsidePhysicalDomainAndUnpopulated(int i, int j, int k)
+  {
+    int count = 0;
+    if(i<0 || i>=NX) count++;
+    if(j<0 || j>=NY) count++;
+    if(k<0 || k>=NZ) count++;
+    if(count>1)
+      return true;
+    return false;
+  }
 
   //! Determine is a point is inside the domain (formed by control volumes / cells)
   bool IsPointInDomain(Vec3D &p, bool include_ghost_layer = false);
