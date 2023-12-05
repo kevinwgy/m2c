@@ -18,6 +18,9 @@
 class IncompressibleOperator
 {
   
+  MPI_Comm& comm;
+  IoData& iod;
+
   //! Variable function
   std::vector<VarFcnBase*>& vf; //!< each material has a varFcn
 
@@ -35,6 +38,9 @@ class IncompressibleOperator
   //! Ghost fluid method
   GhostFluidOperator *gfo;
 
+  //! Internal space variables
+  SpaceVariable3D V3;
+
 public:
 
   IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -46,11 +52,17 @@ public:
 
   void FinalizeInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID);
 
-  void ApplyBoundaryConditions(SpaceVariable3D &V);
+  void ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                           SpaceVariable3D *localDt = NULL);
+
+  void ApplyBoundaryConditions(SpaceVariable3D &V); //!< Also modify non-ghost entries (due to MAC grid)
 
 private:
 
   void CheckInputs(IoData &iod); //!< Check input file. Quit if error is found.
+
+  void ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                 SpaceVariable3D &LocalDt);
 
 };
 

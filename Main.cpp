@@ -365,8 +365,7 @@ int main(int argc, char* argv[])
   mpo.UpdateMaterialIDAtGhostNodes(ID); //ghost nodes (outside domain) get the ID of their image nodes
 
   if(incompressible) {
-    assert(inco);
-    inco->FinalizeInitialCondition(V, ID); //set rho specified in Incompressible model and p=0
+    inco->FinalizeInitialCondition(V, ID); //Shift vel to cell faces, set rho=rho0 and p=0
     inco->ApplyBoundaryConditions(V);
   }
 
@@ -476,7 +475,6 @@ int main(int argc, char* argv[])
       print_error("*** Error: Incompressible flows require a semi-implicit time-integrator.\n");
       exit_mpi();
     }
-    assert(inco);
     if(iod.ts.semi_impl.type == SemiImplicitTsData::SIMPLE)
       integrator = new TimeIntegratorSIMPLE(comm, iod, dms, spo, *inco, lso, mpo, laser, embed, heo, pmo);
     else if(iod.ts.semi_impl.type == SemiImplicitTsData::SIMPLER)
@@ -600,10 +598,11 @@ int main(int argc, char* argv[])
                                  embed->GetPointerToIntersectors()); //update V, ID, Phi
     spo.ClipDensityAndPressure(V,ID);
     if(boundary_swept) {
-      if(inco) //incompressible flow
+      if(incompressible)
         inco->ApplyBoundaryConditions(V);
       else
         spo.ApplyBoundaryConditions(V);
+
       for(int i=0; i<(int)Phi.size(); i++) 
         lso[i]->ApplyBoundaryConditions(*Phi[i]);
     }
@@ -642,7 +641,10 @@ int main(int argc, char* argv[])
     do { //subcycling w.r.t. concurrent programs
 
       // Compute time step size
-      spo.ComputeTimeStepSize(V, ID, dt, cfl, LocalDt); 
+      if(!incompressible)
+        spo.ComputeTimeStepSize(V, ID, dt, cfl, LocalDt); 
+      else 
+        inco->ComputeTimeStepSize(V, ID, dt, cfl, LocalDt);
 
       // Modify dt and cfl, dtleft if needed
       if(concurrent.GetTimeStepSize()>0) {//concurrent solver provides a "dts"

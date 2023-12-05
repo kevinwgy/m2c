@@ -1226,8 +1226,9 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
-                                        SpaceVariable3D *LocalDt)
+void
+SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                   SpaceVariable3D *LocalDt)
 {
 
   if(LocalDt) { //local time-stepping, dealt with separately.
@@ -1252,14 +1253,19 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
 
   if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {
-    double dt_surfaceTension = 0.9 * ComputeTimeStepSizeSurfaceTension(V, ID); // 0.9 is a safety coefficient
-    dt = std::min(dt, dt_surfaceTension);
+    double dt_surfaceTension = 0.9*ComputeTimeStepSizeSurfaceTension(V, ID); // 0.9 is a safety factor 
+    if(dt>dt_surfaceTension) {
+      dt = dt_surfaceTension;
+      cfl = dt/dx_over_char_speed_min;
+    }
   }
 }
+
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
-                                              SpaceVariable3D &LocalDt)
+void
+SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                         SpaceVariable3D &LocalDt)
 {
 
   cfl = iod.ts.cfl;
@@ -2679,25 +2685,35 @@ SpaceOperator::GetNormalForOneSidedRiemann(int d, int forward_or_backward, Vec3D
 }
 
 //-----------------------------------------------------
-double SpaceOperator::CalculateCurvatureAtCellInterface(int d /*0,1,2*/, double*** phi, double*** kappaPhi, int i, int j, int k) {
+
+double
+SpaceOperator::CalculateCurvatureAtCellInterface(int d /*0,1,2*/, double*** phi, double*** kappaPhi,
+                                                 int i, int j, int k)
+{
   double ans = 0.;
   if (d == 0) { // x-direction
-    ans = ( kappaPhi[k][j][i-1]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j][i-1]) ) / ( fabs(phi[k][j][i-1]) + fabs(phi[k][j][i]) ); 
+    ans = ( kappaPhi[k][j][i-1]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j][i-1]) ) /
+          ( fabs(phi[k][j][i-1]) + fabs(phi[k][j][i]) ); 
   } else if(d == 1) { // y-direction
-    ans = ( kappaPhi[k][j-1][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j-1][i]) ) / ( fabs(phi[k][j-1][i]) + fabs(phi[k][j][i]) ); 
+    ans = ( kappaPhi[k][j-1][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j-1][i]) ) /
+          ( fabs(phi[k][j-1][i]) + fabs(phi[k][j][i]) ); 
   } else if(d == 2) { // z-direction
-    ans = ( kappaPhi[k-1][j][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k-1][j][i]) ) / ( fabs(phi[k-1][j][i]) + fabs(phi[k][j][i]) ); 
-  } else {
-    std::cout << "direction variable should only be 0, 1, or 2" << std::endl;
-    exit_mpi();
+    ans = ( kappaPhi[k-1][j][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k-1][j][i]) ) /
+          ( fabs(phi[k-1][j][i]) + fabs(phi[k][j][i]) ); 
   }
   return ans;
 }
 
 //-----------------------------------------------------
 
-double SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID)
+double
+SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID)
 {
+
+  double sigma = riemann.GetSurfaceTensionCoefficient(); //assume const surface tension coefficient (TODO)
+  if(sigma==0.0)
+    return DBL_MAX; //no surface tension
+
   //------------------------------------
   // Extract data
   //------------------------------------
@@ -2709,68 +2725,57 @@ double SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, Spac
   int neighborid = -1;
   double my_dx = 0.;  
   double dt_min_surfaceTension = DBL_MAX;  
-  double sigma = riemann.GetSurfaceTensionCoefficient(); //assume same surface tension coefficient everywhere
 
-  // Loop through the domain interior, and the right, top, and front ghost layers. For each pair of cells occupied different fluid materials, calculate the
-  // time step size associated to surface tension
+  // Loop through the domain interior, and the right, top, and front ghost layers. For each pair of cells 
+  // occupied by different fluid materials, calculate the time step size due to surface tension.
   for(int k=k0; k<kkmax; k++) {
     for(int j=j0; j<jjmax; j++) {
       for(int i=i0; i<iimax; i++) {
 
-	myid = id[k][j][i];
-	my_dx = min(dxyz[k][j][i][0],
-	                min(dxyz[k][j][i][1], dxyz[k][j][i][2]) );
+        myid = id[k][j][i];
+        if(myid==INACTIVE_MATERIAL_ID)
+          continue;
+
+        my_dx = min(dxyz[k][j][i][0], min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
 
 	//**********************************************
 	//cell interfaces perpendicular to x-direction
 	//**********************************************
-	if(k!=kkmax-1 && j!=jjmax-1) {
-
-	  neighborid = id[k][j][i-1];
-
-	  if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
-            double neighbor_dx = min(dxyz[k][j][i-1][0],
-                                         min(dxyz[k][j][i-1][1], dxyz[k][j][i-1][2]) );
+        if(k!=kkmax-1 && j!=jjmax-1) {
+          neighborid = id[k][j][i-1];
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k][j][i-1][0], min(dxyz[k][j][i-1][1], dxyz[k][j][i-1][2]) );
             double dx = min(my_dx, neighbor_dx);
             double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j][i-1][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
-            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
-	  }
-	}
-
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension);
+          }
+        }
 
         //**********************************************
         //cell interfaces perpendicular to y-direction
         //**********************************************
         if(k!=kkmax-1 && i!=iimax-1) {
-
           neighborid = id[k][j-1][i];
-
-          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
-            double neighbor_dx = min(dxyz[k][j-1][i][0],
-                                         min(dxyz[k][j-1][i][1], dxyz[k][j-1][i][2]) );
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k][j-1][i][0], min(dxyz[k][j-1][i][1], dxyz[k][j-1][i][2]) );
             double dx = min(my_dx, neighbor_dx);
             double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j-1][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
             dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
           }
         }
 
-
         //**********************************************
         //cell interfaces perpendicular to z-direction
         //**********************************************
         if(j!=jjmax-1 && i!=iimax-1) {
-
           neighborid = id[k-1][j][i];
-
-          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) { //active material interface
-            double neighbor_dx = min(dxyz[k-1][j][i][0],
-                                         min(dxyz[k-1][j][i][1], dxyz[k-1][j][i][2]) );
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = min(dxyz[k-1][j][i][0], min(dxyz[k-1][j][i][1], dxyz[k-1][j][i][2]) );
             double dx = min(my_dx, neighbor_dx);
             double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k-1][j][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
             dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
           }
         }
-
       }
     }
   }

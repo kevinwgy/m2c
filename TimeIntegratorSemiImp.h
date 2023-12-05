@@ -20,6 +20,9 @@ protected:
 
   IncompressibleOperator &inco;
 
+  SpaceVariable3D Vstar, Pprime;
+  SpaceVariable3D B; //!< generally used as the right-hand-side of linear systems
+
 public:
 
   TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,

@@ -1758,6 +1758,9 @@ SemiImplicitTsData::SemiImplicitTsData()
 
   E = 5.0; // Van Doormaal and Raithby (1984) says 4-10 is common.
   alphaP = 0.8; // recommended in Patankar's book (Section 6.7-2)
+
+  maxIts = 4;
+  convergence_tolerance = 1.0e-4;
 }
 
 //------------------------------------------------------------------------------
@@ -1765,7 +1768,7 @@ SemiImplicitTsData::SemiImplicitTsData()
 void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
 
   new ClassToken<SemiImplicitTsData>
     (ca, "Type", this,
@@ -1774,6 +1777,10 @@ void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
 
   new ClassDouble<SemiImplicitTsData>(ca, "E", this, &SemiImplicitTsData::E);
   new ClassDouble<SemiImplicitTsData>(ca, "AlphaP", this, &SemiImplicitTsData::alphaP);
+
+  new ClassInt<SemiImplicitTsData>(ca, "MaxIts", this, &SemiImplicitTsData::maxIts);
+  new ClassDouble<SemiImplicitTsData>(ca, "ConvergenceTolerance", this,
+                                      &SemiImplicitTsData::convergence_tolerance);
 
 }
 

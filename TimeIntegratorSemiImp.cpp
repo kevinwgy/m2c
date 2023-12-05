@@ -15,7 +15,8 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                                            LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                                            HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_)
                     : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_, pmo_),
-                      inco(inco_)
+                      inco(inco_), Vstar(comm_, &(dms_.ghosted1_1dof)),
+                      Pprime(comm_, &(dms_.ghosted1_1dof)), B(comm_, &(dms_.ghosted1_1dof))
 {
 
 
@@ -30,7 +31,13 @@ TimeIntegratorSIMPLE::~TimeIntegratorSIMPLE()
 
 void
 TimeIntegratorSIMPLE::Destroy()
-{ }
+{
+  Vstar.Destroy();
+  Pprime.Destroy();
+  B.Destroy();
+
+  TimeIntegratorBase::Destroy();
+}
 
 //----------------------------------------------------------------------------
 
@@ -42,6 +49,19 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
                                          double time, double dt, int time_step, int subcycle, double dts)
 {
   print_error("*** Error: TimeIntegratorSIMPLE::AdvanceOneTimeStep has not been implemented yet.\n");
+
+  int maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
+  for(int iter = 0; iter < maxIter; iter++) {
+
+    // build velocity equation
+
+    //  
+
+
+
+
+  }
+
 }
 
 //----------------------------------------------------------------------------
@@ -72,7 +92,11 @@ TimeIntegratorSIMPLER::~TimeIntegratorSIMPLER()
 
 void
 TimeIntegratorSIMPLER::Destroy()
-{ }
+{
+
+
+  TimeIntegratorBase::Destroy();
+}
 
 //----------------------------------------------------------------------------
 
@@ -114,7 +138,11 @@ TimeIntegratorSIMPLEC::~TimeIntegratorSIMPLEC()
 
 void
 TimeIntegratorSIMPLEC::Destroy()
-{ }
+{ 
+
+
+  TimeIntegratorBase::Destroy();
+}
 
 //----------------------------------------------------------------------------
 
@@ -156,7 +184,11 @@ TimeIntegratorPISO::~TimeIntegratorPISO()
 
 void
 TimeIntegratorPISO::Destroy()
-{ }
+{ 
+
+
+  TimeIntegratorBase::Destroy();
+}
 
 //----------------------------------------------------------------------------
 

@@ -913,7 +913,10 @@ struct SemiImplicitTsData {
   double E;       //!< control the relaxation in the solution of momentum equations
   double alphaP;  //!< relaxation in the solution of the pressure correction equaitons
 
-  //TODO: Add more...
+
+  int maxIts; //!< maximum number of (sub-)iterations within each time step
+  double convergence_tolerance; //!< relative error tolerance within each time step
+
   
   SemiImplicitTsData();
   ~SemiImplicitTsData() {}
