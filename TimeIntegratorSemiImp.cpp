@@ -15,14 +15,24 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                                            LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                                            HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_)
                     : TimeIntegratorBase(comm_, iod_, dms_, spo_, lso_, mpo_, laser_, embed_, heo_, pmo_),
-                      inco(inco_), VXstar(comm_, &(dms_.ghosted1_1dof)),
+                      inco(inco_), Homo(comm_, &(dms_.ghosted1_1dof)), VXstar(comm_, &(dms_.ghosted1_1dof)),
                       VYstar(comm_, &(dms_.ghosted1_1dof)), VZstar(comm_, &(dms_.ghosted1_1dof)),
                       Pprime(comm_, &(dms_.ghosted1_1dof)), B(comm_, &(dms_.ghosted1_1dof)),
                       vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver)
 {
+  Homo.SetConstantValue(1, true); //default
 
-
+  if(iod.ts.semi_impl.E<=0.0) {
+    print_error("*** Error: In the SIMPLE family of methods, E must be set to a positive value.\n");
+    exit_mpi();
+  }
+  
+  if(iod.ts.semi_impl.alphaP<=0.0) {
+    print_error("*** Error: In the SIMPLE family of methods, alphaP must be set to a positive value "
+                "(usually less than 1).\n");
+    exit_mpi();
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -40,6 +50,7 @@ TimeIntegratorSIMPLE::Destroy()
   VZstar.Destroy();
   Pprime.Destroy();
   B.Destroy();
+  Homo.Destroy();
 
   vlin_solver.Destroy();
   plin_solver.Destroy();
@@ -59,11 +70,18 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
   GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
+  if(mpo.NumberOfMaterials()>1) {
+    print_error("*** Error: Need to update homogeneity. Currently, the incompressible flow solver does not allow"
+                " more than one material.\n");
+    exit_mpi();
+  }
+
+  double*** id = ID.GetDataPointer();
+
   int maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   for(int iter = 0; iter < maxIter; iter++) {
 
     Vec5D***   v = (Vec5D***)V.GetDataPointer();
-    double*** id = ID.GetDataPointer();
 
     ExtractVariableComponents(v, VXstar, VYstar, VZstar, Pprime);
 
@@ -72,20 +90,20 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
 
     // Solve the x-momentum equation
-    inco.BuildVelocityEquationSIMPLE(0, v, id, vlin_rows, B, iod.ts.semi_impl);
+    inco.BuildVelocityEquationSIMPLE(0, v, id, vlin_rows, B, iod.ts.semi_impl, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     vlin_solver.Solve(B, VXstar);
 
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
-      inco.BuildVelocityEquationSIMPLE(1, v, id, vlin_rows, B, iod.ts.semi_impl);
+      inco.BuildVelocityEquationSIMPLE(1, v, id, vlin_rows, B, iod.ts.semi_impl, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       vlin_solver.Solve(B, VYstar);
     }
 
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
-      inco.BuildVelocityEquationSIMPLE(2, v, id, vlin_rows, B, iod.ts.semi_impl);
+      inco.BuildVelocityEquationSIMPLE(2, v, id, vlin_rows, B, iod.ts.semi_impl, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       vlin_solver.Solve(B, VZstar);
     }
@@ -110,7 +128,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       break; 
   }
 
+
   // don't forget to restore variables
+  ID.RestoreDataPointerToLocalVector();
 }
 
 //----------------------------------------------------------------------------
@@ -141,6 +161,10 @@ TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VXs
   VZstar.RestoreDataPointerToLocalVector();
   Pprime.RestoreDataPointerToLocalVector();
 }
+
+//----------------------------------------------------------------------------
+
+
 
 //----------------------------------------------------------------------------
 // SIMPLER

@@ -23,6 +23,7 @@ protected:
 
   SpaceVariable3D VXstar, VYstar, VZstar, Pprime;
   SpaceVariable3D B; //!< generally used as the right-hand-side of linear systems
+  SpaceVariable3D Homo; //!< whether each node is within a homogeneous neighborhood (const. rho, mu)
 
   vector<RowEntries> vlin_rows;
   vector<RowEntries> plin_rows;

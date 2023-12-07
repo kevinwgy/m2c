@@ -62,6 +62,10 @@ public:
                      SpaceOperator &spo, vector<LevelSetOperator*> &lso);
   ~MultiPhaseOperator();
 
+  //! get number of materials
+  inline int NumberOfMaterials(bool include_inactive = false) {
+    return include_inactive ? varFcn.size()-1 : varFcn.size();}
+
   //! update material id at (external) ghost nodes (they get the IDs of their images)
   void UpdateMaterialIDAtGhostNodes(SpaceVariable3D &ID);
 
