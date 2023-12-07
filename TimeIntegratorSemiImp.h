@@ -48,6 +48,11 @@ public:
 
   void Destroy();
 
+protected:
+
+  void ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
+                                 SpaceVariable3D &VZstar, SpaceVariable3D &Pprime);
+
 };  
 
 

@@ -130,7 +130,7 @@ public:
 
 class ViscoFcnConstant : public ViscoFcnBase {
 
-  double dyna, bulk; //See Kevin's notes
+  double dyna, bulk; //!< See Kevin's notes
 
 public:
 
@@ -189,7 +189,7 @@ public:
 
 class ViscoFcnSutherland : public ViscoFcnBase {
 
-  double mu0, T0, Smu; //See Kevin's notes
+  double mu0, T0, Smu; //!< See Kevin's notes
   double bulk;
 
 public:
@@ -264,7 +264,7 @@ public:
 //classical model by von Neumann and Richtmyer (1950)
 class ViscoFcnRodionov : public ViscoFcnBase {
 
-  double Cav, Cth; //See Kevin's notes
+  double Cav, Cth; //!< See Kevin's notes
   double bulk; 
 
 public:
@@ -274,7 +274,7 @@ public:
     type = ARTIFICIAL_RODIONOV;
     Cav = vis.Cav;
     Cth = vis.Cth;
-    bulk = vis.bulkViscosity; //generally set to 0
+    bulk = vis.bulkViscosity; //!< generally set to 0
   }
   ~ViscoFcnRodionov() {}
 

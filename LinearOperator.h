@@ -24,6 +24,7 @@
  *********************************************************************/
 
 struct RowEntries {
+
   MatStencil row; //!< row number, defined by i,j,k,c
   std::vector<MatStencil> cols; //!< col numbers
   std::vector<double> vals; //entries (one per col)
@@ -33,6 +34,21 @@ struct RowEntries {
     cols.reserve(nEntries);
     vals.reserve(nEntries);
   }
+
+  void Clear() {row.i = row.j = row.k = row.c = 0; cols.clear(); vals.clear();} //!< does not free memory
+  void ClearEntries() {cols.clear(); vals.clear();} //!< does not free memory
+
+  void SetRow(int i, int j, int k) {row.i = i;  row.j = j;  row.k = k;}
+  void SetRow(int i, int j, int k, int c) {row.i = i;  row.j = j;  row.k = k;  row.c = c;}
+
+  void PushEntry(int i, int j, int k, double v) {
+    cols.push_back(MatStencil()); cols.back().i = i; cols.back().j = j; cols.back().k = k;
+    vals.push_back(v);}
+
+  void PushEntry(int i, int j, int k, int c, double v) {
+    cols.push_back(MatStencil()); cols.back().i = i; cols.back().j = j; cols.back().k = k; cols.back().c = c;
+    vals.push_back(v);}
+
 };
 
 

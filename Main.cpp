@@ -244,14 +244,6 @@ int main(int argc, char* argv[])
   if(true) //may add more choices later
     grad = new GradientCalculatorCentral(comm, dms, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), *interp);
   
-
-  //! Initialize incompressible flow space operator
-  IncompressibleOperator* inco = NULL;
-  if(incompressible) {
-    assert(interp);
-    inco = new IncompressibleOperator(comm, dms, iod, vf, spo, *interp);
-  }
-
   //! Setup viscosity operator in spo (if viscosity model is not NONE)
   spo.SetupViscosityOperator(interp, grad, embed!=NULL);
 
@@ -264,6 +256,12 @@ int main(int argc, char* argv[])
   std::set<Int3> spo_frozen_nodes;
   spo.SetPointerToFrozenNodes(&spo_frozen_nodes); 
 
+  //! Initialize incompressible flow space operator
+  IncompressibleOperator* inco = NULL;
+  if(incompressible) {
+    assert(interp);
+    inco = new IncompressibleOperator(comm, dms, iod, vf, spo, *interp);
+  }
 
   //! Allocate memory for V and ID 
   SpaceVariable3D V(comm, &(dms.ghosted1_5dof)); //!< primitive state variables

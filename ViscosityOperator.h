@@ -31,7 +31,7 @@ class ViscosityOperator
   vector<VarFcnBase*>& varFcn; //!< each material has a varFcn
 
   //! Viscosity function (one for each material)
-  vector<ViscoFcnBase*> visFcn;
+  vector<ViscoFcnBase*> visFcn; //!< undefined for INACTIVE_MATERIAL_ID
 
   //! Mesh info
   SpaceVariable3D &coordinates;
@@ -92,6 +92,8 @@ public:
                     bool with_embedded_boundary);
 
   ~ViscosityOperator();
+
+  inline vector<ViscoFcnBase*>& GetViscoFcns() {return visFcn;}
 
   //! calculate diffusion fluxes (on the left-hand-side of the N-S equations; add them to R) 
   void AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 

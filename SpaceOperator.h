@@ -110,6 +110,8 @@ public:
   void SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_,
                               bool with_embedded_boundary = false);
 
+  ViscosityOperator* GetPointerToViscosityOperator() {return visco;} //!< can be NULL!
+
   void SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_);
 
   void SetHyperelasticityOperatorPointer(HyperelasticityOperator *heo_) {heo = heo_;}

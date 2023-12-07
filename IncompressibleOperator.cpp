@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include<IncompressibleOperator.h>
+#include<LinearOperator.h>
 #include<GeoTools.h>
 using std::vector;
 
@@ -18,7 +19,7 @@ IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &
                                                vector<VarFcnBase*> &varFcn_, SpaceOperator &spo_, 
                                                InterpolatorBase &interp_)
                       : comm(comm_), iod(iod_), vf(varFcn_), spo(spo_), interpolator(interp_), gfo(NULL),
-                        V3(comm_, &(dm_all_.ghosted1_3dof))
+                        V3(comm_, &(dm_all_.ghosted1_3dof)), viscous(false)
 {
   // Get i0, j0, etc.
   SpaceVariable3D &coordinates(spo.GetMeshCoordinates());
@@ -27,6 +28,50 @@ IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &
   coordinates.GetGlobalSize(&NX,&NY,&NZ);
 
   CheckInputs(iod_);
+
+  // Fill mu (dynamic viscosity)
+  Mu.assign(vf.size(), 0.0); //by default, mu = 0
+  ViscosityOperator *visco_ptr = spo.GetPointerToViscosityOperator();
+  if(visco_ptr) {
+    vector<ViscoFcnBase*>& visFcns(visco_ptr->GetViscoFcns());
+    for(int i=0; i<(int)visFcns.size(); i++) {
+      if(visFcns[i]->type == ViscoFcnBase::CONSTANT)
+        Mu[i] = visFcns[i]->GetMu();
+      else if(visFcn[i]->type != ViscoFcnBase::NONE) {
+        print_error("*** Error: Currently, IncompressibleOperator only supports CONSTANT viscosity.\n");
+        exit_mpi();
+      }
+    }
+  }
+
+  // Calculate deltas
+  Dx.resize(3); //dir = 0, 1, 2
+  Dy.resize(3);
+  Dz.resize(3);
+  dx_l.resize(3);
+  dx_r.resize(3);
+  dy_b.resize(3);
+  dy_t.resize(3);
+  dz_k.resize(3);
+  dz_f.resize(3);
+  for(d=0; d<3; d++) {
+    for(int i=i0; i<imax; i++) {
+      Dx[d].push_back(d==0 ? 0.5*(global_mesh.GetDx(i-1)+global_mesh.GetDx(i)) : global_mesh.GetDx(i));
+      dx_l[d].push_back(d==0 ? global_mesh.GetDx(i-1) : 0.5*(global_mesh.GetDx(i-1)+global_mesh.GetDx(i)));
+      dx_r[d].push_back(d==0 ? global_mesh.GetDx(i)   : 0.5*(global_mesh.GetDx(i)+global_mesh.GetDx(i+1)));
+    }
+    for(int j=j0; j<jmax; j++) {
+      Dy[d].push_back(d==1 ? 0.5*(global_mesh.GetDy(j-1)+global_mesh.GetDy(j)) : global_mesh.GetDy(j));
+      dy_b[d].push_back(d==1 ? global_mesh.GetDy(j-1) : 0.5*(global_mesh.GetDy(j-1)+global_mesh.GetDy(j)));
+      dy_t[d].push_back(d==1 ? global_mesh.GetDy(j)   : 0.5*(global_mesh.GetDy(j)+global_mesh.GetDy(j+1)));
+    }
+    for(int k=k0; k<kmax; k++) {
+      Dz[d].push_back(d==2 ? 0.5*(global_mesh.GetDz(k-1)+global_mesh.GetDz(k)) : global_mesh.GetDz(k));
+      dz_k[d].push_back(d==2 ? global_mesh.GetDz(k-1) : 0.5*(global_mesh.GetDz(k-1)+global_mesh.GetDz(k)));
+      dz_f[d].push_back(d==2 ? global_mesh.GetDz(k)   : 0.5*(global_mesh.GetDz(k)+global_mesh.GetDz(k+1)));
+    }
+  }
+
 }
 
 //--------------------------------------------------------------------------
@@ -871,8 +916,319 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
 
 //--------------------------------------------------------------------------
 
+void
+IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*** id,
+                                                    vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
+                                                    SemiImplicitTsData &iod_semi)
+{
+
+  assert(dir==0 || dir==1 || dir==2);
+
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
+
+  double*** bb = B.GetDataPointer();
+
+  int row_counter = 0;
+  int original_size = vlin_rows.size();
+  int myid;
+
+  double a_p, a_l, a_r, a_b, a_t, a_k, a_f, b, dp;
+  double Dx, Dy, Dz, dx_l, dx_r, dy_b, dy_t, dz_k, dz_f;
+  double mu;
+
+  for(int k=k0; k<kmax; k++) {
+    dz  = Dz[dir][k-k0];
+    dzk = dz_k[dir][k-k0];
+    dzf = dz_f[dir][k-k0];
+    for(int j=j0; j<jmax; j++) {
+      dy   = Dy[dir][j-j0];
+      dyb  = dy_b[dir][j-j0];
+      dyt  = dy_t[dir][j-j0];
+      dydz = dy*dz;
+      for(int i=i0; i<imax; i++) {
+
+        // locate the row
+        if(row_counter>=original_size)
+          vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
+        RowEntries &row(vlin_rows[row_counter]);
+        row.SetRow(i,j,k);
+        row.ClearEntries();
+        row_counter++;
+
+        if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0)) {
+          row.PushEntry(i,j,k, 1.0); 
+          bb[k][j][i] = v[k][j][i][1+dir];
+          continue;
+        }
+
+        dx   = Dx[dir][i-i0];
+        dxl  = dx_l[dir][i-i0];
+        dxr  = dx_r[dir][i-i0];
+        dxdy = dx*dy;
+        dxdz = dx*dz;
 
 
+        //---------------------------------------------------
+        // Reference: Patankar's book, Eqs. (5.61) - (5.64)
+        //---------------------------------------------------
+
+        ap = 0.0; //diagonal
+
+        //-----------
+        // LEFT
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==0)
+          F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
+        else {
+          cm = global_mesh.GetDx(i-1);
+          cp = global_mesh.GetDx(i);
+          cm_plus_cp = cm + cp;
+          rhou1 = dir==1 ? v[k][j-1][i][1]*(cp*v[k][j-1][i-1][0] + cm*v[k][j-1][i][0])/cm_plus_cp
+                         : v[k-1][j][i][1]*(cp*v[k-1][j][i-1][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
+          rhou2 = v[k][j][i][1]*(cp*v[k][j][i-1][0] + cm*v[k][j][i][0])/(cm+cp);
+          F = dir== 1 ? (dyt*rhou1 + dyb*rhou2)/(dyb+dyt) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dydz;
+        // Calculate D and the "a" coefficient
+        a = std::max(F, 0.0);
+        if(dir==0)
+          mu = Mu[id[k][j][i-1]];
+        else {
+          // cm and cp has been calculated!   
+          if(i==0) {
+            mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+          } else {
+            mu1 = dir==1 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+          }
+          mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+        }
+        if(mu>0.0) {
+          D  = mu*dydz/dxl;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        // Add entry
+        row.PushEntry(i-1,j,k, -a);  //on the left hand side
+             
+
+        //-----------
+        // RIGHT 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==0)
+          F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
+        else {
+          cm = global_mesh.GetDx(i);
+          cp = global_mesh.GetDx(i+1);
+          cm_plus_cp = cm + cp;
+          rhou1 = dir==1 ? v[k][j-1][i+1][1]*(cp*v[k][j-1][i][0] + cm*v[k][j-1][i+1][0])/cm_plus_cp
+                         : v[k-1][j][i+1][1]*(cp*v[k-1][j][i][0] + cm*v[k-1][j][i+1][0])/cm_plus_cp;
+          rhou2 = v[k][j][i+1][1]*(cp*v[k][j][i][0] + cm*v[k][j][i+1][0])/(cm+cp);
+          F = dir== 1 ? (dyt*rhou1 + dyb*rhou2)/(dyb+dyt) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dydz;
+        // Calculate D and the "a" coefficient
+        a = std::max(-F, 0.0);
+        if(dir==0)
+          mu = Mu[id[k][j][i]];
+        else {
+          // cm and cp has been calculated!   
+          if(i==NX-1) {
+            mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+          } else {
+            mu1 = dir==1 ? (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j-1][i+1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j][i+1]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j][i+1]])/cm_plus_cp;
+          }
+          mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+        }
+        if(mu>0.0) {
+          D  = mu*dydz/dxr;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        // Add entry
+        row.PushEntry(i+1,j,k, -a);  //on the left hand side
+             
+    
+        //-----------
+        // BOTTOM 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==1)
+          F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
+        else {
+          cm = global_mesh.GetDy(j-1);
+          cp = global_mesh.GetDy(j);
+          cm_plus_cp = cm + cp;
+          rhou1 = dir==0 ? v[k][j][i-1][2]*(cp*v[k][j-1][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
+                         : v[k-1][j][i][2]*(cp*v[k-1][j-1][i][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
+          rhou2 = v[k][j][i][2]*(cp*v[k][j-1][i][0] + cm*v[k][j][i][0])/(cm+cp);
+          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dxdz;
+        // Calculate D and the "a" coefficient
+        a = std::max(F, 0.0);
+        if(dir==1)
+          mu = Mu[id[k][j-1][i]];
+        else {
+          // cm and cp has been calculated!   
+          if(j==0) {
+            mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+        }
+        if(mu>0.0) {
+          D  = mu*dxdz/dyb;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        // Add entry
+        row.PushEntry(i,j-1,k, -a);  //on the left hand side
+             
+
+        //-----------
+        // TOP 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==1)
+          F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
+        else {
+          cm = global_mesh.GetDy(j);
+          cp = global_mesh.GetDy(j+1);
+          cm_plus_cp = cm + cp;
+          rhou1 = dir==0 ? v[k][j+1][i-1][2]*(cp*v[k][j][i-1][0] + cm*v[k][j+1][i-1][0])/cm_plus_cp
+                         : v[k-1][j+1][i][2]*(cp*v[k-1][j][i][0] + cm*v[k-1][j+1][i][0])/cm_plus_cp;
+          rhou2 = v[k][j+1][i][2]*(cp*v[k][j][i][0] + cm*v[k][j+1][i][0])/(cm+cp);
+          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dxdz;
+        // Calculate D and the "a" coefficient
+        a = std::max(-F, 0.0);
+        if(dir==1)
+          mu = Mu[id[k][j][i]];
+        else {
+          // cm and cp has been calculated!   
+          if(j==NY-1) {
+            mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j+1][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j+1][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j+1][i]])/cm_plus_cp;
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+        }
+        if(mu>0.0) {
+          D  = mu*dxdz/dyt;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        // Add entry
+        row.PushEntry(i,j+1,k, -a);  //on the left hand side
+             
+    
+        //-----------
+        // BACK 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==2)
+          F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
+        else {
+          cm = global_mesh.GetDz(k-1);
+          cp = global_mesh.GetDy(k);
+          cm_plus_cp = cm + cp;
+          rhou1 = dir==0 ? v[k][j][i-1][3]*(cp*v[k-1][j][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
+                         : v[k][j-1][i][3]*(cp*v[k-1][j-1][i][0] + cm*v[k][j-1][i][0])/cm_plus_cp;
+          rhou2 = v[k][j][i][3]*(cp*v[k-1][j][i][0] + cm*v[k][j][i][0])/(cm+cp);
+          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dyt*rhou1 + dyb*rhou2)/(dyb+dyt);
+        }
+        F *= dxdy;
+        // Calculate D and the "a" coefficient
+        a = std::max(F, 0.0);
+        if(dir==2)
+          mu = Mu[id[k-1][j][i]];
+        else {
+          // cm and cp has been calculated!   
+          if(k==0) {
+            mu1 = dir==0 ? Mu[id[k-1][j][i]] : Mu[id[k][j][i-1]];
+            mu2 = Mu[id[k][j][i]];
+I AM HERE
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+        }
+        if(mu>0.0) {
+          D  = mu*dxdz/dyb;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        // Add entry
+        row.PushEntry(i,j-1,k, -a);  //on the left hand side
+             
+
+        //-----------
+        // TOP 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==1)
+          F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
+        else {
+          cm = global_mesh.GetDy(j);
+          cp = global_mesh.GetDy(j+1);
+          cm_plus_cp = cm + cp;
+          rhou1 = dir==0 ? v[k][j+1][i-1][2]*(cp*v[k][j][i-1][0] + cm*v[k][j+1][i-1][0])/cm_plus_cp
+                         : v[k-1][j+1][i][2]*(cp*v[k-1][j][i][0] + cm*v[k-1][j+1][i][0])/cm_plus_cp;
+          rhou2 = v[k][j+1][i][2]*(cp*v[k][j][i][0] + cm*v[k][j+1][i][0])/(cm+cp);
+          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dxdz;
+        // Calculate D and the "a" coefficient
+        a = std::max(-F, 0.0);
+        if(dir==1)
+          mu = Mu[id[k][j][i]];
+        else {
+          // cm and cp has been calculated!   
+          if(j==NY-1) {
+            mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j+1][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j+1][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j+1][i]])/cm_plus_cp;
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+        }
+        if(mu>0.0) {
+          D  = mu*dxdz/dyt;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        // Add entry
+        row.PushEntry(i,j+1,k, -a);  //on the left hand side
+              
+ 
+         
+      }
+    }
+  }
+
+
+  B.RestoreDataPointerAndInsert();
+}
 
 //--------------------------------------------------------------------------
 

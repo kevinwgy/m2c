@@ -110,10 +110,37 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       break; 
   }
 
+  // don't forget to restore variables
 }
 
 //----------------------------------------------------------------------------
 
+void
+TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
+                                                SpaceVariable3D &VZstar, SpaceVariable3D &Pprime)
+{
+  double*** vxstar = VXstar.GetDataPointer();
+  double*** vystar = VYstar.GetDataPointer();
+  double*** vzstar = VZstar.GetDataPointer();
+  double*** pprime = Pprime.GetDataPointer();
+
+  int ii0, jj0, kk0, iimax, jjmax, kkmax;
+  VXstar.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+        vxstar[k][j][i] = v[k][j][i][1];
+        vystar[k][j][i] = v[k][j][i][2];
+        vzstar[k][j][i] = v[k][j][i][3];
+        pprime[k][j][i] = v[k][j][i][4];
+      }
+
+  VXstar.RestoreDataPointerToLocalVector(); //no need to exchange, as we have covered ghost layers
+  VYstar.RestoreDataPointerToLocalVector();
+  VZstar.RestoreDataPointerToLocalVector();
+  Pprime.RestoreDataPointerToLocalVector();
+}
 
 //----------------------------------------------------------------------------
 // SIMPLER
