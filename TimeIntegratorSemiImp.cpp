@@ -18,6 +18,8 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                       inco(inco_), Homo(comm_, &(dms_.ghosted1_1dof)), VXstar(comm_, &(dms_.ghosted1_1dof)),
                       VYstar(comm_, &(dms_.ghosted1_1dof)), VZstar(comm_, &(dms_.ghosted1_1dof)),
                       Pprime(comm_, &(dms_.ghosted1_1dof)), B(comm_, &(dms_.ghosted1_1dof)),
+                      DX(comm_, &(dms_.ghosted1_1dof)), DY(comm_, &(dms_.ghosted1_1dof)),
+                      DZ(comm_, &(dms_.ghosted1_1dof)),
                       vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver)
 {
@@ -51,6 +53,9 @@ TimeIntegratorSIMPLE::Destroy()
   Pprime.Destroy();
   B.Destroy();
   Homo.Destroy();
+  DX.Destroy();
+  DY.Destroy();
+  DZ.Destroy();
 
   vlin_solver.Destroy();
   plin_solver.Destroy();
@@ -77,11 +82,12 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   }
 
   double*** id = ID.GetDataPointer();
+  double*** homo = Homo.GetDataPointer();
 
   int maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   for(int iter = 0; iter < maxIter; iter++) {
 
-    Vec5D***   v = (Vec5D***)V.GetDataPointer();
+    Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
     ExtractVariableComponents(v, VXstar, VYstar, VZstar, Pprime);
 
@@ -90,20 +96,20 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
 
     // Solve the x-momentum equation
-    inco.BuildVelocityEquationSIMPLE(0, v, id, vlin_rows, B, iod.ts.semi_impl, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, iod.ts.semi_impl.E, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     vlin_solver.Solve(B, VXstar);
 
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
-      inco.BuildVelocityEquationSIMPLE(1, v, id, vlin_rows, B, iod.ts.semi_impl, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, iod.ts.semi_impl.E, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       vlin_solver.Solve(B, VYstar);
     }
 
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
-      inco.BuildVelocityEquationSIMPLE(2, v, id, vlin_rows, B, iod.ts.semi_impl, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, iod.ts.semi_impl.E, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       vlin_solver.Solve(B, VZstar);
     }
@@ -112,25 +118,24 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
-    inco.BuildPressureEquationSIMPLE(v, id, VXstar, VYstar, VZstar, plin_rows, B, iod.ts.semi_impl);
+    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B);
     plin_solver.SetLinearOperator(plin_rows);
     plin_solver.Solve(B, Pprime);
 
 
     //-----------------------------------------------------
-    // Step 3: Update p, u, v, w, and compute relative error
+    // Step 3: Update p, u, v, w, and compute relative error in velocity
     //-----------------------------------------------------
-    double err = UpdateStates(v, id, VXstar, VYstar, VZstar, Pprime); 
+    double rel_err = UpdateStates(v); //Uses DX, DY, DZ, VXstar, VYstar, VZstar, Pprime
 
-    I AM HERE!
+    V.RestoreDataPointerAndInsert();
 
-    if(err<tol)
+    if(rel_err<iod.ts.semi_impl.convergence_tolerance)
       break; 
   }
 
-
-  // don't forget to restore variables
   ID.RestoreDataPointerToLocalVector();
+  Homo.RestoreDataPointerToLocalVector();
 }
 
 //----------------------------------------------------------------------------
@@ -161,6 +166,55 @@ TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VXs
   VZstar.RestoreDataPointerToLocalVector();
   Pprime.RestoreDataPointerToLocalVector();
 }
+
+//----------------------------------------------------------------------------
+
+double
+TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v)
+{
+
+  double*** diagx = DX.GetDataPointer();
+  double*** diagy = DY.GetDataPointer();
+  double*** diagz = DZ.GetDataPointer();
+  double*** ustar = VXstar.GetDataPointer();
+  double*** vstar = VYstar.GetDataPointer();
+  double*** wstar = VZstar.GetDataPointer();
+  double*** pprime= Pprime.GetDataPointer();
+
+  double alphaP = iod.ts.semi_impl.alphaP;
+
+  double uerr  = 0.0;
+  double unorm = 0.0;
+  double uold, vold, wold, unew, vnew, wnew;
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        uold = v[k][j][i][1];
+        vold = v[k][j][i][2];
+        wold = v[k][j][i][3];
+     
+        if(i>0) v[k][j][i][1] = ustar[k][j][i] + diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]);
+        if(j>0) v[k][j][i][2] = vstar[k][j][i] + diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]);
+        if(k>0) v[k][j][i][3] = wstar[k][j][i] + diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i]);
+        v[k][j][i][4] += alphaP*pprime[k][j][i];
+
+        unew = v[k][j][i][1];
+        vnew = v[k][j][i][2];
+        wnew = v[k][j][i][2];
+
+        unorm += unew*unew + vnew*vnew + wnew*wnew;
+        uerr  += (unew-uold)*(unew-uold) + (vnew-vold)*(vnew-vold) + (wnew-wold)*(wnew-wold);
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, &unorm, 1, MPI_DOUBLE, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &uerr, 1, MPI_DOUBLE, MPI_SUM, comm);
+
+  return sqrt(uerr/unorm);
+
+}
+
 
 //----------------------------------------------------------------------------
 

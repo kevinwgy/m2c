@@ -68,8 +68,14 @@ public:
   void BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*** id,
                                    double*** homo, //wheter each node is in a homogeneous region
                                    std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
-                                   SemiImplicitTsData &iod_semi, double dt,
+                                   SpaceVariable3D &Ddiag, double Efactor, double dt,
                                    SpaceVariable3D *LocalDt = NULL); //!< dir: 0,1,2
+
+  void BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, SpaceVariable3D &VXstar,
+                                   SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
+                                   SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
+                                   std::vector<RowEntries> &plin_rows, SpaceVariable3D &B);
+
 
 private:
 

@@ -25,6 +25,7 @@ protected:
   SpaceVariable3D B; //!< generally used as the right-hand-side of linear systems
   SpaceVariable3D Homo; //!< whether each node is within a homogeneous neighborhood (const. rho, mu)
 
+  SpaceVariable3D DX, DY, DZ; //!< coefficients from momentum equations, later used in pressure-correction
   vector<RowEntries> vlin_rows;
   vector<RowEntries> plin_rows;
 
@@ -53,6 +54,8 @@ protected:
 
   void ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
                                  SpaceVariable3D &VZstar, SpaceVariable3D &Pprime);
+
+  double UpdateStates(Vec5D*** v); //!< uses DX, DY, DZ, VXstar, VYstar, VZstar, Pprime
 
 };  
 
