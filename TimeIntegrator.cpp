@@ -22,6 +22,9 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
                     heo(heo_), pmo(pmo_), IDn(comm_, &(dms_.ghosted1_1dof)), sso(NULL),
                     local_time_stepping(iod.ts.local_dt == TsData::YES)
 {
+
+  type = NONE;
+
   for(int i=0; i<(int)lso.size(); i++) {
     ls_mat_id.push_back(lso[i]->GetMaterialID());
 
@@ -106,6 +109,8 @@ TimeIntegratorFE::TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D
                   Un(comm_, &(dms_.ghosted1_5dof)),
                   Rn(comm_, &(dms_.ghosted1_5dof)), Rn_xi(NULL)
 {
+  type = FORWARD_EULER;
+
   for(int i=0; i<(int)lso.size(); i++) {
     Rn_ls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
   }
@@ -246,6 +251,9 @@ TimeIntegratorRK2::TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers
                    R(comm_, &(dms_.ghosted1_5dof)),
                    Xi1(NULL), Rxi(NULL)
 {
+
+  type = RUNGE_KUTTA_2;
+
   for(int i=0; i<(int)lso.size(); i++) {
     Phi1.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
     Rls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
@@ -446,6 +454,9 @@ TimeIntegratorRK3::TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers
                    Xi1(NULL), Rxi(NULL)
                 
 {
+
+  type = RUNGE_KUTTA_3;
+
   for(int i=0; i<(int)lso.size(); i++) {
     Phi1.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));
     Rls.push_back(new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof)));

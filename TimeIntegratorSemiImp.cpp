@@ -23,18 +23,23 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                       vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver)
 {
+  type = SIMPLE;
+
   Homo.SetConstantValue(1, true); //default
 
   if(iod.ts.semi_impl.E<=0.0) {
     print_error("*** Error: In the SIMPLE family of methods, E must be set to a positive value.\n");
     exit_mpi();
   }
+  Efactor = iod.ts.semi_impl.E;
   
   if(iod.ts.semi_impl.alphaP<=0.0) {
     print_error("*** Error: In the SIMPLE family of methods, alphaP must be set to a positive value "
                 "(usually less than 1).\n");
     exit_mpi();
   }
+  alphaP = iod.ts.semi_impl.alphaP;
+
 }
 
 //----------------------------------------------------------------------------
@@ -70,22 +75,37 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
                                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                                          vector<SpaceVariable3D*> &KappaPhi,
                                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
-                                         double time, double dt, int time_step, int subcycle, double dts)
+                                         [[maybe_unused]] double time, double dt, 
+                                         [[maybe_unused]] int time_step, int subcycle, double dts)
 {
-
-  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
   if(mpo.NumberOfMaterials()>1) {
     print_error("*** Error: Need to update homogeneity. Currently, the incompressible flow solver does not allow"
                 " more than one material.\n");
     exit_mpi();
   }
+  if(Phi.size()>0 || NPhi.size()>0 || KappaPhi.size()>0 || L || Xi || subcycle>0 || dts != dt) {
+    print_error("*** Error: Problem setup is not supported by TimeIntegratorSIMPLE.\n");
+    exit_mpi();
+  }
+
+
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
   double*** id = ID.GetDataPointer();
   double*** homo = Homo.GetDataPointer();
 
-  int maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
-  for(int iter = 0; iter < maxIter; iter++) {
+  int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
+  vector<double> lin_rnorm; 
+  bool lin_success, converged(false);
+  double rel_err;
+
+  if(type == SIMPLEC)
+    print("  o Running the iterative SIMPLEC procedure.\n");
+  else
+    print("  o Running the iterative SIMPLE procedure.\n");
+
+  for(iter = 0; iter < maxIter; iter++) {
 
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
@@ -96,22 +116,37 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
 
     // Solve the x-momentum equation
-    inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, iod.ts.semi_impl.E, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
-    vlin_solver.Solve(B, VXstar);
+    lin_success = vlin_solver.Solve(B, VXstar, NULL, NULL, &lin_rnorm);
+    if(!lin_success) {
+      print_warning("  x Warning: Linear solver for the x-momentum equation failed to converge.\n");
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    }
 
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
-      inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, iod.ts.semi_impl.E, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
-      vlin_solver.Solve(B, VYstar);
+      vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
+    }
+    if(!lin_success) {
+      print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     }
 
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
-      inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, iod.ts.semi_impl.E, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
-      vlin_solver.Solve(B, VZstar);
+      vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
+    }
+    if(!lin_success) {
+      print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     }
 
     
@@ -120,19 +155,34 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B);
     plin_solver.SetLinearOperator(plin_rows);
-    plin_solver.Solve(B, Pprime);
+    plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    if(!lin_success) {
+      print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    }
 
 
     //-----------------------------------------------------
     // Step 3: Update p, u, v, w, and compute relative error in velocity
     //-----------------------------------------------------
-    double rel_err = UpdateStates(v); //Uses DX, DY, DZ, VXstar, VYstar, VZstar, Pprime
+    rel_err = UpdateStates(v); //Uses DX, DY, DZ, VXstar, VYstar, VZstar, Pprime
 
     V.RestoreDataPointerAndInsert();
 
-    if(rel_err<iod.ts.semi_impl.convergence_tolerance)
+    if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
+      converged = true;
       break; 
+    }
+
+    print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
+
   }
+  if(converged)
+    print("  o Converged after %d iterations. Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
+  else
+    print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
+    
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();
@@ -170,7 +220,7 @@ TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VXs
 //----------------------------------------------------------------------------
 
 double
-TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v)
+TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v)
 {
 
   double*** diagx = DX.GetDataPointer();
@@ -181,23 +231,21 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v)
   double*** wstar = VZstar.GetDataPointer();
   double*** pprime= Pprime.GetDataPointer();
 
-  double alphaP = iod.ts.semi_impl.alphaP;
-
   double uerr  = 0.0;
   double unorm = 0.0;
-  double uold, vold, wold, unew, vnew, wnew;
+  double ucorr, vcorr, wcorr, unew, vnew, wnew;
 
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
 
-        uold = v[k][j][i][1];
-        vold = v[k][j][i][2];
-        wold = v[k][j][i][3];
+        ucorr = i>0 ? diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]) : 0.0;
+        vcorr = j>0 ? diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]) : 0.0;
+        wcorr = k>0 ? diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i]) : 0.0;
      
-        if(i>0) v[k][j][i][1] = ustar[k][j][i] + diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]);
-        if(j>0) v[k][j][i][2] = vstar[k][j][i] + diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]);
-        if(k>0) v[k][j][i][3] = wstar[k][j][i] + diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i]);
+        if(i>0) v[k][j][i][1] = ustar[k][j][i] + ucorr;
+        if(j>0) v[k][j][i][2] = vstar[k][j][i] + vcorr;
+        if(k>0) v[k][j][i][3] = wstar[k][j][i] + wcorr;
         v[k][j][i][4] += alphaP*pprime[k][j][i];
 
         unew = v[k][j][i][1];
@@ -205,12 +253,20 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v)
         wnew = v[k][j][i][2];
 
         unorm += unew*unew + vnew*vnew + wnew*wnew;
-        uerr  += (unew-uold)*(unew-uold) + (vnew-vold)*(vnew-vold) + (wnew-wold)*(wnew-wold);
+        uerr  += ucorr*ucorr + vcorr*vcorr + wcorr*wcorr;
       }
 
   MPI_Allreduce(MPI_IN_PLACE, &unorm, 1, MPI_DOUBLE, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &uerr, 1, MPI_DOUBLE, MPI_SUM, comm);
 
+  DX.RestoreDataPointerToLocalVector();
+  DY.RestoreDataPointerToLocalVector();
+  DZ.RestoreDataPointerToLocalVector();
+  VXstar.RestoreDataPointerToLocalVector();
+  VYstar.RestoreDataPointerToLocalVector();
+  VZstar.RestoreDataPointerToLocalVector();
+  Pprime.RestoreDataPointerToLocalVector();
+   
   return sqrt(uerr/unorm);
 
 }
@@ -232,7 +288,7 @@ TimeIntegratorSIMPLER::TimeIntegratorSIMPLER(MPI_Comm &comm_, IoData& iod_, Data
                      : TimeIntegratorSIMPLE(comm_, iod_, dms_, spo_, inco_, lso_, mpo_, laser_, embed_, 
                                             heo_, pmo_)
 {
-
+  type = SIMPLER;
 
 }
 
@@ -246,9 +302,7 @@ TimeIntegratorSIMPLER::~TimeIntegratorSIMPLER()
 void
 TimeIntegratorSIMPLER::Destroy()
 {
-
-
-  TimeIntegratorBase::Destroy();
+  TimeIntegratorSIMPLE::Destroy();
 }
 
 //----------------------------------------------------------------------------
@@ -278,8 +332,8 @@ TimeIntegratorSIMPLEC::TimeIntegratorSIMPLEC(MPI_Comm &comm_, IoData& iod_, Data
                      : TimeIntegratorSIMPLE(comm_, iod_, dms_, spo_, inco_, lso_, mpo_, laser_, embed_, 
                                             heo_, pmo_)
 {
-
-
+  type = SIMPLEC;
+  alphaP = 1.0; //!< fixed to 1.0 in the SIMPLEC algorithm
 }
 
 //----------------------------------------------------------------------------
@@ -292,9 +346,7 @@ TimeIntegratorSIMPLEC::~TimeIntegratorSIMPLEC()
 void
 TimeIntegratorSIMPLEC::Destroy()
 { 
-
-
-  TimeIntegratorBase::Destroy();
+  TimeIntegratorSIMPLE::Destroy();
 }
 
 //----------------------------------------------------------------------------
@@ -306,7 +358,8 @@ TimeIntegratorSIMPLEC::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
                                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                                           double time, double dt, int time_step, int subcycle, double dts)
 {
-  print_error("*** Error: TimeIntegratorSIMPLEC::AdvanceOneTimeStep has not been implemented yet.\n");
+  TimeIntegratorSIMPLE::AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt,
+                                           time, dt, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -340,7 +393,7 @@ TimeIntegratorPISO::Destroy()
 { 
 
 
-  TimeIntegratorBase::Destroy();
+  TimeIntegratorSIMPLE::Destroy();
 }
 
 //----------------------------------------------------------------------------

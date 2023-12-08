@@ -920,7 +920,7 @@ void
 IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*** id,
                                                     double*** homo, //node is in a homogeneous region?
                                                     vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
-                                                    SpaceVariable3D &Ddiag, double Efactor,
+                                                    SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
                                                     double dt, SpaceVariable3D *LocalDt)
 {
   assert(dir==0 || dir==1 || dir==2);
@@ -941,7 +941,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm, dp, cm_plus_cp, rhou1, rhou2;
-  double a, ap, ap0, F, D, mu, mu1, mu2;
+  double a, ap, ap0, F, D, mu, mu1, mu2, anb;
 
   for(int k=k0; k<kmax; k++) {
     dz  = Dz[dir][k-k0];
@@ -1281,11 +1281,12 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
         // Add entry
         row.PushEntry(i,j,k+1, -a);  //on the left hand side
              
- 
+
         //------------------------------------------------------
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
         //------------------------------------------------------
+        anb = SIMPLEC ? ap : 0.0; //needed later
         ap0 = dir==0 ? (dxr*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dxr) :
               dir==1 ? (dyt*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dyt) :
                        (dzf*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dzf);
@@ -1302,11 +1303,12 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
         bb[k][j][i] += ap*v[k][j][i][dir+1]/Efactor;
 
         ap *= 1.0 + 1.0/Efactor; 
-        assert(ap!=0.0);
         row.PushEntry(i,j,k, ap);
 
         // Store diagonal for use in pressure correction equation
-        diag[k][j][i] = dir==0 ? dydz/ap : dir==1 ? dxdz/ap : dxdy/ap;
+        assert(ap-anb!=0.0);
+        diag[k][j][i] = 1.0/(ap-anb);
+        diag[k][j][i] *= dir==0 ? dydz : dir==1 ? dxdz : dxdy;
 
       }
     }

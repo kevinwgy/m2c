@@ -32,6 +32,10 @@ protected:
   LinearSystemSolver vlin_solver; //!< solves the velocity linear systems
   LinearSystemSolver plin_solver; //!< solves the pressure linear system
 
+  //! Relaxation coefficients
+  double Efactor;
+  double alphaP;
+
 public:
 
   TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,

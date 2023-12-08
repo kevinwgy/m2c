@@ -60,11 +60,16 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
   KSPSetFromOptions(ksp); //overrides any options specified above
 
 
+  rnorm_history.resize(1000); //1000 entries should be more than enough
+  KSPSetResidualHistory(rnorm_history.data(), rnorm_history.size(), true); //reset for each Solve
+
+/*
   PC pc;
   KSPGetPC(ksp, &pc);
   PCType pctype;
   PCGetType(pc, &pctype);
   std::cout << "Precondition: " << pctype << std::endl;
+*/
 }
 
 //-----------------------------------------------------
@@ -117,8 +122,9 @@ LinearSystemSolver::SetLinearOperator(vector<RowEntries>& row_entries)
 
 //-----------------------------------------------------
 
-int
-LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x)
+bool
+LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
+                          ConvergenceReason *reason, int *numIts, std::vector<double> *rnorm)
 {
   // --------------------------------------------------
   // Sanity checks
@@ -140,12 +146,47 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x)
   // ---------------------------------------------------
   
 
+  // ---------------------------------------------------
+  // Solve!
   Vec &bb(b.GetRefToGlobalVec());
   Vec &xx(x.GetRefToGlobalVec());
+  KSPSolve(ksp, bb, xx);
+  // ---------------------------------------------------
 
-  PetscErrorCode error_code = KSPSolve(ksp, bb, xx);
 
-  return (int)error_code; //0 means no error
+  KSPConvergedReason ksp_code; //positive if convergence; negative if diverged
+  KSPGetConvergedReason(ksp, &ksp_code);
+  bool success = ksp_code>0;
+
+  if(reason) { //user requested convergence/divergence reason
+    ConvergenceReason reason(NONE);
+    if(ksp_code == KSP_CONVERGED_RTOL)
+      *reason = CONVERGED_REL_TOL;
+    else if(ksp_code == KSP_CONVERGED_ATOL)
+      *reason = CONVERGED_ABS_TOL;
+    else if((int)ksp_code>0)
+      *reason = CONVERGED_OTHER;
+    else if(ksp_code == KSP_DIVERGED_ITS)
+      *reason = DIVERGED_ITS;
+    else if(ksp_code == KSP_DIVERGED_DTOL)
+      *reason = DIVERGED_DTOL;
+    else
+      *reason = DIVERGED_OTHER;
+  }
+
+
+  if(numIts) //user requested output of number of iterations
+    KSPGetIterationNumber(ksp, numIts);
+
+  if(rnorm) {//user requested output of residual norm history
+    int nEntries(0);
+    KSPGetResidualHistory(ksp, NULL, &nEntries);
+    rnorm->resize(nEntries, 0);
+    for(int i=0; i<nEntries) //copy data instead of passing rnorm_history (safer)
+      (*rnorm)[i] = rnorm_history[i];
+  }
+
+  return success;
 }
 
 

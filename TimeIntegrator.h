@@ -22,7 +22,13 @@ using std::vector;
  *******************************************************************/
 class TimeIntegratorBase
 {
+
 protected:
+
+  enum Type {NONE = 0, FORWARD_EULER = 1, RUNGE_KUTTA_2 = 2, RUNGE_KUTTA_3 = 3,
+             SIMPLE = 4, SIMPLER = 5, SIMPLEC = 6, PISO = 7} type;
+
+
   MPI_Comm&       comm;
   IoData&         iod;
   SpaceOperator&  spo;
