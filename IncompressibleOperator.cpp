@@ -1327,7 +1327,8 @@ void
 IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, SpaceVariable3D &VXstar,
                                                     SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                                     SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
-                                                    vector<RowEntries> &plin_rows, SpaceVariable3D &B)
+                                                    vector<RowEntries> &plin_rows, SpaceVariable3D &B,
+                                                    Int3 *ijk_zero_p)
 {
 
   GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
@@ -1369,6 +1370,15 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         // initialization
         ap = 0.0;
         bb[k][j][i] = 0.0;
+
+
+        // set p = 0? (Otherwise, the linear system is singular, but still solvable by iterative methods)
+        if(ijk_zero_p && i==(*ijk_zero_p)[0] && j==(*ijk_zero_p)[1] && k==(*ijk_zero_p)[2]) {
+          row.PushEntry(i,j,k, 1.0);
+          bb[k][j][i] = 0.0;
+          continue;
+        }
+
 
         //-------
         // LEFT
@@ -1457,10 +1467,398 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
 
 //--------------------------------------------------------------------------
 
+void
+IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, double*** id,
+                            double*** homo, SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag,
+                            double Efactor, double dt, SpaceVariable3D *LocalDt)
+{
+
+  // very similar to BuildVelocityEquationSIMPLE
+
+  assert(dir==0 || dir==1 || dir==2);
+
+  double*** dtloc = NULL;
+  if(LocalDt) { //local time-stepping, dealt with separately.
+    assert(iod.ts.timestep<=0.0); //shouldn't have constant time-step size.
+    dtloc = LocalDt->GetDataPointer();
+  }
+
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
+
+  double*** vhat = Ddiag.GetDataPointer();
+  double*** diag = Ddiag.GetDataPointer();
+
+  double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
+  double cm, dp, cm_plus_cp, rhou1, rhou2;
+  double a, ap, ap0, F, D, mu, mu1, mu2;
+
+  for(int k=k0; k<kmax; k++) {
+    dz  = Dz[dir][k-k0];
+    dzk = dz_k[dir][k-k0];
+    dzf = dz_f[dir][k-k0];
+    for(int j=j0; j<jmax; j++) {
+      dy   = Dy[dir][j-j0];
+      dyb  = dy_b[dir][j-j0];
+      dyt  = dy_t[dir][j-j0];
+      dydz = dy*dz;
+      for(int i=i0; i<imax; i++) {
+
+        if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0)) {
+          vhat[k][j][i] = v[k][j][i][dir+1];
+          diag[k][j][i] = 0.0; // not really used
+          continue;
+        }
+
+        dx   = Dx[dir][i-i0];
+        dxl  = dx_l[dir][i-i0];
+        dxr  = dx_r[dir][i-i0];
+        dxdy = dx*dy;
+        dxdz = dx*dz;
+
+
+        //---------------------------------------------------
+        // Reference: Patankar's book, Eqs. (5.61) - (5.64)
+        //---------------------------------------------------
+
+        ap = 0.0; //diagonal
+        vhat[k][j][i] = 0.0;
+
+        //-----------
+        // LEFT
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==0)
+          F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
+        else {
+          if(homo[k][j][i]) { //this "cell" (i,j,k) is in a neighborhood w/ constant rho and mu
+            rhou1 = dir==1 ? v[k][j-1][i][1]*v[k][j][i][0] : v[k-1][j][i][1]*v[k][j][i][0];
+            rhou2 = v[k][j][i][1]*v[k][j][i][0];
+          } else {
+            cm = global_mesh.GetDx(i-1);
+            cp = global_mesh.GetDx(i);
+            cm_plus_cp = cm + cp;
+            rhou1 = dir==1 ? v[k][j-1][i][1]*(cp*v[k][j-1][i-1][0] + cm*v[k][j-1][i][0])/cm_plus_cp
+                           : v[k-1][j][i][1]*(cp*v[k-1][j][i-1][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
+            rhou2 = v[k][j][i][1]*(cp*v[k][j][i-1][0] + cm*v[k][j][i][0])/(cm+cp);
+          }
+          F = dir== 1 ? (dyt*rhou1 + dyb*rhou2)/(dyb+dyt) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dydz;
+        // Calculate D and the "a" coefficient
+        a = std::max(F, 0.0);
+        if(dir==0)
+          mu = Mu[id[k][j][i-1]];
+        else {
+          if(homo[k][j][i])
+            mu = Mu[id[k][j][i]];
+          else {
+            // cm and cp have been calculated!   
+            if(i==0) {
+              mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
+              mu2 = Mu[id[k][j][i]];
+            } else {
+              mu1 = dir==1 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp
+                           : (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+              mu2 = (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+            }
+            mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          }
+        }
+        if(mu>0.0) {
+          D  = mu*dydz/dxl;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        vhat[k][j][i] += a*v[k][j][i-1][dir+1];
+             
+
+        //-----------
+        // RIGHT 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==0)
+          F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
+        else {
+          if(homo[k][j][i]) {
+            rhou1 = dir==1 ? v[k][j-1][i+1][1]*v[k][j][i][0] : v[k-1][j][i+1][1]*v[k][j][i][0];
+            rhou2 = v[k][j][i+1][1]*v[k][j][i][0];
+          } else {
+            cm = global_mesh.GetDx(i);
+            cp = global_mesh.GetDx(i+1);
+            cm_plus_cp = cm + cp;
+            rhou1 = dir==1 ? v[k][j-1][i+1][1]*(cp*v[k][j-1][i][0] + cm*v[k][j-1][i+1][0])/cm_plus_cp
+                           : v[k-1][j][i+1][1]*(cp*v[k-1][j][i][0] + cm*v[k-1][j][i+1][0])/cm_plus_cp;
+            rhou2 = v[k][j][i+1][1]*(cp*v[k][j][i][0] + cm*v[k][j][i+1][0])/(cm+cp);
+          }
+          F = dir== 1 ? (dyt*rhou1 + dyb*rhou2)/(dyb+dyt) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dydz;
+        // Calculate D and the "a" coefficient
+        a = std::max(-F, 0.0);
+        if(dir==0)
+          mu = Mu[id[k][j][i]];
+        else {
+          if(homo[k][j][i])
+            mu = Mu[id[k][j][i]];
+          else {
+            // cm and cp have been calculated!   
+            if(i==NX-1) {
+              mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
+              mu2 = Mu[id[k][j][i]];
+            } else {
+              mu1 = dir==1 ? (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j-1][i+1]])/cm_plus_cp
+                           : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j][i+1]])/cm_plus_cp;
+              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j][i+1]])/cm_plus_cp;
+            }
+            mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          }
+        }
+        if(mu>0.0) {
+          D  = mu*dydz/dxr;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        vhat[k][j][i] += a*v[k][j][i+1][dir+1];
+             
+    
+        //-----------
+        // BOTTOM 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==1)
+          F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
+        else {
+          if(homo[k][j][i]) {
+            rhou1 = dir==0 ? v[k][j][i-1][2]*v[k][j][i][0] : v[k-1][j][i][2]*v[k][j][i][0];
+            rhou2 = v[k][j][i][2]*v[k][j][i][0];
+          } else {
+            cm = global_mesh.GetDy(j-1);
+            cp = global_mesh.GetDy(j);
+            cm_plus_cp = cm + cp;
+            rhou1 = dir==0 ? v[k][j][i-1][2]*(cp*v[k][j-1][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
+                           : v[k-1][j][i][2]*(cp*v[k-1][j-1][i][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
+            rhou2 = v[k][j][i][2]*(cp*v[k][j-1][i][0] + cm*v[k][j][i][0])/(cm+cp);
+          }
+          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dxdz;
+        // Calculate D and the "a" coefficient
+        a = std::max(F, 0.0);
+        if(dir==1)
+          mu = Mu[id[k][j-1][i]];
+        else {
+          if(homo[k][j][i])
+            mu = Mu[id[k][j][i]]; 
+          else {
+            // cm and cp have been calculated!   
+            if(j==0) {
+              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+              mu2 = Mu[id[k][j][i]];
+            } else {
+              mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
+                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+              mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+            }
+            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          }
+        }
+        if(mu>0.0) {
+          D  = mu*dxdz/dyb;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        vhat[k][j][i] += a*v[k][j-1][i][dir+1];
+             
+
+        //-----------
+        // TOP 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==1)
+          F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
+        else {
+          if(homo[k][j][i]) {
+            rhou1 = dir==0 ? v[k][j+1][i-1][2]*v[k][j][i][0] : v[k-1][j+1][i][2]*v[k][j][i][0];
+            rhou2 = v[k][j+1][i][2]*v[k][j][i][0];
+          } else {
+            cm = global_mesh.GetDy(j);
+            cp = global_mesh.GetDy(j+1);
+            cm_plus_cp = cm + cp;
+            rhou1 = dir==0 ? v[k][j+1][i-1][2]*(cp*v[k][j][i-1][0] + cm*v[k][j+1][i-1][0])/cm_plus_cp
+                           : v[k-1][j+1][i][2]*(cp*v[k-1][j][i][0] + cm*v[k-1][j+1][i][0])/cm_plus_cp;
+            rhou2 = v[k][j+1][i][2]*(cp*v[k][j][i][0] + cm*v[k][j+1][i][0])/(cm+cp);
+          }
+          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dxdz;
+        // Calculate D and the "a" coefficient
+        a = std::max(-F, 0.0);
+        if(dir==1)
+          mu = Mu[id[k][j][i]];
+        else {
+          if(homo[k][j][i])
+            mu = Mu[id[k][j][i]];
+          else {
+            // cm and cp have been calculated!   
+            if(j==NY-1) {
+              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+              mu2 = Mu[id[k][j][i]];
+            } else {
+              mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j+1][i-1]])/cm_plus_cp
+                           : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j+1][i]])/cm_plus_cp;
+              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j+1][i]])/cm_plus_cp;
+            }
+            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          }
+        }
+        if(mu>0.0) {
+          D  = mu*dxdz/dyt;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        vhat[k][j][i] += a*v[k][j+1][i][dir+1];
+             
+    
+        //-----------
+        // BACK
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==2)
+          F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
+        else {
+          if(homo[k][j][i]) {
+            rhou1 = dir==0 ? v[k][j][i-1][3]*v[k][j][i][0] : v[k][j-1][i][3]*v[k][j][i][0];
+            rhou2 = v[k][j][i][3]*v[k][j][i][0];
+          } else {
+            cm = global_mesh.GetDz(k-1);
+            cp = global_mesh.GetDz(k);
+            cm_plus_cp = cm + cp;
+            rhou1 = dir==0 ? v[k][j][i-1][3]*(cp*v[k-1][j][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
+                           : v[k][j-1][i][3]*(cp*v[k-1][j-1][i][0] + cm*v[k][j-1][i][0])/cm_plus_cp;
+            rhou2 = v[k][j][i][3]*(cp*v[k-1][j][i][0] + cm*v[k][j][i][0])/(cm+cp);
+          }
+          F = dir==0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dyt*rhou1 + dyb*rhou2)/(dyb+dyt);
+        }
+        F *= dxdy;
+        // Calculate D and the "a" coefficient
+        a = std::max(F, 0.0);
+        if(dir==2)
+          mu = Mu[id[k-1][j][i]];
+        else {
+          if(homo[k][j][i])
+            mu = Mu[id[k][j][i]];
+          else {
+            // cm and cp have been calculated!   
+            if(k==0) {
+              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
+              mu2 = Mu[id[k][j][i]];
+            } else {
+              mu1 = dir==0 ? (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
+                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp;
+              mu2 = (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+            }
+            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
+          }
+        }
+        if(mu>0.0) {
+          D  = mu*dxdy/dzk;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        vhat[k][j][i] += a*v[k-1][j][i][dir+1];
+             
+
+        //-----------
+        // FRONT 
+        //-----------
+        // Calculate F at the correct location (different for dir=1,2,3)
+        if(dir==2)
+          F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
+        else {
+          if(homo[k][j][i]) {
+            rhou1 = dir==0 ? v[k+1][j][i-1][3]*v[k][j][i][0] : v[k+1][j-1][i][3]*v[k][j][i][0];
+            rhou2 = v[k+1][j][i][3]*v[k][j][i][0];
+          } else {
+            cm = global_mesh.GetDz(k);
+            cp = global_mesh.GetDz(k+1);
+            cm_plus_cp = cm + cp;
+            rhou1 = dir==0 ? v[k+1][j][i-1][3]*(cp*v[k][j][i-1][0] + cm*v[k+1][j][i-1][0])/cm_plus_cp
+                           : v[k+1][j-1][i][3]*(cp*v[k][j-1][i][0] + cm*v[k+1][j-1][i][0])/cm_plus_cp;
+            rhou2 = v[k+1][j][i][3]*(cp*v[k][j][i][0] + cm*v[k+1][j][i][0])/(cm+cp);
+            F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dyt*rhou1 + dyb*rhou2)/(dyb+dyt);
+          }
+        }
+        F *= dxdy;
+        // Calculate D and the "a" coefficient
+        a = std::max(-F, 0.0);
+        if(dir==2)
+          mu = Mu[id[k][j][i]];
+        else {
+          if(homo[k][j][i]) 
+            mu = Mu[id[k][j][i]];
+          else {
+            // cm and cp have been calculated!   
+            if(k==NZ-1) {
+              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
+              mu2 = Mu[id[k][j][i]];
+            } else {
+              mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k+1][j][i-1]])/cm_plus_cp
+                           : (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k+1][j-1][i]])/cm_plus_cp;
+              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k+1][j][i]])/cm_plus_cp;
+            }
+            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
+          }
+        }
+        if(mu>0.0) {
+          D  = mu*dxdy/dzf;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        vhat[k][j][i] += a*v[k+1][j][i][dir+1];
+             
+
+        //------------------------------------------------------
+        // Calculate and add the diagonal entry and the RHS (b)
+        // Ref: Eqs. (5.62) and (6.8) in Patankar's book
+        //------------------------------------------------------
+        ap0 = dir==0 ? (dxr*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dxr) :
+              dir==1 ? (dyt*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dyt) :
+                       (dzf*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dzf);
+        ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
+        ap += ap0; //!< -Sp*dx*dy*dz, for source terms
+
+        vhat[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        // no pressure here (SIMPLER)
+
+        // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
+        assert(Efactor>0.0);
+        vhat[k][j][i] += ap*v[k][j][i][dir+1]/Efactor;
+
+        ap *= 1.0 + 1.0/Efactor; 
+
+        // Store diagonal for use in pressure correction equation
+        assert(ap!=0.0);
+        diag[k][j][i] = 1.0/ap;
+        vhat[k][j][i] *= diag[k][j][i];
+        diag[k][j][i] *= dir==0 ? dydz : dir==1 ? dxdz : dxdy;
+
+      }
+    }
+  }
+
+  Vhat.RestoreDataPointerAndInsert();
+  Ddiag.RestoreDataPointerAndInsert();
+
+  if(LocalDt)
+    LocalDt->RestoreDataPointerToLocalVector();
+}
+
+//--------------------------------------------------------------------------
 
 
 
 
+//--------------------------------------------------------------------------
 
 
 

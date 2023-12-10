@@ -76,8 +76,12 @@ public:
   void BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, SpaceVariable3D &VXstar,
                                    SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                    SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
-                                   std::vector<RowEntries> &plin_rows, SpaceVariable3D &B);
+                                   std::vector<RowEntries> &plin_rows, SpaceVariable3D &B,
+                                   Int3 *ijk_zero_p = NULL); //!< allows p to be fixed at one node
 
+  void EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, double*** id, double*** homo,
+                                          SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag, double Efactor,
+                                          double dt, SpaceVariable3D *LocalDt = NULL);
 
 private:
 

@@ -33,6 +33,11 @@ public:
 
   void SetLinearOperator(std::vector<RowEntries>& row_entries);
 
+  /** By default, every time "Solve" is called, the solver rebuilds the preconditioner. But if one solves \n
+   *  multiple linear systems with the same operator (A) but different RHS (b), the same preconditioner can \n
+   *  be reused. In this case, one may call this function after the first "Solve". */
+  void UsePreviousPreconditioner(bool reuse_or_not = true);
+
   bool Solve(SpaceVariable3D &b, SpaceVariable3D &x, //!< x: both input (initial guess) & output (solution)
              ConvergenceReason *reason = NULL, int *numIts = NULL, std::vector<double> *rnorm = NULL) ;
 

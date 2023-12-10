@@ -122,6 +122,14 @@ LinearSystemSolver::SetLinearOperator(vector<RowEntries>& row_entries)
 
 //-----------------------------------------------------
 
+void
+LinearSystemSolver::UsePreviousPreconditioner(bool reuse_or_not)
+{
+  KSPSetReusePreconditioner(ksp, reuse_or_not);
+}
+
+//-----------------------------------------------------
+
 bool
 LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
                           ConvergenceReason *reason, int *numIts, std::vector<double> *rnorm)

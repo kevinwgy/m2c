@@ -36,6 +36,9 @@ protected:
   double Efactor;
   double alphaP;
 
+  //! A corner where pressure is fixed to 0
+  Int3 ijk_zero_p; //!< set to [NZ-1][NY-1][NX-1]
+
 public:
 
   TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
@@ -56,11 +59,19 @@ public:
 
 protected:
 
-  void ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
-                                 SpaceVariable3D &VZstar, SpaceVariable3D &Pprime);
+  //! v --> VX, VY, VZ, P
+  void ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VX, SpaceVariable3D &VY,
+                                 SpaceVariable3D &VZ, SpaceVariable3D &P);
 
-  double UpdateStates(Vec5D*** v); //!< uses DX, DY, DZ, VXstar, VYstar, VZstar, Pprime
+  //! Update v, reset P = 0 (for next iteration)
+  virtual double UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &DX,
+                      SpaceVariable3D &DY, SpaceVariable3D &DZ, SpaceVariable3D &VX,
+                      SpaceVariable3D &VY, SpaceVariable3D &VZ, double prelax);
 
+  virtual void UpdatePressure(Vec5D*** v, SpaceVariable3D &P) {
+    print_error("*** Error: Function UpdatePressure is undefined.\n");
+    exit_mpi();
+  }
 };  
 
 
@@ -81,6 +92,8 @@ public:
                         PrescribedMotionOperator* pmo_);
   ~TimeIntegratorSIMPLER();
 
+  void Destroy();
+
   //! Note: virtual functions in the base class are automatically virtual in derived classes.
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
@@ -88,7 +101,7 @@ public:
                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
-  void Destroy();
+  void UpdatePressure(Vec5D*** v, SpaceVariable3D &P);
 
 };  
 
@@ -108,15 +121,6 @@ public:
                         EmbeddedBoundaryOperator* embed_, HyperelasticityOperator* heo_,
                         PrescribedMotionOperator* pmo_);
   ~TimeIntegratorSIMPLEC();
-
-  //! Note: virtual functions in the base class are automatically virtual in derived classes.
-  void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
-                          vector<SpaceVariable3D*> &KappaPhi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
-                          double time, double dt, int time_step, int subcycle, double dts);
-
-  void Destroy();
 
 };  
 
