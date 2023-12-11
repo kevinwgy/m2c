@@ -53,6 +53,9 @@ LinearOperator::Destroy()
 void
 LinearOperator::SetLinearOperator(vector<RowEntries>& row_entries)
 {
+
+  MatZeroEntries(A); //!< zeros all entries but retains the previous nonzero structure
+
   for(auto&& entries : row_entries)
     MatSetValuesStencil(A, 1, &entries.row, entries.cols.size(), entries.cols.data(),
                         entries.vals.data(), ADD_VALUES);

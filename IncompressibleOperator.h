@@ -79,9 +79,18 @@ public:
                                    std::vector<RowEntries> &plin_rows, SpaceVariable3D &B,
                                    Int3 *ijk_zero_p = NULL); //!< allows p to be fixed at one node
 
-  void EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, double*** id, double*** homo,
-                                          SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag, double Efactor,
-                                          double dt, SpaceVariable3D *LocalDt = NULL);
+  //! For a specified momentum equation (dir=0,1,2), calculates coefficients for pressure and velocity equations
+  void CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double*** id, double*** homo,
+                                    std::vector<RowEntries> &vlin_rows, SpaceVariable3D &Bv,
+                                    SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag, double Efactor,
+                                    double dt, SpaceVariable3D *LocalDt = NULL);
+
+  void UpdateVelocityEquationRHS_SIMPLER(int dir, SpaceVariable3D &P, SpaceVariable3D &B);
+
+  void BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** homo,
+                                        SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
+                                        SpaceVariable3D &VZstar, SpaceVariable3D &B, Int3 *ijk_zero_p = NULL);
+
 
 private:
 

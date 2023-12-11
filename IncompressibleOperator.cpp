@@ -1468,9 +1468,11 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
 //--------------------------------------------------------------------------
 
 void
-IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, double*** id,
-                            double*** homo, SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag,
-                            double Efactor, double dt, SpaceVariable3D *LocalDt)
+IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double*** id,
+                                                     double*** homo, vector<RowEntries> &vlin_rows,
+                                                     SpaceVariable3D &Bv,
+                                                     SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag,
+                                                     double Efactor, double dt, SpaceVariable3D *LocalDt)
 {
 
   // very similar to BuildVelocityEquationSIMPLE
@@ -1485,8 +1487,12 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
 
   GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
 
-  double*** vhat = Ddiag.GetDataPointer();
+  double*** vhat = Vhat.GetDataPointer();
   double*** diag = Ddiag.GetDataPointer();
+  double*** bb   = Bv.GetDataPointer();
+
+  int row_counter = 0;
+  int original_size = vlin_rows.size();
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm, dp, cm_plus_cp, rhou1, rhou2;
@@ -1503,9 +1509,19 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
       dydz = dy*dz;
       for(int i=i0; i<imax; i++) {
 
+        // locate the row
+        if(row_counter>=original_size)
+          vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
+        RowEntries &row(vlin_rows[row_counter]);
+        row.SetRow(i,j,k);
+        row.ClearEntries();
+        row_counter++;
+
         if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0)) {
-          vhat[k][j][i] = v[k][j][i][dir+1];
+          row.PushEntry(i,j,k, 1.0);
+          bb[k][j][i] = v[k][j][i][1+dir];
           diag[k][j][i] = 0.0; // not really used
+          vhat[k][j][i] = v[k][j][i][dir+1];
           continue;
         }
 
@@ -1570,7 +1586,9 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j][i-1][dir+1];
-             
+        // Add entry
+        row.PushEntry(i-1,j,k, -a);  //on the left hand side
+ 
 
         //-----------
         // RIGHT 
@@ -1619,6 +1637,8 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j][i+1][dir+1];
+        // Add entry
+        row.PushEntry(i+1,j,k, -a);  //on the left hand side
              
     
         //-----------
@@ -1668,6 +1688,8 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j-1][i][dir+1];
+        // Add entry
+        row.PushEntry(i,j-1,k, -a);  //on the left hand side
              
 
         //-----------
@@ -1717,6 +1739,8 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j+1][i][dir+1];
+        // Add entry
+        row.PushEntry(i,j+1,k, -a);  //on the left hand side
              
     
         //-----------
@@ -1766,6 +1790,8 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
         }
         ap += a;
         vhat[k][j][i] += a*v[k-1][j][i][dir+1];
+        // Add entry
+        row.PushEntry(i,j,k-1, -a);  //on the left hand side
              
 
         //-----------
@@ -1815,6 +1841,8 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
         }
         ap += a;
         vhat[k][j][i] += a*v[k+1][j][i][dir+1];
+        // Add entry
+        row.PushEntry(i,j,k+1, -a);  //on the left hand side
              
 
         //------------------------------------------------------
@@ -1830,11 +1858,15 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
         vhat[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
         // no pressure here (SIMPLER)
 
+        bb[k][j][i] = ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
         assert(Efactor>0.0);
         vhat[k][j][i] += ap*v[k][j][i][dir+1]/Efactor;
+        bb[k][j][i]   += ap*v[k][j][i][dir+1]/Efactor; 
 
         ap *= 1.0 + 1.0/Efactor; 
+        row.PushEntry(i,j,k, ap);
 
         // Store diagonal for use in pressure correction equation
         assert(ap!=0.0);
@@ -1848,6 +1880,7 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
 
   Vhat.RestoreDataPointerAndInsert();
   Ddiag.RestoreDataPointerAndInsert();
+  Bv.RestoreDataPointerAndInsert();
 
   if(LocalDt)
     LocalDt->RestoreDataPointerToLocalVector();
@@ -1855,8 +1888,146 @@ IncompressibleOperator::EstimateVelocityForPressureSIMPLER(int dir, Vec5D*** v, 
 
 //--------------------------------------------------------------------------
 
+void
+IncompressibleOperator::UpdateVelocityEquationRHS_SIMPLER(int dir, SpaceVariable3D &P, SpaceVariable3D &B)
+{
+
+  assert(dir==0 || dir==1 || dir==2);
+
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
+
+  double*** p  = P.GetDataPointer();
+  double*** bb = B.GetDataPointer();
+
+  double dx, dy, dz, dxdy, dydz, dxdz;
+
+  for(int k=k0; k<kmax; k++) {
+    dz  = Dz[dir][k-k0];
+    for(int j=j0; j<jmax; j++) {
+      dy   = Dy[dir][j-j0];
+      dydz = dy*dz;
+      for(int i=i0; i<imax; i++) {
+
+        if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0))
+          continue; 
+
+        dx   = Dx[dir][i-i0];
+        dxdy = dx*dy;
+        dxdz = dx*dz;
+
+        bb[k][j][i] += dir==0 ? (p[k][j][i-1] - p[k][j][i])*dydz :
+                       dir==1 ? (p[k][j-1][i] - p[k][j][i])*dxdz :
+                                (p[k-1][j][i] - p[k][j][i])*dxdy;
+      }
+    }
+  }
+
+  P.RestoreDataPointerToLocalVector();
+  B.RestoreDataPointerAndInsert();
+
+}
+
+//--------------------------------------------------------------------------
+
+void
+IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** homo,
+                                                         SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
+                                                         SpaceVariable3D &VZstar, SpaceVariable3D &B,
+                                                         Int3 *ijk_zero_p)
+{
+
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
+
+  double*** bb = B.GetDataPointer();
+  double*** ustar = VXstar.GetDataPointer();
+  double*** vstar = VYstar.GetDataPointer();
+  double*** wstar = VZstar.GetDataPointer();
+
+  double ap, a, rho, dx, dxl, dxr, dy, dyb, dyt, dz, dzk, dzf;
+
+  for(int k=k0; k<kmax; k++) {
+    dz  = global_mesh.GetDz(k);
+    dzk = global_mesh.GetDz(k-1);
+    dzf = global_mesh.GetDz(k+1);
+    for(int j=j0; j<jmax; j++) {
+      dy  = global_mesh.GetDy(j);
+      dyb = global_mesh.GetDy(j-1);
+      dyt = global_mesh.GetDy(j+1);
+      for(int i=i0; i<imax; i++) {
+        dx  = global_mesh.GetDx(i);
+        dxl = global_mesh.GetDx(i-1);
+        dxr = global_mesh.GetDx(i+1);
+
+        // initialization
+        bb[k][j][i] = 0.0;
+
+        // set p = 0? (Otherwise, the linear system is singular, but still solvable by iterative methods)
+        if(ijk_zero_p && i==(*ijk_zero_p)[0] && j==(*ijk_zero_p)[1] && k==(*ijk_zero_p)[2]) {
+          bb[k][j][i] = 0.0;
+          continue;
+        }
+
+        //-------
+        // LEFT
+        //-------
+        // if i==0, do nothing: at a boundary where normal velocity is known, a = 0. (Chap 6.7-3 of Patankar)
+        if(i>0) {
+          rho = homo[k][j][i] ? v[k][j][i][0] : (dx*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dx);
+          bb[k][j][i] += rho*ustar[k][j][i]/dx;
+        }
+
+        //-------
+        // RIGHT 
+        //-------
+        // if i==NX-1, do nothing: at a boundary where normal velocity is known, a = 0. (Chap 6.7-3 of Patankar)
+        if(i<NX-1) {
+          rho = homo[k][j][i] ? v[k][j][i][0] : (dxr*v[k][j][i][0] + dx*v[k][j][i+1][0])/(dx+dxr);
+          bb[k][j][i] -= rho*ustar[k][j][i+1]/dx;
+        }
+ 
+        //-------
+        // BOTTOM 
+        //-------
+        if(j>0) {
+          rho = homo[k][j][i] ? v[k][j][i][0] : (dy*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dy);
+          bb[k][j][i] += rho*vstar[k][j][i]/dy;
+        }
+
+        //-------
+        // TOP 
+        //-------
+        if(j<NY-1) {
+          rho = homo[k][j][i] ? v[k][j][i][0] : (dyt*v[k][j][i][0] + dy*v[k][j+1][i][0])/(dy+dyt);
+          bb[k][j][i] -= rho*vstar[k][j+1][i]/dy;
+        }
+  
+        //-------
+        // BACK 
+        //-------
+        if(k>0) {
+          rho = homo[k][j][i] ? v[k][j][i][0] : (dz*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dz);
+          bb[k][j][i] += rho*wstar[k][j][i]/dz;
+        }
+
+        //-------
+        // FRONT 
+        //-------
+        if(k<NZ-1) {
+          rho = homo[k][j][i] ? v[k][j][i][0] : (dzf*v[k][j][i][0] + dz*v[k+1][j][i][0])/(dz+dzf);
+          bb[k][j][i] -= rho*wstar[k+1][j][i]/dz;
+        }
+ 
+      }
+    }
+  }
 
 
+  B.RestoreDataPointerAndInsert();
+  VXstar.RestoreDataPointerToLocalVector();
+  VYstar.RestoreDataPointerToLocalVector();
+  VZstar.RestoreDataPointerToLocalVector();
+
+}
 
 //--------------------------------------------------------------------------
 

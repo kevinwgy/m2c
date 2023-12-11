@@ -110,7 +110,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
-    ExtractVariableComponents(v, VXstar, VYstar, VZstar, Pprime);
+    ExtractVariableComponents(v, &VXstar, &VYstar, &VZstar, NULL);
 
     //-----------------------------------------------------
     // Step 1: Solve the momentum equations for u*, v*, w*
@@ -130,7 +130,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     if(!global_mesh.IsMesh1D()) {
       inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
-      vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
+      lin_success = vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
     }
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
@@ -142,7 +142,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
       inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
-      vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
+      lin_success = vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
     }
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
@@ -156,7 +156,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
     plin_solver.SetLinearOperator(plin_rows);
-    plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
+    lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
@@ -166,7 +167,6 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     //-----------------------------------------------------
     // Step 3: Update p, u, v, w, and compute relative error in velocity
-    //         Rescale p and Pprime 
     //-----------------------------------------------------
     rel_err = UpdateStates(v, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, alphaP); 
 
@@ -193,13 +193,13 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 //----------------------------------------------------------------------------
 
 void
-TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VX, SpaceVariable3D &VY,
-                                                SpaceVariable3D &VZ, SpaceVariable3D &P)
+TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D *VX_ptr, SpaceVariable3D *VY_ptr,
+                                                SpaceVariable3D *VZ_ptr, SpaceVariable3D *P_ptr)
 {
-  double*** vxstar = VX.GetDataPointer();
-  double*** vystar = VY.GetDataPointer();
-  double*** vzstar = VZ.GetDataPointer();
-  double*** pp     = P.GetDataPointer();
+  double*** vx = VX_ptr ? VX_ptr->GetDataPointer() : NULL;
+  double*** vy = VY_ptr ? VY_ptr->GetDataPointer() : NULL;
+  double*** vz = VZ_ptr ? VZ_ptr->GetDataPointer() : NULL;
+  double*** pp = P_ptr  ? P_ptr->GetDataPointer()  : NULL;
 
   int ii0, jj0, kk0, iimax, jjmax, kkmax;
   VXstar.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
@@ -207,16 +207,16 @@ TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VX,
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
-        vxstar[k][j][i] = v[k][j][i][1];
-        vystar[k][j][i] = v[k][j][i][2];
-        vzstar[k][j][i] = v[k][j][i][3];
-        pp[k][j][i]     = v[k][j][i][4];
+        if(vx) vx[k][j][i] = v[k][j][i][1];
+        if(vy) vy[k][j][i] = v[k][j][i][2];
+        if(vz) vz[k][j][i] = v[k][j][i][3];
+        if(pp) pp[k][j][i] = v[k][j][i][4];
       }
 
-  VX.RestoreDataPointerToLocalVector(); //no need to exchange, as we have covered ghost layers
-  VY.RestoreDataPointerToLocalVector();
-  VZ.RestoreDataPointerToLocalVector();
-  P.RestoreDataPointerToLocalVector();
+  if(VX_ptr) VX_ptr->RestoreDataPointerToLocalVector(); //no need to exchange, as we have covered ghost layers
+  if(VY_ptr) VY_ptr->RestoreDataPointerToLocalVector();
+  if(VZ_ptr) VY_ptr->RestoreDataPointerToLocalVector();
+  if(P_ptr)   P_ptr->RestoreDataPointerToLocalVector();
 }
 
 //----------------------------------------------------------------------------
@@ -231,7 +231,7 @@ TimeIntegratorSIMPLE::FindCornerFixedPressure()
 //----------------------------------------------------------------------------
 
 double
-TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &DX,
+TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVariable3D &DX,
                                    SpaceVariable3D &DY, SpaceVariable3D &DZ,
                                    SpaceVariable3D &VX, SpaceVariable3D &VY,
                                    SpaceVariable3D &VZ, double prelax)
@@ -243,7 +243,7 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable
   double*** ustar = VX.GetDataPointer();
   double*** vstar = VY.GetDataPointer();
   double*** wstar = VZ.GetDataPointer();
-  double*** pp    = P.GetDataPointer();
+  double*** pp    = Pprime.GetDataPointer();
 
   double uerr  = 0.0;
   double unorm = 0.0;
@@ -261,11 +261,10 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable
         if(j>0) v[k][j][i][2] = vstar[k][j][i] + vcorr;
         if(k>0) v[k][j][i][3] = wstar[k][j][i] + wcorr;
         v[k][j][i][4] += prelax*pp[k][j][i];
-        pp[k][j][i] = 0.0; //reset to 0 for next iteration
 
         unew = v[k][j][i][1];
         vnew = v[k][j][i][2];
-        wnew = v[k][j][i][2];
+        wnew = v[k][j][i][3];
 
         unorm += unew*unew + vnew*vnew + wnew*wnew;
         uerr  += ucorr*ucorr + vcorr*vcorr + wcorr*wcorr;
@@ -280,7 +279,7 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable
   VX.RestoreDataPointerToLocalVector();
   VY.RestoreDataPointerToLocalVector();
   VZ.RestoreDataPointerToLocalVector();
-  P.RestoreDataPointerToLocalVector();
+  Pprime.RestoreDataPointerToLocalVector();
    
   return sqrt(uerr/unorm);
 
@@ -301,10 +300,12 @@ TimeIntegratorSIMPLER::TimeIntegratorSIMPLER(MPI_Comm &comm_, IoData& iod_, Data
                                              LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                                              HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_)
                      : TimeIntegratorSIMPLE(comm_, iod_, dms_, spo_, inco_, lso_, mpo_, laser_, embed_, 
-                                            heo_, pmo_)
+                                            heo_, pmo_),
+                       Bu(comm_, &(dms_.ghosted1_1dof)), Bv(comm_, &(dms_.ghosted1_1dof)),
+                       Bw(comm_, &(dms_.ghosted1_1dof)), P(comm_, &(dms_.ghosted1_1dof))
 {
   type = SIMPLER;
-
+  alphaP = 0.0; //not used
 }
 
 //----------------------------------------------------------------------------
@@ -317,6 +318,10 @@ TimeIntegratorSIMPLER::~TimeIntegratorSIMPLER()
 void
 TimeIntegratorSIMPLER::Destroy()
 {
+  Bu.Destroy();
+  Bv.Destroy();
+  Bw.Destroy();
+  P.Destroy();
   TimeIntegratorSIMPLE::Destroy();
 }
 
@@ -357,36 +362,38 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
-    ExtractVariableComponents(v, VXstar, VYstar, VZstar, Pprime);
-
+    ExtractVariableComponents(v, NULL, NULL, NULL, &P);
     
     //-----------------------------------------------------
     // Step 1: Solve the pressure (not p') equation
     //-----------------------------------------------------
     B.SetConstantValue(0.0);
-    inco.EstimateVelocityForPressureSIMPLER(0, v, id, homo, VXstar, DX, Efactor, dt, LocalDt); //"Uhat"
-    inco.EstimateVelocityForPressureSIMPLER(1, v, id, homo, VYstar, DY, Efactor, dt, LocalDt); //"Vhat"
-    inco.EstimateVelocityForPressureSIMPLER(2, v, id, homo, VZstar, DZ, Efactor, dt, LocalDt); //"What"
+    Bu.SetConstantValue(0.0);
+    Bv.SetConstantValue(0.0);
+    Bw.SetConstantValue(0.0);
+    // ulin_rows, vlin_rows, and wlin_rows will be used in Step 2
+    inco.CalculateCoefficientsSIMPLER(0, v, id, homo, ulin_rows, Bu, VXstar, DX, Efactor, dt, LocalDt); //"Uhat"
+    inco.CalculateCoefficientsSIMPLER(1, v, id, homo, vlin_rows, Bv, VYstar, DY, Efactor, dt, LocalDt); //"Vhat"
+    inco.CalculateCoefficientsSIMPLER(2, v, id, homo, wlin_rows, Bw, VZstar, DZ, Efactor, dt, LocalDt); //"What"
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
     plin_solver.SetLinearOperator(plin_rows);
-    plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    lin_success = plin_solver.Solve(B, P, NULL, NULL, &lin_rnorm);
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the pressure equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
         print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     }
-    UpdatePressure(v, Pprime); //!< Pprime --> v[k][j][i][4]
 
 
     //-----------------------------------------------------
     // Step 2: Solve the momentum equations for u*, v*, w*
-    // TODO: The equations can be built faster by reusing info in Estimate...
     //-----------------------------------------------------
+    ExtractVariableComponents(v, &VXstar, &VYstar, &VZstar, NULL); //initial guesses
 
     // Solve the x-momentum equation
-    inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, Efactor, dt, LocalDt);
-    vlin_solver.SetLinearOperator(vlin_rows);
-    lin_success = vlin_solver.Solve(B, VXstar, NULL, NULL, &lin_rnorm);
+    inco.UpdateVelocityEquationRHS_SIMPLER(0, P, Bu);
+    vlin_solver.SetLinearOperator(ulin_rows);
+    lin_success = vlin_solver.Solve(Bu, VXstar, NULL, NULL, &lin_rnorm);
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the x-momentum equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
@@ -395,9 +402,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
-      inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, Efactor, dt, LocalDt);
+      inco.UpdateVelocityEquationRHS_SIMPLER(1, P, Bv);
       vlin_solver.SetLinearOperator(vlin_rows);
-      vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
+      lin_success = vlin_solver.Solve(Bv, VYstar, NULL, NULL, &lin_rnorm);
     }
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
@@ -407,9 +414,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
-      inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, Efactor, dt, LocalDt);
-      vlin_solver.SetLinearOperator(vlin_rows);
-      vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
+      inco.UpdateVelocityEquationRHS_SIMPLER(2, P, Bw);
+      vlin_solver.SetLinearOperator(wlin_rows);
+      lin_success = vlin_solver.Solve(Bw, VZstar, NULL, NULL, &lin_rnorm);
     }
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
@@ -419,12 +426,12 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
     
     //-----------------------------------------------------
-    // Step 2: Solve the p' equation
+    // Step 3: Solve the p' equation
     //-----------------------------------------------------
-    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
-    plin_solver.UsePreviousPreconditioner(true);
-    plin_solver.SetLinearOperator(plin_rows);
-    plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXstar, VYstar, VZstar, B, &ijk_zero_p);
+    plin_solver.UsePreviousPreconditioner(true); //The matrix A is still the same
+    Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
+    lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
     if(!lin_success) {
       print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
@@ -433,9 +440,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
 
     //-----------------------------------------------------
-    // Step 3: Update p, u, v, w, and compute relative error in velocity
+    // Step 4: Update p, u, v, w, and compute relative error in velocity
     //-----------------------------------------------------
-    rel_err = UpdateVelocity(v); //Uses DX, DY, DZ, VXstar, VYstar, VZstar
+    rel_err = UpdateStates(v, P, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar); 
 
     V.RestoreDataPointerAndInsert();
 
@@ -459,20 +466,64 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
 //----------------------------------------------------------------------------
 
-void
-TimeIntegratorSIMPLER::UpdatePressure(Vec5D*** v, SpaceVariable3D &P)
+double
+TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &Pprime,
+                                    SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
+                                    SpaceVariable3D &VX, SpaceVariable3D &VY, SpaceVariable3D &VZ)
 {
 
-  double*** pp = P.GetDataPointer();
+  double*** diagx = DX.GetDataPointer();
+  double*** diagy = DY.GetDataPointer();
+  double*** diagz = DZ.GetDataPointer();
+  double*** ustar = VX.GetDataPointer();
+  double*** vstar = VY.GetDataPointer();
+  double*** wstar = VZ.GetDataPointer();
+  double*** p     = P.GetDataPointer();
+  double*** pp    = Pprime.GetDataPointer();
+
+  double uerr  = 0.0;
+  double unorm = 0.0;
+  double ucorr, vcorr, wcorr, unew, vnew, wnew;
 
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++)
-        v[k][j][i][4] = pp[k][j][i]; //reset to 0 for next iteration
+      for(int i=i0; i<imax; i++) {
 
+        ucorr = i>0 ? diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]) : 0.0;
+        vcorr = j>0 ? diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]) : 0.0;
+        wcorr = k>0 ? diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i]) : 0.0;
+     
+        if(i>0) v[k][j][i][1] = ustar[k][j][i] + ucorr;
+        if(j>0) v[k][j][i][2] = vstar[k][j][i] + vcorr;
+        if(k>0) v[k][j][i][3] = wstar[k][j][i] + wcorr;
+        v[k][j][i][4] = p[k][j][i];
+
+        unew = v[k][j][i][1];
+        vnew = v[k][j][i][2];
+        wnew = v[k][j][i][3];
+
+        unorm += unew*unew + vnew*vnew + wnew*wnew;
+        uerr  += ucorr*ucorr + vcorr*vcorr + wcorr*wcorr;
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, &unorm, 1, MPI_DOUBLE, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &uerr, 1, MPI_DOUBLE, MPI_SUM, comm);
+
+  DX.RestoreDataPointerToLocalVector();
+  DY.RestoreDataPointerToLocalVector();
+  DZ.RestoreDataPointerToLocalVector();
+  VX.RestoreDataPointerToLocalVector();
+  VY.RestoreDataPointerToLocalVector();
+  VZ.RestoreDataPointerToLocalVector();
   P.RestoreDataPointerToLocalVector();
+  Pprime.RestoreDataPointerToLocalVector();
    
+  return sqrt(uerr/unorm);
+
 }
+
+
+
 
 //----------------------------------------------------------------------------
 // SIMPLEC

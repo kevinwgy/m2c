@@ -60,18 +60,14 @@ public:
 protected:
 
   //! v --> VX, VY, VZ, P
-  void ExtractVariableComponents(Vec5D*** v, SpaceVariable3D &VX, SpaceVariable3D &VY,
-                                 SpaceVariable3D &VZ, SpaceVariable3D &P);
+  void ExtractVariableComponents(Vec5D*** v, SpaceVariable3D *VX_ptr, SpaceVariable3D *VY_ptr,
+                                 SpaceVariable3D *VZ_ptr, SpaceVariable3D *P_ptr);
 
-  //! Update v, reset P = 0 (for next iteration)
-  virtual double UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &DX,
-                      SpaceVariable3D &DY, SpaceVariable3D &DZ, SpaceVariable3D &VX,
-                      SpaceVariable3D &VY, SpaceVariable3D &VZ, double prelax);
+  //! Update v and p (for next iteration)
+  virtual double UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVariable3D &DX,
+                              SpaceVariable3D &DY, SpaceVariable3D &DZ, SpaceVariable3D &VX,
+                              SpaceVariable3D &VY, SpaceVariable3D &VZ, double prelax);
 
-  virtual void UpdatePressure(Vec5D*** v, SpaceVariable3D &P) {
-    print_error("*** Error: Function UpdatePressure is undefined.\n");
-    exit_mpi();
-  }
 };  
 
 
@@ -82,6 +78,13 @@ protected:
  *******************************************************************/
 class TimeIntegratorSIMPLER : public TimeIntegratorSIMPLE
 {
+
+protected:
+
+  LinearSystemSolver ulin_solver;
+  LinearSystemSolver wlin_solver;
+
+  SpaceVariable3D Bu, Bv, Bw, P;
 
 public:
 
@@ -101,8 +104,10 @@ public:
                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
-  void UpdatePressure(Vec5D*** v, SpaceVariable3D &P);
-
+  //! Update v and p (for next iteration)
+  double UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &Pprime, SpaceVariable3D &DX,
+                      SpaceVariable3D &DY, SpaceVariable3D &DZ, SpaceVariable3D &VX,
+                      SpaceVariable3D &VY, SpaceVariable3D &VZ);
 };  
 
 
