@@ -1754,12 +1754,14 @@ void ExplicitTsData::setup(const char *name, ClassAssigner *father)
 
 SemiImplicitTsData::SemiImplicitTsData()
 {
-  type = SIMPLEC;
+  type = PISO;
+  maxIts = 2;
 
+  // for PISO, these two parameters are actually not used
   E = 5.0; // Van Doormaal and Raithby (1984) says 4-10 is common.
   alphaP = 0.8; // recommended in Patankar's book (Section 6.7-2)
 
-  maxIts = 4;
+  // for PISO, convergence_tolerance is not used
   convergence_tolerance = 1.0e-4;
 }
 

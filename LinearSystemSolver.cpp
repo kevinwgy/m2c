@@ -61,7 +61,7 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
 
 
   rnorm_history.resize(1000); //1000 entries should be more than enough
-  KSPSetResidualHistory(rnorm_history.data(), rnorm_history.size(), true); //reset for each Solve
+  KSPSetResidualHistory(ksp, rnorm_history.data(), rnorm_history.size(), PETSC_TRUE); //reset for each Solve
 
 /*
   PC pc;
@@ -125,14 +125,14 @@ LinearSystemSolver::SetLinearOperator(vector<RowEntries>& row_entries)
 void
 LinearSystemSolver::UsePreviousPreconditioner(bool reuse_or_not)
 {
-  KSPSetReusePreconditioner(ksp, reuse_or_not);
+  KSPSetReusePreconditioner(ksp, reuse_or_not ? PETSC_TRUE : PETSC_FALSE);
 }
 
 //-----------------------------------------------------
 
 bool
 LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
-                          ConvergenceReason *reason, int *numIts, std::vector<double> *rnorm)
+                          LinearSystemConvergenceReason *reason, int *numIts, std::vector<double> *rnorm)
 {
   // --------------------------------------------------
   // Sanity checks
@@ -167,7 +167,6 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
   bool success = ksp_code>0;
 
   if(reason) { //user requested convergence/divergence reason
-    ConvergenceReason reason(NONE);
     if(ksp_code == KSP_CONVERGED_RTOL)
       *reason = CONVERGED_REL_TOL;
     else if(ksp_code == KSP_CONVERGED_ATOL)
@@ -190,7 +189,7 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
     int nEntries(0);
     KSPGetResidualHistory(ksp, NULL, &nEntries);
     rnorm->resize(nEntries, 0);
-    for(int i=0; i<nEntries) //copy data instead of passing rnorm_history (safer)
+    for(int i=0; i<nEntries; i++) //copy data instead of passing rnorm_history (safer)
       (*rnorm)[i] = rnorm_history[i];
   }
 

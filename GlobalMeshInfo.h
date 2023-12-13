@@ -33,7 +33,7 @@ class GlobalMeshInfo {
 private:
 
   /** Neighbors of all processor cores/subdomains, indexed w/ proc id.
-      The neighbors of each subdomain follow a certain order. See GetSubdomainInfo(...) in the .cpp file. **/
+      The neighbors of each subdomain follow a certain order. See FindSubdomainInfo(...) in the .cpp file. **/
   std::vector<std::vector<int> > subD_neighbors_27; //!< all 27 neighbors, including self and non-exist ones
   std::vector<std::vector<int> > subD_neighbors_all; //!< all real neighbors, w/o self and non-exist ones
   std::vector<std::vector<int> > subD_neighbors_19; //!< 27 - 8 corners
@@ -52,6 +52,8 @@ public:
 
   int NX, NY, NZ;
 
+  double domain_volume; //!< does not include ghost layer
+
   std::vector<Vec3D> subD_xyz_min, subD_xyz_max; //!< actual boundaries of subs, up to cell boundaries
   std::vector<Int3> subD_ijk_min, subD_ijk_max; //!< Note: "max" is max index + 1 
 
@@ -64,7 +66,7 @@ public:
   ~GlobalMeshInfo();
 
   //! Setup the subD_xxx vectors
-  void GetSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms);
+  void FindSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms);
 
   //! Get specific info 
   double GetX(int i);

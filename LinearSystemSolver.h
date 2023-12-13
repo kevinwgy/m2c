@@ -16,16 +16,16 @@
  *********************************************************************
 */
 
+enum LinearSystemConvergenceReason 
+         {NONE = 0, CONVERGED_REL_TOL = 1, CONVERGED_ABS_TOL = 2, CONVERGED_OTHER = 3,
+          DIVERGED_ITS = 4, DIVERGED_DTOL = 5, DIVERGED_OTHER = 6};
+
 class LinearSystemSolver : public LinearOperator {
 
   KSP ksp;
   std::vector<double> rnorm_history; //!< stores the history of residual norm for the "Solve"
 
 public:
-
-  enum ConvergenceReason {NONE = 0, CONVERGED_REL_TOL = 1, CONVERGED_ABS_TOL = 2, CONVERGED_OTHER = 3,
-                          DIVERGED_ITS = 4, DIVERGED_DTOL = 5, DIVERGED_OTHER = 6};
-
 
   LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input);
   ~LinearSystemSolver(); 
@@ -39,7 +39,7 @@ public:
   void UsePreviousPreconditioner(bool reuse_or_not = true);
 
   bool Solve(SpaceVariable3D &b, SpaceVariable3D &x, //!< x: both input (initial guess) & output (solution)
-             ConvergenceReason *reason = NULL, int *numIts = NULL, std::vector<double> *rnorm = NULL) ;
+             LinearSystemConvergenceReason *reason = NULL, int *numIts = NULL, std::vector<double> *rnorm = NULL) ;
 
   void GetTolerances(double *rtol, double *abstol, double *dtol, int *maxits); //!< set NULL to params not needed
 

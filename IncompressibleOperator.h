@@ -79,7 +79,7 @@ public:
                                    std::vector<RowEntries> &plin_rows, SpaceVariable3D &B,
                                    Int3 *ijk_zero_p = NULL); //!< allows p to be fixed at one node
 
-  //! For a specified momentum equation (dir=0,1,2), calculates coefficients for pressure and velocity equations
+  //! For specified momentum equation (dir=0,1,2), find coefficients for pressure and velocity equations
   void CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double*** id, double*** homo,
                                     std::vector<RowEntries> &vlin_rows, SpaceVariable3D &Bv,
                                     SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag, double Efactor,
@@ -90,6 +90,12 @@ public:
   void BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** homo,
                                         SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
                                         SpaceVariable3D &VZstar, SpaceVariable3D &B, Int3 *ijk_zero_p = NULL);
+
+  //! For specified momentum equation (dir=0,1,2), calculate "velocity tilde prime"
+  void CalculateVelocityTildePISO(int dir, Vec5D*** v, double*** id, double*** homo,
+                                  SpaceVariable3D &Vprime, SpaceVariable3D &Vtilde, double Efactor,
+                                  double dt, SpaceVariable3D *LocalDt = NULL);
+ 
 
 
 private:

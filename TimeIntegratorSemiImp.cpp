@@ -236,6 +236,7 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
                                    SpaceVariable3D &VX, SpaceVariable3D &VY,
                                    SpaceVariable3D &VZ, double prelax)
 {
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
   double*** diagx = DX.GetDataPointer();
   double*** diagy = DY.GetDataPointer();
@@ -248,10 +249,14 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
   double uerr  = 0.0;
   double unorm = 0.0;
   double ucorr, vcorr, wcorr, unew, vnew, wnew;
+  double dz, dydz, dxdydz;
 
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dydz = dz*global_mesh.GetDy(j);
       for(int i=i0; i<imax; i++) {
+        dxdydz = dydz*global_mesh.GetDx(i);
 
         ucorr = i>0 ? diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]) : 0.0;
         vcorr = j>0 ? diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]) : 0.0;
@@ -266,9 +271,11 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
         vnew = v[k][j][i][2];
         wnew = v[k][j][i][3];
 
-        unorm += unew*unew + vnew*vnew + wnew*wnew;
-        uerr  += ucorr*ucorr + vcorr*vcorr + wcorr*wcorr;
+        unorm += (unew*unew + vnew*vnew + wnew*wnew)*dxdydz;
+        uerr  += (ucorr*ucorr + vcorr*vcorr + wcorr*wcorr)*dxdydz;
       }
+    }
+  }
 
   MPI_Allreduce(MPI_IN_PLACE, &unorm, 1, MPI_DOUBLE, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &uerr, 1, MPI_DOUBLE, MPI_SUM, comm);
@@ -471,6 +478,7 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariabl
                                     SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
                                     SpaceVariable3D &VX, SpaceVariable3D &VY, SpaceVariable3D &VZ)
 {
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
   double*** diagx = DX.GetDataPointer();
   double*** diagy = DY.GetDataPointer();
@@ -484,10 +492,14 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariabl
   double uerr  = 0.0;
   double unorm = 0.0;
   double ucorr, vcorr, wcorr, unew, vnew, wnew;
+  double dz, dydz, dxdydz;
 
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dydz = dz*global_mesh.GetDy(j);
       for(int i=i0; i<imax; i++) {
+        dxdydz = dydz*global_mesh.GetDx(i);
 
         ucorr = i>0 ? diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]) : 0.0;
         vcorr = j>0 ? diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]) : 0.0;
@@ -502,9 +514,11 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariabl
         vnew = v[k][j][i][2];
         wnew = v[k][j][i][3];
 
-        unorm += unew*unew + vnew*vnew + wnew*wnew;
-        uerr  += ucorr*ucorr + vcorr*vcorr + wcorr*wcorr;
+        unorm += (unew*unew + vnew*vnew + wnew*wnew)*dxdydz;
+        uerr  += (ucorr*ucorr + vcorr*vcorr + wcorr*wcorr)*dxdydz;
       }
+    }
+  }
 
   MPI_Allreduce(MPI_IN_PLACE, &unorm, 1, MPI_DOUBLE, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &uerr, 1, MPI_DOUBLE, MPI_SUM, comm);
@@ -559,12 +573,16 @@ TimeIntegratorPISO::TimeIntegratorPISO(MPI_Comm &comm_, IoData& iod_, DataManage
                                        LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                                        HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_)
                      : TimeIntegratorSIMPLE(comm_, iod_, dms_, spo_, inco_, lso_, mpo_, laser_, embed_, 
-                                            heo_, pmo_)
+                                            heo_, pmo_),
+                       VXprime(comm_, &(dms_.ghosted1_1dof)), VYprime(comm_, &(dms_.ghosted1_1dof)),
+                       VZprime(comm_, &(dms_.ghosted1_1dof)), Pstar(comm_, &(dms_ghosted1_1dof)),
+                       VXtildep(comm_, &(dms_.ghosted1_1dof)), VYtildep(comm_, &(dms_.ghosted1_1dof)),
+                       VZtildep(comm_, &(dms_.ghosted1_1dof))
 {
-
-
+  type = PISO;
+  Efactor = 1.0e8; // essentially, no relaxation
+  alphaP  = 1.0; //no relaxation
 }
-
 //----------------------------------------------------------------------------
 
 TimeIntegratorPISO::~TimeIntegratorPISO()
@@ -575,7 +593,13 @@ TimeIntegratorPISO::~TimeIntegratorPISO()
 void
 TimeIntegratorPISO::Destroy()
 { 
-
+  VXprime.Destroy();
+  VYprime.Destroy();
+  VZprime.Destroy();
+  VXtildep.Destroy();
+  VYtildep.Destroy();
+  VZtildep.Destroy();
+  Pstar.Destroy();
 
   TimeIntegratorSIMPLE::Destroy();
 }
@@ -589,22 +613,271 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                        SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                                        double time, double dt, int time_step, int subcycle, double dts)
 {
-  print_error("*** Error: TimeIntegratorPISO::AdvanceOneTimeStep has not been implemented yet.\n");
+
+  if(mpo.NumberOfMaterials()>1) {
+    print_error("*** Error: Need to update homogeneity. Currently, the incompressible flow solver does not allow"
+                " more than one material.\n");
+    exit_mpi();
+  }
+  if(Phi.size()>0 || NPhi.size()>0 || KappaPhi.size()>0 || L || Xi || subcycle>0 || dts != dt) {
+    print_error("*** Error: Problem setup is not supported by TimeIntegratorSIMPLE(or SIMPLEC).\n");
+    exit_mpi();
+  }
+
+
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
+
+  double*** id = ID.GetDataPointer();
+  double*** homo = Homo.GetDataPointer();
+
+  int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
+  vector<double> lin_rnorm; 
+  bool lin_success, converged(false);
+  double rel_err;
+
+  print("  o Running the PISO procedure.\n");
+
+  Vec5D*** v = (Vec5D***)V.GetDataPointer();
+
+  ExtractVariableComponents(v, &VXstar, &VYstar, &VZstar, &Pstar);
+
+  //-----------------------------------------------------
+  // Step 1: Solve the momentum equations for u*, v*, w*
+  //-----------------------------------------------------
+
+  // Solve the x-momentum equation
+  inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, false, Efactor, dt, LocalDt);
+  vlin_solver.SetLinearOperator(vlin_rows);
+  lin_success = vlin_solver.Solve(B, VXstar, NULL, NULL, &lin_rnorm);
+  if(!lin_success) {
+    print_warning("  x Warning: Linear solver for the x-momentum equation failed to converge.\n");
+    for(int i=0; i<(int)lin_rnorm.size(); i++)
+      print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+  }
+
+  // Solve the y-momentum equation
+  if(!global_mesh.IsMesh1D()) {
+    inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
+    vlin_solver.SetLinearOperator(vlin_rows);
+    lin_success = vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
+  }
+  if(!lin_success) {
+    print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+    for(int i=0; i<(int)lin_rnorm.size(); i++)
+      print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+  }
+
+  // Solve the z-momentum equation
+  if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
+    inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
+    vlin_solver.SetLinearOperator(vlin_rows);
+    lin_success = vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
+  }
+  if(!lin_success) {
+    print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+    for(int i=0; i<(int)lin_rnorm.size(); i++)
+      print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+  }
+
+ 
+   
+  //-----------------------------------------------------
+  // Step 2: Solve the p' equation (First Corrector Step)
+  //-----------------------------------------------------
+  inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
+  plin_solver.SetLinearOperator(plin_rows);
+  Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
+  lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+  if(!lin_success) {
+    print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+    for(int i=0; i<(int)lin_rnorm.size(); i++)
+      print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+  }
+
+  
+  //-----------------------------------------------------
+  // Step 3: Update p, u, v, w, and compute relative error in velocity (First Corrector Step)
+  //-----------------------------------------------------
+  rel_err = UpdateStatesCorrector(Pstar, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, 
+                                  VXprime, VYprime, VZprime); 
+  print("  o Corrector Step %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
+   
+  if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
+    converged = true;
+    goto END_CORRECTORS;
+  }
+
+  //-----------------------------------------------------
+  // Step 4: Update p, u, v, w, and compute relative error in velocity (Subsequent Corrector Steps)
+  //-----------------------------------------------------
+  for(iter = 1; iter < maxIter; iter++) {
+
+    inco.CalculateVelocityTildePISO(0, v, id, homo, VXprime, VXtildep, Efactor, dt, LocalDt);
+    inco.CalculateVelocityTildePISO(1, v, id, homo, VYprime, VYtildep, Efactor, dt, LocalDt);
+    inco.CalculateVelocityTildePISO(2, v, id, homo, VZprime, VZtildep, Efactor, dt, LocalDt);
+
+    inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXtildep, VYtildep, VZtildep, B, &ijk_zero_p);
+    plin_solver.UsePreviousPreconditioner(true); //The matrix A is still the same
+    Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
+    lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    if(!lin_success) {
+      print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    }
+
+    rel_err = UpdateStatesCorrector(Pstar, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, 
+                                    VXprime, VYprime, VZprime, &VXtildep, &VYtildep, &VZtildep); 
+
+    if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
+      converged = true;
+      break; 
+    }
+
+    print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
+
+  }
+
+END_CORRECTORS:
+
+  UpdateStatesFinal(v, Pstar, VXstar, VYstar, VZstar); // update v
+  V.RestoreDataPointerAndInsert();
+
+  if(converged)
+    print("  o Converged after %d iterations. Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
+  else
+    print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
+
+
+  ID.RestoreDataPointerToLocalVector();
+  Homo.RestoreDataPointerToLocalVector();
+
 }
 
 //----------------------------------------------------------------------------
 
+double
+TimeIntegratorPISO::UpdateStatesCorrector(SpaceVariable3D &Pstar, SpaceVariable3D &Pprime,
+                        SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
+                        SpaceVariable3D &VXstar, SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
+                        SpaceVariable3D &VXprime, SpaceVariable3D &VYprime, SpaceVariable3D &VZprime,
+                        SpaceVariable3D *VXtildep, SpaceVariable3D *VYtildep,
+                        SpaceVariable3D *VZtildep)
+{
 
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
+  //inputs: DX, DY, DZ, VXstar, VYstar, VZstar, Pstar, Pprime
+  //        (VXtildep, VYtildep, VZtildep for 2nd, 3rd, etc. correctors)
+  //outputs: VXstar, VYstar, VZstar, Pstar, VXprime, VYprime, VZprime
+  double*** diagx = DX.GetDataPointer();
+  double*** diagy = DY.GetDataPointer();
+  double*** diagz = DZ.GetDataPointer();
+  double*** ustar = VXstar.GetDataPointer();
+  double*** vstar = VYstar.GetDataPointer();
+  double*** wstar = VZstar.GetDataPointer();
 
+  double*** utildep = VXtildep ? VXtildep->GetDataPointer() : NULL;
+  double*** vtildep = VYtildep ? VYtildep->GetDataPointer() : NULL;
+  double*** wtildep = VZtildep ? VZtildep->GetDataPointer() : NULL;
+  
+  double*** up    = VXprime.GetDataPointer();
+  double*** vp    = VYprime.GetDataPointer();
+  double*** wp    = VZprime.GetDataPointer();
+  double*** pstar = Pstar.GetDataPointer();
+  double*** pp    = Pprime.GetDataPointer();
 
+  double uerr  = 0.0;
+  double unorm = 0.0;
+  double ucorr, vcorr, wcorr, unew, vnew, wnew;
+  double dz, dydz, dxdydz;
 
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dydz = dz*global_mesh.GetDy(j);
+      for(int i=i0; i<imax; i++) {
+        dxdydz = dydz*global_mesh.GetDx(i);
 
+        ucorr = i>0 ? (utildep ? utildep[k][j][i] : 0.0) +
+                      diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i])
+                    : 0.0;
+        vcorr = j>0 ? (vtildep ? vtildep[k][j][i] : 0.0) +
+                      diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i])
+                    : 0.0;
+        wcorr = k>0 ? (wtildep ? wtildep[k][j][i] : 0.0) +
+                      diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i])
+                    : 0.0;
+     
+        // Updates
+        ustar[k][j][i] += ucorr;
+        vstar[k][j][i] += vcorr;
+        wstar[k][j][i] += wcorr;
+        up[k][j][i]     = ucorr;
+        vp[k][j][i]     = vcorr;
+        wp[k][j][i]     = wcorr;
+        pstar          += pp[k][j][i];
+
+        unew = ustar[k][j][i];
+        vnew = vstar[k][j][i];
+        wnew = wstar[k][j][i];
+        unorm += (unew*unew + vnew*vnew + wnew*wnew)*dxdydz;
+        uerr  += (ucorr*ucorr + vcorr*vcorr + wcorr*wcorr)*dxdydz;
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &unorm, 1, MPI_DOUBLE, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &uerr, 1, MPI_DOUBLE, MPI_SUM, comm);
+
+  DX.RestoreDataPointerToLocalVector();
+  DY.RestoreDataPointerToLocalVector();
+  DZ.RestoreDataPointerToLocalVector();
+  Pprime.RestoreDataPointerToLocalVector();
+  VXstar.RestoreDataPointerAndInsert();
+  VYstar.RestoreDataPointerAndInsert();
+  VZstar.RestoreDataPointerAndInsert();
+  VXprime.RestoreDataPointerAndInsert();
+  VYprime.RestoreDataPointerAndInsert();
+  VZprime.RestoreDataPointerAndInsert();
+  Pstar.RestoreDataPointerAndInsert();
+   
+  if(VXtildep) VXtildep->RestoreDataPointerToLocalVector();
+  if(VYtildep) VYtildep->RestoreDataPointerToLocalVector();
+  if(VZtildep) VZtildep->RestoreDataPointerToLocalVector();
+
+  return sqrt(uerr/unorm);
+
+}
 
 //----------------------------------------------------------------------------
 
+void
+TimeIntegratorPISO::UpdateStatesFinal(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &VX,
+                                      SpaceVariable3D &VY, SpaceVariable3D &VZ)
+{
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
+  double*** pp = P.GetDataPointer();
+  double*** uu = VX.GetDataPointer();
+  double*** vv = VY.GetDataPointer();
+  double*** ww = VZ.GetDataPointer();
 
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(i>0) v[k][j][i][1] = uu[k][j][i];
+        if(j>0) v[k][j][i][2] = vv[k][j][i];
+        if(k>0) v[k][j][i][3] = ww[k][j][i];
+        v[k][j][i][4] = pp[k][j][i];
+      }
+
+  VX.RestoreDataPointerToLocalVector();
+  VY.RestoreDataPointerToLocalVector();
+  VZ.RestoreDataPointerToLocalVector();
+  P.RestoreDataPointerToLocalVector();
+   
+}
 
 //----------------------------------------------------------------------------
 

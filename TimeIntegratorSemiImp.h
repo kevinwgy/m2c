@@ -104,6 +104,8 @@ public:
                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
+protected:
+
   //! Update v and p (for next iteration)
   double UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &Pprime, SpaceVariable3D &DX,
                       SpaceVariable3D &DY, SpaceVariable3D &DZ, SpaceVariable3D &VX,
@@ -137,6 +139,10 @@ public:
 class TimeIntegratorPISO : public TimeIntegratorSIMPLE
 {
 
+protected:
+
+  SpaceVariable3D VXprime, VYprime, VZprime, VXtildep, VYtildep, VZtildep, Pstar;
+
 public:
 
   TimeIntegratorPISO(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
@@ -154,6 +160,18 @@ public:
                           double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
+
+protected:
+
+  double UpdateStatesCorrector(SpaceVariable3D &Pstar, SpaceVariable3D &Pprime, SpaceVariable3D &DX,
+                               SpaceVariable3D &DY, SpaceVariable3D &DZ, SpaceVariable3D &VXstar,
+                               SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
+                               SpaceVariable3D &VXprime, SpaceVariable3D &VYprime,
+                               SpaceVariable3D &VZprime, SpaceVariable3D *VXtildep = NULL,
+                               SpaceVariable3D *VYtildep = NULL, SpaceVariable3D *VZtildep = NULL);
+
+  void UpdateStatesFinal(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &VX,
+                         SpaceVariable3D &VY, SpaceVariable3D &VZ);
 
 };  
 
