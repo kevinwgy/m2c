@@ -77,7 +77,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
                                          vector<SpaceVariable3D*> &KappaPhi,
                                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
                                          [[maybe_unused]] double time, double dt, 
-                                         [[maybe_unused]] int time_step, int subcycle, double dts)
+                                         int time_step, int subcycle, double dts)
 {
 
   if(mpo.NumberOfMaterials()>1) {
@@ -99,7 +99,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   vector<double> lin_rnorm; 
   bool lin_success, converged(false);
-  double rel_err;
+  double rel_err(10000.0);
 
   if(type == SIMPLEC)
     print("  o Running the iterative SIMPLEC procedure.\n");
@@ -180,6 +180,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
 
   }
+
   if(converged)
     print("  o Converged after %d iterations. Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
   else
@@ -251,6 +252,9 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
   double ucorr, vcorr, wcorr, unew, vnew, wnew;
   double dz, dydz, dxdydz;
 
+  int i0, j0, k0, imax, jmax, kmax;
+  DX.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
   for(int k=k0; k<kmax; k++) {
     dz = global_mesh.GetDz(k);
     for(int j=j0; j<jmax; j++) {
@@ -258,9 +262,9 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
       for(int i=i0; i<imax; i++) {
         dxdydz = dydz*global_mesh.GetDx(i);
 
-        ucorr = i>0 ? diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]) : 0.0;
-        vcorr = j>0 ? diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]) : 0.0;
-        wcorr = k>0 ? diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i]) : 0.0;
+        ucorr = i>0 ? diagx[k][j][i]*(pp[k][j][i-1] - pp[k][j][i]) : 0.0;
+        vcorr = j>0 ? diagy[k][j][i]*(pp[k][j-1][i] - pp[k][j][i]) : 0.0;
+        wcorr = k>0 ? diagz[k][j][i]*(pp[k-1][j][i] - pp[k][j][i]) : 0.0;
      
         if(i>0) v[k][j][i][1] = ustar[k][j][i] + ucorr;
         if(j>0) v[k][j][i][2] = vstar[k][j][i] + vcorr;
@@ -309,7 +313,9 @@ TimeIntegratorSIMPLER::TimeIntegratorSIMPLER(MPI_Comm &comm_, IoData& iod_, Data
                      : TimeIntegratorSIMPLE(comm_, iod_, dms_, spo_, inco_, lso_, mpo_, laser_, embed_, 
                                             heo_, pmo_),
                        Bu(comm_, &(dms_.ghosted1_1dof)), Bv(comm_, &(dms_.ghosted1_1dof)),
-                       Bw(comm_, &(dms_.ghosted1_1dof)), P(comm_, &(dms_.ghosted1_1dof))
+                       Bw(comm_, &(dms_.ghosted1_1dof)), P(comm_, &(dms_.ghosted1_1dof)),
+                       ulin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver),
+                       wlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver)
 {
   type = SIMPLER;
   alphaP = 0.0; //not used
@@ -339,7 +345,8 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
                                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                                           vector<SpaceVariable3D*> &KappaPhi,
                                           SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
-                                          double time, double dt, int time_step, int subcycle, double dts)
+                                          [[maybe_unused]] double time, double dt, int time_step, 
+                                          int subcycle, double dts)
 {
 
   if(mpo.NumberOfMaterials()>1) {
@@ -361,7 +368,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   vector<double> lin_rnorm; 
   bool lin_success, converged(false);
-  double rel_err;
+  double rel_err(10000.0);
 
   print("  o Running the iterative SIMPLER procedure.\n");
 
@@ -461,6 +468,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
 
   }
+
   if(converged)
     print("  o Converged after %d iterations. Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
   else
@@ -494,6 +502,9 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariabl
   double ucorr, vcorr, wcorr, unew, vnew, wnew;
   double dz, dydz, dxdydz;
 
+  int i0, j0, k0, imax, jmax, kmax;
+  DX.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
   for(int k=k0; k<kmax; k++) {
     dz = global_mesh.GetDz(k);
     for(int j=j0; j<jmax; j++) {
@@ -501,9 +512,9 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariabl
       for(int i=i0; i<imax; i++) {
         dxdydz = dydz*global_mesh.GetDx(i);
 
-        ucorr = i>0 ? diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i]) : 0.0;
-        vcorr = j>0 ? diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i]) : 0.0;
-        wcorr = k>0 ? diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i]) : 0.0;
+        ucorr = i>0 ? diagx[k][j][i]*(pp[k][j][i-1] - pp[k][j][i]) : 0.0;
+        vcorr = j>0 ? diagy[k][j][i]*(pp[k][j-1][i] - pp[k][j][i]) : 0.0;
+        wcorr = k>0 ? diagz[k][j][i]*(pp[k-1][j][i] - pp[k][j][i]) : 0.0;
      
         if(i>0) v[k][j][i][1] = ustar[k][j][i] + ucorr;
         if(j>0) v[k][j][i][2] = vstar[k][j][i] + vcorr;
@@ -575,7 +586,7 @@ TimeIntegratorPISO::TimeIntegratorPISO(MPI_Comm &comm_, IoData& iod_, DataManage
                      : TimeIntegratorSIMPLE(comm_, iod_, dms_, spo_, inco_, lso_, mpo_, laser_, embed_, 
                                             heo_, pmo_),
                        VXprime(comm_, &(dms_.ghosted1_1dof)), VYprime(comm_, &(dms_.ghosted1_1dof)),
-                       VZprime(comm_, &(dms_.ghosted1_1dof)), Pstar(comm_, &(dms_ghosted1_1dof)),
+                       VZprime(comm_, &(dms_.ghosted1_1dof)), Pstar(comm_, &(dms_.ghosted1_1dof)),
                        VXtildep(comm_, &(dms_.ghosted1_1dof)), VYtildep(comm_, &(dms_.ghosted1_1dof)),
                        VZtildep(comm_, &(dms_.ghosted1_1dof))
 {
@@ -611,7 +622,8 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                        vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                                        vector<SpaceVariable3D*> &KappaPhi,
                                        SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
-                                       double time, double dt, int time_step, int subcycle, double dts)
+                                       [[maybe_unused]] double time, double dt, int time_step, int subcycle,
+                                       double dts)
 {
 
   if(mpo.NumberOfMaterials()>1) {
@@ -630,7 +642,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   double*** id = ID.GetDataPointer();
   double*** homo = Homo.GetDataPointer();
 
-  int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
+  int iter(0), maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   vector<double> lin_rnorm; 
   bool lin_success, converged(false);
   double rel_err;
@@ -792,6 +804,9 @@ TimeIntegratorPISO::UpdateStatesCorrector(SpaceVariable3D &Pstar, SpaceVariable3
   double ucorr, vcorr, wcorr, unew, vnew, wnew;
   double dz, dydz, dxdydz;
 
+  int i0, j0, k0, imax, jmax, kmax;
+  DX.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
   for(int k=k0; k<kmax; k++) {
     dz = global_mesh.GetDz(k);
     for(int j=j0; j<jmax; j++) {
@@ -800,13 +815,13 @@ TimeIntegratorPISO::UpdateStatesCorrector(SpaceVariable3D &Pstar, SpaceVariable3
         dxdydz = dydz*global_mesh.GetDx(i);
 
         ucorr = i>0 ? (utildep ? utildep[k][j][i] : 0.0) +
-                      diagx[k][j][i]*(pprime[k][j][i-1] - pprime[k][j][i])
+                      diagx[k][j][i]*(pp[k][j][i-1] - pp[k][j][i])
                     : 0.0;
         vcorr = j>0 ? (vtildep ? vtildep[k][j][i] : 0.0) +
-                      diagy[k][j][i]*(pprime[k][j-1][i] - pprime[k][j][i])
+                      diagy[k][j][i]*(pp[k][j-1][i] - pp[k][j][i])
                     : 0.0;
         wcorr = k>0 ? (wtildep ? wtildep[k][j][i] : 0.0) +
-                      diagz[k][j][i]*(pprime[k-1][j][i] - pprime[k][j][i])
+                      diagz[k][j][i]*(pp[k-1][j][i] - pp[k][j][i])
                     : 0.0;
      
         // Updates
@@ -816,7 +831,7 @@ TimeIntegratorPISO::UpdateStatesCorrector(SpaceVariable3D &Pstar, SpaceVariable3
         up[k][j][i]     = ucorr;
         vp[k][j][i]     = vcorr;
         wp[k][j][i]     = wcorr;
-        pstar          += pp[k][j][i];
+        pstar[k][j][i] += pp[k][j][i];
 
         unew = ustar[k][j][i];
         vnew = vstar[k][j][i];
@@ -856,12 +871,14 @@ void
 TimeIntegratorPISO::UpdateStatesFinal(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &VX,
                                       SpaceVariable3D &VY, SpaceVariable3D &VZ)
 {
-  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
   double*** pp = P.GetDataPointer();
   double*** uu = VX.GetDataPointer();
   double*** vv = VY.GetDataPointer();
   double*** ww = VZ.GetDataPointer();
+
+  int i0, j0, k0, imax, jmax, kmax;
+  P.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
 
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)

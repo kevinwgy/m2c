@@ -19,7 +19,7 @@ IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &
                                                vector<VarFcnBase*> &varFcn_, SpaceOperator &spo_, 
                                                InterpolatorBase &interp_)
                       : comm(comm_), iod(iod_), vf(varFcn_), spo(spo_), interpolator(interp_), gfo(NULL),
-                        V3(comm_, &(dm_all_.ghosted1_3dof)), viscous(false)
+                        V3(comm_, &(dm_all_.ghosted1_3dof))
 {
   // Get i0, j0, etc.
   SpaceVariable3D &coordinates(spo.GetMeshCoordinates());
@@ -37,7 +37,7 @@ IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &
     for(int i=0; i<(int)visFcns.size(); i++) {
       if(visFcns[i]->type == ViscoFcnBase::CONSTANT)
         Mu[i] = visFcns[i]->GetMu();
-      else if(visFcn[i]->type != ViscoFcnBase::NONE) {
+      else if(visFcns[i]->type != ViscoFcnBase::NONE) {
         print_error("*** Error: Currently, IncompressibleOperator only supports CONSTANT viscosity.\n");
         exit_mpi();
       }
@@ -45,6 +45,7 @@ IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &
   }
 
   // Calculate deltas
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
   Dx.resize(3); //dir = 0, 1, 2
   Dy.resize(3);
   Dz.resize(3);
@@ -54,7 +55,7 @@ IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &
   dy_t.resize(3);
   dz_k.resize(3);
   dz_f.resize(3);
-  for(d=0; d<3; d++) {
+  for(int d=0; d<3; d++) {
     for(int i=i0; i<imax; i++) {
       Dx[d].push_back(d==0 ? 0.5*(global_mesh.GetDx(i-1)+global_mesh.GetDx(i)) : global_mesh.GetDx(i));
       dx_l[d].push_back(d==0 ? global_mesh.GetDx(i-1) : 0.5*(global_mesh.GetDx(i-1)+global_mesh.GetDx(i)));
@@ -940,7 +941,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
   int original_size = vlin_rows.size();
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
-  double cm, dp, cm_plus_cp, rhou1, rhou2;
+  double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
 
   for(int k=k0; k<kmax; k++) {
@@ -1495,7 +1496,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
   int original_size = vlin_rows.size();
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
-  double cm, dp, cm_plus_cp, rhou1, rhou2;
+  double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2;
 
   for(int k=k0; k<kmax; k++) {
@@ -1894,8 +1895,6 @@ IncompressibleOperator::UpdateVelocityEquationRHS_SIMPLER(int dir, SpaceVariable
 
   assert(dir==0 || dir==1 || dir==2);
 
-  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
-
   double*** p  = P.GetDataPointer();
   double*** bb = B.GetDataPointer();
 
@@ -1943,7 +1942,7 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
   double*** vstar = VYstar.GetDataPointer();
   double*** wstar = VZstar.GetDataPointer();
 
-  double ap, a, rho, dx, dxl, dxr, dy, dyb, dyt, dz, dzk, dzf;
+  double rho, dx, dxl, dxr, dy, dyb, dyt, dz, dzk, dzf;
 
   for(int k=k0; k<kmax; k++) {
     dz  = global_mesh.GetDz(k);
@@ -2053,7 +2052,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v, double**
   double*** vtilde = Vtilde.GetDataPointer();
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
-  double cm, dp, cm_plus_cp, rhou1, rhou2;
+  double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2;
 
   for(int k=k0; k<kmax; k++) {

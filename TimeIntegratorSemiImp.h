@@ -59,6 +59,8 @@ public:
 
 protected:
 
+  Int3 FindCornerFixedPressure();
+
   //! v --> VX, VY, VZ, P
   void ExtractVariableComponents(Vec5D*** v, SpaceVariable3D *VX_ptr, SpaceVariable3D *VY_ptr,
                                  SpaceVariable3D *VZ_ptr, SpaceVariable3D *P_ptr);
@@ -80,6 +82,9 @@ class TimeIntegratorSIMPLER : public TimeIntegratorSIMPLE
 {
 
 protected:
+
+  vector<RowEntries> ulin_rows;
+  vector<RowEntries> wlin_rows;
 
   LinearSystemSolver ulin_solver;
   LinearSystemSolver wlin_solver;
