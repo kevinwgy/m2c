@@ -43,6 +43,8 @@ public:
 
   void GetTolerances(double *rtol, double *abstol, double *dtol, int *maxits); //!< set NULL to params not needed
 
+  void GetSolverType(string *ksp_type, string *pc_type = NULL); //!< if only one is needed, use NULL for the other
+
 private:
 
   void SetTolerances(LinearSolverData &lin_input);

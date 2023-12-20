@@ -41,6 +41,17 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
   alphaP = iod.ts.semi_impl.alphaP;
 
   ijk_zero_p = FindCornerFixedPressure();
+
+
+  // screen outputs
+  print("- Setting up a semi-implicit time integrator.\n");
+  string ksp_type, pc_type;
+  vlin_solver.GetSolverType(&ksp_type, &pc_type);
+  print("  o Linear solver for velocity: %s, Preconditioner: %s.\n",
+        ksp_type.c_str(), pc_type.c_str());
+  plin_solver.GetSolverType(&ksp_type, &pc_type);
+  print("  o Linear solver for pressure: %s, Preconditioner: %s.\n",
+        ksp_type.c_str(), pc_type.c_str());
 }
 
 //----------------------------------------------------------------------------
@@ -102,9 +113,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   double rel_err(10000.0);
 
   if(type == SIMPLEC)
-    print("  o Running the iterative SIMPLEC procedure.\n");
+    print("  o Running the iterative SIMPLEC procedure (E = %e).\n", Efactor);
   else
-    print("  o Running the iterative SIMPLE procedure.\n");
+    print("  o Running the iterative SIMPLE procedure (E = %e, alphaP = %e).\n", Efactor, alphaP);
 
   for(iter = 0; iter < maxIter; iter++) {
 
@@ -370,7 +381,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   bool lin_success, converged(false);
   double rel_err(10000.0);
 
-  print("  o Running the iterative SIMPLER procedure.\n");
+  print("  o Running the iterative SIMPLER procedure (E = %e).\n", Efactor);
 
   for(iter = 0; iter < maxIter; iter++) {
 
