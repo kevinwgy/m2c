@@ -62,6 +62,7 @@ LinearOperator::SetLinearOperator(vector<RowEntries>& row_entries)
 
   MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
   MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+
 }
 
 //-----------------------------------------------------
@@ -74,6 +75,8 @@ LinearOperator::ApplyLinearOperator(SpaceVariable3D &x, SpaceVariable3D &y)
   assert(&xx != &yy); //cannot be the same vector
 
   MatMult(A, xx, yy); 
+
+  y.SyncLocalToGlobal(); //update the localVec of y 
 }
 
 //-----------------------------------------------------
@@ -108,8 +111,33 @@ LinearOperator::CalculateMatrixFrobeniusNorm()
 
 //-----------------------------------------------------
 
+void
+LinearOperator::SetOutputVariableName(const char *name)
+{
+  PetscObjectSetName((PetscObject)A, name);
+}
 
+//-----------------------------------------------------
 
+void
+LinearOperator::WriteToMatlabFile(const char *filename, const char *varname)
+{
+  if(varname)
+    SetOutputVariableName(varname);
+
+  PetscViewer viewer;
+  int code = PetscViewerASCIIOpen(comm, filename, &viewer);
+  if(code) {
+    print_error("*** Error: Cannot open file '%s' for output. (code: %d)\n", filename, code);
+    exit_mpi();
+  }
+
+  PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB);
+  MatView(A, viewer);
+
+  PetscViewerDestroy(&viewer);
+  MPI_Barrier(comm);
+}
 
 
 //-----------------------------------------------------

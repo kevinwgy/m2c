@@ -45,6 +45,8 @@ public:
  *       is filled with 0.
  *******************************************
  */
+class GlobalMeshInfo;
+
 class SpaceVariable3D {
 
   MPI_Comm*  comm; 
@@ -97,6 +99,7 @@ public:
   void StoreMeshCoordinates(SpaceVariable3D &coordinates);
   void WriteToVTRFile(const char *filename, const char *varname = NULL); //!< write vector to file (w/o mesh info)
   void WriteToCGNSFile(const char *filename, const char *varname = NULL);
+  void WriteToMatlabFile(const char *filename, const char *varname = NULL);
   void SetOutputVariableName(const char *name); //!< give it a name, which will show up in output files (VTR/VTK)
 
   inline void GetCornerIndices(int *i0_, int *j0_, int *k0_, int *imax_=0, int *jmax_=0, int *kmax_=0) {
@@ -136,7 +139,8 @@ public:
   inline void NumProcs(int *nProcX_, int *nProcY_, int *nProcZ_) {*nProcX_ = nProcX; *nProcY_ = nProcY; *nProcZ_ = nProcZ;}
   inline void GetGlobalSize(int *NX_, int *NY_, int *NZ_) {*NX_ = NX; *NY_ = NY; *NZ_ = NZ;}
  
-  inline Vec& GetRefToGlobalVec() {return globalVec;}
+  inline Vec& GetRefToGlobalVec() {return globalVec;} //!< call SyncLocalToGlobal if globalVec gets modified!
+  void SyncLocalToGlobal(); //!< should be called when globalVec is updated (e.g., by some PETSc function)
 
   inline bool OutsidePhysicalDomain(int i, int j, int k) {return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
 
@@ -188,10 +192,16 @@ public:
                 std::vector<int>& Yindices, bool workOnGhost = false); //!< customized version
   void SetConstantValue(double a, bool workOnGhost = false); //!< set value to a
   
-  //! calculate norms using PETSc functions
+  //! calculate vector norms using PETSc functions
   double CalculateVectorOneNorm();
   double CalculateVectorTwoNorm();
   double CalculateVectorInfNorm();
+
+  //! calculate function L1 and L2 norms (const. reconstruction within cells)
+  double CalculateFunctionL1NormConRec(SpaceVariable3D &volume);
+  double CalculateFunctionL1NormConRec(GlobalMeshInfo &global_mesh);
+  double CalculateFunctionL2NormConRec(SpaceVariable3D &volume);
+  double CalculateFunctionL2NormConRec(GlobalMeshInfo &global_mesh);
 
 };
 

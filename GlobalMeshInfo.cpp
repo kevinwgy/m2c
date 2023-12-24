@@ -19,6 +19,13 @@ GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double>
   assert(y_glob.size() == dy_glob.size());
   assert(z_glob.size() == dz_glob.size());
 
+  xyz_min[0] = x_glob.front() - 0.5*dx_glob.front();
+  xyz_max[0] = x_glob.back()  + 0.5*dx_glob.back();
+  xyz_min[1] = y_glob.front() - 0.5*dy_glob.front();
+  xyz_max[1] = y_glob.back()  + 0.5*dy_glob.back();
+  xyz_min[2] = z_glob.front() - 0.5*dz_glob.front();
+  xyz_max[2] = z_glob.back()  + 0.5*dz_glob.back();
+
   one_dimensional_mesh = (y_glob.size()==1) && (z_glob.size()==1);
 
   two_dimensional_mesh = (!one_dimensional_mesh) && (z_glob.size()==1);

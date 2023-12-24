@@ -87,6 +87,9 @@ public:
   double CalculateMatrixInfNorm();
   double CalculateMatrixFrobeniusNorm();
 
+  void SetOutputVariableName(const char *name);
+  void WriteToMatlabFile(const char *filename, const char *varname = NULL);
+
 protected:
 
 };

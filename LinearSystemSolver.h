@@ -16,7 +16,7 @@
  *********************************************************************
 */
 
-enum LinearSystemConvergenceReason 
+enum LinearSolverConvergenceReason 
          {NONE = 0, CONVERGED_REL_TOL = 1, CONVERGED_ABS_TOL = 2, CONVERGED_OTHER = 3,
           DIVERGED_ITS = 4, DIVERGED_DTOL = 5, DIVERGED_OTHER = 6};
 
@@ -39,11 +39,13 @@ public:
   void UsePreviousPreconditioner(bool reuse_or_not = true);
 
   bool Solve(SpaceVariable3D &b, SpaceVariable3D &x, //!< x: both input (initial guess) & output (solution)
-             LinearSystemConvergenceReason *reason = NULL, int *numIts = NULL, std::vector<double> *rnorm = NULL) ;
+             LinearSolverConvergenceReason *reason = NULL, int *numIts = NULL, std::vector<double> *rnorm = NULL) ;
 
   void GetTolerances(double *rtol, double *abstol, double *dtol, int *maxits); //!< set NULL to params not needed
 
   void GetSolverType(string *ksp_type, string *pc_type = NULL); //!< if only one is needed, use NULL for the other
+
+  void ComputeResidual(SpaceVariable3D &b, SpaceVariable3D &x, SpaceVariable3D &res); //!< res = b-Ax
 
 private:
 

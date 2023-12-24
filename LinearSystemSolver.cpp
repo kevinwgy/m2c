@@ -54,18 +54,20 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
     }
   }
 
-  if(strcmp(lin_input.options_file, ""))
+  if(strcmp(lin_input.options_file, "")) {
+    FILE *file = fopen(lin_input.options_file, "r");
+    if(file == NULL) {
+      print_error("*** Error: Cannot open PETSc options file %s.\n", lin_input.options_file);
+      exit_mpi();
+    }
+    fclose(file); // just make sure the file can be opened...
     PetscOptionsInsert(NULL, NULL, NULL, lin_input.options_file);
+  }
 
   KSPSetFromOptions(ksp); //overrides any options specified above
 
   rnorm_history.resize(1000); //1000 entries should be more than enough
   KSPSetResidualHistory(ksp, rnorm_history.data(), rnorm_history.size(), PETSC_TRUE); //reset for each Solve
-
-  string ksp_type, pc_type;
-  GetSolverType(&ksp_type, &pc_type);
-
-  print("KSP Type: %s, PC Type: %s.\n", ksp_type.c_str(), pc_type.c_str());
 
 }
 
@@ -113,13 +115,18 @@ LinearSystemSolver::GetTolerances(double *rtol, double *abstol, double *dtol, in
 void
 LinearSystemSolver::GetSolverType(string *ksp_type, string *pc_type)
 {
-  if(ksp_type) 
-    KSPGetType(ksp, (KSPType*)ksp_type);
+  if(ksp_type) {
+    KSPType ksp_type_;
+    KSPGetType(ksp, &ksp_type_);
+    *ksp_type = (string)ksp_type_;
+  }
 
   if(pc_type) {
     PC pc;
     KSPGetPC(ksp, &pc);
-    PCGetType(pc, (PCType*)pc_type);
+    PCType pc_type_;
+    PCGetType(pc, &pc_type_);
+    *pc_type = (string)pc_type_;
   }
 }
 
@@ -135,6 +142,16 @@ LinearSystemSolver::SetLinearOperator(vector<RowEntries>& row_entries)
 //-----------------------------------------------------
 
 void
+LinearSystemSolver::ComputeResidual(SpaceVariable3D &b, SpaceVariable3D &x,
+                                    SpaceVariable3D &res)
+{
+  ApplyLinearOperator(x, res); //res = Ax 
+  res.AXPlusBY(-1.0, 1.0, b); //res = -1.0*res + b = b - Ax
+}
+
+//-----------------------------------------------------
+
+void
 LinearSystemSolver::UsePreviousPreconditioner(bool reuse_or_not)
 {
   KSPSetReusePreconditioner(ksp, reuse_or_not ? PETSC_TRUE : PETSC_FALSE);
@@ -144,7 +161,7 @@ LinearSystemSolver::UsePreviousPreconditioner(bool reuse_or_not)
 
 bool
 LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
-                          LinearSystemConvergenceReason *reason, int *numIts, std::vector<double> *rnorm)
+                          LinearSolverConvergenceReason *reason, int *numIts, std::vector<double> *rnorm)
 {
   // --------------------------------------------------
   // Sanity checks
@@ -171,6 +188,7 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
   Vec &bb(b.GetRefToGlobalVec());
   Vec &xx(x.GetRefToGlobalVec());
   KSPSolve(ksp, bb, xx);
+  x.SyncLocalToGlobal(); //update the "localVec" of x to match xx
   // ---------------------------------------------------
 
 

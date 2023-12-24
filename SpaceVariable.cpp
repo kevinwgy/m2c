@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include <SpaceVariable.h>
+#include <GlobalMeshInfo.h>
 #include <petscviewer.h>
 #include <Utils.h>
 #include <bits/stdc++.h> //min_element, max_element
@@ -302,6 +303,18 @@ void SpaceVariable3D::RestoreDataPointerToLocalVector()
 
 //---------------------------------------------------------
 
+void SpaceVariable3D::SyncLocalToGlobal()
+{
+  if(!dm)
+    return;
+
+  // sync local to global
+  DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
+  DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
+}
+
+//---------------------------------------------------------
+
 void SpaceVariable3D::Destroy()
 {
   if(!dm)
@@ -360,6 +373,30 @@ void SpaceVariable3D::WriteToCGNSFile(const char *filename, const char *varname)
 
   PetscViewerDestroy(&viewer);
   MPI_Barrier(*comm);
+}
+
+//---------------------------------------------------------
+
+void SpaceVariable3D::WriteToMatlabFile(const char *filename, const char *varname)
+{
+  if(!dm)
+    return;
+
+  if(varname)
+    SetOutputVariableName(varname);
+
+  PetscViewer viewer;
+  int code = PetscViewerASCIIOpen(*comm, filename, &viewer);
+  if(code) {
+    print_error("*** Error: Cannot open file '%s' for output. (code: %d)\n", filename, code);
+    exit_mpi();
+  }
+
+  PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB);
+  VecView(globalVec, viewer);
+
+  PetscViewerDestroy(&viewer);
+  MPI_Barrier(*comm); 
 }
 
 //---------------------------------------------------------
@@ -592,6 +629,123 @@ SpaceVariable3D::CalculateVectorInfNorm()
 
 //---------------------------------------------------------
 
+double
+SpaceVariable3D::CalculateFunctionL1NormConRec(SpaceVariable3D &volume)
+{
+  double norm(0.0);
+
+  double*** v   = GetDataPointer();
+  double*** vol = volume.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        for(int p=0; p<dof; p++)
+          norm += fabs(v[k][j][i*dof+p])*vol[k][j][i];
+
+  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
+
+  RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+
+  return norm;
+}
 
 //---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateFunctionL1NormConRec(GlobalMeshInfo &global_mesh)
+{
+  double norm(0.0);
+
+  double*** v   = GetDataPointer();
+
+  double dz, dydz, dxdydz;
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dydz = dz*global_mesh.GetDy(j);
+      for(int i=i0; i<imax; i++) {
+        dxdydz = dydz*global_mesh.GetDx(i);
+        for(int p=0; p<dof; p++)
+          norm += fabs(v[k][j][i*dof+p])*dxdydz;
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
+
+  RestoreDataPointerToLocalVector();
+
+  return norm;
+}
+
+//---------------------------------------------------------
+
+
+double
+SpaceVariable3D::CalculateFunctionL2NormConRec(SpaceVariable3D &volume)
+{
+  double norm(0.0);
+
+  double*** v   = GetDataPointer();
+  double*** vol = volume.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        for(int p=0; p<dof; p++)
+          norm += v[k][j][i*dof+p]*v[k][j][i*dof+p]*vol[k][j][i];
+
+  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
+
+  norm = sqrt(norm);
+
+  RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+
+  return norm;
+}
+
+//---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateFunctionL2NormConRec(GlobalMeshInfo &global_mesh)
+{
+  double norm(0.0);
+
+  double*** v   = GetDataPointer();
+
+  double dz, dydz, dxdydz;
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dydz = dz*global_mesh.GetDy(j);
+      for(int i=i0; i<imax; i++) {
+        dxdydz = dydz*global_mesh.GetDx(i);
+        for(int p=0; p<dof; p++)
+          norm += v[k][j][i*dof+p]*v[k][j][i*dof+p]*dxdydz;
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
+
+  norm = sqrt(norm);
+
+  RestoreDataPointerToLocalVector();
+
+  return norm;
+}
+
+//---------------------------------------------------------
+
+
+//---------------------------------------------------------
+
+
+
+//---------------------------------------------------------
+
+
 

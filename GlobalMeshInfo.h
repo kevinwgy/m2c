@@ -50,6 +50,7 @@ public:
   std::vector<double> x_glob, y_glob, z_glob;
   std::vector<double> dx_glob, dy_glob, dz_glob;
 
+  Vec3D xyz_min, xyz_max; //!< boundary of the physical domain (up to cell boundaries)
   int NX, NY, NZ;
 
   double domain_volume; //!< does not include ghost layer
@@ -69,6 +70,13 @@ public:
   void FindSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms);
 
   //! Get specific info 
+  double GetXmin() {return xyz_min[0];}
+  double GetYmin() {return xyz_min[1];}
+  double GetZmin() {return xyz_min[2];}
+  double GetXmax() {return xyz_max[0];}
+  double GetYmax() {return xyz_max[1];}
+  double GetZmax() {return xyz_max[2];}
+
   double GetX(int i);
   double GetY(int j);
   double GetZ(int k);
