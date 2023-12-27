@@ -18,18 +18,20 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
 
   SetTolerances(lin_input);
 
-  if(lin_input.ksp == LinearSolverData::KSP_DEFAULT) {
+  if(lin_input.ksp == LinearSolverData::PETSC_KSP_DEFAULT) {
     /* nothing to do */
-  } else if(lin_input.ksp == LinearSolverData::GMRES) {
-    KSPSetType(ksp, KSPGMRES);
   } else if(lin_input.ksp == LinearSolverData::FLEXIBLE_GMRES) {
     KSPSetType(ksp, KSPFGMRES);
+  } else if(lin_input.ksp == LinearSolverData::STAB_BI_CG) {
+    KSPSetType(ksp, KSPBCGSL);
+  } else if(lin_input.ksp == LinearSolverData::IMPROVED_STAB_BI_CG) {
+    KSPSetType(ksp, KSPIBCGS);
   } else {
     print_error("*** Error: Detected unknown PETSc KSP type.\n");
     exit_mpi();
   }
 
-  if(lin_input.pc == LinearSolverData::PC_DEFAULT) {
+  if(lin_input.pc == LinearSolverData::PETSC_PC_DEFAULT) {
     /* nothing to do*/
   } 
   else {
@@ -42,10 +44,8 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
       PCSetType(pc, PCNONE);
     else if(lin_input.pc == LinearSolverData::JACOBI)
       PCSetType(pc, PCJACOBI);
-    else if(lin_input.pc == LinearSolverData::INCOMPLETE_LU)
-      PCSetType(pc, PCILU);
-    else if(lin_input.pc == LinearSolverData::INCOMPLETE_CHOLESKY)
-      PCSetType(pc, PCICC);
+    else if(lin_input.pc == LinearSolverData::BLOCK_JACOBI)
+      PCSetType(pc, PCBJACOBI);
     else if(lin_input.pc == LinearSolverData::MG)
       PCSetType(pc, PCMG);
     else { 

@@ -907,9 +907,8 @@ struct ExplicitTsData {
 
 struct LinearSolverData {
 
-  enum KSPType {KSP_DEFAULT = 0, GMRES = 1, FLEXIBLE_GMRES = 2} ksp;
-  enum PCType {PC_DEFAULT = 0, PC_NONE = 1, JACOBI = 2, INCOMPLETE_LU = 3, INCOMPLETE_CHOLESKY = 4,
-               MG = 5} pc;
+  enum KSPType {PETSC_KSP_DEFAULT = 0, FLEXIBLE_GMRES = 1, STAB_BI_CG = 2, IMPROVED_STAB_BI_CG = 3} ksp;
+  enum PCType {PETSC_PC_DEFAULT = 0, PC_NONE = 1, JACOBI = 2, BLOCK_JACOBI = 3, MG = 4} pc;
 
   double rtol; //!< relative error tolerance (in terms of residual norm)
   double abstol; //!< absolute error tolerance (in terms of residual norm)

@@ -3632,8 +3632,8 @@ void SpecialToolsData::setup(const char *name, ClassAssigner *father)
 LinearSolverData::LinearSolverData()
 {
   // solver options
-  ksp = KSP_DEFAULT;
-  pc  = PC_DEFAULT;
+  ksp = IMPROVED_STAB_BI_CG;
+  pc  = BLOCK_JACOBI;
 
   // tolerances
   rtol   = -1.0; //a negative number means PETSc default will be used
@@ -3651,13 +3651,12 @@ void LinearSolverData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   new ClassToken<LinearSolverData> (ca, "Type", this,
-     reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::ksp), 3,
-     "Default", 0, "GMRes", 1, "FlexibleGMRes", 2);
+     reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::ksp), 4,
+     "PETScDefault", 0, "FlexibleGMRes", 1, "StabilizedBiCG", 2, "ImprovedStabilizedBiCG", 3);
 
   new ClassToken<LinearSolverData> (ca, "Preconditioner", this,
-     reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::pc), 6,
-     "Default", 0, "None", 1, "Jacobi", 2, "IncompleteLU", 3, "IncompleteCholesky", 4,
-     "MultiGrid", 5);
+     reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::pc), 5,
+     "PETScDefault", 0, "None", 1, "Jacobi", 2, "BlockJacobi", 3, "MultiGrid", 4);
 
   new ClassDouble<LinearSolverData>(ca, "RelativeErrorTolerance", this,
                                        &LinearSolverData::rtol);
