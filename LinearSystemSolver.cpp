@@ -9,8 +9,9 @@
 
 //-----------------------------------------------------
 
-LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input)
-                  : LinearOperator(comm_, dm_)
+LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input,
+                                       const char *equation_name_)
+                  : LinearOperator(comm_, dm_), log_filename(lin_input.logfile)
 {
 
   KSPCreate(comm, &ksp);
@@ -68,6 +69,25 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
 
   rnorm_history.resize(1000); //1000 entries should be more than enough
   KSPSetResidualHistory(ksp, rnorm_history.data(), rnorm_history.size(), PETSC_TRUE); //reset for each Solve
+
+  // Set up log file
+  equation_name = equation_name_;
+  log_filename = lin_input.logfile;
+  if(!log_filename.empty()) {
+    FILE *file = fopen(log_filename.c_str(), "w");
+    if(file == NULL) {
+      print_error("*** Error: Unable to open file %s for printing the log of linear system solver.\n");
+      exit_mpi();
+    }
+    if(equation_name.empty())
+      print(file, "## Solution of linear systems - Log file.\n");
+    else
+      print(file, "## Solution of linear systems (%s) - Log file.\n", equation_name.c_str());
+  
+    fclose(file);
+    MPI_Barrier(comm);
+  }
+  write_log_to_screen = lin_input.write_log_to_screen == LinearSolverData::YES;
 
 }
 
@@ -215,13 +235,53 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
   if(numIts) //user requested output of number of iterations
     KSPGetIterationNumber(ksp, numIts);
 
-  if(rnorm) {//user requested output of residual norm history
+
+  // log
+  if(rnorm || !log_filename.empty() || write_log_to_screen) {//need residual norm history
     int nEntries(0);
     KSPGetResidualHistory(ksp, NULL, &nEntries);
-    rnorm->resize(nEntries, 0);
-    for(int i=0; i<nEntries; i++) //copy data instead of passing rnorm_history (safer)
-      (*rnorm)[i] = rnorm_history[i];
+
+    if(rnorm) {
+      rnorm->resize(nEntries, 0);
+      for(int i=0; i<nEntries; i++) //copy data instead of passing rnorm_history (safer)
+        (*rnorm)[i] = rnorm_history[i];
+    }
+
+    if(write_log_to_screen) {
+      if(success) {
+        if(equation_name.empty())
+          print("  o Linear solver converged.\n");
+        else
+          print("  o Linear solver for %s converged.\n", equation_name.c_str());
+      } else {
+        if(equation_name.empty())
+          print_warning("  o Linear solver failed to converged.\n");
+        else
+          print_warning("  o Linear solver for %s failed to converged.\n", equation_name.c_str());
+      }
+      for(int i=0; i<nEntries; i++)
+        print("    > It. %d: residual = %e.\n", i+1, rnorm_history[i]);
+    }
+
+    if(!log_filename.empty()) {
+      FILE *file = fopen(log_filename.c_str(), "a");
+      if(!file) {
+        print_error("*** Error: Unable to open file %s for printing the log of linear system solver.\n");
+        exit_mpi();
+      }
+      if(success) 
+        print(file, "o Linear solver converged.\n");
+      else
+        print(file, "o Linear solver failed to converged.\n");
+
+      for(int i=0; i<nEntries; i++)
+        print(file, "  > It. %d: residual = %e.\n", i+1, rnorm_history[i]);
+
+      fclose(file);
+      MPI_Barrier(comm);
+    }
   }
+
 
   return success;
 }

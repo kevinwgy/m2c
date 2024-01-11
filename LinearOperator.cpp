@@ -81,6 +81,23 @@ LinearOperator::ApplyLinearOperator(SpaceVariable3D &x, SpaceVariable3D &y)
 
 //-----------------------------------------------------
 
+void
+LinearOperator::ApplyLinearOperatorAndAdd(SpaceVariable3D &x, SpaceVariable3D &b,
+                                          SpaceVariable3D &y)
+{
+  Vec &xx(x.GetRefToGlobalVec());
+  Vec &bb(b.GetRefToGlobalVec());
+  Vec &yy(y.GetRefToGlobalVec());
+  assert(&xx != &yy); //cannot be the same vector
+
+  MatMultAdd(A, xx, bb, yy); 
+
+  y.SyncLocalToGlobal(); //update the localVec of y 
+}
+
+//-----------------------------------------------------
+
+
 double
 LinearOperator::CalculateMatrixOneNorm()
 {
@@ -107,6 +124,19 @@ LinearOperator::CalculateMatrixFrobeniusNorm()
   double norm(0.0);
   MatNorm(A, NORM_FROBENIUS, &norm);
   return norm;
+}
+
+//-----------------------------------------------------
+
+bool
+LinearOperator::IsSymmetric(double tol)
+{
+  assert(tol>=0.0);
+
+  PetscBool flg(PETSC_FALSE);
+  MatIsSymmetric(A, tol, &flg);
+
+  return flg==PETSC_TRUE;
 }
 
 //-----------------------------------------------------

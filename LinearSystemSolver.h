@@ -25,9 +25,13 @@ class LinearSystemSolver : public LinearOperator {
   KSP ksp;
   std::vector<double> rnorm_history; //!< stores the history of residual norm for the "Solve"
 
+  bool write_log_to_screen;
+  string log_filename;
+  string equation_name; //!< optional (used in log file only)
+
 public:
 
-  LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input);
+  LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input, const char *equation_name_ = "");
   ~LinearSystemSolver(); 
   void Destroy();
 

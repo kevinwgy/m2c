@@ -83,9 +83,14 @@ public:
 
   void ApplyLinearOperator(SpaceVariable3D &x, SpaceVariable3D &y); //!< calculates Ax -> y (x =/= y!)
 
+  void ApplyLinearOperatorAndAdd(SpaceVariable3D &x, SpaceVariable3D &b,
+                                 SpaceVariable3D &y); //!< calculates y = Ax + b (x =/= y!)
+
   double CalculateMatrixOneNorm();
   double CalculateMatrixInfNorm();
   double CalculateMatrixFrobeniusNorm();
+
+  bool IsSymmetric(double tol = 0.0); //!< Calls MatIsSymmetric in PETSc
 
   void SetOutputVariableName(const char *name);
   void WriteToMatlabFile(const char *filename, const char *varname = NULL);

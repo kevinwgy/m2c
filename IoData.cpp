@@ -3640,7 +3640,11 @@ LinearSolverData::LinearSolverData()
   abstol = -1.0;
   dtol   = -1.0;
   maxits = -1;
+
   options_file = "";
+
+  write_log_to_screen = NO;
+  logfile = "";
 }
 
 //------------------------------------------------------------------------------
@@ -3648,7 +3652,7 @@ LinearSolverData::LinearSolverData()
 void LinearSolverData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
   new ClassToken<LinearSolverData> (ca, "Type", this,
      reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::ksp), 4,
@@ -3670,6 +3674,12 @@ void LinearSolverData::setup(const char *name, ClassAssigner *father)
   new ClassInt<LinearSolverData>(ca, "MaxIts", this, &LinearSolverData::maxits);
 
   new ClassStr<LinearSolverData>(ca, "PETScOptionsFile", this, &LinearSolverData::options_file);
+
+  new ClassToken<LinearSolverData>(ca, "PrintLogToScreen", this,
+                 reinterpret_cast<int LinearSolverData::*>(&LinearSolverData::write_log_to_screen), 2,
+                 "No", 0, "Yes", 1);
+
+  new ClassStr<LinearSolverData>(ca, "LogFile", this, &LinearSolverData::logfile);
 
 }
 

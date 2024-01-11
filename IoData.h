@@ -917,6 +917,9 @@ struct LinearSolverData {
 
   const char *options_file; //!< additional options can be specified through a file
 
+  enum YesNo {NO = 0, YES = 1} write_log_to_screen;
+  const char *logfile; //!< print log to a file
+
   LinearSolverData();
   ~LinearSolverData() {}
 
