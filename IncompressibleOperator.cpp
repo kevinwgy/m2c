@@ -937,8 +937,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
   double*** bb = B.GetDataPointer();
   double*** diag = Ddiag.GetDataPointer();
 
+  vlin_rows.clear(); //clear existing data (to be safe)
   int row_counter = 0;
-  int original_size = vlin_rows.size();
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
@@ -955,12 +955,10 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
       dydz = dy*dz;
       for(int i=i0; i<imax; i++) {
 
-        // locate the row
-        if(row_counter>=original_size)
-          vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
+        // insedrt the row
+        vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
         RowEntries &row(vlin_rows[row_counter]);
         row.SetRow(i,j,k);
-        row.ClearEntries();
         row_counter++;
 
         if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0)) {
@@ -982,6 +980,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
         //---------------------------------------------------
 
         ap = 0.0; //diagonal
+        bb[k][j][i] = 0.0; //rhs
 
         //-----------
         // LEFT
@@ -1029,9 +1028,26 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
           a += D*PowerLaw(F/D);
         }
         ap += a;
-        // Add entry
-        row.PushEntry(i-1,j,k, -a);  //on the left hand side
-             
+
+        // Add entry (or add to bb or ap, if i-1 is outside boundary)
+        if(i-1>=0)
+          row.PushEntry(i-1,j,k, -a);  //on the left hand side
+        else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
+          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET ||
+             iod.mesh.bc_x0 == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j][i-1][dir+1]; //+a*v or +a*w to the RHS 
+          else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
+            ap -= a;
+          else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
+            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_x0);
+            exit(-1);
+          }
+        }
+
 
         //-----------
         // RIGHT 
@@ -1079,9 +1095,26 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
           a += D*PowerLaw(F/D);
         }
         ap += a;
-        // Add entry
-        row.PushEntry(i+1,j,k, -a);  //on the left hand side
-             
+        // Add entry (or add to bb or ap, if i+1 is outside boundary)
+        if(i+1<NX)
+          row.PushEntry(i+1,j,k, -a);  //on the left hand side
+        else { //i+1 is outside domain boundary
+          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET ||
+             iod.mesh.bc_xmax == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j][i+1][dir+1];
+          else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
+            if(dir != 0) //otherwise, v[k][j][i+1][1] = 0
+              ap -= a;
+          } else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
+            if(dir != 0) //otherwise, v[k][j][i+1][1] should be 0 as it is on the wall
+              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
+          } else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_xmax);
+            exit(-1);
+          }
+        }
+
     
         //-----------
         // BOTTOM 
@@ -1129,9 +1162,25 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
           a += D*PowerLaw(F/D);
         }
         ap += a;
-        // Add entry
-        row.PushEntry(i,j-1,k, -a);  //on the left hand side
-             
+        // Add entry (or add to bb or ap, if j-1 is outside boundary)
+        if(j-1>=0)
+          row.PushEntry(i,j-1,k, -a);  //on the left hand side
+        else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
+          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
+             iod.mesh.bc_y0 == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS 
+          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
+            ap -= a;
+          else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
+            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_y0);
+            exit(-1);
+          }
+        }
+
 
         //-----------
         // TOP 
@@ -1179,9 +1228,26 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
           a += D*PowerLaw(F/D);
         }
         ap += a;
-        // Add entry
-        row.PushEntry(i,j+1,k, -a);  //on the left hand side
-             
+        // Add entry (or add to bb or ap, if j+1 is outside boundary)
+        if(j+1<NY)
+          row.PushEntry(i,j+1,k, -a);  //on the left hand side
+        else { //j+1 is outside domain boundary
+          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET ||
+             iod.mesh.bc_ymax == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j+1][i][dir+1];
+          else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
+            if(dir != 1) //otherwise, v[k][j+1][i][2] = 0
+              ap -= a;
+          } else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
+            if(dir != 1) //otherwise, v[k][j+1][i][2] should be 0 as it is on the wall
+              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
+          } else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_ymax);
+            exit(-1);
+          }
+        }
+   
     
         //-----------
         // BACK
@@ -1229,9 +1295,27 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
           a += D*PowerLaw(F/D);
         }
         ap += a;
-        // Add entry
-        row.PushEntry(i,j,k-1, -a);  //on the left hand side
-             
+        // Add entry (or add to bb or ap, if k-1 is outside boundary)
+        if(k-1>=0)
+          row.PushEntry(i,j,k-1, -a);  //on the left hand side
+        else { //k-1 is outside domain boundary (if it gets here, dir must be x or y (0 or 1))
+          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET ||
+             iod.mesh.bc_z0 == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k-1][j][i][dir+1]; //+a*u or +a*v to the RHS 
+          else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
+            ap -= a;
+          else if(iod.mesh.bc_z0 == MeshData::STICKWALL)
+            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_z0);
+            exit(-1);
+          }
+        }
+
+
+              
 
         //-----------
         // FRONT 
@@ -1279,10 +1363,27 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
           a += D*PowerLaw(F/D);
         }
         ap += a;
-        // Add entry
-        row.PushEntry(i,j,k+1, -a);  //on the left hand side
-             
-
+        // Add entry (or add to bb or ap, if j+1 is outside boundary)
+        if(k+1<NZ)
+          row.PushEntry(i,j,k+1, -a);  //on the left hand side
+        else { //k+1 is outside domain boundary
+          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET ||
+             iod.mesh.bc_zmax == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k+1][j][i][dir+1];
+          else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
+            if(dir != 2) //otherwise, v[k+1][j][i][3] = 0
+              ap -= a;
+          } else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
+            if(dir != 2) //otherwise, v[k+1][j][i][3] should be 0 as it is on the wall
+              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
+          } else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_zmax);
+            exit(-1);
+          }
+        }
+   
+   
         //------------------------------------------------------
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
@@ -1294,7 +1395,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
-        bb[k][j][i] = ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        bb[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
         bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
                        dir==1 ? (v[k][j-1][i][4] - v[k][j][i][4])*dxdz :
                                 (v[k-1][j][i][4] - v[k][j][i][4])*dxdy;
@@ -1343,7 +1444,7 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
   double*** wstar = VZstar.GetDataPointer();
 
   int row_counter = 0;
-  int original_size = plin_rows.size();
+  plin_rows.clear(); //clear existing data
 
   double ap, a, rho, dx, dxl, dxr, dy, dyb, dyt, dz, dzk, dzf;
 
@@ -1361,11 +1462,9 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         dxr = global_mesh.GetDx(i+1);
 
         // locate the row
-        if(row_counter>=original_size)
-          plin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
+        plin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
         RowEntries &row(plin_rows[row_counter]);
         row.SetRow(i,j,k);
-        row.ClearEntries();
         row_counter++;
 
         // initialization
@@ -1493,11 +1592,10 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
   double*** bb   = Bv.GetDataPointer();
 
   int row_counter = 0;
-  int original_size = vlin_rows.size();
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
-  double a, ap, ap0, F, D, mu, mu1, mu2;
+  double a, ap, ap0, F, D, mu, mu1, mu2, vhat_denom;
 
   for(int k=k0; k<kmax; k++) {
     dz  = Dz[dir][k-k0];
@@ -1510,12 +1608,10 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
       dydz = dy*dz;
       for(int i=i0; i<imax; i++) {
 
-        // locate the row
-        if(row_counter>=original_size)
-          vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
+        // create the row
+        vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
         RowEntries &row(vlin_rows[row_counter]);
         row.SetRow(i,j,k);
-        row.ClearEntries();
         row_counter++;
 
         if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0)) {
@@ -1539,6 +1635,8 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
 
         ap = 0.0; //diagonal
         vhat[k][j][i] = 0.0;
+        vhat_denom = 0.0; //denominator of vhat, usually same as ap, except near some boundaries
+        bb[k][j][i] = 0.0;
 
         //-----------
         // LEFT
@@ -1587,9 +1685,26 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j][i-1][dir+1];
-        // Add entry
-        row.PushEntry(i-1,j,k, -a);  //on the left hand side
- 
+        vhat_denom += a;
+
+        // Add entry (or add to bb or ap, if i-1 is outside boundary)
+        if(i-1>=0)
+          row.PushEntry(i-1,j,k, -a);  //on the left hand side
+        else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
+          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET ||
+             iod.mesh.bc_x0 == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j][i-1][dir+1]; //+a*v or +a*w to the RHS
+          else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
+            ap -= a; // vhat_denom remains the same
+          else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
+            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_x0);
+            exit(-1);
+          }
+        } 
 
         //-----------
         // RIGHT 
@@ -1638,10 +1753,29 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j][i+1][dir+1];
-        // Add entry
-        row.PushEntry(i+1,j,k, -a);  //on the left hand side
-             
+        vhat_denom += a;
+
+        // Add entry (or add to bb or ap, if i+1 is outside boundary)
+        if(i+1<NX)
+          row.PushEntry(i+1,j,k, -a);  //on the left hand side
+        else { //i+1 is outside domain boundary
+          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET ||
+             iod.mesh.bc_xmax == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j][i+1][dir+1];
+          else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
+            if(dir != 0) //otherwise, v[k][j][i+1][1] = 0
+              ap -= a;
+          } else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
+            if(dir != 0) //otherwise, v[k][j][i+1][1] should be 0 as it is on the wall
+              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
+          } else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_xmax);
+            exit(-1);
+          }
+        }
     
+
         //-----------
         // BOTTOM 
         //-----------
@@ -1689,9 +1823,27 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j-1][i][dir+1];
-        // Add entry
-        row.PushEntry(i,j-1,k, -a);  //on the left hand side
-             
+        vhat_denom += a;
+
+        // Add entry (or add to bb or ap, if j-1 is outside boundary)
+        if(j-1>=0)
+          row.PushEntry(i,j-1,k, -a);  //on the left hand side
+        else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
+          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
+             iod.mesh.bc_y0 == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS
+          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
+            ap -= a;
+          else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
+            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_y0);
+            exit(-1);
+          }
+        }             
+
 
         //-----------
         // TOP 
@@ -1740,10 +1892,29 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         }
         ap += a;
         vhat[k][j][i] += a*v[k][j+1][i][dir+1];
-        // Add entry
-        row.PushEntry(i,j+1,k, -a);  //on the left hand side
-             
+        vhat_denom += a;
+
+        // Add entry (or add to bb or ap, if j+1 is outside boundary)
+        if(j+1<NY)
+          row.PushEntry(i,j+1,k, -a);  //on the left hand side
+        else { //j+1 is outside domain boundary
+          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET ||
+             iod.mesh.bc_ymax == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j+1][i][dir+1];
+          else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
+            if(dir != 1) //otherwise, v[k][j+1][i][2] = 0
+              ap -= a;
+          } else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
+            if(dir != 1) //otherwise, v[k][j+1][i][2] should be 0 as it is on the wall
+              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
+          } else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_ymax);
+            exit(-1);
+          }
+        }     
     
+
         //-----------
         // BACK
         //-----------
@@ -1791,8 +1962,26 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         }
         ap += a;
         vhat[k][j][i] += a*v[k-1][j][i][dir+1];
-        // Add entry
-        row.PushEntry(i,j,k-1, -a);  //on the left hand side
+        vhat_denom += a;
+
+        // Add entry (or add to bb or ap, if k-1 is outside boundary)
+        if(k-1>=0)
+          row.PushEntry(i,j,k-1, -a);  //on the left hand side
+        else { //k-1 is outside domain boundary (if it gets here, dir must be x or y (0 or 1))
+          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET ||
+             iod.mesh.bc_z0 == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k-1][j][i][dir+1]; //+a*u or +a*v to the RHS
+          else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
+            ap -= a;
+          else if(iod.mesh.bc_z0 == MeshData::STICKWALL)
+            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_z0);
+            exit(-1);
+          }
+        }
              
 
         //-----------
@@ -1842,8 +2031,27 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         }
         ap += a;
         vhat[k][j][i] += a*v[k+1][j][i][dir+1];
-        // Add entry
-        row.PushEntry(i,j,k+1, -a);  //on the left hand side
+        vhat_denom += a;
+
+        // Add entry (or add to bb or ap, if j+1 is outside boundary)
+        if(k+1<NZ)
+          row.PushEntry(i,j,k+1, -a);  //on the left hand side
+        else { //k+1 is outside domain boundary
+          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET ||
+             iod.mesh.bc_zmax == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k+1][j][i][dir+1];
+          else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
+            if(dir != 2) //otherwise, v[k+1][j][i][3] = 0
+              ap -= a;
+          } else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
+            if(dir != 2) //otherwise, v[k+1][j][i][3] should be 0 as it is on the wall
+              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
+          } else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_zmax);
+            exit(-1);
+          }
+        }
              
 
         //------------------------------------------------------
@@ -1857,22 +2065,26 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
         vhat[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        vhat_denom += ap0;
+
         // no pressure here (SIMPLER)
 
-        bb[k][j][i] = ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        bb[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
 
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
         assert(Efactor>0.0);
-        vhat[k][j][i] += ap*v[k][j][i][dir+1]/Efactor;
         bb[k][j][i]   += ap*v[k][j][i][dir+1]/Efactor; 
 
         ap *= 1.0 + 1.0/Efactor; 
         row.PushEntry(i,j,k, ap);
 
+        // Also apply relaxation to vhat
+        vhat[k][j][i] += vhat_denom*v[k][j][i][dir+1]/Efactor;
+        vhat[k][j][i] *= (1.0 + 1.0/Efactor)/vhat_denom;
+
         // Store diagonal for use in pressure correction equation
         assert(ap!=0.0);
         diag[k][j][i] = 1.0/ap;
-        vhat[k][j][i] *= diag[k][j][i];
         diag[k][j][i] *= dir==0 ? dydz : dir==1 ? dxdz : dxdy;
 
       }
@@ -2132,6 +2344,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v, double**
         }
         ap += a;
         vtilde[k][j][i] += a*vprime[k][j][i-1];
+        //TODO: BOUNDARY CONDITION!!!
  
         //-----------
         // RIGHT 

@@ -123,14 +123,23 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
+    print("Here.\n");
     ExtractVariableComponents(v, &VXstar, &VYstar, &VZstar, NULL);
 
     //-----------------------------------------------------
     // Step 1: Solve the momentum equations for u*, v*, w*
     //-----------------------------------------------------
 
+    print("Here 2.\n");
     // Solve the x-momentum equation
     inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
+
+      for(auto&& row : vlin_rows) {
+        for(int i=0; i<(int)row.cols.size(); i++)
+        fprintf(stdout,"Row (%d,%d,%d), Col (%d,%d,%d): %e.\n", row.row.i, row.row.j, row.row.k,
+                row.cols[i].i, row.cols[i].j, row.cols[i].k, row.vals[i]);
+      }
+
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VXstar, NULL, NULL, &lin_rnorm);
     if(!lin_success) {
@@ -139,10 +148,17 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     }
 
+    print("Here 3.\n");
+
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
       inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
+      print("Here 3.5.\n");
+
+
+
       vlin_solver.SetLinearOperator(vlin_rows);
+      print("Here 3.6.\n");
       lin_success = vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
     }
     if(!lin_success) {
@@ -150,6 +166,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       for(int i=0; i<(int)lin_rnorm.size(); i++)
         print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     }
+
+    print("Here 4.\n");
 
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
@@ -162,6 +180,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       for(int i=0; i<(int)lin_rnorm.size(); i++)
         print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     }
+
+    print("Good for now.\n");
+    exit_mpi();
 
     
     //-----------------------------------------------------
@@ -229,7 +250,7 @@ TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D *VX_
 
   if(VX_ptr) VX_ptr->RestoreDataPointerToLocalVector(); //no need to exchange, as we have covered ghost layers
   if(VY_ptr) VY_ptr->RestoreDataPointerToLocalVector();
-  if(VZ_ptr) VY_ptr->RestoreDataPointerToLocalVector();
+  if(VZ_ptr) VZ_ptr->RestoreDataPointerToLocalVector();
   if(P_ptr)   P_ptr->RestoreDataPointerToLocalVector();
 }
 
