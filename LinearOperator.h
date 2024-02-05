@@ -38,11 +38,11 @@ struct RowEntries {
   void Clear() {row.i = row.j = row.k = row.c = 0; cols.clear(); vals.clear();} //!< does not free memory
   void ClearEntries() {cols.clear(); vals.clear();} //!< does not free memory
 
-  void SetRow(int i, int j, int k) {row.i = i;  row.j = j;  row.k = k;}
+  void SetRow(int i, int j, int k) {row.i = i;  row.j = j;  row.k = k;  row.c = 0;}
   void SetRow(int i, int j, int k, int c) {row.i = i;  row.j = j;  row.k = k;  row.c = c;}
 
   void PushEntry(int i, int j, int k, double v) {
-    cols.push_back(MatStencil()); cols.back().i = i; cols.back().j = j; cols.back().k = k;
+    cols.push_back(MatStencil()); cols.back().i = i; cols.back().j = j; cols.back().k = k; cols.back().c = 0;
     vals.push_back(v);}
 
   void PushEntry(int i, int j, int k, int c, double v) {

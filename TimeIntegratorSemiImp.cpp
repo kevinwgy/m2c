@@ -133,13 +133,6 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     print("Here 2.\n");
     // Solve the x-momentum equation
     inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
-
-      for(auto&& row : vlin_rows) {
-        for(int i=0; i<(int)row.cols.size(); i++)
-        fprintf(stdout,"Row (%d,%d,%d), Col (%d,%d,%d): %e.\n", row.row.i, row.row.j, row.row.k,
-                row.cols[i].i, row.cols[i].j, row.cols[i].k, row.vals[i]);
-      }
-
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VXstar, NULL, NULL, &lin_rnorm);
     if(!lin_success) {
@@ -149,36 +142,29 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     }
 
     print("Here 3.\n");
-
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
       inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
-      print("Here 3.5.\n");
-
-
-
       vlin_solver.SetLinearOperator(vlin_rows);
-      print("Here 3.6.\n");
       lin_success = vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
-    }
-    if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(!lin_success) {
+        print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      }
     }
 
     print("Here 4.\n");
-
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
       inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
-    }
-    if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(!lin_success) {
+        print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      }
     }
 
     print("Good for now.\n");
@@ -453,11 +439,11 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       inco.UpdateVelocityEquationRHS_SIMPLER(1, P, Bv);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(Bv, VYstar, NULL, NULL, &lin_rnorm);
-    }
-    if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(!lin_success) {
+        print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      }
     }
 
     // Solve the z-momentum equation
@@ -465,11 +451,11 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       inco.UpdateVelocityEquationRHS_SIMPLER(2, P, Bw);
       vlin_solver.SetLinearOperator(wlin_rows);
       lin_success = vlin_solver.Solve(Bw, VZstar, NULL, NULL, &lin_rnorm);
-    }
-    if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(!lin_success) {
+        print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      }
     }
 
     
@@ -706,11 +692,11 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
-  }
-  if(!lin_success) {
-    print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
-    for(int i=0; i<(int)lin_rnorm.size(); i++)
-      print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    if(!lin_success) {
+      print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    }
   }
 
   // Solve the z-momentum equation
@@ -718,11 +704,11 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
-  }
-  if(!lin_success) {
-    print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
-    for(int i=0; i<(int)lin_rnorm.size(); i++)
-      print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    if(!lin_success) {
+      print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    }
   }
 
  
