@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include<TimeIntegratorSemiImp.h>
+extern int verbose;
 
 //----------------------------------------------------------------------------
 // SIMPLE 
@@ -112,6 +113,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   vector<double> lin_rnorm; 
   bool lin_success, converged(false);
+  int nLinIts(0);
   double rel_err(10000.0);
 
   if(type == SIMPLEC)
@@ -123,72 +125,83 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
-    print("Here.\n");
     ExtractVariableComponents(v, &VXstar, &VYstar, &VZstar, NULL);
 
     //-----------------------------------------------------
     // Step 1: Solve the momentum equations for u*, v*, w*
     //-----------------------------------------------------
 
-    print("Here 2.\n");
     // Solve the x-momentum equation
     inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
-    lin_success = vlin_solver.Solve(B, VXstar, NULL, NULL, &lin_rnorm);
+    lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the x-momentum equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the x-momentum equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
     }
+    VXstar.WriteToVTRFile("VXstar.vtr","VXstar");
 
-    print("Here 3.\n");
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
       inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
-      lin_success = vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
+      lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
-        print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+        print_warning("    x Warning: Linear solver for the y-momentum equation failed to converge.\n");
         for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+          print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      } else {
+        if(verbose>=1)
+          print("    x Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
+    VYstar.WriteToVTRFile("VYstar.vtr","VYstar");
 
-    print("Here 4.\n");
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
       inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
-      lin_success = vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
+      lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
-        print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+        print_warning("    x Warning: Linear solver for the z-momentum equation failed to converge.\n");
         for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      } else {
+        if(verbose>=1)
+          print("    x Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
+    VZstar.WriteToVTRFile("VZstar.vtr","VZstar");
 
-    print("Good for now.\n");
-    exit_mpi();
 
-    
     //-----------------------------------------------------
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
     plin_solver.SetLinearOperator(plin_rows);
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
-    lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
     }
+
+    Pprime.WriteToVTRFile("Pprime.vtr","Pprime");
 
 
     //-----------------------------------------------------
     // Step 3: Update p, u, v, w, and compute relative error in velocity
     //-----------------------------------------------------
     rel_err = UpdateStates(v, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, alphaP); 
+
 
     V.RestoreDataPointerAndInsert();
 
@@ -199,6 +212,11 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
 
+    if(iter==10) {
+      print("Fine...\n");
+      V.WriteToVTRFile("V.vtr","V");
+      exit_mpi();
+    }
   }
 
   if(converged)
@@ -388,6 +406,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   vector<double> lin_rnorm; 
   bool lin_success, converged(false);
+  int nLinIts(0);
   double rel_err(10000.0);
 
   print("  o Running the iterative SIMPLER procedure (E = %e).\n", Efactor);
@@ -411,11 +430,14 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     inco.CalculateCoefficientsSIMPLER(2, v, id, homo, wlin_rows, Bw, VZstar, DZ, Efactor, dt, LocalDt); //"What"
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
     plin_solver.SetLinearOperator(plin_rows);
-    lin_success = plin_solver.Solve(B, P, NULL, NULL, &lin_rnorm);
+    lin_success = plin_solver.Solve(B, P, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the pressure equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the pressure equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the pressure equation converged in %d iterations.\n", nLinIts);
     }
 
 
@@ -427,22 +449,28 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     // Solve the x-momentum equation
     inco.UpdateVelocityEquationRHS_SIMPLER(0, P, Bu);
     vlin_solver.SetLinearOperator(ulin_rows);
-    lin_success = vlin_solver.Solve(Bu, VXstar, NULL, NULL, &lin_rnorm);
+    lin_success = vlin_solver.Solve(Bu, VXstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the x-momentum equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the x-momentum equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
     }
 
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
       inco.UpdateVelocityEquationRHS_SIMPLER(1, P, Bv);
       vlin_solver.SetLinearOperator(vlin_rows);
-      lin_success = vlin_solver.Solve(Bv, VYstar, NULL, NULL, &lin_rnorm);
+      lin_success = vlin_solver.Solve(Bv, VYstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
-        print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+        print_warning("    x Warning: Linear solver for the y-momentum equation failed to converge.\n");
         for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+          print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      } else {
+        if(verbose>=1)
+          print("    x Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -450,11 +478,14 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
       inco.UpdateVelocityEquationRHS_SIMPLER(2, P, Bw);
       vlin_solver.SetLinearOperator(wlin_rows);
-      lin_success = vlin_solver.Solve(Bw, VZstar, NULL, NULL, &lin_rnorm);
+      lin_success = vlin_solver.Solve(Bw, VZstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
-        print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+        print_warning("    x Warning: Linear solver for the z-momentum equation failed to converge.\n");
         for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      } else {
+        if(verbose>=1)
+          print("    x Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -465,11 +496,14 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXstar, VYstar, VZstar, B, &ijk_zero_p);
     plin_solver.UsePreviousPreconditioner(true); //The matrix A is still the same
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
-    lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
     }
 
 
@@ -665,6 +699,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   int iter(0), maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
   vector<double> lin_rnorm; 
   bool lin_success, converged(false);
+  int nLinIts(0);
   double rel_err;
 
   print("  o Running the PISO procedure.\n");
@@ -680,22 +715,28 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Solve the x-momentum equation
   inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, false, Efactor, dt, LocalDt);
   vlin_solver.SetLinearOperator(vlin_rows);
-  lin_success = vlin_solver.Solve(B, VXstar, NULL, NULL, &lin_rnorm);
+  lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
   if(!lin_success) {
-    print_warning("  x Warning: Linear solver for the x-momentum equation failed to converge.\n");
+    print_warning("    x Warning: Linear solver for the x-momentum equation failed to converge.\n");
     for(int i=0; i<(int)lin_rnorm.size(); i++)
-      print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+  } else {
+    if(verbose>=1)
+      print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
   }
 
   // Solve the y-momentum equation
   if(!global_mesh.IsMesh1D()) {
     inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
-    lin_success = vlin_solver.Solve(B, VYstar, NULL, NULL, &lin_rnorm);
+    lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the y-momentum equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the y-momentum equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
     }
   }
 
@@ -703,11 +744,14 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
     inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
-    lin_success = vlin_solver.Solve(B, VZstar, NULL, NULL, &lin_rnorm);
+    lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the z-momentum equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the z-momentum equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
     }
   }
 
@@ -719,11 +763,14 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
   plin_solver.SetLinearOperator(plin_rows);
   Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
-  lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+  lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
   if(!lin_success) {
-    print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+    print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
     for(int i=0; i<(int)lin_rnorm.size(); i++)
-      print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+  } else {
+    if(verbose>=1)
+      print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
   }
 
   
@@ -751,11 +798,14 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXtildep, VYtildep, VZtildep, B, &ijk_zero_p);
     plin_solver.UsePreviousPreconditioner(true); //The matrix A is still the same
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
-    lin_success = plin_solver.Solve(B, Pprime, NULL, NULL, &lin_rnorm);
+    lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
-      print_warning("  x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+      print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
       for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("    > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    } else {
+      if(verbose>=1)
+        print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
     }
 
     rel_err = UpdateStatesCorrector(Pstar, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, 
