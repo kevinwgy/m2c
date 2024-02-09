@@ -143,7 +143,11 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       if(verbose>=1)
         print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
     }
+/*
+    vlin_solver.WriteToMatlabFile("VXMatrix.m", "VXMat");
+    B.WriteToMatlabFile("VXB.m", "VXB");
     VXstar.WriteToVTRFile("VXstar.vtr","VXstar");
+*/
 
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
@@ -159,8 +163,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
           print("    x Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
+/*
     VYstar.WriteToVTRFile("VYstar.vtr","VYstar");
-
+*/
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
       inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
@@ -175,8 +180,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
           print("    x Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
+/*
     VZstar.WriteToVTRFile("VZstar.vtr","VZstar");
-
+*/
 
     //-----------------------------------------------------
     // Step 2: Solve the p' equation
@@ -194,8 +200,11 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
     }
 
+/*
+    plin_solver.WriteToMatlabFile("PMatrix.m", "PMat");
+    B.WriteToMatlabFile("PB.m", "PB");
     Pprime.WriteToVTRFile("Pprime.vtr","Pprime");
-
+*/
 
     //-----------------------------------------------------
     // Step 3: Update p, u, v, w, and compute relative error in velocity
@@ -211,12 +220,14 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     }
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
-
-    if(iter==10) {
+/*
+    if(iter==0) {
       print("Fine...\n");
+      V.StoreMeshCoordinates(spo.GetMeshCoordinates());
       V.WriteToVTRFile("V.vtr","V");
       exit_mpi();
     }
+*/
   }
 
   if(converged)

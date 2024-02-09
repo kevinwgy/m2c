@@ -1395,6 +1395,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
+//TODO: MUST USE VELOCITY AT PREVIOUS TIME STEP!
+
         bb[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
         bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
                        dir==1 ? (v[k][j-1][i][4] - v[k][j][i][4])*dxdz :
@@ -1471,14 +1473,12 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         ap = 0.0;
         bb[k][j][i] = 0.0;
 
-
         // set p = 0? (Otherwise, the linear system is singular, but still solvable by iterative methods)
         if(ijk_zero_p && i==(*ijk_zero_p)[0] && j==(*ijk_zero_p)[1] && k==(*ijk_zero_p)[2]) {
           row.PushEntry(i,j,k, 1.0);
           bb[k][j][i] = 0.0;
           continue;
         }
-
 
         //-------
         // LEFT
