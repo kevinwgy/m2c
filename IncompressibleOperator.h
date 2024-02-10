@@ -66,7 +66,7 @@ public:
   void ApplyBoundaryConditions(SpaceVariable3D &V); //!< Also modify non-ghost entries (due to MAC grid)
 
   void BuildVelocityEquationSIMPLE(int dir, //!< dir: 0,1,2 for x,y,z
-                                   Vec5D*** v, double*** id,
+                                   Vec5D*** v0, Vec5D*** v, double*** id,
                                    double*** homo, //wheter each node is in a homogeneous region
                                    std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, SpaceVariable3D &Ddiag,
                                    bool SIMPLEC, //!< for SIMPLEC, generates a different Ddiag; otherwise the same
@@ -80,7 +80,7 @@ public:
                                    Int3 *ijk_zero_p = NULL); //!< allows p to be fixed at one node
 
   //! For specified momentum equation (dir=0,1,2), find coefficients for pressure and velocity equations
-  void CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double*** id, double*** homo,
+  void CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D*** v, double*** id, double*** homo,
                                     std::vector<RowEntries> &vlin_rows, SpaceVariable3D &Bv,
                                     SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag, double Efactor,
                                     double dt, SpaceVariable3D *LocalDt = NULL);
@@ -92,7 +92,7 @@ public:
                                         SpaceVariable3D &VZstar, SpaceVariable3D &B, Int3 *ijk_zero_p = NULL);
 
   //! For specified momentum equation (dir=0,1,2), calculate "velocity tilde prime"
-  void CalculateVelocityTildePISO(int dir, Vec5D*** v, double*** id, double*** homo,
+  void CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D*** v, double*** id, double*** homo,
                                   SpaceVariable3D &Vprime, SpaceVariable3D &Vtilde, double Efactor,
                                   double dt, SpaceVariable3D *LocalDt = NULL);
  

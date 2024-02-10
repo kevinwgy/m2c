@@ -20,7 +20,7 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                       VYstar(comm_, &(dms_.ghosted1_1dof)), VZstar(comm_, &(dms_.ghosted1_1dof)),
                       Pprime(comm_, &(dms_.ghosted1_1dof)), B(comm_, &(dms_.ghosted1_1dof)),
                       DX(comm_, &(dms_.ghosted1_1dof)), DY(comm_, &(dms_.ghosted1_1dof)),
-                      DZ(comm_, &(dms_.ghosted1_1dof)),
+                      DZ(comm_, &(dms_.ghosted1_1dof)), V0(comm_, &(dms_.ghosted1_5dof)),
                       vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver,
                       "velocity"),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver,
@@ -76,6 +76,7 @@ TimeIntegratorSIMPLE::Destroy()
   DX.Destroy();
   DY.Destroy();
   DZ.Destroy();
+  V0.Destroy();
 
   vlin_solver.Destroy();
   plin_solver.Destroy();
@@ -121,6 +122,10 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   else
     print("  o Running the iterative SIMPLE procedure (E = %e, alphaP = %e).\n", Efactor, alphaP);
 
+  // Store V0
+  V0.AXPlusBY(0.0, 1.0, V); //V0 = V (only copy nodes inside physical domain)
+  Vec5D*** v0 = (Vec5D***)V0.GetDataPointer();
+
   for(iter = 0; iter < maxIter; iter++) {
 
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
@@ -132,7 +137,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
 
     // Solve the x-momentum equation
-    inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(0, v0, v, id, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
@@ -151,7 +156,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the y-momentum equation
     if(!global_mesh.IsMesh1D()) {
-      inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -168,7 +173,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 */
     // Solve the z-momentum equation
     if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
-      inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -235,6 +240,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   else
     print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
     
+
+  V0.RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();
@@ -422,6 +429,10 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
 
   print("  o Running the iterative SIMPLER procedure (E = %e).\n", Efactor);
 
+  // Store V0
+  V0.AXPlusBY(0.0, 1.0, V); //V0 = V (only copy nodes inside physical domain)
+  Vec5D*** v0 = (Vec5D***)V0.GetDataPointer();
+
   for(iter = 0; iter < maxIter; iter++) {
 
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
@@ -436,9 +447,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     Bv.SetConstantValue(0.0);
     Bw.SetConstantValue(0.0);
     // ulin_rows, vlin_rows, and wlin_rows will be used in Step 2
-    inco.CalculateCoefficientsSIMPLER(0, v, id, homo, ulin_rows, Bu, VXstar, DX, Efactor, dt, LocalDt); //"Uhat"
-    inco.CalculateCoefficientsSIMPLER(1, v, id, homo, vlin_rows, Bv, VYstar, DY, Efactor, dt, LocalDt); //"Vhat"
-    inco.CalculateCoefficientsSIMPLER(2, v, id, homo, wlin_rows, Bw, VZstar, DZ, Efactor, dt, LocalDt); //"What"
+    inco.CalculateCoefficientsSIMPLER(0, v0, v, id, homo, ulin_rows, Bu, VXstar, DX, Efactor, dt, LocalDt); //"Uhat"
+    inco.CalculateCoefficientsSIMPLER(1, v0, v, id, homo, vlin_rows, Bv, VYstar, DY, Efactor, dt, LocalDt); //"Vhat"
+    inco.CalculateCoefficientsSIMPLER(2, v0, v, id, homo, wlin_rows, Bw, VZstar, DZ, Efactor, dt, LocalDt); //"What"
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
     plin_solver.SetLinearOperator(plin_rows);
     lin_success = plin_solver.Solve(B, P, NULL, &nLinIts, &lin_rnorm);
@@ -539,6 +550,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
   else
     print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
     
+  V.RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();
@@ -715,6 +727,10 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   print("  o Running the PISO procedure.\n");
 
+  // Store V0
+  V0.AXPlusBY(0.0, 1.0, V); //V0 = V (only copy nodes inside physical domain)
+  Vec5D*** v0 = (Vec5D***)V0.GetDataPointer();
+
   Vec5D*** v = (Vec5D***)V.GetDataPointer();
 
   ExtractVariableComponents(v, &VXstar, &VYstar, &VZstar, &Pstar);
@@ -724,7 +740,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //-----------------------------------------------------
 
   // Solve the x-momentum equation
-  inco.BuildVelocityEquationSIMPLE(0, v, id, homo, vlin_rows, B, DX, false, Efactor, dt, LocalDt);
+  inco.BuildVelocityEquationSIMPLE(0, v0, v, id, homo, vlin_rows, B, DX, false, Efactor, dt, LocalDt);
   vlin_solver.SetLinearOperator(vlin_rows);
   lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
   if(!lin_success) {
@@ -738,7 +754,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the y-momentum equation
   if(!global_mesh.IsMesh1D()) {
-    inco.BuildVelocityEquationSIMPLE(1, v, id, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(1, v0, v, id, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
@@ -753,7 +769,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the z-momentum equation
   if(!global_mesh.IsMesh1D() && !global_mesh.IsMesh2D()) {
-    inco.BuildVelocityEquationSIMPLE(2, v, id, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(2, v0, v, id, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
@@ -802,9 +818,9 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //-----------------------------------------------------
   for(iter = 1; iter < maxIter; iter++) {
 
-    inco.CalculateVelocityTildePISO(0, v, id, homo, VXprime, VXtildep, Efactor, dt, LocalDt);
-    inco.CalculateVelocityTildePISO(1, v, id, homo, VYprime, VYtildep, Efactor, dt, LocalDt);
-    inco.CalculateVelocityTildePISO(2, v, id, homo, VZprime, VZtildep, Efactor, dt, LocalDt);
+    inco.CalculateVelocityTildePISO(0, v0, v, id, homo, VXprime, VXtildep, Efactor, dt, LocalDt);
+    inco.CalculateVelocityTildePISO(1, v0, v, id, homo, VYprime, VYtildep, Efactor, dt, LocalDt);
+    inco.CalculateVelocityTildePISO(2, v0, v, id, homo, VZprime, VZtildep, Efactor, dt, LocalDt);
 
     inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXtildep, VYtildep, VZtildep, B, &ijk_zero_p);
     plin_solver.UsePreviousPreconditioner(true); //The matrix A is still the same
@@ -841,6 +857,7 @@ END_CORRECTORS:
   else
     print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
 
+  V0.RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();

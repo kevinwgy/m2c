@@ -918,7 +918,7 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
 //--------------------------------------------------------------------------
 
 void
-IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*** id,
+IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*** v, double*** id,
                                                     double*** homo, //node is in a homogeneous region?
                                                     vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
                                                     SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
@@ -1389,22 +1389,20 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v, double*
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
         //------------------------------------------------------
         anb = SIMPLEC ? ap : 0.0; //needed later
-        ap0 = dir==0 ? (dxr*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dxr) :
-              dir==1 ? (dyt*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dyt) :
-                       (dzf*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dzf);
+        ap0 = dir==0 ? (dxr*v0[k][j][i-1][0] + dxl*v0[k][j][i][0])/(dxl+dxr) :
+              dir==1 ? (dyt*v0[k][j-1][i][0] + dyb*v0[k][j][i][0])/(dyb+dyt) :
+                       (dzf*v0[k-1][j][i][0] + dzk*v0[k][j][i][0])/(dzk+dzf);
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
-//TODO: MUST USE VELOCITY AT PREVIOUS TIME STEP!
-
-        bb[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        bb[k][j][i] += ap0*v0[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
         bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
                        dir==1 ? (v[k][j-1][i][4] - v[k][j][i][4])*dxdz :
                                 (v[k-1][j][i][4] - v[k][j][i][4])*dxdy;
 
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
         assert(Efactor>0.0);
-        bb[k][j][i] += ap*v[k][j][i][dir+1]/Efactor;
+        bb[k][j][i] += ap*v0[k][j][i][dir+1]/Efactor;
 
         ap *= 1.0 + 1.0/Efactor; 
         row.PushEntry(i,j,k, ap);
@@ -1568,7 +1566,7 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
 //--------------------------------------------------------------------------
 
 void
-IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double*** id,
+IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D*** v, double*** id,
                                                      double*** homo, vector<RowEntries> &vlin_rows,
                                                      SpaceVariable3D &Bv,
                                                      SpaceVariable3D &Vhat, SpaceVariable3D &Ddiag,
@@ -2058,28 +2056,28 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v, double
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
         //------------------------------------------------------
-        ap0 = dir==0 ? (dxr*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dxr) :
-              dir==1 ? (dyt*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dyt) :
-                       (dzf*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dzf);
+        ap0 = dir==0 ? (dxr*v0[k][j][i-1][0] + dxl*v0[k][j][i][0])/(dxl+dxr) :
+              dir==1 ? (dyt*v0[k][j-1][i][0] + dyb*v0[k][j][i][0])/(dyb+dyt) :
+                       (dzf*v0[k-1][j][i][0] + dzk*v0[k][j][i][0])/(dzk+dzf);
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
-        vhat[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        vhat[k][j][i] += ap0*v0[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
         vhat_denom += ap0;
 
         // no pressure here (SIMPLER)
 
-        bb[k][j][i] += ap0*v[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        bb[k][j][i] += ap0*v0[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
 
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
         assert(Efactor>0.0);
-        bb[k][j][i]   += ap*v[k][j][i][dir+1]/Efactor; 
+        bb[k][j][i]   += ap*v0[k][j][i][dir+1]/Efactor; 
 
         ap *= 1.0 + 1.0/Efactor; 
         row.PushEntry(i,j,k, ap);
 
         // Also apply relaxation to vhat
-        vhat[k][j][i] += vhat_denom*v[k][j][i][dir+1]/Efactor;
+        vhat[k][j][i] += vhat_denom*v0[k][j][i][dir+1]/Efactor;
         vhat[k][j][i] *= (1.0 + 1.0/Efactor)/vhat_denom;
 
         // Store diagonal for use in pressure correction equation
@@ -2243,7 +2241,7 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
 //--------------------------------------------------------------------------
 
 void
-IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v, double*** id, double*** homo,
+IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D*** v, double*** id, double*** homo,
                                                    SpaceVariable3D &Vprime, SpaceVariable3D &Vtilde,
                                                    double Efactor, double dt, SpaceVariable3D *LocalDt)
 {
@@ -2595,9 +2593,9 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v, double**
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
         //------------------------------------------------------
-        ap0 = dir==0 ? (dxr*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dxr) :
-              dir==1 ? (dyt*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dyt) :
-                       (dzf*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dzf);
+        ap0 = dir==0 ? (dxr*v0[k][j][i-1][0] + dxl*v0[k][j][i][0])/(dxl+dxr) :
+              dir==1 ? (dyt*v0[k][j-1][i][0] + dyb*v0[k][j][i][0])/(dyb+dyt) :
+                       (dzf*v0[k-1][j][i][0] + dzk*v0[k][j][i][0])/(dzk+dzf);
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 

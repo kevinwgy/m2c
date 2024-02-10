@@ -21,6 +21,8 @@ protected:
 
   IncompressibleOperator &inco;
 
+  SpaceVariable3D V0; //!< solution at the previous time step
+
   SpaceVariable3D VXstar, VYstar, VZstar, Pprime;
   SpaceVariable3D B; //!< generally used as the right-hand-side of linear systems
   SpaceVariable3D Homo; //!< whether each node is within a homogeneous neighborhood (const. rho, mu)
