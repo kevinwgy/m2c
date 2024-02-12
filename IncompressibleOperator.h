@@ -109,6 +109,7 @@ private:
 
   //! Function "A" -- Eq.(5.64) in Patankar's book
   inline double PowerLaw(double pc) {double pp=1.0-0.1*fabs(pc); return pp>0.0 ? pow(pp,5) : 0.0;}
+  //inline double PowerLaw(double pc) {return 1.0;} //degenerates to upwinding (useful for debugging)
 };
 
 #endif

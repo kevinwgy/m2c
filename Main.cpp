@@ -688,12 +688,12 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-      print("Hi, I am here!\n");
+      //print("Hi, I am here!\n");
       integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt, t, dt, time_step,
                                      subcycle, dts); 
-      V.WriteToVTRFile("V.vtr");
-      print("Done!\n");
-      exit_mpi();
+      //V.WriteToVTRFile("V.vtr");
+      //print("Done!\n");
+      //exit_mpi();
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 

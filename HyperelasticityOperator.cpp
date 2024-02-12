@@ -46,8 +46,8 @@ HyperelasticityOperator::HyperelasticityOperator(MPI_Comm &comm_, DataManagers3D
   cylindrical_symmetry = false;
   if(iod.mesh.type == MeshData::CYLINDRICAL) {
     cylindrical_symmetry = true;
-    if(!global_mesh.IsMesh2D()) {
-      print_error("*** Error: HyperelasticityOperator detected 3D mesh, "
+    if(!global_mesh.two_dimensional_xy) {
+      print_error("*** Error: HyperelasticityOperator detected incorrect mesh, "
                   "with cylindrical symmetry requested.\n");
       exit_mpi();
     }

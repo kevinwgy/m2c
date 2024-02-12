@@ -217,6 +217,10 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
   // determine twoD_to_threeD (in the constructor, it is set to false by default)
   assert(global_mesh_ptr);
   if(global_mesh_ptr->IsMesh2D()) {
+    if(!global_mesh_ptr->two_dimensional_xy) {
+      print_error("*** Error: 2D Mesh must be in x-y plane. (EmbeddedBoundaryOperator.cpp)\n");
+      exit_mpi();
+    }
     for(int surf=0; surf<(int)twoD_to_threeD.size(); surf++)
       twoD_to_threeD[surf] = IsEmbeddedSurfaceIn3D(surf);
   }

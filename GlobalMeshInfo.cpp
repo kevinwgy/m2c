@@ -6,6 +6,7 @@
 #include<GlobalMeshInfo.h>
 #include<SpaceVariable.h>
 #include<algorithm> //std::upper_bound
+#include<cfloat> //DBL_MAX
 
 //------------------------------------------------------------------
 
@@ -26,9 +27,13 @@ GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double>
   xyz_min[2] = z_glob.front() - 0.5*dz_glob.front();
   xyz_max[2] = z_glob.back()  + 0.5*dz_glob.back();
 
-  one_dimensional_mesh = (y_glob.size()==1) && (z_glob.size()==1);
+  one_dimensional_x = (y_glob.size()==1) && (z_glob.size()==1);
+  one_dimensional_y = (x_glob.size()==1) && (z_glob.size()==1);
+  one_dimensional_z = (x_glob.size()==1) && (y_glob.size()==1);
 
-  two_dimensional_mesh = (!one_dimensional_mesh) && (z_glob.size()==1);
+  two_dimensional_xy = (z_glob.size()==1) && (x_glob.size()>1) && (y_glob.size()>1);
+  two_dimensional_xz = (y_glob.size()==1) && (x_glob.size()>1) && (z_glob.size()>1);
+  two_dimensional_yz = (x_glob.size()==1) && (y_glob.size()>1) && (z_glob.size()>1);
 
   NX = x_glob.size();
   NY = y_glob.size();
@@ -327,9 +332,11 @@ GlobalMeshInfo::GetDXYZ(int i, int j, int k)
 double
 GlobalMeshInfo::GetMinDXYZ(Int3 ijk)
 {
-  return two_dimensional_mesh ? std::min(GetDx(ijk[0]), GetDy(ijk[1]))
-                              : std::min(std::min(GetDx(ijk[0]), GetDy(ijk[1])), 
-                                         GetDz(ijk[2]));
+  double min_dxyz = DBL_MAX;
+  if(x_glob.size()>1)  min_dxyz = std::min(min_dxyz, GetDx(ijk[0]));
+  if(y_glob.size()>1)  min_dxyz = std::min(min_dxyz, GetDy(ijk[1]));
+  if(z_glob.size()>1)  min_dxyz = std::min(min_dxyz, GetDz(ijk[2]));
+  return min_dxyz;
 }
 
 //------------------------------------------------------------------
@@ -337,9 +344,11 @@ GlobalMeshInfo::GetMinDXYZ(Int3 ijk)
 double
 GlobalMeshInfo::GetMaxDXYZ(Int3 ijk)
 {
-  return two_dimensional_mesh ? std::max(GetDx(ijk[0]), GetDy(ijk[1]))
-                              : std::max(std::max(GetDx(ijk[0]), GetDy(ijk[1])),
-                                         GetDz(ijk[2]) );
+  double max_dxyz = -DBL_MAX;
+  if(x_glob.size()>1)  max_dxyz = std::max(max_dxyz, GetDx(ijk[0]));
+  if(y_glob.size()>1)  max_dxyz = std::max(max_dxyz, GetDy(ijk[1]));
+  if(z_glob.size()>1)  max_dxyz = std::max(max_dxyz, GetDz(ijk[2]));
+  return max_dxyz;
 }
 
 //------------------------------------------------------------------

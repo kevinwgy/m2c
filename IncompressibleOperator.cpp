@@ -1481,25 +1481,31 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         //-------
         // LEFT
         //-------
-        // if i==0, do nothing: at a boundary where normal velocity is known, a = 0. (Chap 6.7-3 of Patankar)
         if(i>0) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dx*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dx);
           a = rho*diagx[k][j][i]/dx;
           row.PushEntry(i-1,j,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] += rho*ustar[k][j][i]/dx;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] += rho*v[k][j][i][1]/dx; //boundary velocity
         }
 
         //-------
         // RIGHT 
         //-------
-        // if i==NX-1, do nothing: at a boundary where normal velocity is known, a = 0. (Chap 6.7-3 of Patankar)
         if(i<NX-1) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dxr*v[k][j][i][0] + dx*v[k][j][i+1][0])/(dx+dxr);
           a = rho*diagx[k][j][i+1]/dx;
           row.PushEntry(i+1,j,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] -= rho*ustar[k][j][i+1]/dx;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] -= rho*v[k][j][i+1][1]/dx; //boundary velocity
         }
  
         //-------
@@ -1511,6 +1517,10 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] += rho*vstar[k][j][i]/dy;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] += rho*v[k][j][i][2]/dy; //boundary velocity
         }
 
         //-------
@@ -1522,6 +1532,10 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
           row.PushEntry(i,j+1,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] -= rho*vstar[k][j+1][i]/dy;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] -= rho*v[k][j+1][i][2]/dy; //boundary velocity
         }
   
         //-------
@@ -1533,6 +1547,10 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
           row.PushEntry(i,j,k-1, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] += rho*wstar[k][j][i]/dz;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] += rho*v[k][j][i][3]/dz; //boundary velocity
         }
 
         //-------
@@ -1544,6 +1562,10 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
           row.PushEntry(i,j,k+1, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] -= rho*wstar[k+1][j][i]/dz;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] -= rho*v[k+1][j][i][3]/dz; //boundary velocity
         }
  
         //Push the diagonal
@@ -2179,10 +2201,13 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
         //-------
         // LEFT
         //-------
-        // if i==0, do nothing: at a boundary where normal velocity is known, a = 0. (Chap 6.7-3 of Patankar)
         if(i>0) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dx*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dx);
           bb[k][j][i] += rho*ustar[k][j][i]/dx;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] += rho*v[k][j][i][1]/dx; //boundary velocity
         }
 
         //-------
@@ -2192,6 +2217,10 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
         if(i<NX-1) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dxr*v[k][j][i][0] + dx*v[k][j][i+1][0])/(dx+dxr);
           bb[k][j][i] -= rho*ustar[k][j][i+1]/dx;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] -= rho*v[k][j][i+1][1]/dx; //boundary velocity
         }
  
         //-------
@@ -2200,6 +2229,10 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
         if(j>0) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dy*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dy);
           bb[k][j][i] += rho*vstar[k][j][i]/dy;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] += rho*v[k][j][i][2]/dy; //boundary velocity
         }
 
         //-------
@@ -2208,6 +2241,10 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
         if(j<NY-1) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dyt*v[k][j][i][0] + dy*v[k][j+1][i][0])/(dy+dyt);
           bb[k][j][i] -= rho*vstar[k][j+1][i]/dy;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] -= rho*v[k][j+1][i][2]/dx; //boundary velocity
         }
   
         //-------
@@ -2216,6 +2253,10 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
         if(k>0) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dz*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dz);
           bb[k][j][i] += rho*wstar[k][j][i]/dz;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] += rho*v[k][j][i][3]/dz; //boundary velocity
         }
 
         //-------
@@ -2224,6 +2265,10 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
         if(k<NZ-1) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dzf*v[k][j][i][0] + dz*v[k+1][j][i][0])/(dz+dzf);
           bb[k][j][i] -= rho*wstar[k+1][j][i]/dz;
+        } else {
+          // TODO: Only consider velocity b.c. for now (velocity is known)
+          rho = v[k][j][i][0];
+          bb[k][j][i] -= rho*v[k+1][j][i][3]/dz; //boundary velocity
         }
  
       }

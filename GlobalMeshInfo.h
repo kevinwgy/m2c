@@ -41,14 +41,18 @@ private:
   std::vector<std::vector<int> > subD_neighbors_7; //!< 19 - 12 edges 
   std::vector<std::vector<int> > subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)
 
-  bool one_dimensional_mesh; //!< set to true if y and z have only one element
-
-  bool two_dimensional_mesh; //!< set to true if (only) z has only one element
-
 public:
 
   std::vector<double> x_glob, y_glob, z_glob;
   std::vector<double> dx_glob, dy_glob, dz_glob;
+
+  bool one_dimensional_x; //!< set to true if y and z have only one element
+  bool one_dimensional_y; //!< set to true if x and z have only one element
+  bool one_dimensional_z; //!< set to true if x and y have only one element
+
+  bool two_dimensional_xy; //!< set to true if (only) z has only one element
+  bool two_dimensional_xz; //!< set to true if (only) y has only one element
+  bool two_dimensional_yz; //!< set to true if (only) x has only one element
 
   Vec3D xyz_min, xyz_max; //!< boundary of the physical domain (up to cell boundaries)
   int NX, NY, NZ;
@@ -96,9 +100,8 @@ public:
   Vec3D GetDXYZ(Int3 ijk);
   Vec3D GetDXYZ(int i, int j, int k);
 
-  bool IsMesh1D() {return one_dimensional_mesh;}
-
-  bool IsMesh2D() {return two_dimensional_mesh;}
+  bool IsMesh1D() {return one_dimensional_x || one_dimensional_y || one_dimensional_z;}
+  bool IsMesh2D() {return two_dimensional_xy|| two_dimensional_xz|| two_dimensional_yz;}
 
   //! If mesh is 2D, only consider dx and dy
   double GetMinDXYZ(Int3 ijk);
