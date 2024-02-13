@@ -18,6 +18,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     iod(iod_), global_mesh(global_mesh_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
+    vector5(comm_, &(dms.ghosted1_5dof)),
     probe_output(comm_, iod_.output, vf_, ion_, heo_),
     matvol_output(comm_, iod_, cell_volume),
     ion(ion_), heo(heo_),
@@ -106,6 +107,7 @@ Output::InitializeOutput(SpaceVariable3D &coordinates)
 {
   scalar.StoreMeshCoordinates(coordinates);
   vector3.StoreMeshCoordinates(coordinates);
+  vector5.StoreMeshCoordinates(coordinates);
 
   probe_output.SetupInterpolation(coordinates);
 
@@ -132,27 +134,33 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
                         SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
 {
 
+  SpaceVariable3D *Vout = &V;
+  if(global_mesh.IsMeshStaggered()) { //interpolate velocity
+    CopyAndInterpolateToCellCenters(V, vector5); 
+    Vout = &vector5;
+  }
+
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
-    WriteSolutionSnapshot(time, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi);
+    WriteSolutionSnapshot(time, time_step, *Vout, ID, Phi, NPhi, KappaPhi, L, Xi);
 
   //write solutions at probes
-  probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, Xi, force_write);
+  probe_output.WriteSolutionAtProbes(time, dt, time_step, *Vout, ID, Phi, L, Xi, force_write);
 
   //write solutions along lines
   for(int i=0; i<(int)line_outputs.size(); i++)
-    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, V, ID, Phi, L, force_write);
+    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, *Vout, ID, Phi, L, force_write);
 
   //write solutions on planes
   for(auto&& plane : plane_outputs)
-    plane->WriteSolutionOnPlane(time, dt, time_step, V, ID, Phi, L, force_write);
+    plane->WriteSolutionOnPlane(time, dt, time_step, *Vout, ID, Phi, L, force_write);
 
   //write material volumes
   matvol_output.WriteSolution(time, dt, time_step, ID, force_write);
 
   //write terminal visualization 
-  terminal.PrintSolutionSnapshot(time, dt, time_step, V, ID, Phi, L, force_write);
+  terminal.PrintSolutionSnapshot(time, dt, time_step, *Vout, ID, Phi, L, force_write);
 
 }
 
@@ -594,11 +602,42 @@ Output::OutputMeshPartition()
 //--------------------------------------------------------------------------
 
 void
+Output::CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vnew)
+{
+  Vec5D*** vold = (Vec5D***)V.GetDataPointer();
+  Vec5D*** vnew = (Vec5D***)Vnew.GetDataPointer();
+
+  //only fills domain interior, not ghost nodes outside physical domain
+  int i0, j0, k0, imax, jmax, kmax;
+  V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);    
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        vnew[k][j][i][0] = vold[k][j][i][0];
+        vnew[k][j][i][1] = 0.5*(vold[k][j][i][1] + vold[k][j][i+1][1]);
+        vnew[k][j][i][2] = 0.5*(vold[k][j][i][2] + vold[k][j+1][i][2]);
+        vnew[k][j][i][3] = 0.5*(vold[k][j][i][3] + vold[k+1][j][i][3]);
+        vnew[k][j][i][4] = vold[k][j][i][4];
+      }
+
+  V.RestoreDataPointerToLocalVector();
+  Vnew.RestoreDataPointerAndInsert();
+}
+
+//--------------------------------------------------------------------------
+
+void
 Output::FinalizeOutput()
 {
   scalar.Destroy();
   vector3.Destroy(); 
+  vector5.Destroy();
 }
+
+//--------------------------------------------------------------------------
+
+
+
 
 //--------------------------------------------------------------------------
 

@@ -42,6 +42,8 @@ GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double>
   domain_volume = ((x_glob[NX-1] + 0.5*dx_glob[NX-1]) - (x_glob[0] - 0.5*dx_glob[0]))
                 * ((y_glob[NY-1] + 0.5*dy_glob[NY-1]) - (y_glob[0] - 0.5*dy_glob[0]))
                 * ((z_glob[NZ-1] + 0.5*dz_glob[NZ-1]) - (z_glob[0] - 0.5*dz_glob[0]));
+
+  staggered_grid = false;
 }
 
 //------------------------------------------------------------------

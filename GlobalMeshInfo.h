@@ -41,6 +41,8 @@ private:
   std::vector<std::vector<int> > subD_neighbors_7; //!< 19 - 12 edges 
   std::vector<std::vector<int> > subD_neighbors_face; //!< only real neighbors with face-contact (at most 6)
 
+  bool staggered_grid; //!< true for incompressible flow solver (if true, global_mesh is the one for rho, p, etc.)
+
 public:
 
   std::vector<double> x_glob, y_glob, z_glob;
@@ -72,6 +74,12 @@ public:
 
   //! Setup the subD_xxx vectors
   void FindSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms);
+
+  //! Set whether mesh is staggered (default is NO)
+  void SetStaggeredMesh(bool is_staggered = true) {staggered_grid = is_staggered;}
+
+  //! Get whether mesh is staggered
+  bool IsMeshStaggered() {return staggered_grid;}
 
   //! Get specific info 
   double GetXmin() {return xyz_min[0];}

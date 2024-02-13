@@ -210,6 +210,8 @@ int main(int argc, char* argv[])
   
   //! Setup global mesh info
   GlobalMeshInfo global_mesh(xcoords, ycoords, zcoords, dx, dy, dz);
+  if(incompressible)
+    global_mesh.SetStaggeredMesh(true);
 
   //! Initialize PETSc
   PETSC_COMM_WORLD = comm;

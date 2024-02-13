@@ -147,7 +147,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
           print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
-          print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
+          print("    * Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -167,7 +167,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
           print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
-          print("    x Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
+          print("    * Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -184,7 +184,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
           print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
-          print("    x Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
+          print("    * Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -204,7 +204,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
-        print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
+        print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
     }
 
 
@@ -470,7 +470,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
         print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
-        print("    x Solver of the pressure equation converged in %d iterations.\n", nLinIts);
+        print("    * Solver of the pressure equation converged in %d iterations.\n", nLinIts);
     }
 
 
@@ -490,7 +490,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
           print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
-          print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
+          print("    * Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -505,7 +505,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
           print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
-          print("    x Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
+          print("    * Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -520,7 +520,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
           print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
-          print("    x Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
+          print("    * Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
       }
     }
 
@@ -538,7 +538,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
         print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
-        print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
+        print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
     }
 
 
@@ -767,7 +767,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
         print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
-        print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
+        print("    * Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
     }
   }
 
@@ -782,7 +782,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
         print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
-        print("    x Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
+        print("    * Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
     }
   }
 
@@ -797,7 +797,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
         print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
-        print("    x Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
+        print("    * Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
     }
   }
 
@@ -816,7 +816,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
       print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
   } else {
     if(verbose>=1)
-      print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
+      print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
   }
 
   
@@ -851,7 +851,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
         print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
-        print("    x Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
+        print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
     }
 
     rel_err = UpdateStatesCorrector(Pstar, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, 

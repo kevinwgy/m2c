@@ -1452,7 +1452,7 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
                                                     SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                                     SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
                                                     vector<RowEntries> &plin_rows, SpaceVariable3D &B,
-                                                    Int3 *ijk_zero_p)
+                                                    [[maybe_unused]] Int3 *ijk_zero_p)
 {
 
   GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
@@ -1492,6 +1492,7 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         // initialization
         ap = 0.0;
         bb[k][j][i] = 0.0;
+
 /*
         // set p = 0? (Otherwise, the linear system is singular, but still solvable by iterative methods)
         if(ijk_zero_p && i==(*ijk_zero_p)[0] && j==(*ijk_zero_p)[1] && k==(*ijk_zero_p)[2]) {
@@ -1500,6 +1501,7 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
           continue;
         }
 */
+
         //-------
         // LEFT
         //-------
@@ -2186,7 +2188,7 @@ void
 IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** homo,
                                                          SpaceVariable3D &VXstar, SpaceVariable3D &VYstar,
                                                          SpaceVariable3D &VZstar, SpaceVariable3D &B,
-                                                         Int3 *ijk_zero_p)
+                                                         [[maybe_unused]] Int3 *ijk_zero_p)
 {
 
   GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
@@ -2214,11 +2216,13 @@ IncompressibleOperator::BuildPressureEquationRHS_SIMPLER(Vec5D*** v, double*** h
         // initialization
         bb[k][j][i] = 0.0;
 
+/*
         // set p = 0? (Otherwise, the linear system is singular, but still solvable by iterative methods)
         if(ijk_zero_p && i==(*ijk_zero_p)[0] && j==(*ijk_zero_p)[1] && k==(*ijk_zero_p)[2]) {
           bb[k][j][i] = 0.0;
           continue;
         }
+*/
 
         //-------
         // LEFT

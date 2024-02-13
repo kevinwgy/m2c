@@ -34,6 +34,7 @@ class Output
   //! These variables will temporarily hold solutions before they are printed to file
   SpaceVariable3D scalar;   
   SpaceVariable3D vector3;
+  SpaceVariable3D vector5;
 
   int iFrame; //!< frame id.
 
@@ -80,6 +81,9 @@ private:
                              SpaceVariable3D *Xi); //!< write solution to file
 
   void OutputMeshPartition();
+
+  //! Takes care of staggered/MAC grid. (Only fills within the physical domain)
+  void CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vnew);
 
 };
 
