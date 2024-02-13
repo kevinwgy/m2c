@@ -2016,6 +2016,11 @@ IcData::IcData()
 
   for(int i=0; i<SIZE; i++)
     specified[i] = 0;
+
+  // default ic. (should be overriden by user or farfield state)
+  default_ic.velocity_x = DBL_MIN;
+  default_ic.velocity_y = DBL_MIN;
+  default_ic.velocity_z = DBL_MIN;
 }
 
 //------------------------------------------------------------------------------
@@ -3740,12 +3745,15 @@ void IoData::finalize()
   if(strcmp(ic.user_specified_ic, ""))
     ic.readUserSpecifiedIC(); 
 
-  //assign default initial state to farfield/inlet b.c. if user did not specify a
-  //default (TODO: This logic would fail if user-specified default i.c. is exactly the same
-  //as the default StateVariable(). But this is highly unlikely...)
-  if(ic.default_ic == StateVariable() &&
-     !(bc.inlet == ic.default_ic))
+  //set default initial state to farfield/inlet b.c. if user did not specify a default 
+  StateVariable base_default;
+  if(ic.default_ic.density == base_default.density &&
+     ic.default_ic.velocity_x == DBL_MIN &&
+     ic.default_ic.velocity_y == DBL_MIN &&
+     ic.default_ic.velocity_z == DBL_MIN &&
+     ic.default_ic.pressure == base_default.pressure) {
     ic.default_ic = bc.inlet;
+  }
 
   //Set dummy_state (except material id)
   if(fabs(eqs.dummy_state.density-1.0e-6)<1e-12 &&

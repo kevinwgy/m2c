@@ -338,7 +338,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
         v[k][j][i][3]    = v[k][j][im_i][3];
       }
       else if(it->bcType == MeshData::STICKWALL) {
-        v[k][j][im_i][0] = 0.0;
+        v[k][j][im_i][1] = 0.0;
         v[k][j][i][2]    = -v[k][j][im_i][2];
         v[k][j][i][3]    = -v[k][j][im_i][3];
       }
@@ -840,7 +840,29 @@ IncompressibleOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D 
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &vel_over_dx_max, 1, MPI_DOUBLE, MPI_MAX, comm);
-  assert(vel_over_dx_max>0.0);
+
+  if(vel_over_dx_max == 0.0) {//velocity is zero everywhere in the domain ==> check ghost layers
+    for(int k=kk0; k<kkmax; k++) {
+      dz = global_mesh.GetDz(k);
+      for(int j=jj0; j<jjmax; j++) {
+        dy = global_mesh.GetDy(j);
+        for(int i=ii0; i<iimax; i++) {
+          if(!global_mesh.OutsidePhysicalDomain(i,j,k) || global_mesh.OutsidePhysicalDomainAndUnpopulated(i,j,k)) 
+            continue;
+          // do not check id == INACTIVE_MATERIAL_ID (ghost cells may not have valid ID)
+          dx = global_mesh.GetDx(i);
+          vel_over_dx_max = max(vel_over_dx_max,
+                                max(fabs(v[k][j][i][1])/dx, 
+                                    max(fabs(v[k][j][i][2])/dy, fabs(v[k][j][i][3])/dz)));
+        }
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &vel_over_dx_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  if(vel_over_dx_max == 0.0) //still zero... give it an arbitrary value
+    vel_over_dx_max = 1.0e8;
+ 
 
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
@@ -1470,14 +1492,14 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         // initialization
         ap = 0.0;
         bb[k][j][i] = 0.0;
-
+/*
         // set p = 0? (Otherwise, the linear system is singular, but still solvable by iterative methods)
         if(ijk_zero_p && i==(*ijk_zero_p)[0] && j==(*ijk_zero_p)[1] && k==(*ijk_zero_p)[2]) {
           row.PushEntry(i,j,k, 1.0);
           bb[k][j][i] = 0.0;
           continue;
         }
-
+*/
         //-------
         // LEFT
         //-------

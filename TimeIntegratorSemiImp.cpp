@@ -149,11 +149,11 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         if(verbose>=1)
           print("    x Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
       }
-
-      vlin_solver.WriteToMatlabFile("VXMatrix.m", "VXMat");
-      B.WriteToMatlabFile("VXB.m", "VXB");
-      VXstar.WriteToVTRFile("VXstar.vtr","VXstar");
     }
+
+    //vlin_solver.WriteToMatlabFile("VXMatrix.m", "VXMat");
+    //B.WriteToMatlabFile("VXB.m", "VXB");
+    //VXstar.WriteToVTRFile("VXstar.vtr","VXstar");
 
 
     // Solve the y-momentum equation
@@ -171,7 +171,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       }
     }
 
-    VYstar.WriteToVTRFile("VYstar.vtr","VYstar");
+    //VYstar.WriteToVTRFile("VYstar.vtr","VYstar");
 
     // Solve the z-momentum equation
     if(global_mesh.z_glob.size()>1) {
@@ -188,7 +188,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       }
     }
 
-    VZstar.WriteToVTRFile("VZstar.vtr","VZstar");
+    //VZstar.WriteToVTRFile("VZstar.vtr","VZstar");
 
 
     //-----------------------------------------------------
@@ -208,9 +208,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     }
 
 
-    plin_solver.WriteToMatlabFile("PMatrix.m", "PMat");
-    B.WriteToMatlabFile("PB.m", "PB");
-    Pprime.WriteToVTRFile("Pprime.vtr","Pprime");
+    //plin_solver.WriteToMatlabFile("PMatrix.m", "PMat");
+    //B.WriteToMatlabFile("PB.m", "PB");
+    //Pprime.WriteToVTRFile("Pprime.vtr","Pprime");
 
 
     //-----------------------------------------------------
@@ -228,12 +228,14 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
 
-    if(iter==100) {
+/*
+    if(iter==0) {
       print("Fine...\n");
       V.StoreMeshCoordinates(spo.GetMeshCoordinates());
       V.WriteToVTRFile("V.vtr","V");
       exit_mpi();
     }
+*/
 
   }
 
@@ -350,6 +352,10 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
   VZ.RestoreDataPointerToLocalVector();
   Pprime.RestoreDataPointerToLocalVector();
    
+  if(fabs(unorm)==0.0) {//new velocity is zero everywhere (return abs. error in this case)
+    unorm = 1.0;
+  }
+
   return sqrt(uerr/unorm);
 
 }
@@ -627,6 +633,10 @@ TimeIntegratorSIMPLER::UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariabl
   P.RestoreDataPointerToLocalVector();
   Pprime.RestoreDataPointerToLocalVector();
    
+  if(fabs(unorm)==0.0) {//new velocity is zero everywhere (return abs. error in this case)
+    unorm = 1.0;
+  }
+
   return sqrt(uerr/unorm);
 
 }
@@ -967,6 +977,10 @@ TimeIntegratorPISO::UpdateStatesCorrector(SpaceVariable3D &Pstar, SpaceVariable3
   if(VXtildep) VXtildep->RestoreDataPointerToLocalVector();
   if(VYtildep) VYtildep->RestoreDataPointerToLocalVector();
   if(VZtildep) VZtildep->RestoreDataPointerToLocalVector();
+
+  if(fabs(unorm)==0.0) {//new velocity is zero everywhere (return abs. error in this case)
+    unorm = 1.0;
+  }
 
   return sqrt(uerr/unorm);
 
