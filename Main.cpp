@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
 
   // -------------------------------------------------------------------------------------------------
   //! Note: If incompresible == true, riemann and some other classes are not needed. But to avoid too
-  //!       many if-statements which complicate the code, we still construct these classes.
+  //!       many if-statements which complicates the code, we still construct these classes.
   // -------------------------------------------------------------------------------------------------
 
 
@@ -209,9 +209,7 @@ int main(int argc, char* argv[])
                          pow(iod.mesh.zmax - iod.mesh.z0, 2));
   
   //! Setup global mesh info
-  GlobalMeshInfo global_mesh(xcoords, ycoords, zcoords, dx, dy, dz);
-  if(incompressible)
-    global_mesh.SetStaggeredMesh(true);
+  GlobalMeshInfo global_mesh(xcoords, ycoords, zcoords, dx, dy, dz, incompressible);
 
   //! Initialize PETSc
   PETSC_COMM_WORLD = comm;

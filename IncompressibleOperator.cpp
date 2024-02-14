@@ -833,9 +833,9 @@ IncompressibleOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D 
         if(id[k][j][i] == INACTIVE_MATERIAL_ID)
           continue;
         dx = global_mesh.GetDx(i);
-        vel_over_dx_max = max(vel_over_dx_max,
-                              max(fabs(v[k][j][i][1])/dx, 
-                                  max(fabs(v[k][j][i][2])/dy, fabs(v[k][j][i][3])/dz)));
+        if(global_mesh.x_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][1])/dx);
+        if(global_mesh.y_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][2])/dy);
+        if(global_mesh.z_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][3])/dz);
       }
     }
   }
@@ -851,9 +851,9 @@ IncompressibleOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D 
             continue;
           // do not check id == INACTIVE_MATERIAL_ID (ghost cells may not have valid ID)
           dx = global_mesh.GetDx(i);
-          vel_over_dx_max = max(vel_over_dx_max,
-                                max(fabs(v[k][j][i][1])/dx, 
-                                    max(fabs(v[k][j][i][2])/dy, fabs(v[k][j][i][3])/dz)));
+          if(global_mesh.x_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][1])/dx);
+          if(global_mesh.y_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][2])/dy);
+          if(global_mesh.z_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][3])/dz);
         }
       }
     }
@@ -901,9 +901,54 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
   double*** id  = ID.GetDataPointer();
   double*** dtl = LocalDt.GetDataPointer();
 
-  double vel_over_dx_max = 0.0, vel_over_dx_max_loc;
-  double dx, dy, dz;
 
+  // Step 1: Get a global dt (in case some cells have zero velocity --- see below)
+  double vel_over_dx_max = 0.0;
+  double dx, dy, dz;
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dy = global_mesh.GetDy(j);
+      for(int i=i0; i<imax; i++) {
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+          continue;
+        dx = global_mesh.GetDx(i);
+        if(global_mesh.x_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][1])/dx);
+        if(global_mesh.y_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][2])/dy);
+        if(global_mesh.z_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][3])/dz);
+      }
+    }
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &vel_over_dx_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+  if(vel_over_dx_max == 0.0) {//velocity is zero everywhere in the domain ==> check ghost layers
+    for(int k=kk0; k<kkmax; k++) {
+      dz = global_mesh.GetDz(k);
+      for(int j=jj0; j<jjmax; j++) {
+        dy = global_mesh.GetDy(j);
+        for(int i=ii0; i<iimax; i++) {
+          if(!global_mesh.OutsidePhysicalDomain(i,j,k) || global_mesh.OutsidePhysicalDomainAndUnpopulated(i,j,k)) 
+            continue;
+          // do not check id == INACTIVE_MATERIAL_ID (ghost cells may not have valid ID)
+          dx = global_mesh.GetDx(i);
+          if(global_mesh.x_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][1])/dx);
+          if(global_mesh.y_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][2])/dy);
+          if(global_mesh.z_glob.size()>1) vel_over_dx_max = max(vel_over_dx_max, fabs(v[k][j][i][3])/dz);
+        }
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &vel_over_dx_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  if(vel_over_dx_max == 0.0) //still zero... give it an arbitrary value
+    vel_over_dx_max = 1.0e8;
+ 
+  // global min dt
+  dt = cfl/vel_over_dx_max;
+
+
+  //Step 2: Determine local dt
+  double vel_over_dx_max_loc;
   // Loop through the real domain (excluding the ghost layer)
   for(int k=k0; k<kmax; k++) {
     dz = global_mesh.GetDz(k);
@@ -914,21 +959,22 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
           continue;
         dx = global_mesh.GetDx(i);
         
-        vel_over_dx_max_loc = max(fabs(v[k][j][i][1])/dx, 
-                                  max(fabs(v[k][j][i][2])/dy, fabs(v[k][j][i][3])/dz));
-        vel_over_dx_max = max(vel_over_dx_max, vel_over_dx_max_loc);
+        vel_over_dx_max_loc = 0.0;
+        if(global_mesh.x_glob.size()>1) vel_over_dx_max_loc = max(vel_over_dx_max_loc, fabs(v[k][j][i][1])/dx);
+        if(global_mesh.y_glob.size()>1) vel_over_dx_max_loc = max(vel_over_dx_max_loc, fabs(v[k][j][i][2])/dy);
+        if(global_mesh.z_glob.size()>1) vel_over_dx_max_loc = max(vel_over_dx_max_loc, fabs(v[k][j][i][3])/dz);
 
         // calculates local time-step size
-        dtl[k][j][i] = cfl/vel_over_dx_max_loc;
+        if(vel_over_dx_max_loc>0) {
+          if(vel_over_dx_max_loc<0.0025*vel_over_dx_max)
+            dtl[k][j][i] = cfl/vel_over_dx_max_loc;
+          else
+            dtl[k][j][i] = cfl/vel_over_dx_max*400.0; //at most, 400 times than dt_min
+        } else
+          dtl[k][j][i] = dt;
       }
     }
   }
-
-  MPI_Allreduce(MPI_IN_PLACE, &vel_over_dx_max, 1, MPI_DOUBLE, MPI_MAX, comm);
-  assert(vel_over_dx_max>0.0);
-
-  // global min dt
-  dt = cfl/vel_over_dx_max;
 
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();

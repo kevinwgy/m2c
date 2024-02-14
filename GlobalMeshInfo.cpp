@@ -12,7 +12,9 @@
 
 GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_,
                                std::vector<double> &z_glob_, std::vector<double> &dx_glob_,
-                               std::vector<double> &dy_glob_, std::vector<double> &dz_glob_)
+                               std::vector<double> &dy_glob_, std::vector<double> &dz_glob_,
+                               bool is_staggered)
+              : staggered_grid(is_staggered)
 {
   x_glob = x_glob_;   y_glob = y_glob_;   z_glob = z_glob_;
   dx_glob = dx_glob_; dy_glob = dy_glob_; dz_glob = dz_glob_;
@@ -43,7 +45,6 @@ GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double>
                 * ((y_glob[NY-1] + 0.5*dy_glob[NY-1]) - (y_glob[0] - 0.5*dy_glob[0]))
                 * ((z_glob[NZ-1] + 0.5*dz_glob[NZ-1]) - (z_glob[0] - 0.5*dz_glob[0]));
 
-  staggered_grid = false;
 }
 
 //------------------------------------------------------------------

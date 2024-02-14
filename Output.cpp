@@ -604,12 +604,13 @@ Output::OutputMeshPartition()
 void
 Output::CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vnew)
 {
-  Vec5D*** vold = (Vec5D***)V.GetDataPointer();
-  Vec5D*** vnew = (Vec5D***)Vnew.GetDataPointer();
-
   //only fills domain interior, not ghost nodes outside physical domain
   int i0, j0, k0, imax, jmax, kmax;
   V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);    
+
+  Vec5D*** vold = (Vec5D***)V.GetDataPointer();
+  Vec5D*** vnew = (Vec5D***)Vnew.GetDataPointer();
+
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {

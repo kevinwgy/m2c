@@ -66,17 +66,15 @@ public:
 
 public:
 
-  GlobalMeshInfo() {} //needed by M2CTwinMessenger (and maybe others)
+  GlobalMeshInfo() : staggered_grid(false) {} //needed by M2CTwinMessenger (and maybe others)
   GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_, std::vector<double> &z_glob_,
-                 std::vector<double> &dx_glob_, std::vector<double> &dy_glob_, std::vector<double> &dz_glob_);
+                 std::vector<double> &dx_glob_, std::vector<double> &dy_glob_, std::vector<double> &dz_glob_,
+                 bool is_staggered = false);
 
   ~GlobalMeshInfo();
 
   //! Setup the subD_xxx vectors
   void FindSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms);
-
-  //! Set whether mesh is staggered (default is NO)
-  void SetStaggeredMesh(bool is_staggered = true) {staggered_grid = is_staggered;}
 
   //! Get whether mesh is staggered
   bool IsMeshStaggered() {return staggered_grid;}
