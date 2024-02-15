@@ -34,6 +34,8 @@ protected:
   LinearSystemSolver vlin_solver; //!< solves the velocity linear systems
   LinearSystemSolver plin_solver; //!< solves the pressure linear system
 
+  SpaceVariable3D *R3_ptr; //!< momentum changes (dof = 3), for steady state only
+
   //! Relaxation coefficients
   double Efactor;
   double alphaP;

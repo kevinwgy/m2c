@@ -8,6 +8,8 @@
 #include <petscviewer.h>
 #include <Utils.h>
 #include <bits/stdc++.h> //min_element, max_element
+using std::vector;
+extern int INACTIVE_MATERIAL_ID;
 
 //---------------------------------------------------------
 // DataManagers3D
@@ -629,10 +631,13 @@ SpaceVariable3D::CalculateVectorInfNorm()
 
 //---------------------------------------------------------
 
-double
-SpaceVariable3D::CalculateFunctionL1NormConRec(SpaceVariable3D &volume)
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(SpaceVariable3D &volume, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
 {
-  double norm(0.0);
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
 
   double*** v   = GetDataPointer();
   double*** vol = volume.GetDataPointer();
@@ -640,23 +645,70 @@ SpaceVariable3D::CalculateFunctionL1NormConRec(SpaceVariable3D &volume)
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++)
-        for(int p=0; p<dof; p++)
-          norm += fabs(v[k][j][i*dof+p])*vol[k][j][i];
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*vol[k][j][i];
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*vol[k][j][i];
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
 
-  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
 
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
   RestoreDataPointerToLocalVector();
   volume.RestoreDataPointerToLocalVector();
-
-  return norm;
 }
 
 //---------------------------------------------------------
 
-double
-SpaceVariable3D::CalculateFunctionL1NormConRec(GlobalMeshInfo &global_mesh)
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(SpaceVariable3D &ID, SpaceVariable3D &volume, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
 {
-  double norm(0.0);
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
+
+  double*** v   = GetDataPointer();
+  double*** vol = volume.GetDataPointer();
+  double*** id  = ID.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+          continue;
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*vol[k][j][i];
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*vol[k][j][i];
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
+
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
+  RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+}
+
+//---------------------------------------------------------
+
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(GlobalMeshInfo &global_mesh, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
+{
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
 
   double*** v   = GetDataPointer();
 
@@ -667,54 +719,38 @@ SpaceVariable3D::CalculateFunctionL1NormConRec(GlobalMeshInfo &global_mesh)
       dydz = dz*global_mesh.GetDy(j);
       for(int i=i0; i<imax; i++) {
         dxdydz = dydz*global_mesh.GetDx(i);
-        for(int p=0; p<dof; p++)
-          norm += fabs(v[k][j][i*dof+p])*dxdydz;
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*dxdydz;
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*dxdydz;
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
       }
     }
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
 
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
   RestoreDataPointerToLocalVector();
-
-  return norm;
 }
 
 //---------------------------------------------------------
 
-
-double
-SpaceVariable3D::CalculateFunctionL2NormConRec(SpaceVariable3D &volume)
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(SpaceVariable3D &ID,
+                                              GlobalMeshInfo &global_mesh, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
 {
-  double norm(0.0);
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
 
-  double*** v   = GetDataPointer();
-  double*** vol = volume.GetDataPointer();
-
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++)
-        for(int p=0; p<dof; p++)
-          norm += v[k][j][i*dof+p]*v[k][j][i*dof+p]*vol[k][j][i];
-
-  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
-
-  norm = sqrt(norm);
-
-  RestoreDataPointerToLocalVector();
-  volume.RestoreDataPointerToLocalVector();
-
-  return norm;
-}
-
-//---------------------------------------------------------
-
-double
-SpaceVariable3D::CalculateFunctionL2NormConRec(GlobalMeshInfo &global_mesh)
-{
-  double norm(0.0);
-
-  double*** v   = GetDataPointer();
+  double*** v  = GetDataPointer();
+  double*** id = ID.GetDataPointer();
 
   double dz, dydz, dxdydz;
   for(int k=k0; k<kmax; k++) {
@@ -722,20 +758,27 @@ SpaceVariable3D::CalculateFunctionL2NormConRec(GlobalMeshInfo &global_mesh)
     for(int j=j0; j<jmax; j++) {
       dydz = dz*global_mesh.GetDy(j);
       for(int i=i0; i<imax; i++) {
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+          continue;
         dxdydz = dydz*global_mesh.GetDx(i);
-        for(int p=0; p<dof; p++)
-          norm += v[k][j][i*dof+p]*v[k][j][i*dof+p]*dxdydz;
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*dxdydz;
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*dxdydz;
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
       }
     }
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
 
-  norm = sqrt(norm);
-
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
   RestoreDataPointerToLocalVector();
-
-  return norm;
+  ID.RestoreDataPointerToLocalVector();
 }
 
 //---------------------------------------------------------

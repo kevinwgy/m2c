@@ -24,7 +24,8 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                       vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver,
                       "velocity"),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver,
-                      "pressure")
+                      "pressure"),
+                      R3_ptr(NULL)
 {
   type = SIMPLE;
 
@@ -55,12 +56,18 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
   plin_solver.GetSolverType(&ksp_type, &pc_type);
   print("  o Linear solver for pressure: %s, Preconditioner: %s.\n",
         ksp_type.c_str(), pc_type.c_str());
+
+  if(sso)
+    R3_ptr = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
 }
 
 //----------------------------------------------------------------------------
 
 TimeIntegratorSIMPLE::~TimeIntegratorSIMPLE()
-{ }
+{
+  if(R3_ptr)
+    delete R3_ptr;
+}
 
 //----------------------------------------------------------------------------
 
@@ -80,6 +87,9 @@ TimeIntegratorSIMPLE::Destroy()
 
   vlin_solver.Destroy();
   plin_solver.Destroy();
+
+  if(R3_ptr)
+    R3_ptr->Destroy();
 
   TimeIntegratorBase::Destroy();
 }
@@ -245,10 +255,19 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
     
 
+  if(sso) {
+    assert(R3_ptr);
+    inco.CalculateMomentumChanges(v0, V, id, *R3_ptr);
+  }
+
   V0.RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();
+
+  if(sso)
+    sso->MonitorConvergence(*R3_ptr, ID);
+    
 }
 
 //----------------------------------------------------------------------------
@@ -362,6 +381,8 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
 
 
 //----------------------------------------------------------------------------
+
+
 
 
 
@@ -562,11 +583,21 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     print("  o Converged after %d iterations. Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
   else
     print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
-    
+ 
+
+  if(sso) {
+    assert(R3_ptr);
+    inco.CalculateMomentumChanges(v0, V, id, *R3_ptr);
+  }
+   
   V0.RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();
+
+  if(sso)
+    sso->MonitorConvergence(*R3_ptr, ID);
+    
 }
 
 //----------------------------------------------------------------------------
@@ -876,11 +907,20 @@ END_CORRECTORS:
   else
     print_warning("  o Failed to converge. Relative error in velocity (2-norm): %e.\n", rel_err);
 
+
+  if(sso) {
+    assert(R3_ptr);
+    inco.CalculateMomentumChanges(v0, V, id, *R3_ptr);
+  }
+   
   V0.RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();
 
+  if(sso)
+    sso->MonitorConvergence(*R3_ptr, ID);
+    
 }
 
 //----------------------------------------------------------------------------

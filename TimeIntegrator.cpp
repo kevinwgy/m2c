@@ -35,7 +35,7 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
     assert(lso.size()==0);
 
   if(iod.ts.convergence_tolerance>0.0) //steady-state analysis
-    sso = new SteadyStateOperator(comm_, iod.ts);
+    sso = new SteadyStateOperator(comm_, iod.ts, spo.GetGlobalMeshInfo());
 }
 
 //----------------------------------------------------------------------------
@@ -226,6 +226,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Check of convergence (for steady-state computations)
   if(sso)
     sso->MonitorConvergence(Rn,ID); //Strictly speaking, should recompute R using updated V. But this is OK.
+                                    //Rn has been divided by dxdydz
 
 
   // -------------------------------------------------------------------------------
@@ -429,6 +430,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Check of convergence (for steady-state computations)
   if(sso)
     sso->MonitorConvergence(R,ID); //Strictly speaking, should recompute R using updated V. But this is OK.
+                                   //Rn has been divided by dxdydz
 
 
   // End-of-step tasks
@@ -688,6 +690,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // Check of convergence (for steady-state computations)
   if(sso)
     sso->MonitorConvergence(R,ID); //Strictly speaking, should recompute R using updated V. But this is OK.
+                                   //Rn has been divided by dxdydz
 
 
   // End-of-step tasks

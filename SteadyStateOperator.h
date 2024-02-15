@@ -8,6 +8,7 @@
 #include<SpaceVariable.h>
 
 struct TsData;
+class GlobalMeshInfo;
 
 /*********************************************************
  * class SteadyStateOperator handles some operations that
@@ -20,9 +21,11 @@ class SteadyStateOperator
 {
   MPI_Comm& comm;
 
+  GlobalMeshInfo &global_mesh;
+
   /** Currently, only monitors the N-S residual for convergence. Can be easily extended
    *  to consider state variable perturbation or some QoI. */   
-  double Rref[5]; //!< ref. residual (mass, momentum and energy fluxes) for non-dimensionalization
+  std::vector<double> Rref; //!< ref. residual (mass, momentum and energy fluxes) for non-dimensionalization
   double Rtol; //!< residual tol. (user input)
   bool ref_calculated; //!< whether references has been computed.
 
@@ -33,7 +36,7 @@ class SteadyStateOperator
 
 public:
 
-  SteadyStateOperator(MPI_Comm &comm_, TsData &iod_ts_);
+  SteadyStateOperator(MPI_Comm &comm_, TsData &iod_ts_, GlobalMeshInfo &global_mesh_);
   ~SteadyStateOperator();
 
   void Destroy();

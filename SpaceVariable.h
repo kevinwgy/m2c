@@ -197,11 +197,15 @@ public:
   double CalculateVectorTwoNorm();
   double CalculateVectorInfNorm();
 
-  //! calculate function L1 and L2 norms (const. reconstruction within cells)
-  double CalculateFunctionL1NormConRec(SpaceVariable3D &volume);
-  double CalculateFunctionL1NormConRec(GlobalMeshInfo &global_mesh);
-  double CalculateFunctionL2NormConRec(SpaceVariable3D &volume);
-  double CalculateFunctionL2NormConRec(GlobalMeshInfo &global_mesh);
+  //! calculate function L1 and L2 and Linf norms (const. reconstruction within cells)
+  void CalculateFunctionNormsConRec(SpaceVariable3D &volume, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
+  void CalculateFunctionNormsConRec(SpaceVariable3D &ID, SpaceVariable3D &volume, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
+  void CalculateFunctionNormsConRec(GlobalMeshInfo &global_mesh, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
+  void CalculateFunctionNormsConRec(SpaceVariable3D &ID, GlobalMeshInfo &global_mesh, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
 
 };
 

@@ -96,7 +96,7 @@ public:
                                   SpaceVariable3D &Vprime, SpaceVariable3D &Vtilde, double Efactor,
                                   double dt, SpaceVariable3D *LocalDt = NULL);
  
-
+  void CalculateMomentumChanges(Vec5D*** v0, SpaceVariable3D &V, double*** id, SpaceVariable3D &R3);
 
 private:
 

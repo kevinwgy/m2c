@@ -2738,6 +2738,42 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D**
 
 //--------------------------------------------------------------------------
 
+void
+IncompressibleOperator::CalculateMomentumChanges(Vec5D*** v0, SpaceVariable3D &V, double*** id,
+                                                 SpaceVariable3D &R3)
+{
+
+  Vec5D*** v = (Vec5D***)V.GetDataPointer();
+  Vec3D*** r = (Vec3D***)R3.GetDataPointer();
+
+  double rho0, rho;
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID) {
+          r[k][j][i] = 0.0;
+          continue;
+        }
+
+        rho0 = v0[k][j][i][0];
+        rho  = v[k][j][i][0];
+
+        for(int p=0; p<3; p++)
+          r[k][j][i][p] = rho*v[k][j][i][p+1] - rho0*v0[k][j][i][p+1];
+      }
+
+  V.RestoreDataPointerToLocalVector();
+  R3.RestoreDataPointerToLocalVector(); //!< no need of communication
+
+}
+
+//----------------------------------------------------------------------------
+
+
+
+//--------------------------------------------------------------------------
+
 
 
 
