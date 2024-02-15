@@ -46,10 +46,13 @@ public:
   void MonitorConvergence(SpaceVariable3D &R, SpaceVariable3D &ID); //!< calculates R1, R2, and Rinf
 
   double GetResidual1Norm() {return R1;}
+  double GetRelativeResidual1Norm() {return R1/R1_init;}
  
   double GetResidual2Norm() {return R2;}
+  double GetRelativeResidual2Norm() {return R2/R2_init;}
  
   double GetResidualInfNorm() {return Rinf;}
+  double GetRelativeResidualInfNorm() {return Rinf/Rinf_init;}
  
 protected:
 

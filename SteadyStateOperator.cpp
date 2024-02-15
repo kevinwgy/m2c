@@ -49,6 +49,8 @@ SteadyStateOperator::MonitorConvergence(SpaceVariable3D &R, SpaceVariable3D &ID)
   vector<double> r1, r2, rinf;
   R.CalculateFunctionNormsConRec(ID, global_mesh, r1, r2, rinf);
 
+//  fprintf(stdout, "r1 = %e %e %e, r2 = %e %e %e, rinf = %e %e %e.\n", r1[0], r1[1], r1[2], r2[0], r2[1], r2[2], rinf[0], rinf[1], rinf[2]);
+
   for(int i=0; i<R.NumDOF(); i++) { // divide each component by ref.
     r1[i]   /= Rref[i];
     r2[i]   /= Rref[i];
@@ -68,7 +70,7 @@ SteadyStateOperator::MonitorConvergence(SpaceVariable3D &R, SpaceVariable3D &ID)
   if(R1_init<0 || R2_init<0 || Rinf_init<0) { // first time-step
     R1_init = R1; 
     R2_init = R2;
-    Rinf_init = Rinf_init;
+    Rinf_init = Rinf;
     bool found_zero = false;
     if(R1_init == 0.0) {
       found_zero = true;
@@ -85,7 +87,7 @@ SteadyStateOperator::MonitorConvergence(SpaceVariable3D &R, SpaceVariable3D &ID)
     if(found_zero)
       print_warning(comm, "Warning: Found zero residual. Replaced by 1.\n"); 
 
-    print(comm, "- Initial residual: %e (L1-norm), %e (L2-norm), %e (Linf-norm).\n", R1_init, R2_init, Rinf_init);
+    print(comm, "- Initial residual: %e (Func. L1 norm), %e (L2), %e (inf).\n", R1_init, R2_init, Rinf_init);
   }
 
   
@@ -95,9 +97,6 @@ SteadyStateOperator::MonitorConvergence(SpaceVariable3D &R, SpaceVariable3D &ID)
   else
     converged = false;
 
-
-  R.RestoreDataPointerToLocalVector();
-  ID.RestoreDataPointerToLocalVector();
 
 }
 

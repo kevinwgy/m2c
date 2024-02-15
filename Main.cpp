@@ -670,10 +670,10 @@ int main(int argc, char* argv[])
         fprintf(stdout,"[Follower] dts = %e, dt = %e, dtleft = %e.\n", dts, dt, dtleft);
 */
  
-      if(steady_state) 
-        print("Step %d: t = %e, dt = %.4e, cfl = %.4e, Res (2 & inf norm): %.4e | %.4e. "
-              "Computation time: %.4e s.\n", time_step, t, dt, cfl, 
-              integrator->GetResidual2Norm(), integrator->GetResidualInfNorm());
+      if(steady_state)  {
+        print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
+              time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+      }
       else { //unsteady
         if(dts<=dt)
           print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
@@ -697,6 +697,11 @@ int main(int argc, char* argv[])
 //      exit_mpi();
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
+
+      if(steady_state)
+        print("  => Residual: %.4e (func 1 norm) |  %.4e (2 norm)  |  %.4e (max).\n",
+              integrator->GetRelativeResidual1Norm(), integrator->GetRelativeResidual2Norm(),
+              integrator->GetRelativeResidualInfNorm());
 
     } while (concurrent.Coupled() && dtleft != 0.0);
 

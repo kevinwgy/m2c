@@ -96,9 +96,9 @@ public:
                                         
   //! Functions pertaining to steady-state computation
   bool Converged() {return sso ? sso->Converged() : false;} //only for steady-state simulations
-  double GetResidual1Norm() {assert(sso); return sso->GetResidual1Norm();}
-  double GetResidual2Norm() {assert(sso); return sso->GetResidual2Norm();}
-  double GetResidualInfNorm() {assert(sso); return sso->GetResidualInfNorm();}
+  double GetRelativeResidual1Norm() {assert(sso); return sso->GetRelativeResidual1Norm();} //function L1 norm
+  double GetRelativeResidual2Norm() {assert(sso); return sso->GetRelativeResidual2Norm();} //function L2 norm
+  double GetRelativeResidualInfNorm() {assert(sso); return sso->GetRelativeResidualInfNorm();}
 
 protected:
 
