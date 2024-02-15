@@ -1,0 +1,671 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: fd4619d+ | Branch: main | Tag: 
+Computation started at: 2024-02-15.14:56:30 EDT
+Using 128 processor cores (including concurrent programs).
+Command: /home/kevinw3/tinkercliffs/zoey6/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+
+- Mesh Statistics:
+  X-Direction: [0.000000e+00, 1.000000e+00], 410 nodes/cells, dx_min = 1.005478e-03, dx_max = 4.987684e-03.
+  Y-Direction: [0.000000e+00, 1.000000e+00], 410 nodes/cells, dy_min = 1.005478e-03, dy_max = 4.987684e-03.
+  Z-Direction: [-5.000000e-03, 5.000000e-03], 1 nodes/cells, dz_min = 1.000000e-02, dz_max = 1.000000e-02.
+  Total number of nodes/cells: 168100.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 28252
+  o Number of ghost nodes outside computational domain: 398044
+
+
+- Initializing the state variables (V) and material id. (ID).
+
+- Initializing terminal visualization.
+- Adjusted the resolution for terminal visualization. dx: 1.797693e+308 -> 3.222563e-02.
+
+- [Line Plot] (5.000000e-01, 0.000000e+00, 0.000000e+00) --> (5.000000e-01, 1.000000e+00, 0.000000e+00), 300 points.
+
+- [Line Plot] (0.000000e+00, 5.000000e-01, 0.000000e+00) --> (1.000000e+00, 5.000000e-01, 0.000000e+00), 300 points.
+- Setting up a semi-implicit time integrator.
+  o Linear solver for velocity: ibcgs, Preconditioner: bjacobi.
+  o Linear solver for pressure: ibcgs, Preconditioner: bjacobi.
+- Performing a steady-state analysis. Tolerance (rel. residual): 2.000000e-07.
+
+
+----------------------------
+--       Main Loop        --
+----------------------------
+
+Step 1: t = 0.000000e+00, dt = 1.005478e+00, cfl = 1.0000e+03. Computation time: 4.4000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 7 iterations.
+    * Solver of the y-momentum equation converged in 7 iterations.
+    * Solver of the pressure correction equation converged in 377 iterations.
+  o It. 1: Relative error in velocity (2-norm): 1.342974e-01.
+    * Solver of the x-momentum equation converged in 6 iterations.
+    * Solver of the y-momentum equation converged in 8 iterations.
+    * Solver of the pressure correction equation converged in 382 iterations.
+  o It. 2: Relative error in velocity (2-norm): 2.753836e-02.
+    * Solver of the x-momentum equation converged in 5 iterations.
+    * Solver of the y-momentum equation converged in 6 iterations.
+    * Solver of the pressure correction equation converged in 389 iterations.
+  o It. 3: Relative error in velocity (2-norm): 1.316153e-02.
+    * Solver of the x-momentum equation converged in 4 iterations.
+    * Solver of the y-momentum equation converged in 6 iterations.
+    * Solver of the pressure correction equation converged in 315 iterations.
+  o It. 4: Relative error in velocity (2-norm): 8.913327e-03.
+    * Solver of the x-momentum equation converged in 4 iterations.
+    * Solver of the y-momentum equation converged in 5 iterations.
+    * Solver of the pressure correction equation converged in 320 iterations.
+  o It. 5: Relative error in velocity (2-norm): 6.292418e-03.
+    * Solver of the x-momentum equation converged in 4 iterations.
+    * Solver of the y-momentum equation converged in 5 iterations.
+    * Solver of the pressure correction equation converged in 320 iterations.
+  o It. 6: Relative error in velocity (2-norm): 4.696655e-03.
+    * Solver of the x-momentum equation converged in 3 iterations.
+    * Solver of the y-momentum equation converged in 5 iterations.
+    * Solver of the pressure correction equation converged in 298 iterations.
+  o It. 7: Relative error in velocity (2-norm): 3.602646e-03.
+    * Solver of the x-momentum equation converged in 3 iterations.
+    * Solver of the y-momentum equation converged in 4 iterations.
+    * Solver of the pressure correction equation converged in 295 iterations.
+  o It. 8: Relative error in velocity (2-norm): 2.824604e-03.
+    * Solver of the x-momentum equation converged in 3 iterations.
+    * Solver of the y-momentum equation converged in 4 iterations.
+    * Solver of the pressure correction equation converged in 284 iterations.
+  o It. 9: Relative error in velocity (2-norm): 2.249338e-03.
+    * Solver of the x-momentum equation converged in 3 iterations.
+    * Solver of the y-momentum equation converged in 4 iterations.
+    * Solver of the pressure correction equation converged in 293 iterations.
+  o It. 10: Relative error in velocity (2-norm): 1.813657e-03.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 236 iterations.
+  o It. 11: Relative error in velocity (2-norm): 1.476936e-03.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 208 iterations.
+  o It. 12: Relative error in velocity (2-norm): 1.212651e-03.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 177 iterations.
+  o It. 13: Relative error in velocity (2-norm): 1.002549e-03.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 157 iterations.
+  o It. 14: Relative error in velocity (2-norm): 8.337562e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 147 iterations.
+  o It. 15: Relative error in velocity (2-norm): 6.969357e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 146 iterations.
+  o It. 16: Relative error in velocity (2-norm): 5.851850e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 119 iterations.
+  o It. 17: Relative error in velocity (2-norm): 4.933072e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 83 iterations.
+  o It. 18: Relative error in velocity (2-norm): 4.173311e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 72 iterations.
+  o It. 19: Relative error in velocity (2-norm): 3.541843e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 77 iterations.
+  o It. 20: Relative error in velocity (2-norm): 3.014622e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 76 iterations.
+  o It. 21: Relative error in velocity (2-norm): 2.572646e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 74 iterations.
+  o It. 22: Relative error in velocity (2-norm): 2.200773e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 69 iterations.
+  o It. 23: Relative error in velocity (2-norm): 1.886840e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 24: Relative error in velocity (2-norm): 1.621013e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 74 iterations.
+  o It. 25: Relative error in velocity (2-norm): 1.395293e-04.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 66 iterations.
+  o It. 26: Relative error in velocity (2-norm): 1.203256e-04.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 64 iterations.
+  o It. 27: Relative error in velocity (2-norm): 1.039254e-04.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 62 iterations.
+  o It. 28: Relative error in velocity (2-norm): 8.989953e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 69 iterations.
+  o It. 29: Relative error in velocity (2-norm): 7.788023e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 58 iterations.
+  o It. 30: Relative error in velocity (2-norm): 6.756068e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 62 iterations.
+  o It. 31: Relative error in velocity (2-norm): 5.868461e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 59 iterations.
+  o It. 32: Relative error in velocity (2-norm): 5.103722e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 64 iterations.
+  o It. 33: Relative error in velocity (2-norm): 4.443799e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 64 iterations.
+  o It. 34: Relative error in velocity (2-norm): 3.873474e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 70 iterations.
+  o It. 35: Relative error in velocity (2-norm): 3.379886e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 59 iterations.
+  o It. 36: Relative error in velocity (2-norm): 2.952137e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 62 iterations.
+  o It. 37: Relative error in velocity (2-norm): 2.580976e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 60 iterations.
+  o It. 38: Relative error in velocity (2-norm): 2.258527e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 59 iterations.
+  o It. 39: Relative error in velocity (2-norm): 1.978078e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 61 iterations.
+  o It. 40: Relative error in velocity (2-norm): 1.734023e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 55 iterations.
+  o It. 41: Relative error in velocity (2-norm): 1.521148e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 60 iterations.
+  o It. 42: Relative error in velocity (2-norm): 1.335429e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 55 iterations.
+  o It. 43: Relative error in velocity (2-norm): 1.173241e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 59 iterations.
+  o It. 44: Relative error in velocity (2-norm): 1.031475e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 58 iterations.
+  o It. 45: Relative error in velocity (2-norm): 9.074509e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 61 iterations.
+  o It. 46: Relative error in velocity (2-norm): 7.988580e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 63 iterations.
+  o It. 47: Relative error in velocity (2-norm): 7.036998e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 64 iterations.
+  o It. 48: Relative error in velocity (2-norm): 6.202499e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 63 iterations.
+  o It. 49: Relative error in velocity (2-norm): 5.470135e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 59 iterations.
+  o It. 50: Relative error in velocity (2-norm): 4.826948e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 57 iterations.
+  o It. 51: Relative error in velocity (2-norm): 4.261690e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 55 iterations.
+  o It. 52: Relative error in velocity (2-norm): 3.764590e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 57 iterations.
+  o It. 53: Relative error in velocity (2-norm): 3.327153e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 59 iterations.
+  o It. 54: Relative error in velocity (2-norm): 2.941979e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 57 iterations.
+  o It. 55: Relative error in velocity (2-norm): 2.602624e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 59 iterations.
+  o It. 56: Relative error in velocity (2-norm): 2.303465e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 53 iterations.
+  o It. 57: Relative error in velocity (2-norm): 2.039596e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 56 iterations.
+  o It. 58: Relative error in velocity (2-norm): 1.806727e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 56 iterations.
+  o It. 59: Relative error in velocity (2-norm): 1.601111e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 61 iterations.
+  o It. 60: Relative error in velocity (2-norm): 1.419468e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 67 iterations.
+  o It. 61: Relative error in velocity (2-norm): 1.258924e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 62: Relative error in velocity (2-norm): 1.116961e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 61 iterations.
+  o It. 63: Relative error in velocity (2-norm): 9.913719e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 55 iterations.
+  o It. 64: Relative error in velocity (2-norm): 8.802189e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 53 iterations.
+  o It. 65: Relative error in velocity (2-norm): 7.818003e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 50 iterations.
+  o It. 66: Relative error in velocity (2-norm): 6.946209e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 44 iterations.
+  o It. 67: Relative error in velocity (2-norm): 6.564257e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 68: Relative error in velocity (2-norm): 5.454913e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 53 iterations.
+  o It. 69: Relative error in velocity (2-norm): 5.146103e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 71 iterations.
+  o It. 70: Relative error in velocity (2-norm): 4.281113e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 51 iterations.
+  o It. 71: Relative error in velocity (2-norm): 4.039840e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 72: Relative error in velocity (2-norm): 3.364523e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 50 iterations.
+  o It. 73: Relative error in velocity (2-norm): 3.175784e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 56 iterations.
+  o It. 74: Relative error in velocity (2-norm): 3.008538e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 95 iterations.
+  o It. 75: Relative error in velocity (2-norm): 2.323422e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 66 iterations.
+  o It. 76: Relative error in velocity (2-norm): 2.189339e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 46 iterations.
+  o It. 77: Relative error in velocity (2-norm): 2.074478e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 37 iterations.
+  o It. 78: Relative error in velocity (2-norm): 1.965836e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 131 iterations.
+  o It. 79: Relative error in velocity (2-norm): 1.396215e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 74 iterations.
+  o It. 80: Relative error in velocity (2-norm): 1.313115e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 101 iterations.
+  o It. 81: Relative error in velocity (2-norm): 1.244493e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 35 iterations.
+  o It. 82: Relative error in velocity (2-norm): 1.179444e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 38 iterations.
+  o It. 83: Relative error in velocity (2-norm): 1.118073e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 48 iterations.
+  o It. 84: Relative error in velocity (2-norm): 1.060143e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 52 iterations.
+  o It. 85: Relative error in velocity (2-norm): 1.005449e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 192 iterations.
+  o Converged after 86 iterations. Relative error in velocity (2-norm): 5.083101e-08.
+- Calculated residual normalization factors: 5.310374e-01 1.338731e-01 1.000000e+00.
+- Initial residual: 9.938248e-05 (Func. L1 norm), 3.759027e-03 (L2), 1.000000e+00 (inf).
+  => Residual: 1.0000e+00 (func 1 norm) |  1.0000e+00 (2 norm)  |  1.0000e+00 (max).
+Step 2: t = 1.005478e+00, dt = 2.650349e+00, cfl = 1.0000e+03. Computation time: 1.8100e+00 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 6 iterations.
+    * Solver of the y-momentum equation converged in 8 iterations.
+    * Solver of the pressure correction equation converged in 385 iterations.
+  o It. 1: Relative error in velocity (2-norm): 2.681266e-02.
+    * Solver of the x-momentum equation converged in 6 iterations.
+    * Solver of the y-momentum equation converged in 7 iterations.
+    * Solver of the pressure correction equation converged in 487 iterations.
+  o It. 2: Relative error in velocity (2-norm): 1.189808e-03.
+    * Solver of the x-momentum equation converged in 4 iterations.
+    * Solver of the y-momentum equation converged in 5 iterations.
+    * Solver of the pressure correction equation converged in 361 iterations.
+  o It. 3: Relative error in velocity (2-norm): 5.365182e-04.
+    * Solver of the x-momentum equation converged in 3 iterations.
+    * Solver of the y-momentum equation converged in 5 iterations.
+    * Solver of the pressure correction equation converged in 334 iterations.
+  o It. 4: Relative error in velocity (2-norm): 3.605452e-04.
+    * Solver of the x-momentum equation converged in 3 iterations.
+    * Solver of the y-momentum equation converged in 4 iterations.
+    * Solver of the pressure correction equation converged in 324 iterations.
+  o It. 5: Relative error in velocity (2-norm): 2.571272e-04.
+    * Solver of the x-momentum equation converged in 3 iterations.
+    * Solver of the y-momentum equation converged in 4 iterations.
+    * Solver of the pressure correction equation converged in 311 iterations.
+  o It. 6: Relative error in velocity (2-norm): 1.913983e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 298 iterations.
+  o It. 7: Relative error in velocity (2-norm): 1.454599e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 295 iterations.
+  o It. 8: Relative error in velocity (2-norm): 1.125480e-04.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 3 iterations.
+    * Solver of the pressure correction equation converged in 309 iterations.
+  o It. 9: Relative error in velocity (2-norm): 8.829808e-05.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 286 iterations.
+  o It. 10: Relative error in velocity (2-norm): 7.007364e-05.
+    * Solver of the x-momentum equation converged in 2 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 272 iterations.
+  o It. 11: Relative error in velocity (2-norm): 5.614809e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 269 iterations.
+  o It. 12: Relative error in velocity (2-norm): 4.537521e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 214 iterations.
+  o It. 13: Relative error in velocity (2-norm): 3.691501e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 191 iterations.
+  o It. 14: Relative error in velocity (2-norm): 3.021879e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 186 iterations.
+  o It. 15: Relative error in velocity (2-norm): 2.487394e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 154 iterations.
+  o It. 16: Relative error in velocity (2-norm): 2.057516e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 146 iterations.
+  o It. 17: Relative error in velocity (2-norm): 1.709456e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 136 iterations.
+  o It. 18: Relative error in velocity (2-norm): 1.425958e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 106 iterations.
+  o It. 19: Relative error in velocity (2-norm): 1.193811e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 2 iterations.
+    * Solver of the pressure correction equation converged in 83 iterations.
+  o It. 20: Relative error in velocity (2-norm): 1.002793e-05.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 21: Relative error in velocity (2-norm): 8.450352e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 85 iterations.
+  o It. 22: Relative error in velocity (2-norm): 7.140048e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 70 iterations.
+  o It. 23: Relative error in velocity (2-norm): 6.048891e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 78 iterations.
+  o It. 24: Relative error in velocity (2-norm): 5.137096e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 71 iterations.
+  o It. 25: Relative error in velocity (2-norm): 4.372778e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 70 iterations.
+  o It. 26: Relative error in velocity (2-norm): 3.730202e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 68 iterations.
+  o It. 27: Relative error in velocity (2-norm): 3.188498e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 68 iterations.
+  o It. 28: Relative error in velocity (2-norm): 2.730661e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 67 iterations.
+  o It. 29: Relative error in velocity (2-norm): 2.342776e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 68 iterations.
+  o It. 30: Relative error in velocity (2-norm): 2.013412e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 72 iterations.
+  o It. 31: Relative error in velocity (2-norm): 1.733143e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 63 iterations.
+  o It. 32: Relative error in velocity (2-norm): 1.494172e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 33: Relative error in velocity (2-norm): 1.290023e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 78 iterations.
+  o It. 34: Relative error in velocity (2-norm): 1.115309e-06.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 71 iterations.
+  o It. 35: Relative error in velocity (2-norm): 9.655272e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 67 iterations.
+  o It. 36: Relative error in velocity (2-norm): 8.369112e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 63 iterations.
+  o It. 37: Relative error in velocity (2-norm): 7.262983e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 66 iterations.
+  o It. 38: Relative error in velocity (2-norm): 6.310277e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 39: Relative error in velocity (2-norm): 5.488553e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 65 iterations.
+  o It. 40: Relative error in velocity (2-norm): 4.778846e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 48 iterations.
+  o It. 41: Relative error in velocity (2-norm): 4.539819e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 71 iterations.
+  o It. 42: Relative error in velocity (2-norm): 3.593322e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 61 iterations.
+  o It. 43: Relative error in velocity (2-norm): 3.404280e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 71 iterations.
+  o It. 44: Relative error in velocity (2-norm): 2.707326e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 74 iterations.
+  o It. 45: Relative error in velocity (2-norm): 2.564615e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 49 iterations.
+  o It. 46: Relative error in velocity (2-norm): 2.442140e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 90 iterations.
+  o It. 47: Relative error in velocity (2-norm): 1.751000e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 112 iterations.
+  o It. 48: Relative error in velocity (2-norm): 1.653335e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 81 iterations.
+  o It. 49: Relative error in velocity (2-norm): 1.573291e-07.
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 52 iterations.
+  o It. 50: Relative error in velocity (2-norm): 1.497628e-07.
+[0;35m  o Failed to converge. Relative error in velocity (2-norm): 1.497628e-07.
+[0m  => Residual: 6.6276e-01 (func 1 norm) |  5.1729e-01 (2 norm)  |  4.7399e-01 (max).
+
+
+
+...
+
+
+
+
+
+Step 14988: t = 1.915777e+04, dt = 1.277936e+00, cfl = 1.0000e+03. Computation time: 6.2225e+02 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 1 iterations.
+    * Solver of the pressure correction equation converged in 539 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 4.527900e-08.
+  => Residual: 2.0044e-18 (func 1 norm) |  4.9333e-17 (2 norm)  |  4.1466e-16 (max).
+- Wrote solution at 1.915905e+04 to solution_0075.vtr.
+
+[0;32m==========================================
+ Velocity (Magnitude) at 1.9159e+04 (Step 14988)
+[0;32m==========================================[0m
+The X-Y plane. z: 0.00e+00, x (horiz.): [5.03e-04, 9.99e-01], y (vert.): [5.03e-04, 9.99e-01].
+------------------------------------------------------------------
+[0m|[48;5;69m  [48;5;166m  [48;5;166m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;160m  [48;5;166m  [48;5;166m  [48;5;69m  [0m|
+[0m|[48;5;54m  [48;5;50m  [48;5;45m  [48;5;85m  [48;5;155m  [48;5;191m  [48;5;227m  [48;5;221m  [48;5;221m  [48;5;221m  [48;5;214m  [48;5;214m  [48;5;214m  [48;5;214m  [48;5;208m  [48;5;208m  [48;5;208m  [48;5;208m  [48;5;208m  [48;5;214m  [48;5;214m  [48;5;214m  [48;5;214m  [48;5;221m  [48;5;221m  [48;5;227m  [48;5;191m  [48;5;155m  [48;5;84m  [48;5;45m  [48;5;50m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;50m  [48;5;50m  [48;5;45m  [48;5;45m  [48;5;44m  [48;5;85m  [48;5;84m  [48;5;120m  [48;5;155m  [48;5;191m  [48;5;191m  [48;5;191m  [48;5;191m  [48;5;227m  [48;5;227m  [48;5;227m  [48;5;227m  [48;5;227m  [48;5;191m  [48;5;191m  [48;5;191m  [48;5;191m  [48;5;155m  [48;5;120m  [48;5;84m  [48;5;50m  [48;5;44m  [48;5;45m  [48;5;50m  [48;5;85m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;44m  [48;5;85m  [48;5;50m  [48;5;45m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;44m  [48;5;50m  [48;5;85m  [48;5;84m  [48;5;84m  [48;5;120m  [48;5;120m  [48;5;120m  [48;5;120m  [48;5;120m  [48;5;120m  [48;5;120m  [48;5;84m  [48;5;84m  [48;5;85m  [48;5;50m  [48;5;44m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;50m  [48;5;85m  [48;5;50m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;45m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;44m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;50m  [48;5;85m  [48;5;85m  [48;5;44m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;75m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;50m  [48;5;85m  [48;5;85m  [48;5;50m  [48;5;45m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;75m  [48;5;44m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;50m  [48;5;85m  [48;5;85m  [48;5;50m  [48;5;75m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;50m  [48;5;85m  [48;5;85m  [48;5;50m  [48;5;44m  [48;5;75m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;69m  [48;5;75m  [48;5;44m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;44m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;45m  [48;5;75m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;69m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;75m  [48;5;69m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;68m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;44m  [48;5;44m  [48;5;50m  [48;5;50m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;69m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;68m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;68m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;44m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;68m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;68m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;45m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;68m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;61m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;68m  [48;5;61m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;61m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;68m  [48;5;61m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;61m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;75m  [48;5;75m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;69m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;68m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;61m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+[0m|[48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [48;5;54m  [0m|
+------------------------------------------------------------------
+[48;5;54m 1.10e-08 [48;5;61m 4.32e-02 [48;5;68m 8.64e-02 [48;5;69m 1.30e-01 [48;5;75m 1.73e-01 [48;5;75m 2.16e-01 [48;5;45m 2.59e-01 [48;5;44m 3.03e-01 [48;5;50m 3.46e-01 [0m
+[48;5;85m 3.89e-01 [48;5;84m 4.32e-01 [48;5;120m 4.75e-01 [48;5;155m 5.19e-01 [48;5;191m 5.62e-01 [48;5;191m 6.05e-01 [48;5;227m 6.48e-01 [48;5;221m 6.92e-01 [48;5;221m 7.35e-01 [0m
+[48;5;214m 7.78e-01 [48;5;208m 8.21e-01 [48;5;208m 8.64e-01 [48;5;202m 9.08e-01 [48;5;166m 9.51e-01 [48;5;160m 9.94e-01 [0m
+
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 1.915905e+04)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 622.500000 sec.
+

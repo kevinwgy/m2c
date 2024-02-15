@@ -629,7 +629,7 @@ int main(int argc, char* argv[])
              : iod.ts.maxIts;
 
   // Time-Stepping
-  while(t<tmax && time_step<maxIts && !integrator->Converged()) {// the last one is for steady-state
+  while(t<tmax-1.0e-6*dts && time_step<maxIts && !integrator->Converged()) {// the last one is for steady-state
 
     double dtleft = dts;
 
