@@ -25,6 +25,9 @@ class Output
   //! Global mesh
   GlobalMeshInfo &global_mesh;
 
+  //! external ghosts
+  std::vector<GhostPoint>& ghost_nodes_outer;
+
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
 
@@ -54,7 +57,7 @@ class Output
 public:
 
   Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-         std::vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
+         std::vector<GhostPoint>* ghost_nodes_outer_, std::vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
          IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL);
   ~Output();
 

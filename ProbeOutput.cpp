@@ -767,80 +767,96 @@ ProbeOutput::CalculateTemperatureAtProbe(Int3& ijk, pair<int, array<bool,8> >& i
     double c000 = 0.0;
     if(ijk_valid.second[0]) {
       myid = id[k][j][i]; 
-      rho  =  v[k][j][i*dim];
-      p    =  v[k][j][i*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c000 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k][j][i*dim];
+        p    =  v[k][j][i*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c000 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     // c100
     double c100 = 0.0;
     if(ijk_valid.second[1]) {
       myid = id[k][j][i+1];
-      rho  =  v[k][j][(i+1)*dim];
-      p    =  v[k][j][(i+1)*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c100 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k][j][(i+1)*dim];
+        p    =  v[k][j][(i+1)*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c100 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     // c010
     double c010 = 0.0;
     if(ijk_valid.second[2]) {
       myid = id[k][j+1][i];
-      rho  =  v[k][j+1][i*dim];
-      p    =  v[k][j+1][i*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c010 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k][j+1][i*dim];
+        p    =  v[k][j+1][i*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c010 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     // c110
     double c110 = 0.0;
     if(ijk_valid.second[3]) {
       myid = id[k][j+1][i+1];
-      rho  =  v[k][j+1][(i+1)*dim];
-      p    =  v[k][j+1][(i+1)*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c110 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k][j+1][(i+1)*dim];
+        p    =  v[k][j+1][(i+1)*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c110 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     // c001
     double c001 = 0.0;
     if(ijk_valid.second[4]) {
       myid = id[k+1][j][i];
-      rho  =  v[k+1][j][i*dim];
-      p    =  v[k+1][j][i*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c001 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k+1][j][i*dim];
+        p    =  v[k+1][j][i*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c001 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     // c101
     double c101 = 0.0;
     if(ijk_valid.second[5]) {
       myid = id[k+1][j][i+1];
-      rho  =  v[k+1][j][(i+1)*dim];
-      p    =  v[k+1][j][(i+1)*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c101 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k+1][j][(i+1)*dim];
+        p    =  v[k+1][j][(i+1)*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c101 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     // c011
     double c011 = 0.0;
     if(ijk_valid.second[6]) {
       myid = id[k+1][j+1][i];
-      rho  =  v[k+1][j+1][i*dim];
-      p    =  v[k+1][j+1][i*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c011 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k+1][j+1][i*dim];
+        p    =  v[k+1][j+1][i*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c011 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     // c111
     double c111 = 0.0;
     if(ijk_valid.second[7]) {
       myid = id[k+1][j+1][i+1];
-      rho  =  v[k+1][j+1][(i+1)*dim];
-      p    =  v[k+1][j+1][(i+1)*dim+4];
-      e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
-      c111 = vf[myid]->GetTemperature(rho,e);
+      if(vf[myid]->type != VarFcnBase::HOMOGENEOUS_INCOMPRESSIBLE) {
+        rho  =  v[k+1][j+1][(i+1)*dim];
+        p    =  v[k+1][j+1][(i+1)*dim+4];
+        e    = vf[myid]->GetInternalEnergyPerUnitMass(rho,p);
+        c111 = vf[myid]->GetTemperature(rho,e);
+      }
     }
 
     if(ijk_valid.first<8) {//fill invalid slots with average value

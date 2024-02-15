@@ -11,11 +11,11 @@
 //--------------------------------------------------------------------------
 
 Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-               std::vector<VarFcnBase*> &vf_, 
+               std::vector<GhostPoint>* ghost_nodes_outer_, std::vector<VarFcnBase*> &vf_, 
                SpaceVariable3D &cell_volume, IonizationOperator* ion_,
                HyperelasticityOperator* heo_) : 
     comm(comm_), 
-    iod(iod_), global_mesh(global_mesh_), vf(vf_),
+    iod(iod_), global_mesh(global_mesh_), ghost_nodes_outer(*ghost_nodes_outer_), vf(vf_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
     vector5(comm_, &(dms.ghosted1_5dof)),
@@ -604,9 +604,9 @@ Output::OutputMeshPartition()
 void
 Output::CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vnew)
 {
-  //only fills domain interior, not ghost nodes outside physical domain
+  //fill domain interior first
   int i0, j0, k0, imax, jmax, kmax;
-  V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);    
+  V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
 
   Vec5D*** vold = (Vec5D***)V.GetDataPointer();
   Vec5D*** vnew = (Vec5D***)Vnew.GetDataPointer();
@@ -620,6 +620,19 @@ Output::CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vne
         vnew[k][j][i][3] = 0.5*(vold[k][j][i][3] + vold[k+1][j][i][3]);
         vnew[k][j][i][4] = vold[k][j][i][4];
       }
+
+
+  //now, populate ghost nodes by const extrapolation
+  int i,j,k, i_im, j_im, k_im;
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+    i = it->ijk[0]; 
+    j = it->ijk[1]; 
+    k = it->ijk[2]; 
+    i_im = it->image_ijk[0]; 
+    j_im = it->image_ijk[1]; 
+    k_im = it->image_ijk[2]; 
+    vnew[k][j][i] = vnew[k_im][j_im][i_im];
+  }
 
   V.RestoreDataPointerToLocalVector();
   Vnew.RestoreDataPointerAndInsert();
