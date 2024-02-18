@@ -1,13 +1,13 @@
-//Units: non-dimensional. This is the problem on Page 130 of Arthur Rallu thesis (Fig. 4.13)
+//Units: g, mm, s, Pa. This is a hypervelocity impact test. The initial condition features a big jump in velocity
 
 under Mesh {
   Type = ThreeDimensional;
   X0   = 0.0;
   Xmax = 1.0;
-  Y0   = -0.05;
-  Ymax = 0.05;
-  Z0   = -0.05;
-  Zmax = 0.05;
+  Y0   = -0.03;
+  Ymax = 0.03;
+  Z0   = -0.03;
+  Zmax = 0.03;
   NumberOfCellsX = 200;
   NumberOfCellsY = 1;
   NumberOfCellsZ = 1;
@@ -20,19 +20,24 @@ under Mesh {
   BoundaryConditionZmax = Symmetry;
 }
 
+//For material properties, refer to Shafquat Islam report (04/2021)
 under Equations {
-  under Material[0] {
-    EquationOfState = StiffenedGas;
-    under StiffenedGasModel {
-      SpecificHeatRatio = 1.4;
-      PressureConstant = 0.0;
+  under Material[0] { //OFHC Copper (projectile)
+    EquationOfState = MieGruneisen;
+    under MieGruneisenModel {
+      ReferenceDensity = 8.96e-3; //g/mm3
+      BulkSpeedOfSound = 3.97e6; //mm/s
+      HugoniotSlope = 1.479; //non-D
+      ReferenceGamma = 2.12; //non-D
     }
   }
-  under Material[1] {
-    EquationOfState = StiffenedGas;
-    under StiffenedGasModel {
-      SpecificHeatRatio = 1.667;
-      PressureConstant = 0.0;
+  under Material[1] { //SLG (Starphire)
+    EquationOfState = MieGruneisen;
+    under MieGruneisenModel {
+      ReferenceDensity = 2.204e-3; //g/mm3
+      BulkSpeedOfSound = 2.22e6; //mm/s
+      HugoniotSlope = 1.61; //non-D
+      ReferenceGamma = 0.65; //non-D
     }
   }
 }
@@ -42,7 +47,7 @@ under InitialCondition {
   under GeometricEntities {
 
     under Plane[0] {
-      Point_x = 0.5;
+      Point_x = 0.4;
       Point_y = 0.0;
       Point_z = 0.0;
       Normal_x = 1.0;
@@ -51,11 +56,11 @@ under InitialCondition {
 
       under InitialState {
         MaterialID = 1;
-        Density = 1.0; 
+        Density = 2.204e-3;
         VelocityX = 0.0;
         VelocityY = 0.0;
         VelocityZ = 0.0;
-        Pressure = 0.2;
+        Pressure = 1.0e5;
       }
     }
   }
@@ -65,31 +70,31 @@ under InitialCondition {
 under BoundaryConditions {
   under Inlet {
     MaterialID = 0;
-    Density = 1.0; 
-    VelocityX = 0.0;
+    Density = 8.96e-3; //g/mm3
+    VelocityX = 3.0e6; //mm/s
     VelocityY = 0.0;
     VelocityZ = 0.0;
-    Pressure = 500.0;
+    Pressure = 1.0e5;
   }
   under Outlet {
     MaterialID = 1;
-    Density = 1.0; 
+    Density = 2.204e-3;
     VelocityX = 0.0;
     VelocityY = 0.0;
     VelocityZ = 0.0;
-    Pressure = 0.2;
+    Pressure = 1.0e5;
   }
 }
 
 under Space {
   under NavierStokes {
-    Flux = Roe; //HLLC;
+    Flux = HLLC;
     under Reconstruction {
       Type = Linear;    
-      VariableType = ConservativeCharacteristic; //clearly better than others
+      VariableType = ConservativeCharacteristic; //C-C ~ C ~ P-C > P
       SlopeNearInterface = NonZero;
-      Limiter = GeneralizedMinMod;
-      GeneralizedMinModCoefficient = 1.2;
+      Limiter = VanAlbada; //GeneralizedMinMod;
+      GeneralizedMinModCoefficient = 1.5;
     }
   }
 
@@ -97,7 +102,7 @@ under Space {
     MaterialID = 1;
     under Reconstruction {
       Type = Linear;
-      Limiter = None; //VanAlbada;
+      Limiter = None;
     }
   }
 
@@ -111,8 +116,7 @@ under MultiPhase {
 
 under Time {
   Type = Explicit;
-  //MaxIts = 500;
-  MaxTime = 0.015;
+  MaxTime = 8.0e-8;
   CFL    = 0.8;
   under Explicit {
     Type = RungeKutta2;
@@ -123,7 +127,7 @@ under Output {
   Prefix = "results/";
   Solution = "solution";
   //Frequency = 10;
-  TimeInterval = 0.001;
+  TimeInterval = 8.0e-9;
   Density = On;
   Velocity = On;
   Pressure = On;
@@ -133,23 +137,10 @@ under Output {
   under LinePlot[0] {
     FileName = "line";
     NumberOfPoints = 200;
-//    TimeInterval = 0.001;
-    X0 = 0.0;  Xmax = 1.0;
+    X0 = 0.0025;  Xmax = 0.9975;
     Y0 = 0.0;  Ymax = 0.0;
     Z0 = 0.0;  Zmax = 0.0;
   }
 
-  under Probes {
-    Frequency = 10;
-    Density = "probe_density.txt";
-    VelocityX = "probe_velocity_x.txt";
-    Pressure = "probe_pressure.txt";
-    under Node[0] {X = 0.5; Y = 0.0; Z = 0.0;}
-    under Node[1] {X = 0.6; Y = 0.0; Z = 0.0;}
-  }
-
-  under MaterialVolumes {
-    FileName = "material_volumes.txt";
-    TimeInterval = 0.001;
-  }
+  //VerboseScreenOutput = On;
 }

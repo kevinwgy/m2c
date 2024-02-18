@@ -51,6 +51,7 @@ public:
   double GetDensity(double p, double e); 
   double GetDpdrho(double rho, double e); 
   inline double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {return omega;}
+  inline double GetTemperature([[maybe_unused]] double rho, [[maybe_unused]] double e) {return 0.0;} //TODO
 
 protected:
   inline double Fun(double rho) {
