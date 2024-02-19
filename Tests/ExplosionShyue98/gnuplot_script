@@ -1,0 +1,17 @@
+plot "results/line_0001.txt" using 1:2 with lp linewidth 2 pointtype 6 ps 2 lc rgb "red"
+set xlabel "x"
+set ylabel "density"
+set grid
+set term png size 1280,960 font "arial,24"
+set output "density.png"
+replot
+
+
+plot "results/line_0001.txt" using 1:6 with lp linewidth 2 pointtype 6 ps 2 lc rgb "red"
+set xlabel "x"
+set ylabel "pressure"
+set grid
+set term png size 1280,960 font "arial,24"
+set output "pressure.png"
+replot
+
