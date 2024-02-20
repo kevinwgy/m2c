@@ -32,6 +32,7 @@ MaterialVolumeOutput::MaterialVolumeOutput(MPI_Comm &comm_, IoData &iod,
                 (iod.mesh.zmax-iod.mesh.z0));
     print(file, "## The last column is the sum over all material subdomains "
                 "(including ghost/inactive).\n");
+    mpi_barrier();
     fflush(file);
     delete [] full_fname;
   } 
@@ -71,6 +72,7 @@ MaterialVolumeOutput::WriteSolution(double time, double dt, int time_step, Space
     sum += vol[i];
   }
   print(file, "%16.8e\n", sum);
+  mpi_barrier();
   fflush(file);
 
   last_snapshot_time = time;

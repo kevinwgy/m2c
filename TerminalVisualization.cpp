@@ -151,7 +151,7 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
       dx = dx_max;
   }
   if(iod_terminal.dx>0 && iod_terminal.dx != dx)
-    print(comm, "- Adjusted the resolution for terminal visualization. dx: %e -> %e.\n", 
+    print(comm, "  o Adjusted the resolution for terminal visualization. dx: %e -> %e.\n", 
           iod_terminal.dx, dx);
 
   // determine nrows and ncols
