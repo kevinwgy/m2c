@@ -25,6 +25,12 @@ MaterialVolumeOutput::MaterialVolumeOutput(MPI_Comm &comm_, IoData &iod,
     char *full_fname = new char[spn + strlen(iod.output.materialVolumes.filename)];
     sprintf(full_fname, "%s%s", iod.output.prefix, iod.output.materialVolumes.filename);
     file = fopen(full_fname, "w");
+
+    if(!file) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", full_fname);
+      exit_mpi();
+    }
+
     print(file, "## Number of physical materials: %d (0 - %d); ID for ghost/inactive cells: %d.\n",
                 numMaterials-1, numMaterials-2, numMaterials-1);
     print(file, "## Total volume of computational domain: %e.\n",

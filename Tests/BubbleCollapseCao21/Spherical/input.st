@@ -108,8 +108,8 @@ under MultiPhase {
 
 under Time {
   Type = Explicit;
-  MaxTime = 8.0e-5;
-  CFL = 0.45;
+  MaxTime = 1.2e-4;
+  CFL = 0.3;
   under Explicit {
     Type = RungeKutta2; //ForwardEuler; RungeKutta2
   }

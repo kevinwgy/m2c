@@ -1251,7 +1251,7 @@ void EquationsData::setup(const char *name, ClassAssigner *father)
 ReconstructionData::ReconstructionData() 
 {
   type = LINEAR;
-  limiter = NONE;
+  limiter = GENERALIZED_MINMOD;
   slopeNearInterface = NONZERO;
 
   generalized_minmod_coeff = 1.2; //The generalized MC Limiter

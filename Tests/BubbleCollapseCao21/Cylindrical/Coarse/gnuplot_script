@@ -1,0 +1,8 @@
+plot "results/volumes" using 2:(sqrt(2.0/(2e-3*pi)*$4)) with l lw 2 title "dx_{min} = 1.5e-2"
+set key right top
+set xlabel "time (s)"
+set ylabel "bubble radius (mm)"
+set grid
+set term png size 1280,960 font "arial,24"
+set output "bubble_radius.png"
+replot

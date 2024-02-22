@@ -53,6 +53,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.density)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.density);
     file[Probes::DENSITY] = fopen(filename, "w");
+
+    if(!file[Probes::DENSITY]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -60,6 +66,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.velocity_x)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.velocity_x);
     file[Probes::VELOCITY_X] = fopen(filename, "w");
+
+    if(!file[Probes::VELOCITY_X]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -67,6 +79,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.velocity_y)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.velocity_y);
     file[Probes::VELOCITY_Y] = fopen(filename, "w");
+
+    if(!file[Probes::VELOCITY_Y]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -74,6 +92,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.velocity_z)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.velocity_z);
     file[Probes::VELOCITY_Z] = fopen(filename, "w");
+
+    if(!file[Probes::VELOCITY_Z]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -81,6 +105,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.pressure)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.pressure);
     file[Probes::PRESSURE] = fopen(filename, "w");
+
+    if(!file[Probes::PRESSURE]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -88,6 +118,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.temperature)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.temperature);
     file[Probes::TEMPERATURE] = fopen(filename, "w");
+
+    if(!file[Probes::TEMPERATURE]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -95,6 +131,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.delta_temperature)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.delta_temperature);
     file[Probes::DELTA_TEMPERATURE] = fopen(filename, "w");
+
+    if(!file[Probes::DELTA_TEMPERATURE]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -102,6 +144,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.materialid)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.materialid);
     file[Probes::MATERIALID] = fopen(filename, "w");
+
+    if(!file[Probes::MATERIALID]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -109,6 +157,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.laser_radiance)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.laser_radiance);
     file[Probes::LASERRADIANCE] = fopen(filename, "w");
+
+    if(!file[Probes::LASERRADIANCE]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -116,6 +170,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.levelset0)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset0);
     file[Probes::LEVELSET0] = fopen(filename, "w");
+
+    if(!file[Probes::LEVELSET0]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -123,6 +183,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.levelset1)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset1);
     file[Probes::LEVELSET1] = fopen(filename, "w");
+
+    if(!file[Probes::LEVELSET1]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -130,6 +196,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.levelset2)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset2);
     file[Probes::LEVELSET2] = fopen(filename, "w");
+
+    if(!file[Probes::LEVELSET2]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -137,6 +209,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.levelset3)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset3);
     file[Probes::LEVELSET3] = fopen(filename, "w");
+
+    if(!file[Probes::LEVELSET3]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -144,6 +222,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.levelset4)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset4);
     file[Probes::LEVELSET4] = fopen(filename, "w");
+
+    if(!file[Probes::LEVELSET4]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -155,6 +239,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.ionization_result)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.ionization_result);
     file[Probes::IONIZATION] = fopen(filename, "w");
+
+    if(!file[Probes::IONIZATION]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -162,6 +252,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.reference_map)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.reference_map);
     file[Probes::REFERENCE_MAP] = fopen(filename, "w");
+
+    if(!file[Probes::REFERENCE_MAP]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -173,6 +269,12 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
     char *filename = new char[spn + strlen(iod_output.probes.principal_elastic_stresses)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.principal_elastic_stresses);
     file[Probes::PRINCIPAL_ELASTIC_STRESSES] = fopen(filename, "w");
+
+    if(!file[Probes::PRINCIPAL_ELASTIC_STRESSES]) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", filename);
+      exit_mpi();
+    }
+
     delete [] filename;
   }
 
@@ -391,6 +493,11 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
 
   //open file & write the header
   FILE *file = fopen(full_fname, "w");
+  if(!file) {
+    print_error("*** Error: Cannot open file '%s' for output.\n", full_fname);
+    exit_mpi();
+  }
+
   print(file, "## Line: (%e, %e, %e) -> (%e, %e, %e)\n", line->x0, line->y0, line->z0,
         line->x1, line->y1, line->z1);
   print(file, "## Number of points: %d (h = %e)\n", line->numPoints, h);

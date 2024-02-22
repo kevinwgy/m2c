@@ -1198,9 +1198,9 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
         fluxFcn.EvaluateMaxEigenvalues(v[k][j][i], myid, lam_f, lam_g, lam_h);
         char_speed_max = max(max(max(char_speed_max, lam_f), lam_g), lam_h);
 
-        dx_over_char_speed_min = min(dx_over_char_speed_min, 
-                                     min(dxyz[k][j][i][0]/lam_f, 
-                                         min(dxyz[k][j][i][1]/lam_g, dxyz[k][j][i][2]/lam_h) ) );
+        if(global_mesh.x_glob.size()>1)  dx_over_char_speed_min = min(dx_over_char_speed_min, dxyz[k][j][i][0]/lam_f);
+        if(global_mesh.y_glob.size()>1)  dx_over_char_speed_min = min(dx_over_char_speed_min, dxyz[k][j][i][1]/lam_g);
+        if(global_mesh.z_glob.size()>1)  dx_over_char_speed_min = min(dx_over_char_speed_min, dxyz[k][j][i][2]/lam_h);
       }
     }
   }
@@ -1314,8 +1314,13 @@ SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID
         fluxFcn.EvaluateMaxEigenvalues(v[k][j][i], myid, lam_f, lam_g, lam_h);
         char_speed_max = max(max(max(char_speed_max, lam_f), lam_g), lam_h);
 
-        dx_over_char_speed_local = min(dxyz[k][j][i][0]/lam_f,
-                                       min(dxyz[k][j][i][1]/lam_g, dxyz[k][j][i][2]/lam_h) );
+        dx_over_char_speed_local = DBL_MAX;
+        if(global_mesh.x_glob.size()>1)
+          dx_over_char_speed_local = min(dx_over_char_speed_local, dxyz[k][j][i][0]/lam_f);
+        if(global_mesh.y_glob.size()>1)
+          dx_over_char_speed_local = min(dx_over_char_speed_local, dxyz[k][j][i][1]/lam_g);
+        if(global_mesh.z_glob.size()>1)
+          dx_over_char_speed_local = min(dx_over_char_speed_local, dxyz[k][j][i][2]/lam_h);
         dx_over_char_speed_min = min(dx_over_char_speed_min, dx_over_char_speed_local);
 
         // calculates local time-step size
@@ -2713,7 +2718,6 @@ SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariab
   //------------------------------------
   Vec5D*** v  = (Vec5D***) V.GetDataPointer();
   double*** id = (double***) ID.GetDataPointer();
-  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   int myid;
   int neighborid = -1;
@@ -2730,7 +2734,7 @@ SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariab
         if(myid==INACTIVE_MATERIAL_ID)
           continue;
 
-        my_dx = min(dxyz[k][j][i][0], min(dxyz[k][j][i][1], dxyz[k][j][i][2]));
+        my_dx = global_mesh.GetMinDXYZ(Int3(i,j,k));
 
 	//**********************************************
 	//cell interfaces perpendicular to x-direction
@@ -2738,7 +2742,7 @@ SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariab
         if(k!=kkmax-1 && j!=jjmax-1) {
           neighborid = id[k][j][i-1];
           if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
-            double neighbor_dx = min(dxyz[k][j][i-1][0], min(dxyz[k][j][i-1][1], dxyz[k][j][i-1][2]) );
+            double neighbor_dx = global_mesh.GetMinDXYZ(Int3(i-1,j,k));
             double dx = min(my_dx, neighbor_dx);
             double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j][i-1][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
             dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension);
@@ -2751,7 +2755,7 @@ SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariab
         if(k!=kkmax-1 && i!=iimax-1) {
           neighborid = id[k][j-1][i];
           if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
-            double neighbor_dx = min(dxyz[k][j-1][i][0], min(dxyz[k][j-1][i][1], dxyz[k][j-1][i][2]) );
+            double neighbor_dx = global_mesh.GetMinDXYZ(Int3(i,j-1,k));
             double dx = min(my_dx, neighbor_dx);
             double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j-1][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
             dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
@@ -2764,7 +2768,7 @@ SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariab
         if(j!=jjmax-1 && i!=iimax-1) {
           neighborid = id[k-1][j][i];
           if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
-            double neighbor_dx = min(dxyz[k-1][j][i][0], min(dxyz[k-1][j][i][1], dxyz[k-1][j][i][2]) );
+            double neighbor_dx = global_mesh.GetMinDXYZ(Int3(i,j,k-1));
             double dx = min(my_dx, neighbor_dx);
             double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k-1][j][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
             dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
@@ -2780,7 +2784,6 @@ SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariab
   //------------------------------------
   // Restore Spatial Variables
   //------------------------------------
-  delta_xyz.RestoreDataPointerToLocalVector(); //no changes
   ID.RestoreDataPointerToLocalVector(); //no changes
   V.RestoreDataPointerToLocalVector();
 
