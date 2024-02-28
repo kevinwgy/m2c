@@ -9,7 +9,9 @@
 #include <IoData.h>
 #include <SpaceVariable.h>
 #include <GlobalMeshInfo.h>
+#include <UserDefinedState.h>
 #include <memory> //std::unique_ptr
+#include <tuple>
 
 class SpaceOperator;
 class EmbeddedBoundaryDataSet;
@@ -29,6 +31,8 @@ class SpaceInitializer
   DataManagers3D& dms;
   IoData&         iod;
   GlobalMeshInfo& global_mesh;
+
+  std::tuple<UserDefinedState*, void*, DestroyUDS*> state_calculator; //!< the 1st one is the calculator
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
@@ -72,6 +76,8 @@ private:
   InitializeVandIDByPoint(PointData& point,
                           std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
                           std::vector<double***> &color, Vec5D*** v, double*** id);
+
+  void ApplyUserDefinedVandID(Vec3D*** coords, Vec5D*** v, double*** id);
 
   void InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
                      std::vector<SpaceVariable3D*> &Phi, std::vector<SpaceVariable3D*> &NPhi,

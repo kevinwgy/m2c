@@ -17,6 +17,7 @@
 #include <DistancePointToPlane.h>
 #include <KDTree.h>
 #include <rbf_interp.hpp>
+#include<dlfcn.h> //dlopen, dlclose
 
 #ifdef LEVELSET_TEST
   #include <Vector2D.h>
@@ -36,17 +37,53 @@ extern int INACTIVE_MATERIAL_ID;
 
 SpaceInitializer::SpaceInitializer(MPI_Comm &comm_, DataManagers3D &dms_, IoData &iod_,
                                    GlobalMeshInfo &global_mesh_, SpaceVariable3D &coordinates)
-                : comm(comm_), dms(dms_), iod(iod_), global_mesh(global_mesh_)
+                : comm(comm_), dms(dms_), iod(iod_), global_mesh(global_mesh_),
+                  state_calculator(std::make_tuple(nullptr,nullptr,nullptr))
 {
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
   coordinates.GetGlobalSize(&NX, &NY, &NZ);
+
+
+  // Setup user-defined state variable calculator
+  if(strcmp(iod.ic.state_calculator, "") != 0) {
+    std::get<1>(state_calculator) = dlopen(iod.ic.state_calculator, RTLD_NOW);
+    if(!std::get<1>(state_calculator)) {
+      print_error("*** Error: Unable to load object %s.\n", iod.ic.state_calculator);
+      exit_mpi();
+    }
+    dlerror();
+    CreateUDS* create = (CreateUDS*) dlsym(std::get<1>(state_calculator), "Create");
+    const char* dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Create in %s.\n", iod.ic.state_calculator);
+      exit_mpi();
+    }
+    std::get<2>(state_calculator) = (DestroyUDS*) dlsym(std::get<1>(state_calculator), "Destroy");
+    dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Destroy in %s.\n", iod.ic.state_calculator);
+      exit_mpi();
+    }
+
+    //This is the actual calculator
+    std::get<0>(state_calculator) = create();
+    print("- Loaded user-defined initial state calculator from %s.\n", iod.ic.state_calculator);
+  }
+
 }
 
 //---------------------------------------------------------------------
 
 SpaceInitializer::~SpaceInitializer()
-{ }
+{
+  if(std::get<0>(state_calculator)) {
+    assert(std::get<2>(state_calculator)); //this is the destruction function
+    std::get<2>(state_calculator)(std::get<0>(state_calculator)); //use it to destroy the calculator
+    assert(std::get<1>(state_calculator));
+    dlclose(std::get<1>(state_calculator));
+  }
+}
 
 //---------------------------------------------------------------------
 
@@ -562,7 +599,14 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
 
 
   //----------------------------------------------------------------
-  // Step 6: Restore Data
+  // Step 6: Apply initial condition from dynamic shared object (If specified)
+  //----------------------------------------------------------------
+  if(std::get<0>(state_calculator))
+    ApplyUserDefinedVandID(coords, v, id);
+
+
+  //----------------------------------------------------------------
+  // Step 7: Restore Data
   //----------------------------------------------------------------
   if(EBDS != nullptr) {
     for(int i=0; i<(int)EBDS->size(); i++)
@@ -573,7 +617,7 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
   coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
 
   //----------------------------------------------------------------
-  // Step 7: Apply boundary conditions to V (ID will be handled in Main by mpo)
+  // Step 8: Apply boundary conditions to V (ID will be handled in Main by mpo)
   //----------------------------------------------------------------
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
@@ -1157,6 +1201,20 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
         }
 
   return make_pair(point.initialConditions.materialid, make_pair(ruling_surface, mycolor_final));
+}
+
+//---------------------------------------------------------------------
+
+void
+SpaceInitializer::ApplyUserDefinedVandID(Vec3D*** coords, Vec5D*** v, double*** id)
+{
+  if(!std::get<0>(state_calculator))
+    return;
+
+  UserDefinedState *calculator(std::get<0>(state_calculator));
+  assert(calculator);
+    
+  calculator->GetUserDefinedState(i0,j0,k0,imax,jmax,kmax,coords,v,id);
 }
 
 //---------------------------------------------------------------------

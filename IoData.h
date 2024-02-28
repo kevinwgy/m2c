@@ -1105,6 +1105,8 @@ struct IcData {
   std::vector<double> user_data2[SIZE]; //!< for radial variation 
   //-----------------------------------------------------------------------
 
+  const char *state_calculator; //!< dynamically loaded object / user-specified i.c.
+
   //-----------------------------------------------------------------------
   //! initial condition specified through "flooding".
   FloodIcData floodIc;

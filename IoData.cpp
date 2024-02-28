@@ -2021,13 +2021,15 @@ IcData::IcData()
   default_ic.velocity_x = DBL_MIN;
   default_ic.velocity_y = DBL_MIN;
   default_ic.velocity_z = DBL_MIN;
+
+  state_calculator = "";
 }
 
 //------------------------------------------------------------------------------
 
 void IcData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 6, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   new ClassStr<IcData>(ca, "UserDataFile", this, &IcData::user_specified_ic);
 
@@ -2042,6 +2044,8 @@ void IcData::setup(const char *name, ClassAssigner *father)
   default_ic.setup("DefaultInitialState");
 
   multiInitialConditions.setup("GeometricEntities");
+
+  new ClassStr<IcData>(ca, "UserDefinedStateCalculator", this, &IcData::state_calculator);
 
   floodIc.setup("Flood");
 
