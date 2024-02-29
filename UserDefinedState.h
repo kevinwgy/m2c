@@ -6,9 +6,8 @@
 #ifndef _USER_DEFINED_STATE_H_
 #define _USER_DEFINED_STATE_H_
 
-#include<Vector3D.h>
-#include<Vector5D.h>
-
+struct Vec3D;
+struct Vec5D;
 /*****************************************************************
  * class UserDefinedState is an interface for user to provide a
  * state variable field (V) and material ID through dynamic loading (see, e.g., dlopen)

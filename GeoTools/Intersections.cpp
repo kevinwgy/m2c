@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include <Intersections.h>
+#include <GeoTools.h>
 #include <set>
 #include <utility> //std::pair
 #include <cassert>
@@ -28,7 +29,7 @@ RayIntersectsTriangle(Vec3D O, Vec3D D, //!< origina and direction of ray
   if(!D_normalized) {
     double Dnorm = D.norm();
     assert(Dnorm>0.0);
-    D /= D.norm();
+    D /= Dnorm;
   }
 
   Vec3D E1, E2, P, T, Q;
@@ -224,6 +225,68 @@ LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y-axis
     return false;
   else
     return true;
+}
+
+// ------------------------------------------------------------------------------------------------------------
+
+bool
+LineSegmentIntersectsPlane(Vec3D X0, Vec3D X1, //!< vertices of line segment
+                           Vec3D V0, Vec3D dir, //!< a point on the plane, and its normal
+                           double* d, //!< optional output: dist from X0 to intersection
+                           Vec3D* xp, //!< optional output: intersection point
+                           bool N_normalized) //!< input: whether N is normalized
+{
+  if(!N_normalized) {
+    double Nnorm = dir.norm();
+    assert(Nnorm>0.0);
+    dir /= Nnorm;
+  }
+
+  Vec3D X01 = X1 - X0;
+  double denom = X01*dir;
+
+  if(denom==0) {
+    if(d)  *d  = DBL_MAX;
+    if(xp) *xp = DBL_MAX;
+    return false;    // This line segment is parallel to the plane
+  }
+
+  double d0 = ProjectPointToPlane(X0, V0, dir, true);
+  double d1 = ProjectPointToPlane(X1, V0, dir, true);
+
+  if(d0*d1<0) {
+    if(d || xp) {
+      double alpha = fabs(d0)/(fabs(d0)+fabs(d1));
+      if(d) 
+        *d = alpha*X01.norm();
+      if(xp)
+        *xp = X0 + alpha*X01;
+    }
+    return true;
+  }
+  else if(fabs(d0)<INTERSECTIONS_EPSILON) {
+    if(d)
+      *d = 0.0;
+    if(xp)
+      *xp = X0;
+    return true;
+  }
+  else if(fabs(d1)<INTERSECTIONS_EPSILON) {
+    if(d)
+      *d = X01.norm();
+    if(xp)
+      *xp = X1;
+    return true;
+  }
+  else {//on the same side
+    if(d)
+      *d = DBL_MAX;
+    if(xp)
+      *xp = DBL_MAX;
+    return false;
+  }
+
+  return false; //will never get here
 }
 
 // ------------------------------------------------------------------------------------------------------------

@@ -38,6 +38,13 @@ bool LineSegmentIntersectsTriangle(Vec3D O, int dir, //!< dir = 0 (x-axis), 1 (y
                                    Vec3D& V0, Vec3D& V1, Vec3D& V2,
                                    double* d = NULL, Vec3D* xp = NULL, Vec3D* baryCoords = NULL);
 
+//! Checks whether a line segment intersects a plane
+bool LineSegmentIntersectsPlane(Vec3D X0, Vec3D X1, //!< vertices of line segment
+                                Vec3D V0, Vec3D dir, //!< a point on the plane, and its normal
+                                double* d = NULL, //!< optional output: dist from X0 to intersection
+                                Vec3D* xp = NULL, //!< optional output: intersection point
+                                bool N_normalized = false); //!< input: whether N is normalized
+
 /** Checks whether a plane cuts an axis-aligned box. If yes, find edge-plane intersections.
  *  "intersections" are ordered such that the the points form the intersection polygon.
  *  Returns the number of intersection points. */

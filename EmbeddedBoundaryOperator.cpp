@@ -868,11 +868,8 @@ EmbeddedBoundaryOperator::ReadMeshFileInSTLFormat(const char *filename, vector<V
   int nodeid(0);
   int n1, n2, n3;
   double x,y,z;
-  int iter = 0;
  
   while(true) {
-
-    iter++;
 
     getline(input, line);
 
@@ -881,32 +878,32 @@ EmbeddedBoundaryOperator::ReadMeshFileInSTLFormat(const char *filename, vector<V
 
     getline(input, line);
     input >> word >> x >> y >> z;
-    Xs.push_back(Vec3D(x,y,z));
+    Vec3D X1(x,y,z);
     input >> word >> x >> y >> z;
-    Xs.push_back(Vec3D(x,y,z));
+    Vec3D X2(x,y,z);
     input >> word >> x >> y >> z;
-    Xs.push_back(Vec3D(x,y,z));
-    Es.push_back(Int3(nodeid, nodeid+1, nodeid+2));
-    nodeid += 3;
-
+    Vec3D X3(x,y,z);
+    Vec3D cr = (X2 - X1)^(X3 - X1);
     getline(input, line); //get the end of line
     getline(input, line);
     getline(input, line);
-  }
 
-  if(verbose>=1)
-    print("Found %d triangular elements from %s.\n", (int)Es.size(), filename);
-
-  for(auto it = Es.begin(); it != Es.end(); it++) {
-    //check if area is non-zero
-    n1 = (*it)[0]; n2 = (*it)[1]; n3 = (*it)[2];
-    Vec3D cr = (Xs[n2] - Xs[n1])^(Xs[n3] - Xs[n1]);
     if(cr.norm() < area_tol) {
       print_warning("Warning: Detected a degenerate triangle with area %e --- dropped from the list.\n",
                     cr.norm());
       continue;
     }
+
+    Xs.push_back(X1);
+    Xs.push_back(X2);
+    Xs.push_back(X3);
+    Es.push_back(Int3(nodeid, nodeid+1, nodeid+2));
+    nodeid += 3;
+
   }
+
+  if(verbose>=1)
+    print("Found %d triangular elements in %s.\n", (int)Es.size(), filename);
 
   input.close();
 }

@@ -4,6 +4,8 @@
  ************************************************************************/
 
 #include "UserDefinedState.h"
+#include "Vector3D.h"
+#include "Vector5D.h"
 
 //------------------------------------------------------------
 // This is a template for users to fill. Not compiled w/ M2C.
