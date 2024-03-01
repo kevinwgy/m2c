@@ -735,7 +735,6 @@ EmbeddedBoundaryOperator::ReadMeshFileInOBJFormat(const char *filename, vector<V
   Vec3D xyz;
   int nVerts, maxVerts = 1024, n1, n2, n3;
   vector<int> ind(maxVerts); //should not have polygons with more than 1024 vertices!
-  vector<Vec3D> nodes;
   vector<std::pair<string, vector<Int3> > > elem_groups;
   vector<Int3> *elems = NULL; 
 
@@ -828,13 +827,13 @@ EmbeddedBoundaryOperator::ReadMeshFileInOBJFormat(const char *filename, vector<V
   for(auto&& eg : elem_groups) {
     for(auto&& e : eg.second) {
       n1 = e[0]; n2 = e[1]; n3 = e[2];
-      if(n1<=0 || n1>(int)nodes.size() || n2<=0 || n2>(int)nodes.size() ||
-         n3<=0 || n3>(int)nodes.size()) {
+      if(n1<=0 || n1>(int)Xs.size() || n2<=0 || n2>(int)Xs.size() ||
+         n3<=0 || n3>(int)Xs.size()) {
         print_error("*** Error: Found element (%d %d %d) in %s with unknown node(s).\n",
                 n1, n2, n3, filename);
         exit_mpi();
       }
-      Vec3D cr = (nodes[n2-1] - nodes[n1-1])^(nodes[n3-1] - nodes[n1-1]);
+      Vec3D cr = (Xs[n2-1] - Xs[n1-1])^(Xs[n3-1] - Xs[n1-1]);
       if(cr.norm() < area_tol) {
         print_warning("Warning: Detected a degenerate triangle with area %e --- dropped from the list.\n",
                       cr.norm());
@@ -866,7 +865,6 @@ EmbeddedBoundaryOperator::ReadMeshFileInSTLFormat(const char *filename, vector<V
   double area_tol = 1e-12;
 
   int nodeid(0);
-  int n1, n2, n3;
   double x,y,z;
  
   while(true) {

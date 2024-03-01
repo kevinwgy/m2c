@@ -43,7 +43,7 @@ bool LineSegmentIntersectsPlane(Vec3D X0, Vec3D X1, //!< vertices of line segmen
                                 Vec3D V0, Vec3D dir, //!< a point on the plane, and its normal
                                 double* d = NULL, //!< optional output: dist from X0 to intersection
                                 Vec3D* xp = NULL, //!< optional output: intersection point
-                                bool N_normalized = false); //!< input: whether N is normalized
+                                bool N_normalized = false); //!< input: whether dir is normalized
 
 /** Checks whether a plane cuts an axis-aligned box. If yes, find edge-plane intersections.
  *  "intersections" are ordered such that the the points form the intersection polygon.

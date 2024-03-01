@@ -234,7 +234,7 @@ LineSegmentIntersectsPlane(Vec3D X0, Vec3D X1, //!< vertices of line segment
                            Vec3D V0, Vec3D dir, //!< a point on the plane, and its normal
                            double* d, //!< optional output: dist from X0 to intersection
                            Vec3D* xp, //!< optional output: intersection point
-                           bool N_normalized) //!< input: whether N is normalized
+                           bool N_normalized) //!< input: whether dir is normalized
 {
   if(!N_normalized) {
     double Nnorm = dir.norm();
