@@ -1041,7 +1041,7 @@ struct EnergyIntegrationData {
   int frequency;
   double frequency_dt;
 
-  enum Vars  {VOLUME = 0, MASS = 1, TOTAL_ENERGY = 2, TOTAL_ENTHALPY = 3, KINETIC_ENERGY = 4, INTERNAL_ENERGY = 5, POTENTIAL_ENERGY = 6, SIZE = 7};
+  enum Vars  {VOLUME = 0, MASS = 1, TOTAL_ENERGY = 2, TOTAL_ENTHALPY = 3, KINETIC_ENERGY = 4, INTERNAL_ENERGY = 5, POTENTIAL_ENERGY = 6, LASER_RADIATION = 7, SIZE = 8};
 
   const char *volume;
   const char *mass;
@@ -1050,6 +1050,7 @@ struct EnergyIntegrationData {
   const char *kinetic_energy;
   const char *internal_energy;
   const char *potential_energy;
+  const char *laser_radiation;
 
   // specify the region
   double x_min;

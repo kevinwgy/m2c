@@ -23,6 +23,11 @@ protected:
   vector<LevelSetOperator*>& lso;
   MultiPhaseOperator& mpo;  
 
+  SpaceVariable3D& volume;
+
+  int i0, j0, k0, imax, jmax, kmax;
+  int ii0, jj0, kk0, iimax, jjmax, kkmax;
+
   //! Laser absorption solver (NULL if laser is not activated)
   LaserAbsorptionSolver* laser;
 

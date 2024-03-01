@@ -2508,6 +2508,7 @@ EnergyIntegrationData::EnergyIntegrationData()
   kinetic_energy = "";
   internal_energy = "";
   potential_energy = "";
+  laser_radiation = "";
 
   x_min = -5;
   x_max = 5;
@@ -2521,7 +2522,7 @@ EnergyIntegrationData::EnergyIntegrationData()
 //------------------------------------------------------------------------------
 void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 15, father);
+  ClassAssigner *ca = new ClassAssigner(name, 16, father);
 
   new ClassInt<EnergyIntegrationData>(ca, "Frequency", this, &EnergyIntegrationData::frequency);
   new ClassDouble<EnergyIntegrationData>(ca, "TimeInterval", this, &EnergyIntegrationData::frequency_dt);
@@ -2532,6 +2533,7 @@ void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
   new ClassStr<EnergyIntegrationData>(ca, "KineticEnergy", this, &EnergyIntegrationData::kinetic_energy);
   new ClassStr<EnergyIntegrationData>(ca, "InternalEnergy", this, &EnergyIntegrationData::internal_energy);
   new ClassStr<EnergyIntegrationData>(ca, "PotentialEnergy", this, &EnergyIntegrationData::potential_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "LaserRadiation", this, &EnergyIntegrationData::laser_radiation);
   
   new ClassDouble<EnergyIntegrationData>(ca, "Xmin", this, &EnergyIntegrationData::x_min);
   new ClassDouble<EnergyIntegrationData>(ca, "Xmax", this, &EnergyIntegrationData::x_max);

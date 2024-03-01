@@ -7,10 +7,11 @@ using namespace std;
 // This constructor is for integration in a specified region
 EnergyIntegrationOutput::EnergyIntegrationOutput(MPI_Comm &comm_, IoData &iod, OutputData &iod_output_, 
                                                  MeshData &iod_mesh_, EquationsData &iod_eqs_,
+                                                 LaserAbsorptionSolver* laser_,
                                                  std::vector<VarFcnBase*> &vf_, SpaceVariable3D& coordinates_,
                                                  SpaceVariable3D& delta_xyz_, SpaceVariable3D& cell_volume_) : 
                                                  comm(comm_), iod_output(iod_output_), 
-                                                 iod_mesh(iod_mesh_), iod_eqs(iod_eqs_),vf(vf_),
+                                                 iod_mesh(iod_mesh_), iod_eqs(iod_eqs_),laser(laser_),vf(vf_),
                                                  coordinates(coordinates_),
                                                  delta_xyz(delta_xyz_),
                                                  cell_volume(cell_volume_) 
@@ -75,6 +76,13 @@ EnergyIntegrationOutput::EnergyIntegrationOutput(MPI_Comm &comm_, IoData &iod, O
     char *filename = new char[spn + strlen(iod_output.energy_integration.potential_energy)];
     sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.potential_energy);
     file[EnergyIntegrationData::POTENTIAL_ENERGY] = fopen(filename, "w");
+    delete [] filename;
+   }
+
+   if (iod_output.energy_integration.laser_radiation[0] != 0) {
+    char *filename = new char[spn + strlen(iod_output.energy_integration.laser_radiation)];
+    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.laser_radiation);
+    file[EnergyIntegrationData::LASER_RADIATION] = fopen(filename, "w");
     delete [] filename;
    }
 
@@ -198,6 +206,23 @@ void EnergyIntegrationOutput::WriteSolutionOfIntegrationEnergy(double time, doub
     }
     print(file[EnergyIntegrationData::POTENTIAL_ENERGY], "%16.8e\n", sum);
     fflush(file[EnergyIntegrationData::POTENTIAL_ENERGY]);
+  }
+
+  if(file[EnergyIntegrationData::LASER_RADIATION]) {
+    print(file[EnergyIntegrationData::LASER_RADIATION], "%10d    %16.8e    ", time_step, time);
+    if(L == NULL) {
+      print_error("*** Error: Requested laser radiation integration, but laser source is not specified.\n");
+      exit_mpi();
+    }
+    double radiation[numMaterials];
+    double sum = 0.0;
+    IntegrateLaserRadiation(V,ID,L,radiation);
+    for(int i=0; i<numMaterials; i++) {
+      print(file[EnergyIntegrationData::LASER_RADIATION], "%16.8e  ", radiation[i]);
+      sum += radiation[i];
+    }
+    print(file[EnergyIntegrationData::LASER_RADIATION], "%16.8e\n", sum);
+    fflush(file[EnergyIntegrationData::LASER_RADIATION]);
   }
 
   last_snapshot_time = time;
@@ -601,5 +626,73 @@ void EnergyIntegrationOutput::IntegratePotentialEnergy(SpaceVariable3D &V, Space
   cell_volume.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
   delta_xyz.RestoreDataPointerToLocalVector();
+
+}
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------
+void EnergyIntegrationOutput::IntegrateLaserRadiation(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D *L, double* radiation)
+{
+  Vec5D***  v  = (Vec5D***) V.GetDataPointer();
+  double*** id   = (double***)ID.GetDataPointer();
+  double*** cell = (double***)cell_volume.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  double*** l  = (double***)L->GetDataPointer();
+
+  int i0, j0, k0, imax, jmax, kmax;
+  ID.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
+  for(int i=0; i<numMaterials; i++)
+      radiation[i] = 0.0;
+
+  double PI = acos(0.0)*2.0;
+  int myid;
+  double e, myT, eta;
+  for(int k=k0; k<kmax; k++) {
+    for(int j=j0; j<jmax; j++) {
+      for(int i=i0; i<imax; i++) {
+        myid = id[k][j][i];
+        if(myid<0 || myid>=numMaterials) {
+          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+                  myid);
+          exit(-1);
+        }
+        if(coords[k][j][i][0] >= iod_output.energy_integration.x_min && coords[k][j][i][0] <= iod_output.energy_integration.x_max)
+          if(coords[k][j][i][1] >= iod_output.energy_integration.y_min && coords[k][j][i][1] <= iod_output.energy_integration.y_max)
+            if(coords[k][j][i][2] >= iod_output.energy_integration.z_min && coords[k][j][i][2] <= iod_output.energy_integration.z_max){
+               if(iod_mesh.type == MeshData::SPHERICAL){
+                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+                 myT = vf[myid]->GetTemperature(v[k][j][i][0], e);
+                 eta = laser->GetAbsorptionCoefficient(myT, myid);
+                 radiation[myid] += eta*l[k][j][i]*cell[k][j][i]*scale;
+               }
+               else if(iod_mesh.type == MeshData::CYLINDRICAL){
+                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+                 myT = vf[myid]->GetTemperature(v[k][j][i][0], e);
+                 eta = laser->GetAbsorptionCoefficient(myT, myid);
+                 radiation[myid] += eta*l[k][j][i]*cell[k][j][i]*scalor;
+               }
+               else{
+                 e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+                 myT = vf[myid]->GetTemperature(v[k][j][i][0], e);
+                 eta = laser->GetAbsorptionCoefficient(myT, myid);
+                 radiation[myid] += eta*l[k][j][i]*cell[k][j][i];
+               }
+            }
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, radiation, numMaterials, MPI_DOUBLE, MPI_SUM, comm);
+
+  V.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+  cell_volume.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  delta_xyz.RestoreDataPointerToLocalVector();
+  L->RestoreDataPointerToLocalVector();
+
 
 }

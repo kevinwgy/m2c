@@ -25,6 +25,8 @@ using namespace GeoTools;
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
 
+//extern std::ofstream residual_file;
+
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -591,6 +593,15 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
       for(int i=myi0; i<myimax; i++) {
 
         nClipped += (int)varFcn[id[k][j][i]]->ClipDensityAndPressure(v[k][j][i]);
+
+        //Temporary change for Solid
+        /*
+        if(coords[k][j][i][0] < 0.7+1e-8 && coords[k][j][i][0] > -0.3-1e-8 && coords[k][j][i][1] < 0.5){
+           v[k][j][i][1] = 0;
+           v[k][j][i][2] = 0;
+           v[k][j][i][3] = 0;
+        }
+        */
 
         if(checkState) {
           if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {
@@ -3252,6 +3263,9 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   return; //testing the level set solver without solving the N-S / Euler equations
 #endif
 
+  //Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  //Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
@@ -3281,11 +3295,41 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   Vec5D***    r = (Vec5D***) R.GetDataPointer();
   double*** vol = (double***)volume.GetDataPointer();
 
+
+  Vec5D fluxsum(0.0);
+  Vec5D R_ghost, R_ghost_nm1;
+  double PI = acos(0.0)*2.0;
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jjmax; j++)
+      for(int i=ii0; i<iimax; i++) {
+        fluxsum += r[k][j][i];
+        if(i==-1 || j == -1 || k == -1 || i == NX || j == NY || k == NZ){
+          //double scale = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+          double scale = 1.0;
+          R_ghost += r[k][j][i]*scale;
+        }
+      }
+  //fluxsum += R_ghost_nm1;
+  R_ghost_nm1 = R_ghost;
+  
+  MPI_Allreduce(MPI_IN_PLACE, &fluxsum, 5, MPI_DOUBLE, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &R_ghost, 5, MPI_DOUBLE, MPI_SUM, comm);
+
+  //residual_file << R_ghost[4]  << "    " << std::setw(8) << fluxsum[4] << std::endl;
+
+  //coordinates.RestoreDataPointerToLocalVector();
+  //delta_xyz.RestoreDataPointerToLocalVector();
+
+  //fprintf(stderr,"I am here. fluxsum = %e %e %e %e %e.\n", fluxsum[0], fluxsum[1], fluxsum[2], fluxsum[3], fluxsum[4]);
+  //fprintf(stderr,"I am here. ghost fluxsum = %e %e %e %e %e.\n", R_ghost_nm1[0], R_ghost_nm1[1], R_ghost_nm1[2], R_ghost_nm1[3], R_ghost_nm1[4]);
+
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++) 
       for(int i=i0; i<imax; i++) {
+        fluxsum += r[k][j][i];
         r[k][j][i] /= -vol[k][j][i];
       }
+  //fprintf(stderr,"I am here. Interior fluxsum = %e %e %e %e %e.\n", fluxsum[0], fluxsum[1], fluxsum[2], fluxsum[3], fluxsum[4]);
 
   // restore spatial variables
   R.RestoreDataPointerToLocalVector(); //NOTE: although R has been updated, there is no need of 

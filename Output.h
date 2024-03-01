@@ -2,6 +2,7 @@
 #define _OUTPUT_H_
 #include <ProbeOutput.h>
 #include <EnergyIntegrationOutput.h>
+#include <LaserAbsorptionSolver.h>
 #include <MaterialVolumeOutput.h>
 #include <TerminalVisualization.h>
 #include <stdio.h>
@@ -21,6 +22,10 @@ class Output
 
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
+
+
+  //! Laser absorption solver
+  LaserAbsorptionSolver* laser;
 
   //! These variables will temporarily hold solutions before they are printed to file
   SpaceVariable3D scalar;   
@@ -44,7 +49,7 @@ class Output
 public:
 
   Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-         vector<VarFcnBase*> &vf_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
+         vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
          IonizationOperator* ion_ = NULL);
   ~Output();
 

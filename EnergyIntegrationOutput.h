@@ -3,6 +3,7 @@
 
 #include <IoData.h>
 #include <SpaceVariable.h>
+#include <LaserAbsorptionSolver.h>
 #include <VarFcnBase.h>
 #include<Vector5D.h>
 
@@ -22,6 +23,8 @@ class EnergyIntegrationOutput
 
   EquationsData& iod_eqs;
 
+  LaserAbsorptionSolver* laser;
+
   int frequency;
   double frequency_dt;
   double last_snapshot_time;
@@ -40,6 +43,7 @@ public:
 
   EnergyIntegrationOutput(MPI_Comm &comm_, IoData &iod, OutputData &iod_output_, 
                           MeshData &iod_mesh_, EquationsData &iod_eqs_, 
+                          LaserAbsorptionSolver* laser_,
                           std::vector<VarFcnBase*> &vf_, SpaceVariable3D& coordinates_,
                           SpaceVariable3D& delta_xyz_, SpaceVariable3D& cell_volume_);
 
@@ -57,6 +61,7 @@ private:
   void IntegrateKineticEnergy(SpaceVariable3D &V, SpaceVariable3D &ID, double* kinetic);
   void IntegrateInternalEnergy(SpaceVariable3D &V, SpaceVariable3D &ID, double* internal);
   void IntegratePotentialEnergy(SpaceVariable3D &V, SpaceVariable3D &ID, double* potential);
+  void IntegrateLaserRadiation(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D *L, double* radiation);
   
 
 };

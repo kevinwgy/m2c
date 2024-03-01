@@ -5,7 +5,9 @@ using std::cout;
 using std::endl;
 using std::unique_ptr;
 
-extern std::ofstream lam_file;
+//extern std::ofstream lam_file;
+//extern std::ofstream de_file;
+//extern std::ofstream residual_file;
 
 //----------------------------------------------------------------------------
 // BASE
@@ -16,8 +18,11 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
                         LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
                         HyperelasticityOperator* heo_)
                   : comm(comm_), iod(iod_), spo(spo_), lso(lso_), mpo(mpo_), laser(laser_), embed(embed_),
-                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)) 
+                    heo(heo_), IDn(comm_, &(dms_.ghosted1_1dof)), volume(spo.GetMeshCellVolumes()) 
 {
+  volume.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  volume.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
+
   for(int i=0; i<lso.size(); i++) {
     ls_mat_id.push_back(lso[i]->GetMaterialID());
 
@@ -122,6 +127,9 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
+   //de_file << std::setw(8) << std::scientific << time << "    " << std::setw(8) << std::scientific << dt  << "       "  << std::setw(8);
+   //residual_file << std::setw(8) << std::scientific << time << "    " << std::setw(8) << std::scientific << dt  << "       "  << std::setw(8);
+
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
@@ -133,7 +141,29 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
   spo.PrimitiveToConservative(V, ID, Un); // get Un
+
+  Vec5D*** UN = (Vec5D***) Un.GetDataPointer(); 
+  Un.RestoreDataPointerToLocalVector();
+
   Un.AXPlusBY(1.0, dt, Rn);
+
+  Vec5D*** UNP1 = (Vec5D***) Un.GetDataPointer();
+  Vec5D desum(0.0);
+  double*** vol = (double***)volume.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        desum += (UNP1[k][j][i] - UN[k][j][i]) * vol[k][j][i];
+          //fprintf(stderr, "I AM HERE. Un+1 = %e, Un = %e.\n", UNP1[k][j][i][4], UN[k][j][i][4]);
+      }
+  MPI_Allreduce(MPI_IN_PLACE, &desum, 5, MPI_DOUBLE, MPI_SUM, comm);  
+  
+  Un.RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+  //de_file << desum[0]  << "    " << std::setw(8) << desum[4] << std::endl; 
+  
+
   spo.ConservativeToPrimitive(Un, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
@@ -250,7 +280,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
-  bool run_heat = time < 41e-6;
+  bool run_heat = time < 41;
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   if(use_grad_phi)
@@ -667,7 +697,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
 
   // Check for phase transitions
-  lam_file << std::setw(8) << std::scientific << time << "    " << std::setw(8);
+  //lam_file << std::setw(8) << std::scientific << time << "    " << std::setw(8);
   if(lso.size()) {
     vector<int> phi_updated(lso.size(), 0); //0 or 1
     vector<Int3> new_useful_nodes[lso.size()];

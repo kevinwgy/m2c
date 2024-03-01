@@ -15,7 +15,7 @@ using std::unique_ptr;
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
 
-extern std::ofstream lam_file;
+//extern std::ofstream lam_file;
 
 //-----------------------------------------------------
 
@@ -2011,8 +2011,8 @@ MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn
 
   MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
 
-  MPI_Allreduce(MPI_IN_PLACE, &lam_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
-  lam_file << lam_sum << std::endl;
+  //MPI_Allreduce(MPI_IN_PLACE, &lam_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+  //lam_file << lam_sum << std::endl;
 
   coordinates.RestoreDataPointerToLocalVector();
   volume.RestoreDataPointerToLocalVector();

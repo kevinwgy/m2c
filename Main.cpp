@@ -28,7 +28,9 @@ using std::to_string;
 //using std::chrono::duration;
 //using std::chrono::milliseconds;
 
-std::ofstream lam_file;
+//std::ofstream lam_file;
+//std::ofstream de_file;
+//std::ofstream residual_file;
 
 int verbose;
 double domain_diagonal;
@@ -42,8 +44,14 @@ int INACTIVE_MATERIAL_ID;
  ************************************/
 int main(int argc, char* argv[])
 {
-  lam_file.open("Lambda.txt");
-  lam_file << "Time     |        Stored latent heat \n";
+  //lam_file.open("Lambda.txt");
+  //lam_file << "Time     |        Stored latent heat \n";
+
+  //de_file.open("de.txt");
+  //de_file << "Time      |        dt           |        dm             |             de \n";
+
+  //residual_file.open("residual.txt");
+  //residual_file << "Time      |        dt           |        residual(mass)     |     residual(energy) \n";
 
   start_time = clock(); //for timing purpose only
 
@@ -306,7 +314,7 @@ int main(int argc, char* argv[])
 */
 
   //! Initialize output
-  Output out(comm, dms, iod, global_mesh, vf, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), ion); 
+  Output out(comm, dms, iod, global_mesh, vf, laser, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), ion); 
   out.InitializeOutput(spo.GetMeshCoordinates());
 
 
@@ -547,7 +555,9 @@ int main(int argc, char* argv[])
   PetscFinalize();
   MPI_Finalize();
 
-  lam_file.close();
+  //lam_file.close();
+  //de_file.close();
+  //residual_file.close();
 
   return 0;
 }

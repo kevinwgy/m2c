@@ -6,14 +6,14 @@
 //--------------------------------------------------------------------------
 
 Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-               vector<VarFcnBase*> &vf_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, 
+               vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, 
                SpaceVariable3D &cell_volume, IonizationOperator* ion_) : 
     comm(comm_), 
-    iod(iod_), global_mesh(global_mesh_), vf(vf_),
+    iod(iod_), global_mesh(global_mesh_), vf(vf_), laser(laser_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
     probe_output(comm_, iod_.output, vf_, ion_),
-    energy_output(comm_,iod_, iod_.output, iod_.mesh, iod_.eqs, vf_, coordinates, delta_xyz, cell_volume),
+    energy_output(comm_,iod_, iod_.output, iod_.mesh, iod_.eqs, laser_, vf_, coordinates, delta_xyz, cell_volume),
     matvol_output(comm_, iod_, cell_volume),
     ion(ion_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)

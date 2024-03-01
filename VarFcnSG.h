@@ -70,6 +70,7 @@ public:
       return invcp*(e + p/rho - q);
     } else
       return invcv*(e + p/rho - q)/gam;
+      //return T0 + invcv*(e-e0);
   }
 
   inline double GetReferenceTemperature() const {return T0;}
@@ -80,6 +81,7 @@ public:
       return invgam*cp*T + q + Pstiff/rho;
     else
       return cv*T + q + Pstiff/rho;
+      //return e0 + cv*(T-T0);
   }
   
   inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {return invgam*h+Pstiff/rho+gam1*invgam*q;}
