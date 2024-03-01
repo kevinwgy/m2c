@@ -1163,7 +1163,7 @@ void ViscosityModelData::setup(const char *name, ClassAssigner *father) {
 HeatDiffusionModelData::HeatDiffusionModelData()
 {
   type = NONE;
-  diffusivity = 0.0;
+  conductivity = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -1177,7 +1177,7 @@ void HeatDiffusionModelData::setup(const char *name, ClassAssigner *father) {
            "None",     HeatDiffusionModelData::NONE,
            "Constant", HeatDiffusionModelData::CONSTANT);
 
-  new ClassDouble<HeatDiffusionModelData>(ca, "Diffusivity", this, &HeatDiffusionModelData::diffusivity);
+  new ClassDouble<HeatDiffusionModelData>(ca, "Conductivity", this, &HeatDiffusionModelData::conductivity);
 } 
 
 //------------------------------------------------------------------------------

@@ -126,8 +126,8 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
   double dx = 0.0, dy = 0.0, dz = 0.0;
   double flux(0.0);
   int neighid = 0;
-  double myk = 0.0; //diffusivity
-  double neighk = 0.0; //neighbor's diffusivity
+  double myk = 0.0; //conductivity
+  double neighk = 0.0; //neighbor's conductivity
   double denom = 0.0;
 
   for(int k=k0; k<kkmax; k++)
@@ -143,7 +143,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         dy   = dxyz[k][j][i][1];
         dz   = dxyz[k][j][i][2];
 
-        myk = heatdiffFcn[myid]->GetDiffusivity();
+        myk = heatdiffFcn[myid]->GetConductivity();
 
 
         //*****************************************
@@ -151,7 +151,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         //*****************************************
         if(k!=kkmax-1 && j!=jjmax-1) {
           neighid = id[k][j][i-1];
-          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          neighk = heatdiffFcn[neighid]->GetConductivity();
           denom = myk + neighk;
           flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdx_i[k][j][i]; //If both are inactive, flux is 0
           flux *= dy*dz;
@@ -164,7 +164,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         //*****************************************
         if(i!=iimax-1 && k!=kkmax-1) {
           neighid = id[k][j-1][i];
-          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          neighk = heatdiffFcn[neighid]->GetConductivity();
           flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdy_j[k][j][i];
           flux *= dx*dz;
           res[k][j][i][4]   += flux;
@@ -176,7 +176,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         //*****************************************   
         if(i!=iimax-1 && j!=jjmax-1) {
           neighid = id[k-1][j][i];
-          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          neighk = heatdiffFcn[neighid]->GetConductivity();
           flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdz_k[k][j][i];
           flux *= dx*dy;
           res[k][j][i][4]   += flux;
@@ -254,7 +254,7 @@ HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &V, Sp
         coeff = vol[k][j][i]*2.0/radial;
  
         myid = id[k][j][i];
-        myk = heatdiffFcn[myid]->GetDiffusivity();
+        myk = heatdiffFcn[myid]->GetConductivity();
 
         r[k][j][i][4] -= coeff*myk*dTdx[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
       }
@@ -326,7 +326,7 @@ HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, 
         //fprintf(stderr,"Check at (%d,%d,%d) coeff = %e\n", i,j,k,coeff);
 
         myid = id[k][j][i];
-        myk = heatdiffFcn[myid]->GetDiffusivity();
+        myk = heatdiffFcn[myid]->GetConductivity();
 
         r[k][j][i][4] -= coeff*myk*dTdy[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
         //fprintf(stderr,"Check at (%d,%d,%d) R[4] = %e\n", i,j,k,r[k][j][i][4]);

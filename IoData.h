@@ -518,7 +518,7 @@ struct HeatDiffusionModelData {
   enum Type {NONE = 0, CONSTANT = 1} type;
 
   // constant
-  double diffusivity;
+  double conductivity;
 
   HeatDiffusionModelData();
   ~HeatDiffusionModelData() {}
