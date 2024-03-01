@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <GradientCalculatorFD3.h>
 #include <algorithm>
 #include <cassert>
@@ -102,7 +107,7 @@ void GradientCalculatorFD3::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,1~d/
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++) { 
 
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             dv[k][j][i*DOFout+pout] = cx[k][j][i*4]*v[k][j][(i-q0)*DOFin+pin]
@@ -124,7 +129,7 @@ void GradientCalculatorFD3::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,1~d/
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++) {
 
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             dv[k][j][i*DOFout+pout] = cy[k][j][i*4]*v[k][j-q0][i*DOFin+pin]
@@ -146,7 +151,7 @@ void GradientCalculatorFD3::CalculateFirstDerivativeAtNodes(int dir/*0~d/dx,1~d/
       for(int j=j0; j<jmax; j++)
         for(int i=i0; i<imax; i++) {
 
-          for(int id=0; id<input_dof.size(); id++) {
+          for(int id=0; id<(int)input_dof.size(); id++) {
             pin  = input_dof[id];
             pout = output_dof[id];
             dv[k][j][i*DOFout+pout] = cz[k][j][i*4]*v[k-q0][j][i*DOFin+pin]
@@ -225,7 +230,7 @@ GradientCalculatorFD3::CalculateFirstDerivativeAtSelectedNodes(int dir/*0~d/dx,1
       if(!coordinates.IsHere(i,j,k,false)) // only work inside the subdomain
         continue;
 
-      for(int id=0; id<input_dof.size(); id++) {
+      for(int id=0; id<(int)input_dof.size(); id++) {
         pin  = input_dof[id];
         pout = output_dof[id];
         dv[k][j][i*DOFout+pout] = cx[k][j][i*4]*v[k][j][(i-q0)*DOFin+pin]
@@ -248,7 +253,7 @@ GradientCalculatorFD3::CalculateFirstDerivativeAtSelectedNodes(int dir/*0~d/dx,1
       if(!coordinates.IsHere(i,j,k,false)) // only work inside the subdomain
         continue;
 
-      for(int id=0; id<input_dof.size(); id++) {
+      for(int id=0; id<(int)input_dof.size(); id++) {
         pin  = input_dof[id];
         pout = output_dof[id];
         dv[k][j][i*DOFout+pout] = cy[k][j][i*4]*v[k][j-q0][i*DOFin+pin]
@@ -271,7 +276,7 @@ GradientCalculatorFD3::CalculateFirstDerivativeAtSelectedNodes(int dir/*0~d/dx,1
       if(!coordinates.IsHere(i,j,k,false)) // only work inside the subdomain
         continue;
 
-      for(int id=0; id<input_dof.size(); id++) {
+      for(int id=0; id<(int)input_dof.size(); id++) {
         pin  = input_dof[id];
         pout = output_dof[id];
         dv[k][j][i*DOFout+pout] = cz[k][j][i*4]*v[k-q0][j][i*DOFin+pin]
@@ -305,8 +310,6 @@ void GradientCalculatorFD3::CalculateCoefficientsLeftBiased()
   double*** cx = (double***)Cx.GetDataPointer();
   double*** cy = (double***)Cy.GetDataPointer();
   double*** cz = (double***)Cz.GetDataPointer();
-
-  double coeffs[4];
 
   //Loop through the real cells
   for(int k=k0; k<kmax; k++)

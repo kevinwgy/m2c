@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _MULTIPHASE_OPERATOR_H_
 #define _MULTIPHASE_OPERATOR_H_
 #include<SpaceVariable.h>
@@ -57,6 +62,10 @@ public:
                      vector<VarFcnBase*> &varFcn_, GlobalMeshInfo &global_mesh_,
                      SpaceOperator &spo, vector<LevelSetOperator*> &lso);
   ~MultiPhaseOperator();
+
+  //! get number of materials
+  inline int NumberOfMaterials(bool include_inactive = false) {
+    return include_inactive ? varFcn.size() : varFcn.size()-1;}
 
   //! update material id at (external) ghost nodes (they get the IDs of their images)
   void UpdateMaterialIDAtGhostNodes(SpaceVariable3D &ID);
@@ -125,7 +134,8 @@ protected:
 
   //! internal function called by UpdateCellsSweptByEmbeddedSurfaces
   void FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
-                                         vector<Intersector*> *intersector,
+                                         vector<Intersector*> *intersector, std::set<Int3> &occlueded,
+                                         std::set<Int3> &imposed_occluded,
                                          vector<std::pair<Int3,bool> > &neighbors);
 
   //! internal function called by ResolveConflictsWithEmbeddedSurfaces

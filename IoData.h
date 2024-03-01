@@ -1,10 +1,15 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _IO_DATA_H_
 #define _IO_DATA_H_
 
 #include <cstdio>
 #include <map>
-#include "parser/Assigner.h"
-#include "parser/Dictionary.h"
+#include <parser/Assigner.h>
+#include <parser/Dictionary.h>
 #include <Vector2D.h>
 #include <Vector3D.h>
 #include <Utils.h>
@@ -53,6 +58,19 @@ struct StateVariable {
 
   void setup(const char *, ClassAssigner * = 0);
 
+  StateVariable &operator=(const StateVariable& s2) {
+    materialid = s2.materialid;  density = s2.density;  velocity_x = s2.velocity_x;
+    velocity_y = s2.velocity_y;  velocity_z = s2.velocity_z;  pressure = s2.pressure;
+    temperature = s2.temperature;  internal_energy_per_mass = s2.internal_energy_per_mass;
+    return *this;}
+
+  bool operator==(const StateVariable& s2) {
+    if(materialid != s2.materialid || density != s2.density || velocity_x != s2.velocity_x ||
+       velocity_y != s2.velocity_y || velocity_z != s2.velocity_z || pressure != s2.pressure ||
+       temperature != s2.temperature || internal_energy_per_mass != s2.internal_energy_per_mass)
+      return false;
+    else
+      return true;}
 };
 
 //------------------------------------------------------------------------------
@@ -60,6 +78,11 @@ struct StateVariable {
 struct PointData {
 
   double x,y,z;
+
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). 
+
   StateVariable initialConditions;
 
   PointData();
@@ -73,6 +96,11 @@ struct PointData {
 struct PlaneData {
 
   double cen_x, cen_y, cen_z, nx, ny, nz;
+
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). 
+
   StateVariable initialConditions;
 
   PlaneData();
@@ -83,9 +111,38 @@ struct PlaneData {
 
 //------------------------------------------------------------------------------
 
+struct ParallelepipedData {
+
+  double x0, y0, z0; //!< point 1
+
+  double ax, ay, az; //!< axis 1 and its length
+  double bx, by, bz; //!< axis 2 and its length
+  double cx, cy, cz; //!< axis 3 and its length
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). 
+
+  StateVariable initialConditions;
+
+  ParallelepipedData();
+  ~ParallelepipedData() {}
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
 struct SphereData {
 
   double cen_x, cen_y, cen_z, radius;
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). 
+
   StateVariable initialConditions;
 
   SphereData();
@@ -100,7 +157,13 @@ struct SpheroidData {
 
   double cen_x, cen_y, cen_z;
   double axis_x, axis_y, axis_z;
-  double length, diameter;
+  double semi_length; //!< half length (along axis)
+  double radius; //!< max. radius on the transverse plane
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). 
 
   StateVariable initialConditions;
 
@@ -118,7 +181,12 @@ struct CylinderConeData {
   double cen_x, cen_y, cen_z, nx, ny, nz, r, L;
   //! info about the cone (connected to the top of the cylinder)
   double opening_angle_degrees, cone_height;
+
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
  
+  int order; //!< set operation order (0, 1, ...). 
+
   StateVariable initialConditions;
 
   CylinderConeData();
@@ -137,6 +205,11 @@ struct CylinderSphereData {
   OnOff front_cap;
   OnOff back_cap;
 
+  enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). 
+
   StateVariable initialConditions;
 
   CylinderSphereData();
@@ -147,14 +220,36 @@ struct CylinderSphereData {
 
 //------------------------------------------------------------------------------
 
+struct UserSpecifiedEnclosureData {
+
+  const char *surface_filename; //!< surface mesh that contains one or multiple enclosures
+  double surface_thickness; //!< artificial thickness of the surface
+
+  enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
+
+  int order; //!< set operation order (0, 1, ...). 
+
+  StateVariable initialConditions;
+
+  UserSpecifiedEnclosureData();
+  ~UserSpecifiedEnclosureData() {} 
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
 struct MultiInitialConditionsData {
 
-  ObjectMap<PointData>    pointMap;
-  ObjectMap<PlaneData>    planeMap;
-  ObjectMap<SphereData>   sphereMap;
-  ObjectMap<SpheroidData> spheroidMap;
-  ObjectMap<CylinderConeData> cylinderconeMap;
+  ObjectMap<PointData>          pointMap;
+  ObjectMap<PlaneData>          planeMap;
+  ObjectMap<SphereData>         sphereMap;
+  ObjectMap<ParallelepipedData> parallelepipedMap;
+  ObjectMap<SpheroidData>       spheroidMap;
+  ObjectMap<CylinderConeData>   cylinderconeMap;
   ObjectMap<CylinderSphereData> cylindersphereMap;
+
+  ObjectMap<UserSpecifiedEnclosureData> enclosureMap;
 
   void setup(const char *, ClassAssigner * = 0);
 };
@@ -185,7 +280,8 @@ struct MeshData {
   ObjectMap<MeshResolution1DPointData>  ypoints_map;
   ObjectMap<MeshResolution1DPointData>  zpoints_map;
 
-  enum BcType {NONE = 0, INLET = 1, OUTLET = 2, SLIPWALL = 3, STICKWALL = 4, SYMMETRY = 5, SIZE = 6};
+  enum BcType {NONE = 0, INLET = 1, OUTLET = 2, SLIPWALL = 3, STICKWALL = 4, SYMMETRY = 5, 
+               OVERSET = 6, SIZE = 7};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
 
   MeshData();
@@ -239,6 +335,7 @@ struct NobleAbelStiffenedGasModelData {
 
   //! parameters related to temperature
   double cv; //!< specific heat at constant volume
+  double integrationConstant; //!< bigC
 
   NobleAbelStiffenedGasModelData();
   ~NobleAbelStiffenedGasModelData() {}
@@ -273,6 +370,64 @@ struct MieGruneisenModelData {
 
 //------------------------------------------------------------------------------
 
+struct ExtendedMieGruneisenModelData {
+
+  double rho0;
+  double c0;
+  double Gamma0;
+  double s;
+  double e0;
+
+  double eta_min; //!< a negative value (tension) that triggers pR = const (rho0*c0*c0*eta_min).
+
+  //! parameters related to temperature
+
+  enum TemperatureLaw {ORIGINAL_CV = 0, SIMPLIFIED_CV = 1, SIMPLIFIED_CP = 2} Tlaw;
+  //! Note: All the three laws require T0. In addition, "0" & "1" require cv. "2" requires cp and h0.
+
+  double cv; //!< specific heat at constant volume
+  double T0;  //!< temperature is T0 when internal energy (per mass) is e0
+
+  double cp; //!< specific heat at constant pressure
+  double h0; //!< enthalpy per specific mass at T0
+
+  ExtendedMieGruneisenModelData();
+  ~ExtendedMieGruneisenModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct TillotsonModelData {
+
+  double rho0; //!< density in the ambient state
+  double e0;   //!< internal energy (per unit mass) in the ambient state
+  double a, b; //!< non-D model parameters. (a+b/4: Gruneisen param in ambient state; a+b: ... at low T (e=0))
+  double A, B; //!< dim: [force]/[length]^2. (A: bulk modulus at p = 0 and e = 0)
+  double alpha, beta; //!< non-D model parameters (in the formula for "hot expanded states")
+
+  double rhoIV; //!< "incipient vaporization" density (constant model param.)
+  double eIV;   //!< "incipient vaporization" internal energy (constant model param.)
+  double eCV;   //!< "complete vaporization" internal energy (constant model param.) (eCV-eIV: latent heat per unit mass)
+
+  double cv; //!< specific heat at constant volume
+  enum YesNo {NO = 0, YES = 1} temperature_depends_on_density; //!< whether T depends on both rho and e, or just e.
+  double T0; //!< temperature at rho0 and e0.
+
+  double cp; //!< specific heat at constant pressure
+  double h0; //!< specific enthalpy corresponding to T0 (only used if T is calculated using cp)
+
+  TillotsonModelData();
+  ~TillotsonModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+  
+};
+
+//------------------------------------------------------------------------------
+
 struct JonesWilkinsLeeModelData {
 
   double omega;
@@ -284,6 +439,48 @@ struct JonesWilkinsLeeModelData {
 
   JonesWilkinsLeeModelData();
   ~JonesWilkinsLeeModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);  
+
+};
+
+//------------------------------------------------------------------------------
+
+struct ANEOSBirchMurnaghanDebyeModelData {
+
+  double zeroKelvinDensity; //!< reference density at 0 K (NOT ambient state)
+  double b0; //!< bulk modulus (ambient)
+  double b0prime; //!< derivative of b0 w.r.t. pressure
+  double delta_e; //!< internal energy shift (often set to 0)
+  double molar_mass; //!< molar mass
+  double T0; //!< reference temperature (ambient state)
+  double e0; //!< reference internal energy (ambient state)
+  double Gamma0; //!< reference Gruneisen parameter (ambient state)
+  double rho0; //!< reference densiy (ambient state)
+
+  double boltzmann_constant; //!< boltzmann constant
+
+  enum DebyeFunctionEvaluation {ON_THE_FLY = 0, CUBIC_SPLINE_INTERPOLATION = 1} debye_evaluation;
+
+  ANEOSBirchMurnaghanDebyeModelData();
+  ~ANEOSBirchMurnaghanDebyeModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);  
+
+};
+
+//------------------------------------------------------------------------------
+
+struct HomoIncompressibleModelData {
+
+  double rho0; //!< density (fixed)
+  double p0; //!< reference pressure 
+  double c; //!< specific heat (for incompressible flow, cp = cv)
+  double T0; //!< reference temperature
+  double e0; //!< reference specific internal energy
+
+  HomoIncompressibleModelData();
+  ~HomoIncompressibleModelData() {}
 
   void setup(const char *, ClassAssigner * = 0);  
 
@@ -334,7 +531,15 @@ struct HeatDiffusionModelData {
 
 struct HyperelasticityModelData {
 
-  enum Type {NONE = 0, CONSTANT = 1} type;
+  enum Type {NONE = 0, SAINTVENANT_KIRCHHOFF = 1, MODIFIED_SAINTVENANT_KIRCHHOFF = 2,
+             NEO_HOOKEAN = 3, MOONEY_RIVLIN = 4} type;
+
+  enum StressOption {FULL = 0, DEVIATOR_ONLY = 1} stress_option;
+
+  double youngs_modulus; 
+  double poissons_ratio;
+
+  double C01; //additional parameter for Mooney-Rivlin (dW/dI2bar)
 
   HyperelasticityModelData();
   ~HyperelasticityModelData() {}
@@ -349,7 +554,9 @@ struct MaterialModelData {
 
   int id;
   enum EOS {STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, 
-            JWL = 3, ANEOS_BIRCH_MURNAGHAN_DEBYE = 4} eos;
+            EXTENDED_MIE_GRUNEISEN = 3,
+            TILLOTSON = 4, JWL = 5, ANEOS_BIRCH_MURNAGHAN_DEBYE = 6,
+            HOMOGENEOUS_INCOMPRESSIBLE = 7} eos;
   double rhomin;
   double pmin;
   double rhomax;
@@ -357,10 +564,14 @@ struct MaterialModelData {
 
   double failsafe_density; //for updating phase change -- last resort
 
-  StiffenedGasModelData    sgModel;
+  StiffenedGasModelData             sgModel;
   NobleAbelStiffenedGasModelData    nasgModel;
-  MieGruneisenModelData    mgModel;
-  JonesWilkinsLeeModelData jwlModel;
+  MieGruneisenModelData             mgModel;
+  ExtendedMieGruneisenModelData     mgextModel;
+  TillotsonModelData                tillotModel;
+  JonesWilkinsLeeModelData          jwlModel;
+  ANEOSBirchMurnaghanDebyeModelData abmdModel;
+  HomoIncompressibleModelData       incompModel;
 
   ViscosityModelData viscosity;
 
@@ -415,9 +626,10 @@ struct EquationsData {
 
 struct FixData {
 
-  ObjectMap<SphereData>   sphereMap;
-  ObjectMap<SpheroidData> spheroidMap;
-  ObjectMap<CylinderConeData> cylinderconeMap;
+  ObjectMap<SphereData>         sphereMap;
+  ObjectMap<ParallelepipedData> parallelepipedMap;
+  ObjectMap<SpheroidData>       spheroidMap;
+  ObjectMap<CylinderConeData>   cylinderconeMap;
   ObjectMap<CylinderSphereData> cylindersphereMap;
 
   FixData();
@@ -537,10 +749,29 @@ struct LevelSetReinitializationData {
 };
 
 //------------------------------------------------------------------------------
+/** Enforces a uniform velocity field (constant value or time-history) for a certain materialid;
+  * Activated when materialid is set to a non-negative value. First, tries to read the file. If it
+  * is not specified, apply the constant velocity values (default: (0,0,0)). */
+struct PrescribedMotionData {
+
+  int materialid; //!< The material id that will have a prescribed velocity
+
+  double velocity_x, velocity_y, velocity_z;
+
+  const char *velocity_time_history;
+
+  PrescribedMotionData();
+  ~PrescribedMotionData() {}
+
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
 
 struct LevelSetSchemeData {
 
-  int materialid; //! The material in the phi<0 region ("inside")
+  int materialid; //!< The material in the phi<0 region ("inside")
 
   enum Solver {FINITE_VOLUME = 0, FINITE_DIFFERENCE = 1} solver;
 
@@ -548,13 +779,17 @@ struct LevelSetSchemeData {
 
   enum Flux {ROE = 0, LOCAL_LAX_FRIEDRICHS = 1, UPWIND = 2} flux;
   ReconstructionData rec;
-  double delta; //! The coeffient in Harten's entropy fix.
+  double delta; //!< The coeffient in Harten's entropy fix.
 
   enum BcType {NONE = 0, ZERO_NEUMANN = 1, LINEAR_EXTRAPOLATION = 2, NON_NEGATIVE = 3, SIZE = 4};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
   
+  //! Initialization of Phi: by distance calculation (accurate, but not robust for complex geometries), \n
+  //! or by the solution of the reinitialization function (may be less accurate, but more robust).
+  enum InitializationMethod {DISTANCE_CALCULATION = 0, REINITIALIZATION = 1} init;
 
-  int bandwidth; //number of layers of nodes on each side of interface
+
+  int bandwidth; //!< number of layers of nodes on each side of interface
 
   LevelSetReinitializationData reinit;
 
@@ -573,6 +808,8 @@ struct SchemesData {
   BoundarySchemeData bc;
 
   ObjectMap<LevelSetSchemeData> ls;
+
+  ObjectMap<PrescribedMotionData> pm;
 
   SchemesData();
   ~SchemesData() {}
@@ -593,13 +830,22 @@ struct ExactRiemannSolverData {
   double tol_shock;
   double tol_rarefaction;
 
-  double min_pressure; //this is to guide the finding of bracketing interval (set it to
-                       //be a low (maybe negative) pressure that is *clearly* out of bound
+  double min_pressure; //!< this is to guide the finding of bracketing interval (set it to
+                       //!< be a low (maybe negative) pressure that is *clearly* out of bound
 
-  double failure_threshold; //when to apply a fixed pressure (at failure)
-  double pressure_at_failure; //this is a fixed pressure to be specified as ps when the solver fails to
-                              //find a bracketing interval and the best approximation obtained is poor.
-                              //this is the last resort. Usually it can be set to a very low but physical pressure
+  double failure_threshold; //!< when to apply a fixed pressure (at failure)
+  double pressure_at_failure; //!< this is a fixed pressure to be specified as ps when the solver fails to
+                              //!< find a bracketing interval and the best approximation obtained is poor.
+                              //!< this is the last resort. Usually it can be set to a very low but physical pressure
+
+
+  // ---------------------------------------------------------------------------------------------
+  //! Experimental (Wentao): Extended Exact Riemann solver w/ pressure jump due to surface tension
+  enum YesNo {NO = 0, YES = 1} surface_tension; //!< whether surface tension is modeled
+  double surface_tension_coefficient; //!< used when surface tension is considered
+  int surface_tension_materialid; //!< the material that pressure jump is *added* to
+  // ---------------------------------------------------------------------------------------------
+
 
   ExactRiemannSolverData();
   ~ExactRiemannSolverData() {}
@@ -612,7 +858,7 @@ struct ExactRiemannSolverData {
 
 struct MultiPhaseData {
 
-  enum Flux {EXACT = 0, NUMERICAL = 1} flux;
+  enum Flux {EXACT = 0, NUMERICAL = 1, LOCAL_LAX_FRIEDRICHS = 2} flux;
 
   enum ReconstructionAtInterface {CONSTANT = 0, LINEAR = 1} recon;
 
@@ -645,13 +891,61 @@ struct MultiPhaseData {
 
 //------------------------------------------------------------------------------
 
-struct ExplicitData {
+struct ExplicitTsData {
 
-//!time-integration scheme used
+  //! time-integration scheme used
   enum Type {FORWARD_EULER = 0, RUNGE_KUTTA_2 = 1, RUNGE_KUTTA_3 = 2} type;
 
-  ExplicitData();
-  ~ExplicitData() {}
+  ExplicitTsData();
+  ~ExplicitTsData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct LinearSolverData {
+
+  enum KSPType {PETSC_KSP_DEFAULT = 0, FLEXIBLE_GMRES = 1, STAB_BI_CG = 2, IMPROVED_STAB_BI_CG = 3} ksp;
+  enum PCType {PETSC_PC_DEFAULT = 0, PC_NONE = 1, JACOBI = 2, BLOCK_JACOBI = 3, MG = 4} pc;
+
+  double rtol; //!< relative error tolerance (in terms of residual norm)
+  double abstol; //!< absolute error tolerance (in terms of residual norm)
+  double dtol; //!< divergence tolerance (in terms of residual norm)
+  int maxits; //!< max. iterations
+
+  const char *options_file; //!< additional options can be specified through a file
+
+  enum YesNo {NO = 0, YES = 1} write_log_to_screen;
+  const char *logfile; //!< print log to a file
+
+  LinearSolverData();
+  ~LinearSolverData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+
+//------------------------------------------------------------------------------
+
+struct SemiImplicitTsData {
+
+  //! time-integration scheme used
+  enum Type {SIMPLE = 0, SIMPLER = 1, SIMPLEC = 2, PISO = 3} type;
+
+  double E;       //!< control the relaxation in the solution of momentum equations
+  double alphaP;  //!< relaxation in the solution of the pressure correction equaitons
+
+
+  int maxIts; //!< maximum number of (sub-)iterations within each time step
+  double convergence_tolerance; //!< relative error tolerance within each time step
+
+  LinearSolverData velocity_linear_solver;
+  LinearSolverData pressure_linear_solver;
+  
+  SemiImplicitTsData();
+  ~SemiImplicitTsData() {}
 
   void setup(const char *, ClassAssigner * = 0);
 
@@ -661,12 +955,20 @@ struct ExplicitData {
 
 struct TsData {
 
-  enum Type {EXPLICIT = 0, IMPLICIT = 1} type;
+  enum Type {EXPLICIT = 0, SEMI_IMPLICIT = 1} type;
+
   int maxIts;
   double timestep;
   double cfl;
   double maxTime;
-  ExplicitData expl;
+
+  //! Parameters for steady-state computations
+  double convergence_tolerance; //!< tolerance for residual.
+  enum YesNo {NO = 0, YES = 1} local_dt; //!< each control volume applies its own time step size
+
+  ExplicitTsData expl; //!< for compressible flows
+
+  SemiImplicitTsData semi_impl; //!< for incompressible flows
 
   TsData();
   ~TsData() {}
@@ -707,6 +1009,7 @@ struct DiskData {
 
 struct RectangleData {
 
+  //! a and b follow right-hand-rule. For example, for a rectangle in the z-x plane, a~z, b~x
   double cen_x, cen_y, cen_z, a, b;
   double normal_x, normal_y, normal_z;
   StateVariable state;
@@ -746,8 +1049,29 @@ struct BcsData {
 };
 
 //------------------------------------------------------------------------------
+//! Fill the domain with a certain material from a source point, up to a "waterline". Pressure varied linearly.
+//! Useful for simulations involving floating vehicles/structures and those that gravity needs to be specified
+struct FloodIcData {
+
+  double source_x, source_y, source_z; //!< "water" source: any point underwater
+  double waterline_x, waterline_y, waterline_z; //!< a point on the waterline
+  double gx, gy, gz; //!< gravitational acceleration 
+
+  //! Note: "source" is needed. Filling everywhere under "waterline" would also flood the ship...
+
+  StateVariable waterline_ic;
+
+  FloodIcData();
+  ~FloodIcData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
 
 struct IcData {
+
+  StateVariable default_ic;
 
   //-----------------------------------------------------------------------
   //! initial condition specified using simple geometric entities (e.g., point, plane,)
@@ -779,6 +1103,13 @@ struct IcData {
   std::vector<double> user_data[SIZE];
 
   std::vector<double> user_data2[SIZE]; //!< for radial variation 
+  //-----------------------------------------------------------------------
+
+  const char *state_calculator; //!< dynamically loaded object / user-specified i.c.
+
+  //-----------------------------------------------------------------------
+  //! initial condition specified through "flooding".
+  FloodIcData floodIc;
   //-----------------------------------------------------------------------
 
   IcData();
@@ -875,7 +1206,9 @@ struct MaterialIonizationModel{
 
   enum Type {NONE = 0, SAHA_IDEAL = 1, SAHA_NONIDEAL = 2} type;
 
-  enum DepressionModel {NO_DEPRESSION = 0, GRIEM = 1, EBELING = 2} depression;
+  enum DepressionModel {NO_DEPRESSION = 0, GRIEM = 1, EBELING = 2, GRIEM_FLETCHER = 3} depression;
+
+  double depression_max; //!< delta_I is capped at dpression_max*I (default: 1.0)
 
   int maxIts;
   double convergence_tol;
@@ -945,7 +1278,8 @@ struct Probes {
 
   enum Vars  {DENSITY = 0, VELOCITY_X = 1, VELOCITY_Y = 2, VELOCITY_Z = 3, PRESSURE = 4, TEMPERATURE = 5, 
               DELTA_TEMPERATURE = 6, MATERIALID = 7, LASERRADIANCE = 8, LEVELSET0 = 9, LEVELSET1 = 10, 
-              LEVELSET2 = 11, LEVELSET3 = 12, LEVELSET4 = 13, IONIZATION = 14, SIZE = 15};
+              LEVELSET2 = 11, LEVELSET3 = 12, LEVELSET4 = 13, IONIZATION = 14, REFERENCE_MAP = 15,
+              PRINCIPAL_ELASTIC_STRESSES = 16, SIZE = 17};
 
   const char *density;
   const char *velocity_x;
@@ -962,6 +1296,8 @@ struct Probes {
   const char *levelset3;
   const char *levelset4;
   const char *ionization_result;
+  const char *reference_map;
+  const char *principal_elastic_stresses;
 
   Probes();
   ~Probes() {}
@@ -990,6 +1326,43 @@ struct LinePlot {
 };
 
 //------------------------------------------------------------------------------
+
+struct PlanePlot {
+
+  enum Vars  {DENSITY = 0, VELOCITY = 1, PRESSURE = 2, TEMPERATURE = 3, 
+              DELTA_TEMPERATURE = 4, MATERIALID = 5, LASERRADIANCE = 6, LEVELSET0 = 7, LEVELSET1 = 8, 
+              LEVELSET2 = 9, LEVELSET3 = 10, LEVELSET4 = 11, IONIZATION = 12, SIZE = 13};
+
+  const char *mesh;
+
+  const char *density;
+  const char *velocity;
+  const char *pressure;
+  const char *temperature;
+  const char *delta_temperature;
+  const char *materialid;
+  const char *laser_radiance;
+  const char *levelset0;
+  const char *levelset1;
+  const char *levelset2;
+  const char *levelset3;
+  const char *levelset4;
+  const char *ionization_result;
+
+  double x0,y0,z0;
+  double normal_x, normal_y, normal_z;
+
+  int frequency;
+  double frequency_dt;
+
+  PlanePlot();
+  ~PlanePlot() {}
+
+  Assigner *getAssigner();
+};
+
+//------------------------------------------------------------------------------
+
 
 struct MaterialVolumes {
 
@@ -1026,7 +1399,7 @@ struct TerminalVisualizationData {
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
   double frequency_clocktime; //!< clock time, in seconds
-  double pause; //!< pause after printing each snapshot, relevant only if filename is stdout or stderr 
+  double pause; //!< pause after printing each snapshot, relevant only if filename is stdout or stdout 
 
   TerminalVisualizationData();
   ~TerminalVisualizationData() {}
@@ -1076,7 +1449,7 @@ struct OutputData {
 
   enum Options {OFF = 0, ON = 1};
   Options density, velocity, pressure, materialid, internal_energy, delta_internal_energy,
-          temperature, delta_temperature, laser_radiance, reference_map;
+          temperature, delta_temperature, laser_radiance, reference_map, principal_elastic_stresses;
 
   enum VerbosityLevel {LOW = 0, MEDIUM = 1, HIGH = 2} verbose;
 
@@ -1114,6 +1487,8 @@ struct OutputData {
 
   ObjectMap<LinePlot> linePlots;
 
+  ObjectMap<PlanePlot> planePlots;
+
   MaterialVolumes materialVolumes;
 
   const char *mesh_filename; //!< file for nodal coordinates
@@ -1139,6 +1514,8 @@ struct LagrangianMeshOutputData {
   const char* disp; //!< displacement
   const char* sol; //!< solution
 
+  const char *wetting_output_filename; //!< optional output file that shows the detected wetted side(s)
+
   LagrangianMeshOutputData();
   ~LagrangianMeshOutputData() {}
 
@@ -1160,20 +1537,24 @@ struct EmbeddedSurfaceData {
   enum YesNo {NO = 0, YES = 1} provided_by_another_solver;
   const char *filename; //!< file for nodal coordinates and elements
   enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
+  double wall_temperature; //!< used only in the case of isothermal wall 
   double heat_source;
-
-  const char *wetting_output_filename; //!< optional output file that shows the detected wetted side(s)
 
   double surface_thickness;
 
   //! tools
   const char *dynamics_calculator;
+  const char *force_calculator;
 
   //! force calculation (NONE: force is 0, i.e. one-way coupling)
   enum GaussQuadratureRule {NONE = 0, ONE_POINT = 1, THREE_POINT = 2, FOUR_POINT = 3,
                             SIX_POINT = 4} quadrature;
   double gauss_points_lofting; //!< non-dimensional, relative to local element size
   double internal_pressure; //!< pressure applied on the inactive side (i.e. inside solid body)
+
+  enum TwoDimensionalToThreeDimensionalMapping {RADIAL_BASIS = 0, 
+                                                NEAREST_NEIGHBOR = 1} twoD_to_threeD; //!< only for 2->3D
+  
 
   //! flux calculation
   double conRec_depth; //!< depth (dimensional) where constant reconstruction is applied (default: 0)
@@ -1237,9 +1618,39 @@ struct AerosCouplingData {
 
 //------------------------------------------------------------------------------
 
+struct AerofCouplingData {
+
+  enum Type {NONE = 0, OVERSET_GRIDS = 1} type;
+
+  AerofCouplingData();
+  ~AerofCouplingData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
+struct M2CTwinningData {
+
+  enum Type {NONE = 0, OVERSET_GRIDS = 1} type;
+
+  M2CTwinningData();
+  ~M2CTwinningData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct ConcurrentProgramsData {
 
   AerosCouplingData aeros;
+
+  AerofCouplingData aerof;
+
+  M2CTwinningData m2c_twin;
 
   ConcurrentProgramsData();
   ~ConcurrentProgramsData() {} 
@@ -1283,11 +1694,38 @@ struct ReferenceMapData {
 
 //------------------------------------------------------------------------------
 
+struct EOSTabulationData {
+
+  int materialid;
+
+  const char *filename; //!< output file name
+   
+  enum Variable {PRESSURE = 0, SPECIFIC_INTERNAL_ENERGY = 1, DENSITY = 2,
+                 DP_DE = 3, //!< dp(rho,e)/de
+                 GRUNEISEN_PARAMETER = 4, //!< 1/rho*dp(rho,e)/de
+                 DP_DRHO = 5, //!< dp(rho,e)/drho
+                 BULK_MODULUS = 6, //!< rho*dp(rho,e)/drho
+                 TEMPERATURE = 7,
+                 SPECIFIC_ENTHALPY = 8} output, xvar, yvar;
+
+  double x0, xmax, y0, ymax; //!< setting x0==xmax or y0==ymax will generate 1D data
+  int Nx, Ny;
+
+  EOSTabulationData();
+  ~EOSTabulationData() {}
+
+  Assigner *getAssigner();
+};
+
+//------------------------------------------------------------------------------
+
 struct SpecialToolsData {
 
-  enum Type {NONE = 0, DYNAMIC_LOAD_CALCULATION = 1, SIZE = 2} type;
+  enum Type {NONE = 0, DYNAMIC_LOAD_CALCULATION = 1, EOS_TABULATION = 2, SIZE = 3} type;
   
   TransientInputData transient_input;
+
+  ObjectMap<EOSTabulationData> eos_tabulationMap;
 
   SpecialToolsData();
   ~SpecialToolsData() {}

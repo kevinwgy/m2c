@@ -14,6 +14,12 @@
 # EXTERNAL cache entries
 ########################
 
+//The directory containing a CMake configuration file for Boost.
+Boost_DIR:PATH=/apps/easybuild/software/tinkercliffs-rome/Boost/1.71.0-iimpi-2019b/lib/cmake/Boost-1.71.0
+
+//Path to a file.
+Boost_INCLUDE_DIR:PATH=/apps/easybuild/software/tinkercliffs-rome/Boost/1.71.0-iimpi-2019b/include
+
 //Path to a program.
 CMAKE_ADDR2LINE:FILEPATH=/apps/easybuild/software/tinkercliffs-rome/binutils/2.32-GCCcore-8.3.0/bin/addr2line
 
@@ -233,11 +239,16 @@ M2C_BINARY_DIR:STATIC=/home/xuningzhao/tinkercliffs/m2c_032023
 //Value Computed by CMake
 M2C_SOURCE_DIR:STATIC=/home/xuningzhao/tinkercliffs/m2c_032023
 
+//The directory containing a CMake configuration file for boost_headers.
+boost_headers_DIR:PATH=/apps/easybuild/software/tinkercliffs-rome/Boost/1.71.0-iimpi-2019b/lib/cmake/boost_headers-1.71.0
+
 
 ########################
 # INTERNAL cache entries
 ########################
 
+//ADVANCED property for variable: Boost_DIR
+Boost_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_ADDR2LINE
 CMAKE_ADDR2LINE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_AR
@@ -383,4 +394,8 @@ CMAKE_STRIP-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//Details about finding Boost
+FIND_PACKAGE_MESSAGE_DETAILS_Boost:INTERNAL=[/apps/easybuild/software/tinkercliffs-rome/Boost/1.71.0-iimpi-2019b/lib/cmake/Boost-1.71.0/BoostConfig.cmake][c ][v1.71.0(1.71)]
+//ADVANCED property for variable: boost_headers_DIR
+boost_headers_DIR-ADVANCED:INTERNAL=1
 

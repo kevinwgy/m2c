@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <iostream>
 #include <Utils.h>
 #include <time.h>
@@ -6,6 +11,7 @@
 #include <cstring>
 #include <cmath> //floor
 #include <unistd.h> //sleep
+using std::vector;
 using std::cout;
 using std::endl;
 
@@ -186,8 +192,15 @@ void print(FILE* fd, const char format[],...)
     va_end(Argp);
   }
 
-  MPI_Barrier(m2c_comm);
+  //MPI_Barrier(m2c_comm); (This slows down the code!)
   return;
+}
+
+//--------------------------------------------------
+
+void mpi_barrier()
+{
+  MPI_Barrier(m2c_comm);
 }
 
 //--------------------------------------------------
@@ -204,7 +217,7 @@ void print(MPI_Comm& comm, FILE* fd, const char format[],...)
     va_end(Argp);
   }
 
-  MPI_Barrier(comm);
+  //MPI_Barrier(comm); (This slows down the code)
   return;
 }
 
@@ -255,7 +268,7 @@ void printHeader(int argc, char *argv[])
     cout << endl;
     cout << "Revision: " << GIT_REV << " | " << "Branch: " << GIT_BRANCH << " | " << "Tag: " << GIT_TAG << endl;
     cout << "Computation started at: " << getCurrentDateTime() << endl;
-    cout << "Using " << size << " processor cores." << endl;
+    cout << "Using " << size << " processor cores (including concurrent programs)." << endl;
     cout << "Command:";
     for(int i=0; i<argc; i++)
       cout << " " << argv[i];
@@ -306,7 +319,8 @@ bool isTimeToWrite(double time, double dt, int time_step, double frequency_dt, i
   }
 }
 
+//--------------------------------------------------
 
 
-
+//--------------------------------------------------
 

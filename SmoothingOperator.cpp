@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<SmoothingOperator.h>
 #include<cmath> //exp
 
@@ -90,7 +95,7 @@ void SmoothingOperator::ApplyBoxFilter(SpaceVariable3D &V, SpaceVariable3D *ID)
               if(coordinates.OutsidePhysicalDomain(neighi,neighj,neighk))
                 continue; //no valid data here.
 
-              //fprintf(stderr,"(%d %d %d) %d : neigh (%d %d %d), weight = %e, rho = %e\n", i,j,k, (int)myid, neighi, neighj, neighk, 1.0, v0[neighk][neighj][neighi*V0dim+0]);
+              //fprintf(stdout,"(%d %d %d) %d : neigh (%d %d %d), weight = %e, rho = %e\n", i,j,k, (int)myid, neighi, neighj, neighk, 1.0, v0[neighk][neighj][neighi*V0dim+0]);
 
               sum_weight += 1.0;
               addarray(&v0[neighk][neighj][neighi*V0dim], &v[k][j][i*Vdim], Vdim);
@@ -176,7 +181,7 @@ void SmoothingOperator::ApplyGausianFilter(SpaceVariable3D &V, SpaceVariable3D *
 
               weight = exp(-pow((x1-x).norm(),2)/(2.0*variance));
 
-//              fprintf(stderr,"(%d %d %d) %d : neigh (%d %d %d), weight = %e, rho = %e\n", i,j,k, (int)myid, neighi, neighj, neighk, weight, v0[neighk][neighj][neighi*V0dim+0]);
+//              fprintf(stdout,"(%d %d %d) %d : neigh (%d %d %d), weight = %e, rho = %e\n", i,j,k, (int)myid, neighi, neighj, neighk, weight, v0[neighk][neighj][neighi*V0dim+0]);
 
               sum_weight += weight;
               for(int p=0; p<Vdim; p++)
@@ -258,7 +263,7 @@ void SmoothingOperator::EnforceLocalConservation(SpaceVariable3D &U0, SpaceVaria
             if(unew[p]!=0.0) {
               double factor = uold[p]/unew[p];
               //double maxdifftmp = std::max(maxdiff, std::fabs((unew[p]-uold[p])/unew[p]));
-              //fprintf(stderr,"(%d,%d,%d) p = %d, old = %e, new = %e, factor = %e, maxdiff = %e.\n", i,j,k, p, uold[p], unew[p], factor, maxdifftmp);
+              //fprintf(stdout,"(%d,%d,%d) p = %d, old = %e, new = %e, factor = %e, maxdiff = %e.\n", i,j,k, p, uold[p], unew[p], factor, maxdifftmp);
               factor = std::min(1.05, factor);
               factor = std::max(0.95, factor);
               u[k][j][Udim*i+p] *= factor; 

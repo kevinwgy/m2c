@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <LevelSetReinitializer.h>
 #include <GradientCalculatorCentral.h>
 #include <cfloat> //DBL_MAX
@@ -5,6 +10,7 @@
 extern int verbose;
 extern double domain_diagonal;
 
+int large_int = 31415927;
 //--------------------------------------------------------------------------
 
 LevelSetReinitializer::LevelSetReinitializer(MPI_Comm &comm_, DataManagers3D &dm_all_, 
@@ -66,7 +72,7 @@ LevelSetReinitializer::Destroy()
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi)
+LevelSetReinitializer::ReinitializeFullDomain(SpaceVariable3D &Phi, int special_maxIts)
 {
   // Step 1: Prep: Tag first layer nodes & store the sign function
   vector<FirstLayerNode> firstLayer;
@@ -95,7 +101,8 @@ RETRY_FullDomain:
 
   double residual = 0.0, dphi_max = 0.0;
   int iter;
-  for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
+  int maxIts = (special_maxIts>0) ? special_maxIts : iod_ls.reinit.maxIts;
+  for(iter = 0; iter < maxIts; iter++) {
 
     Phi0.AXPlusBY(0.0, 1.0, Phi);
 
@@ -146,10 +153,10 @@ RETRY_FullDomain:
   }
 
   // apply failsafe
-  if(iter==iod_ls.reinit.maxIts) {
+  if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
                   "Tol = %e.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(dphi_max<0.1) //ok...
+    if(dphi_max<0.02) //ok...
       return;
     if(cfl < 0.02) {//failed...
       print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
@@ -169,7 +176,8 @@ RETRY_FullDomain:
 void
 LevelSetReinitializer::ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, 
                            SpaceVariable3D &UsefulG2,SpaceVariable3D &Active, 
-                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes)
+                           vector<Int3> &useful_nodes, vector<Int3> &active_nodes,
+                           int special_maxIts)
 {
 
   // update phi_max and phi_min (only for use in updating new useful nodes)
@@ -207,7 +215,8 @@ RETRY_NarrowBand:
   
   double residual = 0.0, dphi_max = 0.0;
   int iter;
-  for(iter = 0; iter < iod_ls.reinit.maxIts; iter++) {
+  int maxIts = (special_maxIts>0) ? special_maxIts : iod_ls.reinit.maxIts;
+  for(iter = 0; iter < maxIts; iter++) {
 
     AXPlusBYInBandPlusOne(0.0, Phi0, 1.0, Phi);
 
@@ -264,16 +273,17 @@ RETRY_NarrowBand:
   }
 
   //Failsafe
-  if(iter==iod_ls.reinit.maxIts) {
+  if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
-                  "Tol = %e. Retrying.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(dphi_max<0.1) //ok...
+                  "Tol = %e.", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+    if(dphi_max<0.02) //ok...
       return; 
     if(cfl < 0.02) {//failed...
       print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
                   residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       exit_mpi();
     } else {
+      print_warning(" Retrying.\n");
       cfl /= 1.5;
       AXPlusBYInBandPlusOne(0.0, Phi, 1.0, Phibk); //set Phi = Phibk and retry
       goto RETRY_NarrowBand;
@@ -657,7 +667,7 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
   Vec3D gradphi;
   double gradphi_norm;
   double epsx, epsy, epsz;
-  for(int n=0; n<firstLayer.size(); n++) {
+  for(int n=0; n<(int)firstLayer.size(); n++) {
 
     // This must be a node in the interior of the subdomain (see how firstLayer is populated)
     i = firstLayer[n].i; 
@@ -692,7 +702,7 @@ LevelSetReinitializer::ReinitializeFirstLayerNodes(SpaceVariable3D &Phi0, SpaceV
     
 
     if(gradphi_norm == 0) {
-      fprintf(stderr,"Warning: (%d,%d,%d)(%e,%e,%e): Updating first layer node led to zero gradient.\n",
+      fprintf(stdout,"Warning: (%d,%d,%d)(%e,%e,%e): Updating first layer node led to zero gradient.\n",
               i,j,k,coords[k][j][i][0],coords[k][j][i][1],coords[k][j][i][2]);
       phi[k][j][i] = phig[k][j][i];
     } else
@@ -888,7 +898,7 @@ LevelSetReinitializer::PopulatePhiG2(SpaceVariable3D &Phi0, vector<Int3> *useful
 //Eq.(21a) of Hartmann et al., 2008, simplified
 double
 LevelSetReinitializer::DifferentiateInFirstLayer(double x0, double x1, double x2, 
-                                                 double tag0, double tag1, double tag2,
+                                                 double tag0, [[maybe_unused]] double tag1, double tag2,
                                                  double phi0, double phi1, double phi2, 
                                                  double phi00, double phi3, double eps)
 {
@@ -1138,7 +1148,6 @@ LevelSetReinitializer::ComputeNormalDirectionBeyondFirstLayer(SpaceVariable3D &P
     normal[it->k][it->j][it->i] = it->nphi0;
 
   // loop through the interior of the subdomain
-  double a,b,c,d,e,f, ap,am, bp,bm, cp,cm, dp,dm, ep,em, fp,fm;
 
 
   if(UsefulG2 && useful_nodes) { //narrow-band level set method
@@ -1482,23 +1491,18 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   double*** level  = Level.GetDataPointer();
   double*** useful = UsefulG2.GetDataPointer();
   double*** active = Active.GetDataPointer();
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  //Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
 
         // reset
-        level[k][j][i] = INT_MAX;
+        level[k][j][i] = large_int;
         useful[k][j][i] = 0;
         active[k][j][i] = 0;
 
         if(Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k))
           continue;
-/*
-        if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
-          fprintf(stderr,"(%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
-
-*/
 
         if(phi[k][j][i]==0) {
           level[k][j][i] = 0;
@@ -1507,17 +1511,13 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
           useful_nodes.push_back(Int3(i,j,k));
           active_nodes.push_back(Int3(i,j,k));
         } 
-        else if ( (i-1>=i0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i-1,j,k) && phi[k][j][i]*phi[k][j][i-1]<=0) ||
-                  (i+1<iimax && !Phi.OutsidePhysicalDomainAndUnpopulated(i+1,j,k) && phi[k][j][i]*phi[k][j][i+1]<=0) ||
-                  (j-1>=j0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j-1,k) && phi[k][j][i]*phi[k][j-1][i]<=0) ||
-                  (j+1<jjmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j+1,k) && phi[k][j][i]*phi[k][j+1][i]<=0) ||
-                  (k-1>=k0   && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k-1) && phi[k][j][i]*phi[k-1][j][i]<=0) ||
-                  (k+1<kkmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k+1) && phi[k][j][i]*phi[k+1][j][i]<=0) ) {
+        else if ((i-1>=ii0  && !Phi.OutsidePhysicalDomainAndUnpopulated(i-1,j,k) && phi[k][j][i]*phi[k][j][i-1]<=0) ||
+                 (i+1<iimax && !Phi.OutsidePhysicalDomainAndUnpopulated(i+1,j,k) && phi[k][j][i]*phi[k][j][i+1]<=0) ||
+                 (j-1>=jj0  && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j-1,k) && phi[k][j][i]*phi[k][j-1][i]<=0) ||
+                 (j+1<jjmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j+1,k) && phi[k][j][i]*phi[k][j+1][i]<=0) ||
+                 (k-1>=kk0  && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k-1) && phi[k][j][i]*phi[k-1][j][i]<=0) ||
+                 (k+1<kkmax && !Phi.OutsidePhysicalDomainAndUnpopulated(i,j,k+1) && phi[k][j][i]*phi[k+1][j][i]<=0)) {
 
-/*
-          if(fabs(coords[k][j][i][0]+0.1)<0.001 && coords[k][j][i][1]<0.002)
-            fprintf(stderr,"adding ... (%d,%d,%d)(%e,%e,%e): phi = %e.\n", i,j,k, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2], phi[k][j][i]);
-*/
           level[k][j][i] = 1;
           useful[k][j][i] = 1;
           active[k][j][i] = 1;
@@ -1528,13 +1528,13 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
 
       }
   Level.RestoreDataPointerAndInsert();
-  coordinates.RestoreDataPointerToLocalVector();
+  //coordinates.RestoreDataPointerToLocalVector();
 
   // Update useful_nodes and active_nodes to get the changes at boundary
   level = Level.GetDataPointer();
   for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
-    if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+    if(level[k][j][i]<large_int && useful[k][j][i]==0) {
       useful[k][j][i] = 1;
       active[k][j][i] = 1;
       useful_nodes.push_back(it->ijk);
@@ -1544,7 +1544,7 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
     int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
     //no need to skip corner nodes --- they won't satisfy the if statement anyway
-    if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+    if(level[k][j][i]<large_int && useful[k][j][i]==0) {
       useful[k][j][i] = 1;
       active[k][j][i] = 1;
       useful_nodes.push_back(it->ijk);
@@ -1574,12 +1574,14 @@ LevelSetReinitializer::ConstructNarrowBand(SpaceVariable3D &Phi,
   // -------------------------------------------------- 
   // Step 4: Build useful_nodes_plus1layer
   // -------------------------------------------------- 
-  CreateUsefulNodesPlusOneLayer(useful_nodes);
+  CreateUsefulNodesPlusOneLayer(useful_nodes, UsefulG2);
 /*
   UsefulG2.WriteToVTRFile("useful.vtr");
   Level.WriteToVTRFile("level.vtr");
   exit_mpi();
 */
+
+  mpi_barrier(); //not necessary
 }
 
 //--------------------------------------------------------------------------
@@ -1611,7 +1613,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
 
       //check its neighbors
       if(i-1>=ii0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i-1,j,k)) { //left
-        if(level[k][j][i-1]==INT_MAX) {
+        if(level[k][j][i-1]==large_int) {
           level[k][j][i-1] = band;
           useful[k][j][i-1] = 1;
           useful_nodes.push_back(Int3(i-1,j,k));
@@ -1623,7 +1625,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(i+1<iimax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i+1,j,k)) { //right
-        if(level[k][j][i+1]==INT_MAX) {
+        if(level[k][j][i+1]==large_int) {
           level[k][j][i+1] = band;
           useful[k][j][i+1] = 1;
           useful_nodes.push_back(Int3(i+1,j,k));
@@ -1635,7 +1637,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(j-1>=jj0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j-1,k)) { //bottom
-        if(level[k][j-1][i]==INT_MAX) {
+        if(level[k][j-1][i]==large_int) {
           level[k][j-1][i] = band;
           useful[k][j-1][i] = 1;
           useful_nodes.push_back(Int3(i,j-1,k));
@@ -1647,7 +1649,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(j+1<jjmax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j+1,k)) { //top
-        if(level[k][j+1][i]==INT_MAX) {
+        if(level[k][j+1][i]==large_int) {
           level[k][j+1][i] = band;
           useful[k][j+1][i] = 1;
           useful_nodes.push_back(Int3(i,j+1,k));
@@ -1659,7 +1661,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(k-1>=kk0 && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j,k-1)) { //back
-        if(level[k-1][j][i]==INT_MAX) {
+        if(level[k-1][j][i]==large_int) {
           level[k-1][j][i] = band;
           useful[k-1][j][i] = 1;
           useful_nodes.push_back(Int3(i,j,k-1));
@@ -1671,7 +1673,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
       }
 
       if(k+1<kkmax && !UsefulG2.OutsidePhysicalDomainAndUnpopulated(i,j,k+1)) { //front
-        if(level[k+1][j][i]==INT_MAX) {
+        if(level[k+1][j][i]==large_int) {
           level[k+1][j][i] = band;
           useful[k+1][j][i] = 1;
           useful_nodes.push_back(Int3(i,j,k+1));
@@ -1689,7 +1691,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
     level = Level.GetDataPointer();
     for(auto it = ghost_nodes_inner.begin(); it != ghost_nodes_inner.end(); it++) {
       int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
-      if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+      if(level[k][j][i]<large_int && useful[k][j][i]==0) {
         useful[k][j][i] = 1;
         useful_nodes.push_back(it->ijk);
         if(band<bandwidth) {
@@ -1700,7 +1702,7 @@ LevelSetReinitializer::PropagateNarrowBand(SpaceVariable3D &Level, SpaceVariable
     } 
     for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
       int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
-      if(level[k][j][i]<INT_MAX && useful[k][j][i]==0) {
+      if(level[k][j][i]<large_int && useful[k][j][i]==0) {
         useful[k][j][i] = 1;
         useful_nodes.push_back(it->ijk);
         if(band<bandwidth) {
@@ -1784,7 +1786,7 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   vector<Int3> useful_nodes_backup = useful_nodes;
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-    level[k][j][i] = INT_MAX;
+    level[k][j][i] = large_int;
     useful[k][j][i] = 0;
     active[k][j][i] = 0;
   }
@@ -1856,7 +1858,7 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
   // -------------------------------------------------- 
   // Step 6: Build useful_nodes_plus1layer
   // -------------------------------------------------- 
-  CreateUsefulNodesPlusOneLayer(useful_nodes);
+  CreateUsefulNodesPlusOneLayer(useful_nodes, UsefulG2);
 
 
 /* DEBUG
@@ -1866,11 +1868,11 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
       for(int i=ii0; i<iimax; i++) {
         Int3 ijk(i,j,k);
         if(useful[k][j][i] && std::find(useful_nodes.begin(), useful_nodes.end(), ijk) == useful_nodes.end())
-          fprintf(stderr,"HORROR!\n");
+          fprintf(stdout,"HORROR!\n");
       }
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
-    if(!useful[k][j][i]) fprintf(stderr,"HORROR 2!\n");
+    if(!useful[k][j][i]) fprintf(stdout,"HORROR 2!\n");
   }
   UsefulG2.RestoreDataPointerToLocalVector();
 */
@@ -1879,52 +1881,48 @@ LevelSetReinitializer::UpdateNarrowBand(SpaceVariable3D &Phi, vector<Int3> &firs
 //--------------------------------------------------------------------------
 
 void
-LevelSetReinitializer::CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes)
+LevelSetReinitializer::CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes, SpaceVariable3D &UsefulG2)
 {
 
-  useful_nodes_plus1layer = useful_nodes;
-
+  // find the extra layer
+  double*** useful = UsefulG2.GetDataPointer();
+  std::set<Int3> extra_layer;
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++) {
 
     int i((*it)[0]), j((*it)[1]), k((*it)[2]);
 
     if(i-1>=ii0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i-1,j,k))  //left
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i-1,j,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i-1,j,k));
+      if(!useful[k][j][i-1])
+        extra_layer.insert(Int3(i-1,j,k));
 
     if(i+1<iimax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i+1,j,k))  //right
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i+1,j,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i+1,j,k));
+      if(!useful[k][j][i+1])
+        extra_layer.insert(Int3(i+1,j,k));
 
     if(j-1>=jj0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j-1,k))  //bottom
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j-1,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j-1,k));
+      if(!useful[k][j-1][i])
+        extra_layer.insert(Int3(i,j-1,k));
 
     if(j+1<jjmax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j+1,k))  //top
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j+1,k)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j+1,k));
+      if(!useful[k][j+1][i])
+        extra_layer.insert(Int3(i,j+1,k));
 
     if(k-1>=kk0 && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k-1))  //back
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j,k-1)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j,k-1));
+      if(!useful[k-1][j][i])
+        extra_layer.insert(Int3(i,j,k-1));
 
     if(k+1<kkmax && !coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,k+1))  //front
-      if(std::find(useful_nodes_plus1layer.begin(), 
-                   useful_nodes_plus1layer.end(), 
-                   Int3(i,j,k+1)) == useful_nodes_plus1layer.end())
-        useful_nodes_plus1layer.push_back(Int3(i,j,k+1));
-
+      if(!useful[k+1][j][i])
+        extra_layer.insert(Int3(i,j,k+1));
   }
+
+  useful_nodes_plus1layer.reserve(useful_nodes.size() + extra_layer.size());
+  useful_nodes_plus1layer = useful_nodes;
+  useful_nodes_plus1layer.insert(useful_nodes_plus1layer.end(),
+                                 extra_layer.begin(), extra_layer.end());
+
+  UsefulG2.RestoreDataPointerToLocalVector();
+  
 }
 
 //--------------------------------------------------------------------------

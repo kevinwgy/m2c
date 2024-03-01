@@ -1,9 +1,16 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <LevelSetOperator.h>
 #include <SpaceOperator.h>
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
+#include <DistancePointToParallelepiped.h>
 #include <GradientCalculatorFD3.h>
 #include <EmbeddedBoundaryDataSet.h>
+#include <EmbeddedBoundaryOperator.h>
 
 #ifdef LEVELSET_TEST
   #include <Vector2D.h>
@@ -20,12 +27,13 @@ extern double domain_diagonal;
 LevelSetOperator::LevelSetOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                    LevelSetSchemeData &iod_ls_, SpaceOperator &spo)
   : comm(comm_), iod(iod_), iod_ls(iod_ls_),
-#if LEVELSET_TEST == 3
     dms(dm_all_),
-#endif
     coordinates(spo.GetMeshCoordinates()),
     delta_xyz(spo.GetMeshDeltaXYZ()),
     volume(spo.GetMeshCellVolumes()),
+    global_mesh(spo.GetGlobalMeshInfo()),
+    spo_ghost_nodes_inner(*spo.GetPointerToInnerGhostNodes()),
+    spo_ghost_nodes_outer(*spo.GetPointerToOuterGhostNodes()),
     reinit(NULL),
     scalar(comm_, &(dm_all_.ghosted1_1dof)),
     scalarG2(comm_, &(dm_all_.ghosted2_1dof)),
@@ -280,406 +288,118 @@ void LevelSetOperator::CreateGhostNodeLists()
 
 //-----------------------------------------------------
 
-void LevelSetOperator::SetInitialCondition(SpaceVariable3D &Phi, 
-                                           unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
-                                           vector<pair<int,int> > *surf_and_color)
+bool 
+LevelSetOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureData &enclosure,
+                                                       SpaceVariable3D &Phi)
 {
-  //get info
-  Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
-  double*** phi    = (double***)Phi.GetDataPointer();
 
-  //first, set phi to be a large number everywhere
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++)
-        phi[k][j][i] = domain_diagonal;
+  bool applied_ic = false;
+  double*** phi = Phi.GetDataPointer();
 
-
-  //TODO: Add this feature later
-  if(iod.ic.specified[IcData::LEVELSET] || iod.ic.specified[IcData::MATERIALID]) {
-    print_error("*** Error: Currently, cannot read level set and material id from user-specified data file.\n");
-    exit_mpi();
+  // Create a reinitializer (if not available) for one-time use within this function
+  // This is a full-domain reinitializer
+  bool created_tmp_reinit = false;
+  if(!reinit) {
+    reinit = new LevelSetReinitializer(comm, dms, iod_ls, coordinates, delta_xyz,
+                                       ghost_nodes_inner, ghost_nodes_outer);
+    created_tmp_reinit = true;
   }
 
-  //initialize phi based on plane, cylinder-cones, and sphere.
-  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
+  // The construction and use of EmbeddedBoundaryOperator is a repetition of what has been done in
+  // SpaceOperator::ApplyInitialConditionWithinEnclosure. However, this is a one-time effort. The
+  // overhead is acceptable.
 
-  // planes
-  for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
+  //create an ad hoc EmbeddedSurfaceData
+  EmbeddedSurfaceData esd;
+  esd.provided_by_another_solver = EmbeddedSurfaceData::NO;
+  esd.surface_thickness          = enclosure.surface_thickness;
+  esd.filename                   = enclosure.surface_filename;
 
-    if(it->second->initialConditions.materialid != materialid)
-      continue; //not the right one
+  //create the embedded operator to track the surface
+  EmbeddedBoundaryOperator embed(comm, esd);
+  embed.SetCommAndMeshInfo(dms, coordinates, spo_ghost_nodes_inner, spo_ghost_nodes_outer,
+                           global_mesh);
+  embed.SetupIntersectors();
 
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-    double dist;
+  //track the surface, and get access to the results
+  double max_dist = embed.TrackSurfaces(5); //compute "phi" for 5 layers
+  auto EBDS = embed.GetPointerToEmbeddedBoundaryData(0);
 
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0)*dir;
-          if(fabs(dist)<fabs(phi[k][j][i]))
-            phi[k][j][i] = -dist; //phi is negative inside the material subdomain, positive outside
-        }
-  }
+  double*** color = EBDS->Color_ptr->GetDataPointer();
+  double*** psi   = EBDS->Phi_ptr->GetDataPointer();
+  double*** cpi   = EBDS->ClosestPointIndex_ptr->GetDataPointer();
+  int nLayer = EBDS->Phi_nLayer;
+  assert(nLayer>=2);
 
-  // cylinder-cone
-  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
-
-    if(it->second->initialConditions.materialid != materialid)
-      continue; //not the right one
-
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-
-    double L = it->second->L; //cylinder height
-    double R = it->second->r; //cylinder radius
-    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
-    double Hmax = R/tan_alpha;
-    double H = min(it->second->cone_height, Hmax); //cone's height
- 
-    // define the geometry
-    vector<pair<Vec3D, Vec3D> > lineSegments; //boundary of the cylinder-cone
-    Vec3D p0(0.0, 0.0, 0.0); //x0
-    Vec3D p1(0.0, R, 0.0);
-    Vec3D p2(L, R, 0.0);
-    Vec3D p3(L+H, (Hmax-H)*tan_alpha, 0.0);
-    Vec3D p4(L+H, 0.0, 0.0); 
-    lineSegments.push_back(std::make_pair(p0,p1));
-    lineSegments.push_back(std::make_pair(p1,p2));
-    lineSegments.push_back(std::make_pair(p2,p3));
-    lineSegments.push_back(std::make_pair(p3,p4)); //may be a degenerate edge (point) but fine
-
-    double x, r, toto, dist;
-    Vec3D xp;
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-    
-          x = (coords[k][j][i]-x0)*dir;
-          r = (coords[k][j][i] - x0 - x*dir).norm();
-          xp = Vec3D(x,r,0.0);
-
-          //calculate unsigned distance from node to the boundary of the cylinder-cone
-          dist = DBL_MAX;
-          for(int l=0; l<lineSegments.size(); l++)
-            dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
-                                 lineSegments[l].first, lineSegments[l].second, toto));
-
-          //figure out the sign, and update phi
-          if(dist<fabs(phi[k][j][i])) {
-            if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) //inside
-              phi[k][j][i] = -dist;
-            else 
-              phi[k][j][i] = dist; 
-          }
-          
-        }
-  }
-
-
-  // cylinder with spherical cap(s)
-  for(auto it=ic.cylindersphereMap.dataMap.begin(); it!=ic.cylindersphereMap.dataMap.end(); it++) {
-
-    if(it->second->initialConditions.materialid != materialid)
-      continue; //not the right one
-
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-
-    double L = it->second->L; //cylinder height
-    double Lhalf = L/2.0;
-    double R = it->second->r; //cylinder radius
-    bool front_cap = (it->second->front_cap == CylinderSphereData::On);
-    bool back_cap = (it->second->back_cap == CylinderSphereData::On);
- 
-    // define the geometry
-    vector<pair<Vec3D, Vec3D> > lineSegments; //boundary of the cylinder
-    Vec3D p0(-Lhalf, 0.0, 0.0); //x0
-    Vec3D p1(-Lhalf, R, 0.0);
-    Vec3D p2(Lhalf, R, 0.0);
-    Vec3D p3(Lhalf, 0.0, 0.0);
-    lineSegments.push_back(std::make_pair(p1,p2));
-    if(!back_cap)
-      lineSegments.push_back(std::make_pair(p0,p1));
-    if(!front_cap)
-      lineSegments.push_back(std::make_pair(p2,p3));
-
-    double x, r, rf(0.0), rb(0.0), toto, dist;
-    Vec3D xf = x0 + Lhalf*dir; //center of the front face
-    Vec3D xb = x0 - Lhalf*dir; //center of the back face
-    Vec3D xp;
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-    
-          x = (coords[k][j][i]-x0)*dir;
-          r = (coords[k][j][i] - x0 - x*dir).norm();
-          xp = Vec3D(x,r,0.0);
-
-          //calculate unsigned distance from node to the boundary of the cylinder
-          if(back_cap && x<=-Lhalf) {
-            rb = (coords[k][j][i] - xb).norm();
-            dist = fabs(rb - R);
-          } 
-          else if(front_cap && x>= Lhalf) {
-            rf = (coords[k][j][i] - xf).norm();
-            dist = fabs(rf - R);
-          }
-          else {
-            dist = DBL_MAX;
-            for(int l=0; l<lineSegments.size(); l++)
-              dist = min(dist, GeoTools::GetShortestDistanceFromPointToLineSegment(xp, 
-                                   lineSegments[l].first, lineSegments[l].second, toto));
-          } 
-
-          //figure out the sign, and update phi
-          if(dist<fabs(phi[k][j][i])) {
-            if( (x>-Lhalf && x<Lhalf && r<R) || (back_cap && x<=-Lhalf && rb<R) ||
-                (front_cap && x>=Lhalf && rf<R) ) //inside
-              phi[k][j][i] = -dist;
-            else 
-              phi[k][j][i] = dist; 
-          }
-          
-        }
-  }
-
-
-  // spheres 
-  for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
-
-    if(it->second->initialConditions.materialid != materialid)
-      continue; //not the right one
-
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    double dist;
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
-          if(fabs(dist)<fabs(phi[k][j][i]))
-            phi[k][j][i] = dist; //>0 outside the sphere
-        }
-  }
-
-
-  // spheroids
-  for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
-
-    if(it->second->initialConditions.materialid != materialid)
-      continue; //not the right one
-
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
-
-    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
-
-    double dist;
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
-          if(fabs(dist)<fabs(phi[k][j][i]))
-            phi[k][j][i] = dist; //>0 outside the spheroid
-        }
-  }
-
-
-#if LEVELSET_TEST == 1
-  // rotation of a sloted disk (Problem 4.2.1 of Hartmann, Meinke, Schroder 2008
-  Vec2D x0(50.0,75.0); //center of disk
-  double r = 15.0; //radius of disk
-  double wid = 5.0, len = 25.0; //slot
-
-  // derivated params
-  Vec2D x1(x0[0]-0.5*wid, x0[1]-sqrt(r*r - pow(0.5*wid ,2))); //lowerleft corner of slot
-  Vec2D x2(x0[0]-0.5*wid, x0[1]+(len-r)); //upperleft corner of slot
-  Vec2D x3(x0[0]+0.5*wid, x0[1]+(len-r)); //upperright corner of slot
-  Vec2D x4(x0[0]+0.5*wid, x0[1]-sqrt(r*r - pow(0.5*wid ,2))); //lowerright corner of slot
-  double alpha = atan((x4[0]-x0[0])/(x0[1]-x4[1])); //half of the `opening angle'
-  //fprintf(stderr,"alpha = %e.\n",alpha);
-
-  double dist;
+  //impose i.c. for phi inside and near enclosures 
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
 
-        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+        if(cpi[k][j][i]<0 && color[k][j][i]>=0)
+          continue;
 
-        if(x[1]<=x1[1] && atan(fabs((x[0]-x0[0])/(x[1]-x0[1])))<=alpha) { //Zone 1: Outside-bottom
-          if(x[0]<=x0[0])
-            phi[k][j][i] = (x-x1).norm();
+        if(!applied_ic)
+          applied_ic = true;
+
+        // determine phi at [k][j][i]
+        if(color[k][j][i]<0) { //"enclosed" (must be consistent with ID specified in space operator)
+          if(phi[k][j][i]>=0)
+            phi[k][j][i] = -psi[k][j][i];
           else
-            phi[k][j][i] = (x-x4).norm();
+            phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
+        } 
+        else if(color[k][j][i] == 0) {//occluded
+          phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
+        } 
+        else { //"outside"
+          if(phi[k][j][i]>=0)
+            phi[k][j][i] = std::min(phi[k][j][i], psi[k][j][i]);
+          else //this is really bad... the user should avoid this...
+            phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
         }
-
-        else if((x-x0).norm()>=r) { //Zone 2: Outside-rest
-          phi[k][j][i] = (x-x0).norm() - r;
-        }
-
-        else if(x[0]<=x4[0] && x[0]>=x1[0] && x[1]<=x2[1]) { //Zone 3: Slot
-          phi[k][j][i] = min(x4[0]-x[0], min(x[0]-x1[0], x2[1]-x[1]));
-        }
-
-        else if(x[0]<=x2[0] && x[1]<=x2[1]) { //Zone 4: Inside-left
-          phi[k][j][i] = -min(r-(x-x0).norm(), x2[0]-x[0]); 
-        }
-
-        else if(x[0]>=x3[0] && x[1]<=x3[1]) { //Zone 5: Inside-right
-          phi[k][j][i] = -min(r-(x-x0).norm(), x[0]-x3[0]);
-        }
-
-        else if(x[0]<=x2[0]) { //Zone 6: Inside-topleft
-          phi[k][j][i] = -min(r-(x-x0).norm(), (x-x2).norm());
-        }
-
-        else if(x[0]<=x3[0]) { //Zone 7: Inside-top
-          phi[k][j][i] = -min(r-(x-x0).norm(), x[1]-x2[1]);
-        }
-
-        else { //Zone 8: Inside-topright
-          phi[k][j][i] = -min(r-(x-x0).norm(), (x-x3).norm());
-        }
-
       }
 
-#elif LEVELSET_TEST == 2
-
-  double r = 0.15;
-  Vec2D x0(0.5, 0.75);
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-
-        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
+  int tmp_int = applied_ic ? 1 : 0;
+  MPI_Allreduce(MPI_IN_PLACE, &tmp_int, 1, MPI_INT, MPI_MAX, comm);
+  if(tmp_int>0)
+    applied_ic = true;
  
-        phi[k][j][i] = (x-x0).norm() - r;
-
-      }
-
-#elif LEVELSET_TEST == 3
-
-  // merging and separation of two circles (4.2.3 of Hartmann et al. 2008)
-   
-  double a = 1.75, r = 1.5;
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-
-        Vec2D x(coords[k][j][i][0], coords[k][j][i][1]);
-        double phi1 = sqrt((x[0]-a)*(x[0]-a) + x[1]*x[1]) - r;
-        double phi2 = sqrt((x[0]+a)*(x[0]+a) + x[1]*x[1]) - r;
-
-        if(phi1<=0)
-          phi[k][j][i] = phi1;
-        else if(phi2<=0)
-          phi[k][j][i] = phi2;
-        else
-          phi[k][j][i] = min(phi1, phi2);
-
-      }
-
-#endif
-
-
-  int ebds_counter = 0;
-  if(EBDS && surf_and_color) {
-    if(!reinit) {
-      print_error("*** Error: Material %d is tracked by both a level set function and an embedded boundary. In this case, \n"
-                  "           level set reinitialization must be turned on.\n", materialid);
-      exit_mpi();
-    }    
-
-    if(iod_ls.reinit.firstLayerTreatment != LevelSetReinitializationData::FIXED)
-      print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary. In this case,\n"
-                    "         it may be better to 'fix' the first layer nodes when reinitializing the level set.\n",
-                    materialid);
-
-
-    for(auto&& mypair : *surf_and_color) {
-
-      int surf = mypair.first;
-      int mycolor = mypair.second;
-
-      int nLayer = (*EBDS)[surf]->Phi_nLayer;
-      if(nLayer<2) 
-        print_warning("Warning: Material %d is tracked by both a level set function and an embeddeed boundary.\n"
-                      "         The intersector should compute unsigned distance ('phi') for at least two layers\n"
-                      "         of nodes. Currently, this value is set to %d.\n", (*EBDS)[surf]->Phi_nLayer); 
-
-      double*** color = (*EBDS)[surf]->Color_ptr->GetDataPointer();
-      double*** psi   = (*EBDS)[surf]->Phi_ptr->GetDataPointer();
-     
-      for(int k=k0; k<kmax; k++)
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-    
-            //Check if this node is within nLayer of the interface
-            bool near = false;
-            for(int k1 = k-nLayer; k1 <= k+nLayer; k1++)
-              for(int j1 = j-nLayer; j1 <= j+nLayer; j1++)
-                for(int i1 = i-nLayer; i1 <= i+nLayer; i1++) {
-                  if(!coordinates.IsHereOrInternalGhost(i1,j1,k1))
-                    continue;
-                  if(color[k1][j1][i1] == mycolor) {
-                    near = true;
-                    goto DONE;  
-                  }
-                }
-DONE:
-
-            if(!near) 
-              continue; //nothing to do
-
-            ebds_counter++;
-
-            // determine phi at [k][j][i]
-            if(color[k][j][i] == mycolor) {//"inside"
-              if(phi[k][j][i]>=0) 
-                phi[k][j][i] = -psi[k][j][i];
-              else
-                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
-            } else if(color[k][j][i] == 0) {//occluded
-              phi[k][j][i] = 0.0; //note that psi may not be 0, because surface has finite thickness
-            } else { //"outside"
-              if(phi[k][j][i]>=0)
-                phi[k][j][i] = std::min(phi[k][j][j], psi[k][j][i]);
-              else //this is really bad... the user should avoid this...
-                phi[k][j][i] = std::max(phi[k][j][i], -psi[k][j][i]);
-            }
-          }
-
-
-      (*EBDS)[surf]->Color_ptr->RestoreDataPointerToLocalVector();
-      (*EBDS)[surf]->Phi_ptr->RestoreDataPointerToLocalVector();
-    }
+  if(!applied_ic) {
+    print_warning("Warning: The surface in %s may either have no enclosure, or"
+                  " lie outside the computational domain.\n", enclosure.surface_filename);
   }
 
-  coordinates.RestoreDataPointerToLocalVector();
+  // Give other enclosed nodes "phi_min" (to avoid large jumps)
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(color[k][j][i]<0 && phi[k][j][i]<-max_dist) //"enclosed" 
+          phi[k][j][i] = -max_dist; 
+        else if(color[k][j][i]>0 && phi[k][j][i]>max_dist)
+          phi[k][j][i] = max_dist;
+      }
+
   Phi.RestoreDataPointerAndInsert();
 
-  ApplyBoundaryConditions(Phi);
-
-  if(iod_ls.bandwidth < INT_MAX) {//narrow-band level set method
-    assert(reinit);
-    reinit->ConstructNarrowBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+  // reinitialize phi here if tmp reinit is created. Otherwise, phi will be reinitialized near
+  // the end of the function "SetInitialCondition"
+  if(created_tmp_reinit) {
+    ApplyBoundaryConditions(Phi); //need this before reinitialization!
+    reinit->ReinitializeFullDomain(Phi, 600); //one-time use
+    reinit->Destroy(); 
+    delete reinit;
+    reinit = NULL;
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &ebds_counter, 1, MPI_INT, MPI_SUM, comm);
-  if(ebds_counter>0) {
-    print("- Updated phi (material id: %d) at %d nodes based on embedded boundary. Going to reinitialize phi.\n",
-          materialid, ebds_counter);
-    Reinitialize(0.0, 1.0, 0.0, Phi, true/*must do*/); //the first 3 inputs are irrelevant because of "must do"
-  }
+  //clean-up
+  EBDS->Color_ptr->RestoreDataPointerToLocalVector();
+  EBDS->Phi_ptr->RestoreDataPointerToLocalVector();
+  EBDS->ClosestPointIndex_ptr->RestoreDataPointerToLocalVector();
 
+  embed.Destroy();
+
+  return applied_ic;
 }
 
 //-----------------------------------------------------
@@ -788,13 +508,269 @@ void LevelSetOperator::ApplyBoundaryConditions(SpaceVariable3D &Phi)
 }
 
 //-----------------------------------------------------
+// Apply boundary conditions by populating ghost cells of NPhi (unit normal vector of zero levelset contour)
+void LevelSetOperator::ApplyBoundaryConditionsNPhi(SpaceVariable3D &NPhi)
+{
+
+  Vec3D*** normal = (Vec3D***) NPhi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  int NX, NY, NZ;
+  NPhi.GetGlobalSize(&NX, &NY, &NZ);
+
+  double r, r1, r2, f1, f2;
+
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    if(it->bcType == (int)LevelSetSchemeData::ZERO_NEUMANN) {
+      normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+      normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+      normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+
+      if(it->side == GhostPoint::LEFT || it->side == GhostPoint::RIGHT) normal[k][j][i][0] = -1.*normal[im_k][im_j][im_i][0];
+      if(it->side == GhostPoint::BOTTOM || it->side == GhostPoint::TOP) normal[k][j][i][1] = -1.*normal[im_k][im_j][im_i][1];
+      if(it->side == GhostPoint::BACK || it->side == GhostPoint::FRONT) normal[k][j][i][2] = -1.*normal[im_k][im_j][im_i][2];
+    }
+    else if ((it->bcType == (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION) ||
+             (it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE)) {
+
+      //make sure the width of the subdomain is big enough for linear extrapolation
+      if(it->side == GhostPoint::LEFT) {
+        if(i+2<NX) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i+1][0]; 
+          r2 = coords[k][j][i+2][0];  
+          for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j][i+1][dir];
+            f2 = normal[k][j][i+2][dir];
+            normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          }
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::RIGHT) {
+        if(i-2>=0) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i-1][0];  
+          r2 = coords[k][j][i-2][0]; 
+          for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j][i-1][dir];
+            f2 = normal[k][j][i-2][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::BOTTOM) {
+        if(j+2<NY) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j+1][i][1]; 
+          r2 = coords[k][j+2][i][1];
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j+1][i][dir];
+            f2 = normal[k][j+2][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::TOP) {
+        if(j-2>=0) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j-1][i][1];
+          r2 = coords[k][j-2][i][1];
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k][j-1][i][dir];
+            f2 = normal[k][j-2][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::BACK) {
+        if(k+2<NZ) { 
+          r  = coords[k][j][i][2];
+          r1 = coords[k+1][j][i][2]; 
+          r2 = coords[k+2][j][i][2]; 
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k+1][j][i][dir];
+            f2 = normal[k+2][j][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+      else if(it->side == GhostPoint::FRONT) {
+        if(k-2>=0) {
+          r  = coords[k][j][i][2];
+          r1 = coords[k-1][j][i][2]; 
+          r2 = coords[k-2][j][i][2];
+	  for (int dir = 0; dir < 3; dir++) { //operating on three components of NPhi
+            f1 = normal[k-1][j][i][dir];
+            f2 = normal[k-2][j][i][dir];
+	    normal[k][j][i][dir] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+          } 
+        } else {
+	  normal[k][j][i][0] = normal[im_k][im_j][im_i][0];
+	  normal[k][j][i][1] = normal[im_k][im_j][im_i][1];
+	  normal[k][j][i][2] = normal[im_k][im_j][im_i][2];
+	} 
+      }
+
+      if(it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE) {
+        std::cout << "Error: The NON_NEGATIVE boundary condition for NPhi (interface normal) has not been implemented at the moment. Execution ends" << std::endl;
+        exit_mpi(); 
+      }
+
+    }
+
+  }
+
+  NPhi.RestoreDataPointerAndInsert();
+
+  coordinates.RestoreDataPointerToLocalVector();
+
+}
+
+//-----------------------------------------------------
+
+// Apply boundary conditions by populating ghost cells of KappaPhi (curvature of zero Levelset)
+void LevelSetOperator::ApplyBoundaryConditionsKappaPhi(SpaceVariable3D &KappaPhi)
+{
+
+  double*** curvature = (double***) KappaPhi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  int NX, NY, NZ;
+  KappaPhi.GetGlobalSize(&NX, &NY, &NZ);
+
+  double r, r1, r2, f1, f2;
+
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end();  it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (i.e. edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    if(it->bcType == (int)LevelSetSchemeData::ZERO_NEUMANN) {
+
+      curvature[k][j][i] = curvature[im_k][im_j][im_i];
+
+    }
+    else if ((it->bcType == (int)LevelSetSchemeData::LINEAR_EXTRAPOLATION) ||
+             (it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE)) {
+
+      //make sure the width of the subdomain is big enough for linear extrapolation
+      if(it->side == GhostPoint::LEFT) {
+        if(i+2<NX) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i+1][0];  f1 = curvature[k][j][i+1];
+          r2 = coords[k][j][i+2][0];  f2 = curvature[k][j][i+2];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::RIGHT) {
+        if(i-2>=0) {
+          r  = coords[k][j][i][0];
+          r1 = coords[k][j][i-1][0];  f1 = curvature[k][j][i-1];
+          r2 = coords[k][j][i-2][0];  f2 = curvature[k][j][i-2];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::BOTTOM) {
+        if(j+2<NY) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j+1][i][1];  f1 = curvature[k][j+1][i];
+          r2 = coords[k][j+2][i][1];  f2 = curvature[k][j+2][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::TOP) {
+        if(j-2>=0) {
+          r  = coords[k][j][i][1];
+          r1 = coords[k][j-1][i][1];  f1 = curvature[k][j-1][i];
+          r2 = coords[k][j-2][i][1];  f2 = curvature[k][j-2][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::BACK) {
+        if(k+2<NZ) { 
+          r  = coords[k][j][i][2];
+          r1 = coords[k+1][j][i][2];  f1 = curvature[k+1][j][i];
+          r2 = coords[k+2][j][i][2];  f2 = curvature[k+2][j][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+      else if(it->side == GhostPoint::FRONT) {
+        if(k-2>=0) {
+          r  = coords[k][j][i][2];
+          r1 = coords[k-1][j][i][2];  f1 = curvature[k-1][j][i];
+          r2 = coords[k-2][j][i][2];  f2 = curvature[k-2][j][i];
+          curvature[k][j][i] = f1 + (f2-f1)/(r2-r1)*(r-r1);
+        } else
+          curvature[k][j][i] = curvature[im_k][im_j][im_i];
+      }
+
+      if(it->bcType == (int)LevelSetSchemeData::NON_NEGATIVE) {
+        std::cout << "Error: The NON_NEGATIVE boundary condition for KappaPhi (interface curvature) has not been implemented at the moment. Execution ends" << std::endl;
+        exit_mpi(); 
+ 
+        //int ind(0);
+        //if(it->side == GhostPoint::LEFT || it->side == GhostPoint::RIGHT)  ind = 0;
+        //if(it->side == GhostPoint::BOTTOM || it->side == GhostPoint::TOP)  ind = 1;
+        //if(it->side == GhostPoint::BACK || it->side == GhostPoint::FRONT)  ind = 2;
+        // double d2wall = 0.5*fabs(coords[im_k][im_j][im_i][ind] - coords[k][j][i][ind]); //distance from this ghost node to the wall boundary
+        // phi[k][j][i] = std::max(-d2wall, phi[k][j][i]);
+      }
+
+    }
+
+  }
+
+  KappaPhi.RestoreDataPointerAndInsert();
+
+  coordinates.RestoreDataPointerToLocalVector();
+
+}
+
+
+
+//-----------------------------------------------------
 
 void LevelSetOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Phi, SpaceVariable3D &R,
-                                       double time, double dt)
+                                       [[maybe_unused]] double time)
 {
 
 #ifdef LEVELSET_TEST
-  PrescribeVelocityFieldForTesting(V, Phi, time, dt);
+  PrescribeVelocityFieldForTesting(V, Phi, time);
 #endif
 
   if(iod_ls.solver == LevelSetSchemeData::FINITE_VOLUME)
@@ -1192,7 +1168,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   double*** wfdata = wf.GetDataPointer();
   double*** res    = R.GetDataPointer(); //residual, on the right-hand-side of the ODE
   double*** active = Active.GetDataPointer();
-  double*** useful = UsefulG2.GetDataPointer();
+  //double*** useful = UsefulG2.GetDataPointer();
 
   //initialize R to 0
   for(auto it = useful_nodes.begin(); it != useful_nodes.end(); it++)
@@ -1260,7 +1236,7 @@ void LevelSetOperator::ComputeAdvectionFluxInBand(SpaceVariable3D &R)
   wk.RestoreDataPointerToLocalVector();
   wf.RestoreDataPointerToLocalVector();
   Active.RestoreDataPointerToLocalVector();
-  UsefulG2.RestoreDataPointerToLocalVector();
+  //UsefulG2.RestoreDataPointerToLocalVector();
 
   R.RestoreDataPointerAndInsert(); //insert
 }
@@ -1350,7 +1326,17 @@ void LevelSetOperator::AddSourceTermInBand(SpaceVariable3D &Phi, SpaceVariable3D
 
 //-----------------------------------------------------
 
-bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi, bool must_do)
+void
+LevelSetOperator::ConstructNarrowBandInReinitializer(SpaceVariable3D &Phi)
+{
+  assert(reinit);
+  reinit->ConstructNarrowBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+}
+
+//-----------------------------------------------------
+
+bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, SpaceVariable3D &Phi,
+                                    int special_maxIts, bool must_do)
 {
   if(must_do && !reinit) {
     print_error("*** Error: Reinitialization for level set (matid = %d) is requested, but not specified "
@@ -1367,10 +1353,10 @@ bool LevelSetOperator::Reinitialize(double time, double dt, int time_step, Space
 
   if(narrow_band) {
 //    print("- Reinitializing the level set function (material id: %d), bandwidth = %d.\n", materialid, iod_ls.bandwidth);
-    reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes);
+    reinit->ReinitializeInBand(Phi, Level, UsefulG2, Active, useful_nodes, active_nodes, special_maxIts);
   } else {
 //    print("- Reinitializing the level set function (material id: %d).\n", materialid);
-    reinit->ReinitializeFullDomain(Phi);
+    reinit->ReinitializeFullDomain(Phi, special_maxIts);
   }
 
   return true;
@@ -1408,8 +1394,10 @@ void LevelSetOperator::ReinitializeAfterPhaseTransition(SpaceVariable3D &Phi, ve
 
 //-----------------------------------------------------
 
-void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, SpaceVariable3D &Phi,
-                                                        double time, double dt)
+void
+LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariable3D &V,
+                                                   [[maybe_unused]] SpaceVariable3D &Phi,
+                                                   [[maybe_unused]] double time)
 {
  
 #if LEVELSET_TEST == 1
@@ -1442,8 +1430,8 @@ void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, Spac
         double T = 8.0;
         double x = coords[k][j][i][0], y = coords[k][j][i][1];
         double pi = 2.0*acos(0);
-        v[k][j][i][1] =  2.0*pow(sin(pi*x),2)*sin(pi*y)*cos(pi*y)*cos(pi*(time-0.5*dt)/T);
-        v[k][j][i][2] = -2.0*sin(pi*x)*cos(pi*x)*pow(sin(pi*y),2)*cos(pi*(time-0.5*dt)/T);
+        v[k][j][i][1] =  2.0*pow(sin(pi*x),2)*sin(pi*y)*cos(pi*y)*cos(pi*time/T);
+        v[k][j][i][2] = -2.0*sin(pi*x)*cos(pi*x)*pow(sin(pi*y),2)*cos(pi*time/T);
         v[k][j][i][3] = 0.0; 
 
       }
@@ -1454,7 +1442,7 @@ void LevelSetOperator::PrescribeVelocityFieldForTesting(SpaceVariable3D &V, Spac
 
   // merging and separation of two circles
   double aa = 1.75, rr = 1.5;
-  double s = (time-0.5*dt)<1.0 ? 1.0 : -1.0;
+  double s = time<1.0 ? 1.0 : -1.0;
   SpaceVariable3D NPhi(comm, &(dms.ghosted1_3dof)); //inefficient, but OK just for testing level set 
 
   if(!narrow_band) {
@@ -1541,12 +1529,12 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_FullDomain(SpaceVari
           normal[k][j][i] /= mynorm; 
 /*
         if(i==548 && j==6 && k==0) {
-          fprintf(stderr,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
+          fprintf(stdout,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
                   normal[k][j][i][2]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
-          fprintf(stderr,"%e  %e  %e\n", phi[k][j-2][i-1], phi[k][j-2][i], phi[k][j-2][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
+          fprintf(stdout,"%e  %e  %e\n", phi[k][j-2][i-1], phi[k][j-2][i], phi[k][j-2][i+1]);
         }
 */
       }
@@ -1612,11 +1600,11 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
 
 /*
     if(i==259 && j==0 && k==0) {
-      fprintf(stderr,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
+      fprintf(stdout,"(%d,%d,%d): normal = %e %e %e. Phi values...\n", i,j,k, normal[k][j][i][0], normal[k][j][i][1],
               normal[k][j][i][2]);
-      fprintf(stderr,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
-      fprintf(stderr,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
-      fprintf(stderr,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
+      fprintf(stdout,"%e  %e  %e\n", phi[k][j+1][i-1], phi[k][j+1][i], phi[k][j+1][i+1]);
+      fprintf(stdout,"%e  %e  %e\n", phi[k][j][i-1], phi[k][j][i], phi[k][j][i+1]);
+      fprintf(stdout,"%e  %e  %e\n", phi[k][j-1][i-1], phi[k][j-1][i], phi[k][j-1][i+1]);
     }
 */
 
@@ -1628,6 +1616,85 @@ LevelSetOperator::ComputeNormalDirectionCentralDifferencing_NarrowBand(SpaceVari
   UsefulG2.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();
   NPhi.RestoreDataPointerAndInsert();
+}
+
+//-----------------------------------------------------
+void LevelSetOperator::ComputeNormal(SpaceVariable3D &Phi, SpaceVariable3D &NPhi) { //currently only implemented the full domain version
+  double*** phi   = Phi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
+
+  // Compute and store first direvatives, needed for the computation of second order mixed partial derivatives
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        normal[k][j][i][0] = CentralDifferenceLocal(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+                                                 coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+        normal[k][j][i][1] = CentralDifferenceLocal(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+                                                 coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+        normal[k][j][i][2] = CentralDifferenceLocal(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+                                                 coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+      }
+
+  Phi.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  NPhi.RestoreDataPointerAndInsert();
+}  
+
+//-----------------------------------------------------
+
+void LevelSetOperator::ComputeUnitNormalAndCurvature(SpaceVariable3D &Phi, SpaceVariable3D &NPhi, SpaceVariable3D &KappaPhi) { // currently only implemented the full domain version
+
+  double*** phi   = Phi.GetDataPointer();
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  double*** curvature = (double***)KappaPhi.GetDataPointer();
+  Vec3D*** normal = (Vec3D***)NPhi.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+	double phi_xx = SecondOrderDifference(phi[k][j][i-1],       phi[k][j][i],       phi[k][j][i+1],
+	                                        coords[k][j][i-1][0], coords[k][j][i][0], coords[k][j][i+1][0]);
+	double phi_yy = SecondOrderDifference(phi[k][j-1][i],       phi[k][j][i],       phi[k][j+1][i],
+	                                        coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+	double phi_zz = SecondOrderDifference(phi[k-1][j][i],       phi[k][j][i],       phi[k+1][j][i],
+	                                        coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+        double phi_xy = CentralDifferenceLocal(/* y-direvative of dphi/dx */
+                                               normal[k][j-1][i][0], normal[k][j][i][0], normal[k][j+1][i][0],
+                                               coords[k][j-1][i][1], coords[k][j][i][1], coords[k][j+1][i][1]);
+
+        double phi_xz = CentralDifferenceLocal(/* z-direvative of dphi/dx */
+                                               normal[k-1][j][i][0], normal[k][j][i][0], normal[k+1][j][i][0], 
+                                               coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+        double phi_yz = CentralDifferenceLocal(/* z-direvative of dphi/dy */
+                                               normal[k-1][j][i][1], normal[k][j][i][1], normal[k+1][j][i][1],
+                                               coords[k-1][j][i][2], coords[k][j][i][2], coords[k+1][j][i][2]);
+
+        double phi_x = normal[k][j][i][0];
+        double phi_y = normal[k][j][i][1];
+        double phi_z = normal[k][j][i][2];   
+
+        curvature[k][j][i] = phi_x*phi_x*phi_yy - 2.*phi_x*phi_y*phi_xy + phi_y*phi_y*phi_xx
+                            +phi_x*phi_x*phi_zz - 2.*phi_x*phi_z*phi_xz + phi_z*phi_z*phi_xx
+                            +phi_y*phi_y*phi_zz - 2.*phi_y*phi_z*phi_yz + phi_z*phi_z*phi_yy;  
+      }
+
+
+  double mynorm;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        mynorm = normal[k][j][i].norm();
+        if(mynorm!=0.0) {
+          curvature[k][j][i] /= (mynorm*mynorm*mynorm); 
+          normal[k][j][i] /= mynorm;
+        }
+      }
+
+  Phi.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+  NPhi.RestoreDataPointerAndInsert();
+  KappaPhi.RestoreDataPointerAndInsert();
 }
 
 //-----------------------------------------------------

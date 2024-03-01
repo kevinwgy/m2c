@@ -1,0 +1,14 @@
+plot "Test1_Re10/results/horizontal_centerline_0019.txt" using 1:4 with l lw 3 title "Re = 10"
+replot "Test2_Re100/results/horizontal_centerline_0021.txt" using 1:4 with l lw 3 title "Re = 100"
+replot "Test3_Re1000/results/horizontal_centerline_0013.txt" using 1:4 with l lw 3 title "Re = 1000"
+replot "Test4_Re5000/results/horizontal_centerline_0011.txt" using 1:4 with l lw 3 title "Re = 5000"
+replot "Test5_Re10000/results/horizontal_centerline_0012.txt" using 1:4 with l lw 3 title "Re = 10000"
+set grid
+set xlabel "x"
+set ylabel "y-velocity"
+set term png size 1280, 800 font "Arial,24"
+set xrange [0:1]
+set yrange [-0.55:0.45]
+set key right top
+set output "lid_driven_cavity_horizontal_centerline.png"
+replot

@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<ExactRiemannSolverBase.h>
 #include<array>
 #include<utility> //std::pair
@@ -39,6 +44,7 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
   min_pressure         = iod_riemann.min_pressure;
   failure_threshold    = iod_riemann.failure_threshold;
   pressure_at_failure  = iod_riemann.pressure_at_failure;
+  surface_tension      = iod_riemann.surface_tension == ExactRiemannSolverData::YES;
   integrationPath1.reserve(500);
   integrationPath3.reserve(500);
 }
@@ -50,14 +56,18 @@ ExactRiemannSolverBase::ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_,
  * 0: no errors
  * 1: riemann solver failed to find a bracketing interval
  */
-  int
+int
 ExactRiemannSolverBase::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
-    double *Vsp /*right 'star' solution*/)
+    double *Vsp /*right 'star' solution*/,
+    double curvature)
 {
+  assert(curvature == 0.0); //the base class does not handle curvature!
+
+  //std::cout << "ExactRiemannSolverBase::ComputeRiemannSolution: this is the base version!" << std::endl;
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
   double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
@@ -65,7 +75,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   double rhor  = Vp[0];
   double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
   double pr    = Vp[4];
-  //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
+  //fprintf(stdout,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
 
   integrationPath1.clear();
   integrationPath3.clear();
@@ -83,7 +93,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   double cl = vf[idl]->ComputeSoundSpeedSquare(rhol, el);
 
   if(rhol<=0 || cl<0) {
-    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l)." 
+    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l)." 
 	" rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
 	rhol, ul, pl, el, cl, idl);
     exit(-1);
@@ -94,7 +104,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
   double cr = vf[idr]->ComputeSoundSpeedSquare(rhor, er);
 
   if(rhor<=0 || cr<0) {
-    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(r)."
+    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(r)."
 	" rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
 	rhor, ur, pr, er, cr, idr);
     exit(-1);
@@ -223,7 +233,7 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 	p2 = 0.5*(p0+p1);
     }
 
-    //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
+    //fprintf(stdout,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
 
 
 try_again:
@@ -235,7 +245,7 @@ try_again:
 	&trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      //fprintf(stderr,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //fprintf(stdout,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
       //        rhol, ul, pl, idl, rhor, ur, pr, idr);
       p2 = 0.5*(p2+p0); //move closer to p0
 
@@ -252,7 +262,7 @@ try_again:
 	&trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      //fprintf(stderr,"*** Error: Exact Riemann solver failed (2). left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //fprintf(stdout,"*** Error: Exact Riemann solver failed (2). left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
       //        rhol, ul, pl, idl, rhor, ur, pr, idr);
       p2 = 0.5*(p2+p1); //move closer to p1
 
@@ -360,6 +370,32 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
   // the 2-wave
   sol1d.push_back(vector<double>{u2 - std::max(1e-6, 0.001*fabs(u2)), rhol2, u2, p2, (double)idl});
   sol1d.push_back(vector<double>{u2, rhor2, u2, p2, (double)idr});
+  // 1- and 3- waves
+  integrationPath1.clear();
+  integrationPath3.clear();
+  std::vector<double> vectL{pl, rhol, ul};
+  std::vector<double> vectR{pr, rhor, ur};
+  integrationPath1.push_back(vectL);
+  integrationPath3.push_back(vectR); 
+ 
+  bool success;
+  double ul2_tmp, ur2_tmp, rhol2_tmp, rhor2_tmp;
+  success = ComputeRhoUStar(1, integrationPath1, rhol, ul, pl, p2, idl/*inputs*/, 
+      rhol2, 0.9*rhol2/*initial guesses for Hugo. eq.*/,
+      rhol2_tmp, ul2_tmp/*outputs*/, 
+      &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+  if (!success) {
+    std::cout <<  "*** Error: ComputeRhoUStar(1) failed when finalizng the solution." << std::endl;
+    exit(-1);
+  } 
+  success = ComputeRhoUStar(3, integrationPath3, rhor, ur, pr,  p2, idr/*inputs*/, 
+      rhor2, 0.9*rhor2/*initial guesses for Hugo. erq.*/,
+      rhor2_tmp, ur2_tmp/*outputs*/,
+      &trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
+  if (!success) {
+    std::cout <<  "*** Error: ComputeRhoUStar(3) failed when finalizng the solution." << std::endl;
+    exit(-1);
+  } 
 #endif
 
   Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
@@ -383,7 +419,7 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 	double cl2 = vf[idl]->ComputeSoundSpeedSquare(rhol2, el2);
 
 	if(rhol2<=0 || cl2<0) {
-	  fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l2)."
+	  fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l2)."
 	      " rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
 	      rhol2, pl, el2, cl2, idl);
 	  exit(-1);
@@ -422,7 +458,7 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 	double cr2 = vf[idr]->ComputeSoundSpeedSquare(rhor2, er2);
 
 	if(rhor2<=0 || cr2<0) {
-	  fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(r2)." 
+	  fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(r2)." 
 	      " rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
 	      rhor2, p2, er2, cr2, idr);
 	  exit(-1);
@@ -510,9 +546,9 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 
 //-----------------------------------------------------
 
-  void
+void
 ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm, 
-    double rhol, double ul, double pl, int idl, double ustar,
+    double rhol, double ul, double pl, int idl, 
     double rhol2, double u2/*ustar*/, double p2,
     bool trans_rare, double Vrare_x0[3], /*inputs*/
     double *Vs, int &id, double *Vsm /*outputs*/)
@@ -552,7 +588,7 @@ ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm,
 	double cl2 = vf[idl]->ComputeSoundSpeedSquare(rhol2, el2);
 
 	if(rhol2<=0 || cl2<0) {
-	  fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l2)."
+	  fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l2)."
 	      " rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
 	      rhol2, pl, el2, cl2, idl);
 	  exit(-1);
@@ -607,7 +643,7 @@ ExactRiemannSolverBase::FinalizeOneSidedSolution(double *dir, double *Vm,
   FILE* solFile = fopen("RiemannSolution.txt", "w");
   print(solFile, "## One-Dimensional Riemann Problem.\n");
   print(solFile, "## Initial State: %e %e %e, id %d (left) | wall velocity: %e.\n", 
-      rhol, ul, pl, idl, ustar);
+      rhol, ul, pl, idl, u2);
   print(solFile, "## xi(x/t) | density | velocity | pressure | internal energy per mass | material id\n");
 
   for(auto it = sol1d.begin(); it != sol1d.end(); it++) 
@@ -642,8 +678,8 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
   }
 
 #if PRINT_RIEMANN_SOLUTION == 1
-  fprintf(stderr, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ur0, p1, ul1-ur1);
-  fprintf(stderr, "Searching for a bracketing interval...\n");
+  fprintf(stdout, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ur0, p1, ul1-ur1);
+  fprintf(stdout, "Searching for a bracketing interval...\n");
 #endif
 
   // Step 2: Starting from the two feasible points, find a bracketing interval
@@ -696,7 +732,7 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
     if(!success) {
 
 #if PRINT_RIEMANN_SOLUTION == 1
-      fprintf(stderr, "  -- p2 = %e (failed)\n", p2);
+      fprintf(stdout, "  -- p2 = %e (failed)\n", p2);
 #endif
       //move closer to [p0, p1]
       for(int j=0; j<maxIts_bracket/2; j++) {
@@ -734,7 +770,7 @@ ExactRiemannSolverBase::FindInitialInterval(double rhol, double ul, double pl, d
     }
 
 #if PRINT_RIEMANN_SOLUTION == 1
-    fprintf(stderr, "  -- p0 = %e, f0 = %e, p1 = %e, f1 = %e (success)\n", p0, ul0-ur0, p1, ul1-ur1);
+    fprintf(stdout, "  -- p0 = %e, f0 = %e, p1 = %e, f1 = %e (success)\n", p0, ul0-ur0, p1, ul1-ur1);
 #endif
 
   }
@@ -816,8 +852,8 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
   assert(p1>=pl);
 
 #if PRINT_RIEMANN_SOLUTION == 1
-  fprintf(stderr, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ustar, p1, ul1-ustar);
-  fprintf(stderr, "Searching for a bracketing interval...\n");
+  fprintf(stdout, "Found two initial points: p0 = %e, f0 = %e, p1 = %e, f1 = %e.\n", p0, ul0-ustar, p1, ul1-ustar);
+  fprintf(stdout, "Searching for a bracketing interval...\n");
 #endif
 
   // Step 2: Starting from the two feasible points, find a bracketing interval
@@ -868,7 +904,7 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
     if(!success) {
 
 #if PRINT_RIEMANN_SOLUTION == 1
-      fprintf(stderr, "  -- p2 = %e (failed)\n", p2);
+      fprintf(stdout, "  -- p2 = %e (failed)\n", p2);
 #endif
       //move closer to [p0, p1]
       for(int j=0; j<maxIts_bracket/2; j++) {
@@ -905,7 +941,7 @@ ExactRiemannSolverBase::FindInitialIntervalOneSided(double rhol, double ul, doub
     }
 
 #if PRINT_RIEMANN_SOLUTION == 1
-    fprintf(stderr, "  -- p0 = %e, f0 = %e, p1 = %e, f1 = %e (success)\n", p0, ul0-ustar, p1, ul1-ustar);
+    fprintf(stdout, "  -- p0 = %e, f0 = %e, p1 = %e, f1 = %e (success)\n", p0, ul0-ustar, p1, ul1-ustar);
 #endif
 
   }
@@ -1007,7 +1043,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePoints(double rhol, double ul, double
 
   if(!success) {
     if(verbose>=1)
-      fprintf(stderr,"Warning: Failed to find the first initial guess (p0) in the 1D Riemann solver (it = %d). "
+      fprintf(stdout,"Warning: Failed to find the first initial guess (p0) in the 1D Riemann solver (it = %d). "
 	  "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
 	  maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
@@ -1035,7 +1071,7 @@ myLabel:
     } 
   if(!success) {
     if(verbose>=1)
-      fprintf(stderr,"Warning: Failed to find the second initial guess (p1) in the 1D Riemann solver (it = %d). "
+      fprintf(stdout,"Warning: Failed to find the second initial guess (p1) in the 1D Riemann solver (it = %d). "
 	  "Left: %e %e %e (%d), Right: %e %e %e (%d).\n",
 	  maxIts_bracket, rhol, ul, pl, idl, rhor, ur, pr, idr);
     return false;
@@ -1055,9 +1091,10 @@ myLabel:
 
 //----------------------------------------------------------------------------------
 
-  int
-ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl, double el, double cl, int idl,
-    double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
+int
+ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl,
+    [[maybe_unused]] double el, double cl, int idl,
+    double rhor, double ur, double pr, [[maybe_unused]] double er, double cr, int idr, /*inputs*/
     double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0, 
     double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/)
 {
@@ -1111,7 +1148,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsByAcousticTheory(double rhol, d
 
   int
 ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticTheory(double rhol, double ul, 
-    double pl, double el, double cl, int idl, double ustar,
+    double pl, [[maybe_unused]] double el, double cl, int idl, double ustar,
     double &p0, double &rhol0, double &ul0, double &p1, double &rhol1, double &ul1)
 {
 
@@ -1148,7 +1185,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsOneSidedByAcousticTheory(double
   success = ComputeRhoUStar(1, integrationPath1, rhol, ul, pl, p1, idl/*inputs*/,
       rhol, rhol0/*initial guesses for Hugo. eq.*/,
       rhol1, ul1/*outputs*/);
-  //  fprintf(stderr,"p1 = %e, success = %d.\n", p1, (int)success);
+  //  fprintf(stdout,"p1 = %e, success = %d.\n", p1, (int)success);
   if(!success)
     return found;
 
@@ -1183,7 +1220,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     double e = vf[id]->GetInternalEnergyPerUnitMass(rho,p);
     double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
     if(rho<=0 || c<0) {
-      fprintf(stderr,"Warning: Negative density or c^2 (square of sound speed) in ComputeRhoUStar." 
+      fprintf(stdout,"Warning: Negative density or c^2 (square of sound speed) in ComputeRhoUStar." 
 	  "rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
 	  rho, p, e, c, id);
       return false; //failure
@@ -1203,7 +1240,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       rhos_0 = integrationPath[index0][1];
       us_0 = integrationPath[index0][2];
       dp_min_adaption = (ps_0 - ps) / numSteps_rarefaction / 2.5;
-      if (index0 != integrationPath.size()-1) { // new starting point is not the last on the trajectory
+      if (index0 != (int)integrationPath.size()-1) { // new starting point is not the last on the trajectory
 	dp = ps_0-ps; 
       } else { // dp from the last step 
 	dp = std::min( integrationPath[index0-1][0]-integrationPath[index0][0], ps_0-ps );
@@ -1218,7 +1255,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     sol1d.push_back(vector<double>{xi, rho, u, p, (double)id});
 #endif
 
-    //fprintf(stderr,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
+    //fprintf(stdout,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
     // integration by Runge-Kutta 4
     bool done = false;
     double uErr = 0.;
@@ -1250,10 +1287,10 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	  rhos_1, us_1, ps_1, xi_1 /*output: end state*/,
 	  uErr, rhoErr /*output: absolute error in us*/);
 
-      //      fprintf(stderr,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
+      //      fprintf(stdout,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
       //              rhos_0, us_0, ps_0, drho, rhos_1, us_1, ps_1, ps, success);
       /*			  if (i > continueTolerance || dp < 1.0e-13) {
-      //          fprintf(stderr,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
+      //          fprintf(stdout,"*** Warning: step size halved %d times, force break the loop. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, c = %e, rho = %e, path size = %ld.\n",
       //                       continueTimes, id, p, ps, dp, ps_1, c, rho, integrationPath.size());
       break;
       }
@@ -1274,13 +1311,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       double uErrScaled = uErr / c + tiny;
       double rhoErrScaled = rhoErr / rho + tiny;
       if (isnan(rhoErrScaled)) {
-	fprintf(stderr,"Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+	fprintf(stdout,"Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
 	    id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhos_0, rhos_1, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
 	exit(-1);
       }  
 
       if (isnan(uErrScaled)) {
-	fprintf(stderr,"Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
+	fprintf(stdout,"Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
 	    id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
 	exit(-1);
       }  
@@ -1327,14 +1364,14 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
       }
 
-      //fprintf(stderr,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
+      //fprintf(stdout,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
 
       // If the solver gets here, it means it hasn't reached the final pressure ps.
       // Adjust step size, then update state
       //
       /*
 	 if(i == moreSteps*numSteps_rarefaction-1) {
-	 fprintf(stderr,"Warning: integrator used up all the steps specified. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, uErrScaled = %e, rhoErrScaled = %e, c = %e, rho = %e, rhos_1 = %e, path size = %ld.\n",
+	 fprintf(stdout,"Warning: integrator used up all the steps specified. id = %d, p = %e, ps = %e, dp = %e, ps_1 = %e, uErrScaled = %e, rhoErrScaled = %e, c = %e, rho = %e, rhos_1 = %e, path size = %ld.\n",
 	 id, p, ps, dp, ps_1, uErrScaled, rhoErrScaled, c, rho, rhos_1, integrationPath.size());
 	 }
 	 */        
@@ -1528,7 +1565,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	}
       }
       if(it==maxIts_shock) {
-	fprintf(stderr,"*** Error: Root-finding method failed to converge after %d iterations.\n", it);
+	fprintf(stdout,"*** Error: Root-finding method failed to converge after %d iterations.\n", it);
 	return false;
       }
       maxit = it;
@@ -1576,8 +1613,8 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 //----------------------------------------------------------------------------------
 //! Connect the left initial state with the left star state (the 1-wave) --- for one-sided Riemann problem
 //! where the solution contains a rarefaction (not a shock).
-  bool  //true: success  | false: failure
-ExactRiemannSolverBase::ComputeOneSidedRarefaction(double rho, double u, double p, double e,
+bool  //true: success  | false: failure
+ExactRiemannSolverBase::ComputeOneSidedRarefaction(double rho, double u, double p, [[maybe_unused]] double e,
     double c, int id, double us/*inputs*/,
     double &rhos, double &ps/*outputs*/, 
     bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/)
@@ -1733,7 +1770,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c_0_square = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
 
   if(rho_0<=0 || c_0_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(0)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(0)." 
     //            " rho = %e, p = %e, e = %e, id = %d.\n",
     //            c_0_square, rho_0, p_0, e_0, id);
     return false;
@@ -1747,21 +1784,21 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
 
   if(rho_1<=0 || c_1_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
     //                   " rho = %e, p = %e, e = %e, id = %d.\n",
     //                   c_1_square, rho_1, p_1, e_1, id);
     return false;
   } 
 
-  double c_1 = sqrt(c_1_square);
-
+  //double c_1 = sqrt(c_1_square); //unused.
+                             
   double rho_2 = rho_0 + 3./40.*dp/c_0_square + 9./40.*dp/c_1_square;
   double p_2 = p_1 + 3./10.*dp;
   double e_2 = vf[id]->GetInternalEnergyPerUnitMass(rho_2, p_2);
   double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
 
   if(rho_2<=0 || c_2_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(2)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(2)." 
     //               " rho = %e, p = %e, e = %e, id = %d.\n",
     //                c_2_square, rho_2, p_2, e_2, id);
     return false;
@@ -1775,7 +1812,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
 
   if(rho_3<=0 || c_3_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(3)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(3)." 
     //                " rho = %e, p = %e, e = %e, id = %d.\n",
     //                c_3_square, rho_3, p_3, e_3, id);
     return false;
@@ -1813,7 +1850,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double du_err = (2825./27648./c_0/rho_0 + 18575./48384./c_2/rho_2 + 13525./55296./c_3/rho_3 + 277./14336./c_4/rho_4 + 0.25/c_5/rho_5) * dp;
 
   if (isnan(du) == 1 || isnan(du_err) ==1) {
-    // fprintf(stderr, "*** Error: du or du_err is nan: du = %e, du_err = %e.\n", du, du_err);
+    // fprintf(stdout, "*** Error: du or du_err is nan: du = %e, du_err = %e.\n", du, du_err);
     return false;
   }
 
@@ -1832,7 +1869,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   //std::cout << std::setw(16) << p << std::setw(16) << rho << std::endl;
 
   if(rho<=0 || c<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(final)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(final)." 
     //               " rho = %e, p = %e, e = %e, id = %d.\n",
     //               c, rho, p, e, id);
     return false;
@@ -1869,7 +1906,7 @@ ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, in
     if(success)
       left.push_back(std::array<double,3>{{ps,rhols,uls}});
     else 
-      fprintf(stderr," -- ComputeRhoUStar(1) failed. left state: %e %e %e (%d), ps = %e.\n",
+      fprintf(stdout," -- ComputeRhoUStar(1) failed. left state: %e %e %e (%d), ps = %e.\n",
 	  rhol, ul, pl, idl, ps);
 
     success = ComputeRhoUStar(3, integrationPath3, rhor, ur, pr, ps, idr/*inputs*/,
@@ -1878,7 +1915,7 @@ ExactRiemannSolverBase::PrintStarRelations(double rhol, double ul, double pl, in
     if(success)
       right.push_back(std::array<double,3>{{ps,rhors,urs}});
     else
-      fprintf(stderr," -- ComputeRhoUStar(3) failed. right state: %e %e %e (%d), ps = %e.\n",
+      fprintf(stdout," -- ComputeRhoUStar(3) failed. right state: %e %e %e (%d), ps = %e.\n",
 	  rhor, ur, pr, idr, ps);
 
     if(ps>=pmax)
@@ -1939,7 +1976,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
   double cl = vf[idl]->ComputeSoundSpeedSquare(rhol, el);
 
   if(rhol<=0 || cl<0) {
-    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeOneSidedRiemannSolution." 
+    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeOneSidedRiemannSolution." 
 	" rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
 	rhol, ul, pl, el, cl, idl);
     exit(-1);
@@ -1971,7 +2008,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 
   // A Trivial Case
   if(fabs(ul-ustar)<1.0e-20) {
-    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol, ul, pl, trans_rare, Vrare_x0, //inputs
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol, ul, pl, trans_rare, Vrare_x0, //inputs
 	Vs, id, Vsm/*outputs*/);
     return 0;
   }
@@ -2005,7 +2042,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 
     // success!
     //
-    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
 	Vs, id, Vsm);
     return 0;
 
@@ -2052,7 +2089,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
       return 1;
     }
 
-    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p1, trans_rare, Vrare_x0, /*inputs*/
+    FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol2, ustar, p1, trans_rare, Vrare_x0, /*inputs*/
 	Vs, id, Vsm);
     return 1;
   }
@@ -2100,7 +2137,7 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 	p2 = 0.5*(p0+p1);
     }
 
-    //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
+    //fprintf(stdout,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
 
 
 try_again:
@@ -2112,7 +2149,7 @@ try_again:
 	&trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      //fprintf(stderr,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //fprintf(stdout,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
       //        rhol, ul, pl, idl, rhor, ur, pr, idr);
       p2 = 0.5*(p2+p0); //move closer to p0
 
@@ -2163,7 +2200,7 @@ try_again:
   // -------------------------------
   // Step 3: Find state at xi = x = 0 (for output)
   // -------------------------------
-  FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, ustar, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
+  FinalizeOneSidedSolution(dir, Vm, rhol, ul, pl, idl, rhol2, ustar, p2, trans_rare, Vrare_x0, /*inputs*/
       Vs, id, Vsm);
 
   if(iter == maxIts_main) {
@@ -2189,14 +2226,17 @@ try_again:
  * 0: no errors
  * 1: riemann solver failed to find a bracketing interval
  */
-  int
+int
 ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir, 
     double *Vm, int idl /*"left" state*/, 
     double *Vp, int idr /*"right" state*/, 
     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
     double *Vsm /*left 'star' solution*/,
-    double *Vsp /*right 'star' solution*/)
+    double *Vsp /*right 'star' solution*/,
+    double curvature)
 {
+  assert(curvature == 0.0); //the base class does not handle curvature!
+
   // Convert to a 1D problem (i.e. One-Dimensional Riemann)
   double rhol  = Vm[0];
   double ul    = Vm[1]*dir[0] + Vm[2]*dir[1] + Vm[3]*dir[2];
@@ -2204,7 +2244,7 @@ ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir,
   double rhor  = Vp[0];
   double ur    = Vp[1]*dir[0] + Vp[2]*dir[1] + Vp[3]*dir[2];
   double pr    = Vp[4];
-  //fprintf(stderr,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
+  //fprintf(stdout,"1DRiemann: left = %e %e %e (%d) : right = %e %e %e (%d)\n", rhol, ul, pl, idl, rhor, ur, pr, idr);
 
   integrationPath1.clear();
   integrationPath3.clear();
@@ -2222,7 +2262,7 @@ ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir,
   double cl = vf[idl]->ComputeSoundSpeedSquare(rhol, el);
 
   if(rhol<=0 || cl<0) {
-    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l)." 
+    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(l)." 
 	" rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
 	rhol, ul, pl, el, cl, idl);
     exit(-1);
@@ -2233,7 +2273,7 @@ ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir,
   double cr = vf[idr]->ComputeSoundSpeedSquare(rhor, er);
 
   if(rhor<=0 || cr<0) {
-    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(r)."
+    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed) in ComputeRiemannSolution(r)."
 	" rho = %e, u = %e, p = %e, e = %e, c^2 = %e, ID = %d.\n",
 	rhor, ur, pr, er, cr, idr);
     exit(-1);
@@ -2354,7 +2394,7 @@ ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir,
 	p2 = 0.5*(p0+p1);
     }
 
-    //fprintf(stderr,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
+    //fprintf(stdout,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
 
 
 try_again:
@@ -2366,7 +2406,7 @@ try_again:
 	&trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      //fprintf(stderr,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //fprintf(stdout,"*** Error: Exact Riemann solver failed. left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
       //        rhol, ul, pl, idl, rhor, ur, pr, idr);
       p2 = 0.5*(p2+p0); //move closer to p0
 
@@ -2383,7 +2423,7 @@ try_again:
 	&trans_rare, Vrare_x0/*filled only if found a trans. rarefaction*/);
 
     if(!success) {
-      //fprintf(stderr,"*** Error: Exact Riemann solver failed (2). left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
+      //fprintf(stdout,"*** Error: Exact Riemann solver failed (2). left: %e %e %e (%d) | right: %e %e %e (%d).\n", 
       //        rhol, ul, pl, idl, rhor, ur, pr, idr);
       p2 = 0.5*(p2+p1); //move closer to p1
 
@@ -2497,7 +2537,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
     double c = vf[id]->ComputeSoundSpeedSquare(rho, e);
     if(rho<=0 || c<0) {
-      fprintf(stderr,"Warning: Negative density or c^2 (square of sound speed) in ComputeRhoUStar." 
+      fprintf(stdout,"Warning: Negative density or c^2 (square of sound speed) in ComputeRhoUStar." 
 	  "rho = %e, p = %e, e = %e, c^2 = %e, id = %d.\n",
 	  rho, p, e, c, id);
       return false; //failure
@@ -2530,7 +2570,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
     sol1d.push_back(vector<double>{xi, rho, u, p, (double)id});
 #endif
 
-    //fprintf(stderr,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
+    //fprintf(stdout,"rho = %e, p = %e, ps = %e\n", rho, p, ps);
     // integration by Runge-Kutta 4
     bool done = false;
     int moreSteps = 5;
@@ -2563,7 +2603,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	  rhos_0, us_0, ps_0 /*start state*/, dp /*step size*/,
 	  rhos_1, us_1, ps_1, xi_1 /*output: end state*/);
 
-      //      fprintf(stderr,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
+      //      fprintf(stdout,"RK4 step: rhos_0 = %e, us_0 = %e, ps_0 = %e, drho = %e, rhos_1 = %e, us_1 = %e, ps_1 = %e | ps = %e | success = %d.\n",
       //              rhos_0, us_0, ps_0, drho, rhos_1, us_1, ps_1, ps, success);
       if(!success) {
 	dp = dp/2.0;
@@ -2603,7 +2643,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 
       }
 
-      //fprintf(stderr,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
+      //fprintf(stdout,"drho = %e, rho: %e -> %e,  u: %e -> %e,  p: %e -> %e\n", drho, rhos_0, rhos_1, us_0, us_1, ps_0, ps_1);
 
       // If the solver gets here, it means it hasn't reached the final pressure ps.
       // Adjust step size, then update state
@@ -2794,7 +2834,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	}
       }
       if(it==maxIts_shock) {
-	fprintf(stderr,"*** Error: Root-finding method failed to converge after %d iterations.\n", it);
+	fprintf(stdout,"*** Error: Root-finding method failed to converge after %d iterations.\n", it);
 	return false;
       }
       maxit = it;
@@ -2853,7 +2893,7 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
   double c_0_square = vf[id]->ComputeSoundSpeedSquare(rho_0, e_0);
 
   if(rho_0<=0 || c_0_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(0)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(0)." 
     //            " rho = %e, p = %e, e = %e, id = %d.\n",
     //            c_0_square, rho_0, p_0, e_0, id);
     return false;
@@ -2867,7 +2907,7 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
   double c_1_square = vf[id]->ComputeSoundSpeedSquare(rho_1, e_1);
 
   if(rho_1<=0 || c_1_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(1)." 
     //                   " rho = %e, p = %e, e = %e, id = %d.\n",
     //                   c_1_square, rho_1, p_1, e_1, id);
     return false;
@@ -2881,7 +2921,7 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
   double c_2_square = vf[id]->ComputeSoundSpeedSquare(rho_2, e_2);
 
   if(rho_2<=0 || c_2_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(2)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(2)." 
     //               " rho = %e, p = %e, e = %e, id = %d.\n",
     //                c_2_square, rho_2, p_2, e_2, id);
     return false;
@@ -2895,7 +2935,7 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
   double c_3_square = vf[id]->ComputeSoundSpeedSquare(rho_3, e_3);
 
   if(rho_3<=0 || c_3_square<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(3)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(3)." 
     //                " rho = %e, p = %e, e = %e, id = %d.\n",
     //                c_3_square, rho_3, p_3, e_3, id);
     return false;
@@ -2922,7 +2962,7 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
   //std::cout << std::setw(16) << p << std::setw(16) << rho << std::endl;
 
   if(rho<=0 || c<0) {
-    //    fprintf(stderr,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(final)." 
+    //    fprintf(stdout,"*** Error: Negative density or c^2 (square of sound speed, %e) in Rarefaction_OneStepRK4(final)." 
     //               " rho = %e, p = %e, e = %e, id = %d.\n",
     //               c, rho, p, e, id);
     return false;
@@ -2972,7 +3012,7 @@ ExactRiemannSolverBase::FindInitialFeasiblePointsOneSided(double rhol, double ul
   }
   if(!success) {
     if(verbose>=1)
-      fprintf(stderr,"Warning: Failed to find the first initial guess (p0) in the 1D half-Riemann solver (it = %d). "
+      fprintf(stdout,"Warning: Failed to find the first initial guess (p0) in the 1D half-Riemann solver (it = %d). "
 	  "Left: %e %e %e (%d), ustar: %e.\n",
 	  maxIts_bracket, rhol, ul, pl, idl, ustar);
     return false;
@@ -2989,7 +3029,7 @@ myLabel:
   }
   if(!success) {
     if(verbose>=1)
-      fprintf(stderr,"Warning: Failed to find the second initial guess (p1) in the 1D half-Riemann solver (it = %d). "
+      fprintf(stdout,"Warning: Failed to find the second initial guess (p1) in the 1D half-Riemann solver (it = %d). "
 	  "Left: %e %e %e (%d), ustar: %e.\n",
 	  maxIts_bracket, rhol, ul, pl, idl, ustar);
     return false;
@@ -3007,4 +3047,7 @@ myLabel:
 
 //----------------------------------------------------------------------------------
 
-
+  double ExactRiemannSolverBase::GetSurfaceTensionCoefficient() {
+    std::cout << "ExactRiemannSolverBase::GetSurfaceTensionCoefficient: This function in the base class should be overrided by the one in the derived class \"ExactRiemannSolverInterfaceJump\". Saying this message indicating something is wrong." << std::endl;
+    exit(-1);
+  }

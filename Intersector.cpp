@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<Intersector.h>
 #include<GeoTools.h>
 #include<Intersections.h>
@@ -147,13 +152,13 @@ void
 Intersector::GetElementsInScope1(std::vector<int> &elems_in_scope)
 {
   elems_in_scope.resize(scope_1.size());
-  for(int i=0; i<scope_1.size(); i++)
+  for(int i=0; i<(int)scope_1.size(); i++)
     elems_in_scope[i] = scope_1[i].trId();
 }
 
 //-------------------------------------------------------------------------
 
-void
+double
 Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers)
 {
   assert(phi_layers>=1);
@@ -171,7 +176,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
     nLayer = phi_layers;
   }
   BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
-  CalculateUnsignedDistanceNearSurface(phi_layers);
+  double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
 
   hasInlet_  = hasInlet;
   hasOutlet_ = hasOutlet;
@@ -192,15 +197,17 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
   Color.WriteToVTRFile("Color.vtr", "color");
   Phi.StoreMeshCoordinates(coordinates);
   Phi.WriteToVTRFile("Phi.vtr", "phi");
-  fprintf(stderr,"Got here!\n");
+  fprintf(stdout,"Got here!\n");
   MPI_Barrier(comm);
   exit_mpi();
 */
+
+  return dist_max;
 }
 
 //-------------------------------------------------------------------------
 
-void
+double
 Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
 {
   assert(phi_layers>=1);
@@ -215,8 +222,9 @@ Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
     nLayer = phi_layers;
   }
   BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
-  CalculateUnsignedDistanceNearSurface(phi_layers);
+  double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
 
+  return dist_max;
 }
 
 //-------------------------------------------------------------------------
@@ -244,16 +252,16 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin,
       for(int i=ii0_in; i<iimax; i++) {
 
         delta = tol*dx_glob[i] + thicker;
-        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - tol;
-        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nL)] + tol;
+        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - delta;
+        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nL)] + delta;
 
         delta = tol*dy_glob[j] + thicker;
-        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nL)] - tol;
-        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nL)] + tol;
+        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nL)] - delta;
+        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nL)] + delta;
 
         delta = tol*dz_glob[k] + thicker;
-        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nL)] - tol;
-        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nL)] + tol;
+        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nL)] - delta;
+        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nL)] + delta;
       }
 
   //subD_bb includes the ghost boundary
@@ -290,7 +298,7 @@ Intersector::BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &
       scope.push_back(tri); //creating a copy of "tri" and store it in scope
   }
 
-//  fprintf(stderr,"scope size: %d.\n", (int)scope.size());
+//  fprintf(stdout,"scope size: %d.\n", (int)scope.size());
 
   // build the tree
   if(*tree)
@@ -855,7 +863,7 @@ Intersector::FloodFillColors()
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
     if(it->type_projection != GhostPoint::FACE)
       continue;
-    if(it->bcType == MeshData::INLET) {
+    if(it->bcType == MeshData::INLET || it->bcType == MeshData::OVERSET) {
       Int3& ijk(it->image_ijk);
       inlet_color.insert(color[ijk[2]][ijk[1]][ijk[0]]);
     } else if(it->bcType == MeshData::OUTLET) {
@@ -901,13 +909,17 @@ Intersector::FloodFillColors()
 
   // Convert colors 
   std::map<int,int> old2new;
-  for(int i=0; i<in_colors.size(); i++)
+  for(int i=0; i<(int)in_colors.size(); i++)
     if(in_colors[i] == 1)
      old2new[i] = 1; //inlet_color;
-  for(int i=0; i<out_colors.size(); i++)
+  for(int i=0; i<(int)out_colors.size(); i++)
     if(out_colors[i] == 1) {
-     assert(old2new.find(i) == old2new.end());
-     old2new[i] = 2; //outlet_color;
+     if(old2new.find(i) != old2new.end() && verbose>=1) {
+       print_warning("Warning: Embedded surface (%d elems) cannot separate Inlet/Farfield0 and Outlet/Farfield1.\n"
+                     "         Treating both as Inlet/Farfield0.\n", surface.elems.size());
+       old2new[i] = 1; //inlet_color
+     } else
+       old2new[i] = 2; //outlet_color;
     }
 
   // give negative colors to enclusures (i.e. regions not connected to farfield)
@@ -918,7 +930,7 @@ Intersector::FloodFillColors()
 
 /*
   for(auto it = old2new.begin(); it != old2new.end(); it++)
-    fprintf(stderr,"old2new: %d --> %d.\n", it->first, it->second);
+    fprintf(stdout,"old2new: %d --> %d.\n", it->first, it->second);
 */
 
   int total_occluded = 0;
@@ -1007,7 +1019,7 @@ Intersector::RefillAfterSurfaceUpdate()
   
 /*
     if(total_remaining_nodes>0) {
-      fprintf(stderr,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
+      fprintf(stdout,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
       Color.StoreMeshCoordinates(coordinates);
       Color.WriteToVTRFile("Color.vtr", "color");
     }
@@ -1101,8 +1113,8 @@ Intersector::RefillAfterSurfaceUpdate()
   // fill remaining nodes as FORCED occluded
   imposed_occluded.clear();
   if(total_remaining_nodes>0) {
-    print_warning("Warning: Found %d unresolved nodes after performing %d iterations of refill. Setting them to be occluded.\n",
-                   total_remaining_nodes, max_it);
+    print_warning("Warning: Found %d unresolved nodes after performing %d iterations of refill. "
+                   "Setting them to be occluded.\n", total_remaining_nodes, max_it);
     imposed_occluded = nodes2fill;
     for(auto it = imposed_occluded.begin(); it != imposed_occluded.end(); it++) 
       color[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
@@ -1173,18 +1185,18 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
                                           Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], &collision_time, half_thickness, 
                                           NULL, NULL, &(As[id]), &(Ns[id]))) {
         swept.insert(*it);
-        //fprintf(stderr,"Found swept node: [%d][%d][%d] [%e %e %e].\n", (*it)[2], (*it)[1], (*it)[0],
+        //fprintf(stdout,"Found swept node: [%d][%d][%d] [%e %e %e].\n", (*it)[2], (*it)[1], (*it)[0],
         //        coords[0], coords[1], coords[2]);
       }
     }
   }
       
   // Verification
-  for(auto&& ijk : previously_occluded_but_not_now) {
-    if(swept.find(ijk) == swept.end()) {
-      fprintf(stderr,"\033[0;31m*** Error: Conflict between 'swept' and 'occluded': %d %d %d. A software bug.\033[0m\n",
+  if(verbose>=1) {
+    for(auto&& ijk : previously_occluded_but_not_now) {
+      if(swept.find(ijk) == swept.end())
+        fprintf(stdout,"\033[0;35mWarning: Previous occluded node is not swept (%d %d %d). May be an error.\033[0m\n",
               ijk[0], ijk[1], ijk[2]);
-      exit(-1);
     } 
   }
   
@@ -1193,11 +1205,13 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
 
 //-------------------------------------------------------------------------
 
-void
+double
 Intersector::CalculateUnsignedDistanceNearSurface(int nL)
 {
 
   assert(nLayer = nL);
+
+  double max_dist = -DBL_MAX;
 
   FindNodalCandidates(BBmin_n, BBmax_n, tree_n, CandidatesIndex_n, candidates_n);
 
@@ -1251,7 +1265,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
       ClosestPoint cp(-1,DBL_MAX,xi); //initialize to garbage
 
       int id;
-      for(int tri=0; tri<cands.size(); tri++) {
+      for(int tri=0; tri<(int)cands.size(); tri++) {
         id = cands[tri].trId();
         Int3 &nodes(Es[id]);
         Vec3D coords(x_glob[i], y_glob[j], z_glob[k]); //inside physical domain (safe)
@@ -1270,10 +1284,12 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
       closest_points.push_back(std::make_pair(*it, cp));
       cpi[k][j][i] = closest_points.size() - 1;
 
+      if(dist>max_dist)
+        max_dist = dist;
 /*
       //verification
       double dist_true = fabs(19.4555 - sqrt(x_glob[i]*x_glob[i]+y_glob[j]*y_glob[j]));
-      fprintf(stderr,"[%d][%d][%d]: (%e, %e, %e) true: %e, numr: %e.\n", i,j,k, x_glob[i], y_glob[j], z_glob[k],
+      fprintf(stdout,"[%d][%d][%d]: (%e, %e, %e) true: %e, numr: %e.\n", i,j,k, x_glob[i], y_glob[j], z_glob[k],
                      dist_true, dist);
 */
 
@@ -1292,11 +1308,13 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
     this_layer = next_layer;
   }
 
+  MPI_Allreduce(MPI_IN_PLACE, &max_dist, 1, MPI_DOUBLE, MPI_MAX, comm);
 
   CandidatesIndex_n.RestoreDataPointerToLocalVector();
   ClosestPointIndex.RestoreDataPointerToLocalVector(); //cannot communicate, because "closest_points" do not.
   Phi.RestoreDataPointerAndInsert(); 
 
+  return max_dist;
 }
 
 //-------------------------------------------------------------------------
@@ -1344,7 +1362,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
   vector<MyTriangle> global_scope;
   global_scope.reserve(Es.size());
 
-  for(int e=0; e<Es.size(); e++) {
+  for(int e=0; e<(int)Es.size(); e++) {
     MyTriangle tri(e, Xs[Es[e][0]], Xs[Es[e][1]], Xs[Es[e][2]]);
     global_scope.push_back(tri);
 
@@ -1376,7 +1394,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
     if(side==1) disp *= -1;
 
     // loop through triangles within the "local scope"
-    for(int i=0; i<local_scope.size(); i++) {
+    for(int i=0; i<(int)local_scope.size(); i++) {
 
       // find point "p" with lofting
       int triangle_id = local_scope[i];
@@ -1448,7 +1466,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
   
   // Step 4. Finalize output
   status.assign(Es.size(), 0);
-  for(int i=0; i<Es.size(); i++) {
+  for(int i=0; i<(int)Es.size(); i++) {
     if(positive_side[i]>0) {
       if(negative_side[i]>0)
         status[i] = 3;
@@ -1478,8 +1496,8 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 
   double dist;
   Vec3D xi; //barycentric coords of the projection point
-  for(int i=0; i<nTri; i++) {
-    int id = tri[i].trId();
+  for(int iTri=0; iTri<nTri; iTri++) {
+    int id = tri[iTri].trId();
     Int3& nodes(Es[id]);
     bool found = GeoTools::LineSegmentIntersectsTriangle(x0, dir, len, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
                                                          &dist, NULL, &xi);

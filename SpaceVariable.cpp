@@ -1,6 +1,15 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <SpaceVariable.h>
+#include <GlobalMeshInfo.h>
+#include <petscviewer.h>
 #include <Utils.h>
 #include <bits/stdc++.h> //min_element, max_element
+using std::vector;
+extern int INACTIVE_MATERIAL_ID;
 
 //---------------------------------------------------------
 // DataManagers3D
@@ -13,6 +22,7 @@ DM DataManagers3D::ghosted1_3dof;
 DM DataManagers3D::ghosted1_4dof;
 DM DataManagers3D::ghosted1_5dof;
 DM DataManagers3D::ghosted1_6dof;
+DM DataManagers3D::ghosted1_9dof;
 
 DM DataManagers3D::ghosted2_1dof;
 DM DataManagers3D::ghosted2_3dof;
@@ -117,6 +127,17 @@ int DataManagers3D::CreateAllDataManagers(MPI_Comm comm, int NX, int NY, int NZ)
                       DMDA_STENCIL_BOX,
                       NX, NY, NZ,
                       PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+                      9/*dof*/, 1/*stencil width*/, 
+                      NULL, NULL, NULL,
+                      &ghosted1_9dof);
+  CHKERRQ(ierr);
+  DMSetFromOptions(ghosted1_9dof);
+  DMSetUp(ghosted1_9dof);
+
+  ierr = DMDACreate3d(comm, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED, DM_BOUNDARY_GHOSTED,
+                      DMDA_STENCIL_BOX,
+                      NX, NY, NZ,
+                      PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
                       1/*dof*/, 2/*stencil width*/, 
                       NULL, NULL, NULL,
                       &ghosted2_1dof);
@@ -148,6 +169,7 @@ void DataManagers3D::DestroyAllDataManagers()
   DMDestroy(&ghosted1_4dof);
   DMDestroy(&ghosted1_5dof);
   DMDestroy(&ghosted1_6dof);
+  DMDestroy(&ghosted1_9dof);
 
   DMDestroy(&ghosted2_1dof);
   DMDestroy(&ghosted2_3dof);
@@ -176,12 +198,10 @@ void SpaceVariable3D::Setup(MPI_Comm &comm_, DM *dm_)
   comm = &comm_;
   dm = dm_;
 
-  auto ierr = DMCreateGlobalVector(*dm, &globalVec); 
-  //CHKERRQ(ierr);
+  DMCreateGlobalVector(*dm, &globalVec); 
   VecSet(globalVec, 0.0);
 
-  ierr = DMCreateLocalVector(*dm, &localVec);
-  //CHKERRQ(ierr);
+  DMCreateLocalVector(*dm, &localVec);
   VecSet(localVec, 0.0);
 
   array = NULL;
@@ -218,11 +238,11 @@ void SpaceVariable3D::Setup(MPI_Comm &comm_, DM *dm_)
   internal_ghost_k0   = ghost_k0<0    ?   k0 : ghost_k0;
   internal_ghost_kmax = ghost_kmax>NZ ? kmax : ghost_kmax;
 
-  numNodes0 = nx*ny*nz;
-  numNodes1 = (internal_ghost_imax-internal_ghost_i0)
+  numNodes0 = (long long)nx*ny*nz;
+  numNodes1 = (long long)(internal_ghost_imax-internal_ghost_i0)
             * (internal_ghost_jmax-internal_ghost_j0)
             * (internal_ghost_kmax-internal_ghost_k0);
-  numNodes2 = ghost_nx*ghost_ny*ghost_nz;
+  numNodes2 = (long long)ghost_nx*ghost_ny*ghost_nz;
 }
 
 //---------------------------------------------------------
@@ -239,8 +259,7 @@ double*** SpaceVariable3D::GetDataPointer()
 {
   if(!dm) return NULL;
 
-  auto ierr = DMDAVecGetArray(*dm, localVec, &array);
-  //CHKERRQ(ierr);
+  DMDAVecGetArray(*dm, localVec, &array);
   return array;
 }
 
@@ -252,8 +271,7 @@ void SpaceVariable3D::RestoreDataPointerAndInsert()
     return;
 
   RestoreDataPointerToLocalVector();
-  auto ierr = DMLocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
-  //CHKERRQ(ierr);
+  DMLocalToGlobal(*dm, localVec, INSERT_VALUES, globalVec);
 
   // sync local to global
   DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
@@ -268,8 +286,7 @@ void SpaceVariable3D::RestoreDataPointerAndAdd()
     return;
 
   RestoreDataPointerToLocalVector();
-  auto ierr = DMLocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
-  //CHKERRQ(ierr);
+  DMLocalToGlobal(*dm, localVec, ADD_VALUES, globalVec);
 
   // sync local to global
   DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
@@ -283,8 +300,19 @@ void SpaceVariable3D::RestoreDataPointerToLocalVector()
   if(!dm)
     return;
 
-  auto ierr = DMDAVecRestoreArray(*dm, localVec, &array);  
-  //CHKERRQ(ierr);
+  DMDAVecRestoreArray(*dm, localVec, &array);  
+}
+
+//---------------------------------------------------------
+
+void SpaceVariable3D::SyncLocalToGlobal()
+{
+  if(!dm)
+    return;
+
+  // sync local to global
+  DMGlobalToLocalBegin(*dm, globalVec, INSERT_VALUES, localVec);
+  DMGlobalToLocalEnd(*dm, globalVec, INSERT_VALUES, localVec);
 }
 
 //---------------------------------------------------------
@@ -305,10 +333,8 @@ void SpaceVariable3D::StoreMeshCoordinates(SpaceVariable3D &coordinates)
   if(!dm)
     return;
 
-  auto ierr = DMSetCoordinateDim(*dm, 3/*3D*/);
-  //CHKERRQ(ierr);
-  ierr = DMSetCoordinates(*dm, coordinates.globalVec);
-  //CHKERRQ(ierr);
+  DMSetCoordinateDim(*dm, 3/*3D*/);
+  DMSetCoordinates(*dm, coordinates.globalVec);
 }
 
 //---------------------------------------------------------
@@ -324,6 +350,53 @@ void SpaceVariable3D::WriteToVTRFile(const char *filename, const char *varname)
   PetscViewer viewer;
   PetscViewerVTKOpen(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer);
   VecView(globalVec, viewer);
+  PetscViewerDestroy(&viewer);
+  MPI_Barrier(*comm); 
+}
+
+//---------------------------------------------------------
+
+void SpaceVariable3D::WriteToCGNSFile(const char *filename, const char *varname)
+{
+  if(!dm)
+    return;
+
+  if(varname)
+    SetOutputVariableName(varname);
+
+  PetscViewer viewer;
+  PetscViewerCreate(*comm, &viewer);
+// Not available yet!
+//  PetscViewerSetType(viewer, PETSCVIEWERCGNS);
+  PetscViewerFileSetMode(viewer, FILE_MODE_WRITE);
+  PetscViewerFileSetName(viewer, filename);
+
+  VecView(globalVec, viewer);
+
+  PetscViewerDestroy(&viewer);
+  MPI_Barrier(*comm);
+}
+
+//---------------------------------------------------------
+
+void SpaceVariable3D::WriteToMatlabFile(const char *filename, const char *varname)
+{
+  if(!dm)
+    return;
+
+  if(varname)
+    SetOutputVariableName(varname);
+
+  PetscViewer viewer;
+  int code = PetscViewerASCIIOpen(*comm, filename, &viewer);
+  if(code) {
+    print_error("*** Error: Cannot open file '%s' for output. (code: %d)\n", filename, code);
+    exit_mpi();
+  }
+
+  PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB);
+  VecView(globalVec, viewer);
+
   PetscViewerDestroy(&viewer);
   MPI_Barrier(*comm); 
 }
@@ -431,7 +504,7 @@ void SpaceVariable3D::AXPlusBY(double a, double b, SpaceVariable3D &y, std::vect
   for(int k=myk0; k<mykmax; k++)
     for(int j=myj0; j<myjmax; j++)
       for(int i=myi0; i<myimax; i++)
-        for(int id=0; id<Xindices.size(); id++) {
+        for(int id=0; id<(int)Xindices.size(); id++) {
           px = Xindices[id];
           py = Yindices[id];
           v[k][j][i*dof+px] = a*v[k][j][i*dof+px] + b*v2[k][j][i*dof+py];
@@ -527,4 +600,195 @@ SpaceVariable3D::CalculateGlobalMax(int mydof, bool workOnGhost)
 }
 
 //---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateVectorOneNorm()
+{
+  double norm(0.0);
+  VecNorm(globalVec, NORM_1, &norm);
+  return norm;
+}
+
+//---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateVectorTwoNorm()
+{
+  double norm(0.0);
+  VecNorm(globalVec, NORM_2, &norm);
+  return norm;
+}
+
+//---------------------------------------------------------
+
+double
+SpaceVariable3D::CalculateVectorInfNorm()
+{
+  double norm(0.0);
+  VecNorm(globalVec, NORM_INFINITY, &norm);
+  return norm;
+}
+
+//---------------------------------------------------------
+
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(SpaceVariable3D &volume, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
+{
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
+
+  double*** v   = GetDataPointer();
+  double*** vol = volume.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*vol[k][j][i];
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*vol[k][j][i];
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
+
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
+
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
+  RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+}
+
+//---------------------------------------------------------
+
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(SpaceVariable3D &ID, SpaceVariable3D &volume, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
+{
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
+
+  double*** v   = GetDataPointer();
+  double*** vol = volume.GetDataPointer();
+  double*** id  = ID.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+          continue;
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*vol[k][j][i];
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*vol[k][j][i];
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
+
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
+  RestoreDataPointerToLocalVector();
+  volume.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+}
+
+//---------------------------------------------------------
+
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(GlobalMeshInfo &global_mesh, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
+{
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
+
+  double*** v   = GetDataPointer();
+
+  double dz, dydz, dxdydz;
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dydz = dz*global_mesh.GetDy(j);
+      for(int i=i0; i<imax; i++) {
+        dxdydz = dydz*global_mesh.GetDx(i);
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*dxdydz;
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*dxdydz;
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
+
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
+  RestoreDataPointerToLocalVector();
+}
+
+//---------------------------------------------------------
+
+void
+SpaceVariable3D::CalculateFunctionNormsConRec(SpaceVariable3D &ID,
+                                              GlobalMeshInfo &global_mesh, vector<double> &norm1_dofs,
+                                              vector<double> &norm2_dofs, vector<double> &norminf_dofs)
+{
+  norm1_dofs.assign(dof,0.0);
+  norm2_dofs.assign(dof,0.0);
+  norminf_dofs.assign(dof,0.0);
+
+  double*** v  = GetDataPointer();
+  double*** id = ID.GetDataPointer();
+
+  double dz, dydz, dxdydz;
+  for(int k=k0; k<kmax; k++) {
+    dz = global_mesh.GetDz(k);
+    for(int j=j0; j<jmax; j++) {
+      dydz = dz*global_mesh.GetDy(j);
+      for(int i=i0; i<imax; i++) {
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+          continue;
+        dxdydz = dydz*global_mesh.GetDx(i);
+        for(int p=0; p<dof; p++) {
+          norm1_dofs[p] += fabs(v[k][j][i*dof+p])*dxdydz;
+          norm2_dofs[p] += v[k][j][i*dof+p]*v[k][j][i*dof+p]*dxdydz;
+          norminf_dofs[p] = std::max(norminf_dofs[p], fabs(v[k][j][i*dof+p]));
+        }
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, norm1_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norm2_dofs.data(), dof, MPI_DOUBLE, MPI_SUM, *comm);
+  MPI_Allreduce(MPI_IN_PLACE, norminf_dofs.data(), dof, MPI_DOUBLE, MPI_MAX, *comm);
+
+  for(auto&& norm2 : norm2_dofs)
+    norm2 = sqrt(norm2);
+ 
+  RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+}
+
+//---------------------------------------------------------
+
+
+//---------------------------------------------------------
+
+
+
+//---------------------------------------------------------
+
+
 

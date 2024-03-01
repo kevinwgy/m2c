@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <Utils.h>
 #include <Vector5D.h>
 #include <Output.h>
@@ -5,17 +10,18 @@
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
+Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_, std::vector<GhostPoint>* ghost_nodes_outer_,
                vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, 
-               SpaceVariable3D &cell_volume, IonizationOperator* ion_) : 
+               SpaceVariable3D &cell_volume, IonizationOperator* ion_, HyperelasticityOperator* heo_) : 
     comm(comm_), 
-    iod(iod_), global_mesh(global_mesh_), vf(vf_), laser(laser_),
+    iod(iod_), global_mesh(global_mesh_), ghost_nodes_outer(*ghost_nodes_outer_), vf(vf_), laser(laser_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
-    probe_output(comm_, iod_.output, vf_, ion_),
+    vector5(comm_, &(dms.ghosted1_5dof)),
+    probe_output(comm_, iod_.output, vf_, ion_, heo_),
     energy_output(comm_,iod_, iod_.output, iod_.mesh, iod_.eqs, laser_, vf_, coordinates, delta_xyz, cell_volume),
     matvol_output(comm_, iod_, cell_volume),
-    ion(ion_),
+    ion(ion_), heo(heo_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
 {
   iFrame = 0;
@@ -39,6 +45,8 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
   print(pvdfile, "  </Collection>\n");
   print(pvdfile, "</VTKFile>\n");
 
+  mpi_barrier();
+
   fclose(pvdfile); pvdfile = NULL;
 
   // setup line plots
@@ -54,6 +62,18 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     line_outputs[line_number] = new ProbeOutput(comm, iod.output, vf, ion, line_number);
   }
 
+  // setup plane plots
+  int numPlanes = iod.output.planePlots.dataMap.size();
+  plane_outputs.resize(numPlanes, NULL);
+  for(auto&& plane : iod.output.planePlots.dataMap) {
+    int plane_number = plane.first;
+    if(plane_number<0 || plane_number>=numPlanes) {
+      print_error("*** Error: Detected error in plane output. Plane number = %d "
+                  "(should be between 0 and %d)\n", plane_number, numPlanes-1); 
+      exit_mpi();
+    }
+    plane_outputs[plane_number] = new PlaneOutput(comm, iod.output, *plane.second, vf, global_mesh, ion);
+  }
 
   // check ionization requests
   if(iod.output.ionization_output_requested() && !ion) {
@@ -61,6 +81,12 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     exit_mpi();
   }
 
+  // check hyperelasticity requests
+  if(iod.output.principal_elastic_stresses==OutputData::ON && !heo) {
+    print_error("*** Error: User requested elasticity outputs without specifying a "
+                "hyperelasticity model.\n");
+    exit_mpi();
+  }
 }
 
 //--------------------------------------------------------------------------
@@ -68,19 +94,28 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
 Output::~Output()
 {
   if(pvdfile) fclose(pvdfile);
-  for(int i=0; i<line_outputs.size(); i++)
+  for(int i=0; i<(int)line_outputs.size(); i++)
     if(line_outputs[i]) delete line_outputs[i];
+  for(int i=0; i<(int)plane_outputs.size(); i++)
+    if(plane_outputs[i]) delete plane_outputs[i];
 }
 
 //--------------------------------------------------------------------------
 
-void Output::InitializeOutput(SpaceVariable3D &coordinates)
+void
+Output::InitializeOutput(SpaceVariable3D &coordinates)
 {
   scalar.StoreMeshCoordinates(coordinates);
   vector3.StoreMeshCoordinates(coordinates);
+  vector5.StoreMeshCoordinates(coordinates);
+
   probe_output.SetupInterpolation(coordinates);
-  for(int i=0; i<line_outputs.size(); i++)
+
+  for(int i=0; i<(int)line_outputs.size(); i++)
     line_outputs[i]->SetupInterpolation(coordinates);
+
+  for(auto&& plane : plane_outputs)
+    plane->InitializeOutput(coordinates);
 
   if(iod.output.mesh_filename[0] != 0)
     OutputMeshInformation(coordinates);
@@ -91,38 +126,55 @@ void Output::InitializeOutput(SpaceVariable3D &coordinates)
 
 //--------------------------------------------------------------------------
 
-void Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
-                             SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
-                             SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
+void
+Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &V, 
+                        SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
+                        std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/,
+                        std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
+                        SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
 {
+
+  SpaceVariable3D *Vout = &V;
+  if(global_mesh.IsMeshStaggered()) { //interpolate velocity
+    CopyAndInterpolateToCellCenters(V, vector5); 
+    Vout = &vector5;
+  }
 
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
-    WriteSolutionSnapshot(time, time_step, V, ID, Phi, L, Xi);
+    WriteSolutionSnapshot(time, time_step, *Vout, ID, Phi, NPhi, KappaPhi, L, Xi);
 
   //write solutions at probes
-  probe_output.WriteSolutionAtProbes(time, dt, time_step, V, ID, Phi, L, force_write);
+  probe_output.WriteSolutionAtProbes(time, dt, time_step, *Vout, ID, Phi, L, Xi, force_write);
 
   //write solutions for integrated energy in the specified region
   energy_output.WriteSolutionOfIntegrationEnergy(time, dt, time_step, V, ID, L, force_write);
 
   //write solutions along lines
-  for(int i=0; i<line_outputs.size(); i++)
-    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, V, ID, Phi, L, force_write);
+  for(int i=0; i<(int)line_outputs.size(); i++)
+    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, *Vout, ID, Phi, L, force_write);
+
+  //write solutions on planes
+  for(auto&& plane : plane_outputs)
+    plane->WriteSolutionOnPlane(time, dt, time_step, *Vout, ID, Phi, L, force_write);
 
   //write material volumes
   matvol_output.WriteSolution(time, dt, time_step, ID, force_write);
 
   //write terminal visualization 
-  terminal.PrintSolutionSnapshot(time, dt, time_step, V, ID, Phi, L, force_write);
+  terminal.PrintSolutionSnapshot(time, dt, time_step, *Vout, ID, Phi, L, force_write);
 
 }
+
 //--------------------------------------------------------------------------
 
-void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &V, 
-                                   SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
-                                   SpaceVariable3D *L, SpaceVariable3D *Xi)
+void
+Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, SpaceVariable3D &V, 
+                              SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
+                              std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ ,
+                              std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
+                              SpaceVariable3D *L, SpaceVariable3D *Xi)
 {
   //! Post-processing
   if(iod.output.ionization_output_requested())
@@ -164,6 +216,9 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     exit_mpi();
   }
 
+  // count the number of solution fields outputed
+  int numSol = 0;
+
   // Write solution snapshot
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id = (double***)ID.GetDataPointer();
@@ -180,6 +235,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "density");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.velocity==OutputData::ON) {
@@ -192,10 +248,12 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     vector3.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "velocity");
     VecView(vector3.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
-  //KW: Looks like "VecView" may have a problem depending on the order. I had to move "molar_fractions" up here.
+  //KW: Looks like "VecView" may have a problem depending on the order.
+  //    I had to move "molar_fractions" up here.
   bool molar_fractions_requested = false;
   for(int j=0; j<OutputData::MAXSPECIES; j++)
     if(iod.output.molar_fractions[j]==OutputData::ON) {
@@ -211,7 +269,8 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
 
       auto it = AlphaRJ.find(j);
       if(it == AlphaRJ.end()) {
-        print_error("*** Error: User requested output of molar fractions for species %d, but it does not exist.\n", j);
+        print_error("*** Error: User requested output of molar fractions for species %d, "
+                    "but it does not exist.\n", j);
         exit_mpi();
       }
 
@@ -221,6 +280,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
       PetscObjectSetName((PetscObject)(AlphaR->GetRefToGlobalVec()), word);
       VecView(AlphaR->GetRefToGlobalVec(), viewer);
     } 
+    numSol++;
   }
 
   if(iod.output.pressure==OutputData::ON) {
@@ -232,6 +292,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "pressure");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.internal_energy==OutputData::ON) {
@@ -243,6 +304,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "internal_energy");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.delta_internal_energy==OutputData::ON) {
@@ -255,6 +317,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "delta_internal_energy");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.materialid==OutputData::ON) {
@@ -271,7 +334,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "materialid");
     VecView(scalar.GetRefToGlobalVec(), viewer);
-
+    numSol++;
   }
 
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
@@ -284,6 +347,19 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
       sprintf(word, "levelset%d", it->first);
       PetscObjectSetName((PetscObject)(Phi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
       VecView(Phi[it->first]->GetRefToGlobalVec(), viewer);
+      numSol++;
+
+      if (iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {                                                                                                    
+	sprintf(word, "NPhi%d", it->first);
+	PetscObjectSetName((PetscObject)(NPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to NPhi[i].
+	VecView(NPhi[it->first]->GetRefToGlobalVec(), viewer);
+        numSol++;
+
+	sprintf(word, "KappaPhi%d", it->first);
+	PetscObjectSetName((PetscObject)(KappaPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to KappaPhi[i].
+	VecView(KappaPhi[it->first]->GetRefToGlobalVec(), viewer);
+        numSol++;
+      }
     }
   }
 
@@ -300,6 +376,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "temperature");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
@@ -316,6 +393,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     scalar.RestoreDataPointerAndInsert();
     PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "delta_temperature");
     VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
@@ -326,6 +404,7 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     }
     PetscObjectSetName((PetscObject)(L->GetRefToGlobalVec()), "laser_radiance");
     VecView(L->GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
 
@@ -333,26 +412,36 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     SpaceVariable3D& Zav(ion->GetReferenceToZav());
     PetscObjectSetName((PetscObject)(Zav.GetRefToGlobalVec()), "mean_charge_number");
     VecView(Zav.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.heavy_particles_density==OutputData::ON) {
     SpaceVariable3D& Nh(ion->GetReferenceToNh());
     PetscObjectSetName((PetscObject)(Nh.GetRefToGlobalVec()), "heavy_particles_density");
     VecView(Nh.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.electron_density==OutputData::ON) {
     SpaceVariable3D& Ne(ion->GetReferenceToNe());
     PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
     VecView(Ne.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
   if(iod.output.electron_density==OutputData::ON) {
     SpaceVariable3D& Ne(ion->GetReferenceToNe());
     PetscObjectSetName((PetscObject)(Ne.GetRefToGlobalVec()), "electron_density");
     VecView(Ne.GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
+  V.RestoreDataPointerToLocalVector(); //no changes made to V.
+  ID.RestoreDataPointerToLocalVector();
+
+
+  // ---------------------------------------
+  // outputs related to hyperelasticity (may use V and ID instead of "v" and "id")
   if(iod.output.reference_map==OutputData::ON) {
     if(Xi == NULL) {
       print_error("*** Error: Cannot output reference map. Solver is not activated.\n");
@@ -360,41 +449,58 @@ void Output::WriteSolutionSnapshot(double time, int time_step, SpaceVariable3D &
     }
     PetscObjectSetName((PetscObject)(Xi->GetRefToGlobalVec()), "reference_map");
     VecView(Xi->GetRefToGlobalVec(), viewer);
+    numSol++;
   }
 
+  if(iod.output.principal_elastic_stresses==OutputData::ON) {
+    if(Xi == NULL) {
+      print_error("*** Error: Cannot output elastic stresses. Ref. map is not provided.\n");
+      exit_mpi();
+    }
+    assert(heo);
+    heo->ComputePrincipalStresses(*Xi, V, ID, vector3);
+    PetscObjectSetName((PetscObject)(vector3.GetRefToGlobalVec()), "PrincipalElasticStresses");
+    VecView(vector3.GetRefToGlobalVec(), viewer);
+    numSol++;
+  }
+
+  // ---------------------------------------
 
   MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
+
+  // clean up
+  PetscViewerDestroy(&viewer);
+
+  if(numSol==0)
+    return; //actually, we did not write any solution snapshot
 
   // Add a line to the pvd file to record the new solutio snapshot
   char f1[256];
   sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
   pvdfile  = fopen(f1,"r+");
   if(!pvdfile) {
-    print_error("*** Error: Cannot open file '%s%s.pvd' for output.\n", iod.output.prefix, iod.output.solution_filename_base);
+    print_error("*** Error: Cannot open file '%s%s.pvd' for output.\n",
+                iod.output.prefix, iod.output.solution_filename_base);
     exit_mpi();
   }
   fseek(pvdfile, -27, SEEK_END); //!< overwrite the previous end of file script
   print(pvdfile, "  <DataSet timestep=\"%e\" file=\"%s\"/>\n", time, fname);
   print(pvdfile, "  </Collection>\n");
   print(pvdfile, "</VTKFile>\n");
+  mpi_barrier();
   fclose(pvdfile); pvdfile = NULL;
-
-  // clean up
-  PetscViewerDestroy(&viewer);
-  V.RestoreDataPointerToLocalVector(); //no changes made to V.
-  ID.RestoreDataPointerToLocalVector();
 
   // bookkeeping
   iFrame++;
   last_snapshot_time = time;
    
-  //print("\033[0;36m- Wrote solution at %e to %s.\033[0m\n", time, fname);
   print("- Wrote solution at %e to %s.\n", time, fname);
 }
 
 //--------------------------------------------------------------------------
 
-void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
+void
+Output::OutputMeshInformation(SpaceVariable3D& coordinates)
 {
   if(iod.output.mesh_filename[0] == 0)
     return; //nothing to do
@@ -444,17 +550,17 @@ void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
   MPI_Allreduce(MPI_IN_PLACE, y.data(), y.size(), MPI_DOUBLE, MPI_MAX, comm);
   MPI_Allreduce(MPI_IN_PLACE, z.data(), z.size(), MPI_DOUBLE, MPI_MAX, comm);
 
-  for(int i=0; i<std::max(std::max(x.size(),y.size()),z.size()); i++) {
+  for(int i=0; i<std::max(std::max((int)x.size(),(int)y.size()),(int)z.size()); i++) {
     print(file,"%8d\t", i-nGhost);
-    if(i<x.size())
+    if(i<(int)x.size())
       print(file,"%16.8e\t", x[i]);
     else
       print(file,"                \t");
-    if(i<y.size())
+    if(i<(int)y.size())
       print(file,"%16.8e\t", y[i]);
     else
       print(file,"                \t");
-    if(i<z.size())
+    if(i<(int)z.size())
       print(file,"%16.8e", z[i]);
     else
       print(file,"                ");
@@ -467,7 +573,8 @@ void Output::OutputMeshInformation(SpaceVariable3D& coordinates)
 
 //--------------------------------------------------------------------------
 
-void Output::OutputMeshPartition()
+void
+Output::OutputMeshPartition()
 {
   if(iod.output.mesh_partition[0] == 0)
     return; //nothing to do
@@ -497,11 +604,57 @@ void Output::OutputMeshPartition()
 
 //--------------------------------------------------------------------------
 
-void Output::FinalizeOutput()
+void
+Output::CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vnew)
+{
+  //fill domain interior first
+  int i0, j0, k0, imax, jmax, kmax;
+  V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+
+  Vec5D*** vold = (Vec5D***)V.GetDataPointer();
+  Vec5D*** vnew = (Vec5D***)Vnew.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        vnew[k][j][i][0] = vold[k][j][i][0];
+        vnew[k][j][i][1] = 0.5*(vold[k][j][i][1] + vold[k][j][i+1][1]);
+        vnew[k][j][i][2] = 0.5*(vold[k][j][i][2] + vold[k][j+1][i][2]);
+        vnew[k][j][i][3] = 0.5*(vold[k][j][i][3] + vold[k+1][j][i][3]);
+        vnew[k][j][i][4] = vold[k][j][i][4];
+      }
+
+
+  //now, populate ghost nodes by const extrapolation
+  int i,j,k, i_im, j_im, k_im;
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+    i = it->ijk[0]; 
+    j = it->ijk[1]; 
+    k = it->ijk[2]; 
+    i_im = it->image_ijk[0]; 
+    j_im = it->image_ijk[1]; 
+    k_im = it->image_ijk[2]; 
+    vnew[k][j][i] = vnew[k_im][j_im][i_im];
+  }
+
+  V.RestoreDataPointerToLocalVector();
+  Vnew.RestoreDataPointerAndInsert();
+}
+
+//--------------------------------------------------------------------------
+
+void
+Output::FinalizeOutput()
 {
   scalar.Destroy();
   vector3.Destroy(); 
+  vector5.Destroy();
 }
+
+//--------------------------------------------------------------------------
+
+
+
 
 //--------------------------------------------------------------------------
 

@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #pragma once
 
 #include <assert.h>
@@ -45,13 +50,13 @@ struct Ellipsoid {
   //! convention: e0 >= e1 >= e2
   Vec3D C; //!< center
   Vec3D U0, U1, U2; //!< axes (must be normalized, and orthogonal)
-  double e0, e1, e2;
+  double e0, e1, e2; //!< semi axis length
 
-  void SetupSpheroid(Vec3D C_, Vec3D Umain, double length, double diameter) {
+  void SetupSpheroid(Vec3D C_, Vec3D Umain, double semi_length, double radius) {
     C = C_;
     U0 = Umain/Umain.norm();
-    e0 = length;
-    e1 = e2 = diameter;
+    e0 = semi_length;
+    e1 = e2 = radius;
 
     U1 = 0.0;
     U2 = 0.0;
@@ -125,9 +130,9 @@ class DistanceFromPointToEllipse {
 
 public:
 
-  //***************************************************************************
-  // Constructor
-  //***************************************************************************
+  /****************************************************************************
+   * Constructor
+   ***************************************************************************/
   DistanceFromPointToEllipse() {}
   ~DistanceFromPointToEllipse() {}
 
@@ -158,10 +163,10 @@ public:
     }
   }
 
-  //***************************************************************************
-  //calculate signed distance (>0 outside) from an arbitrary point Q to the ellipse, 
-  //including the closest point (P)
-  //***************************************************************************
+  /****************************************************************************
+   * calculate signed distance (>0 outside) from an arbitrary point Q to the ellipse, 
+   * including a closest point (P) (may not be unique)
+   ***************************************************************************/
   double Calculate(double *Q_, double *P = NULL) {
 
     Vec2D Q(Q_);
@@ -224,25 +229,25 @@ public:
     return distance;
   }
 
-//***************************************************************************
-// Internal functions
-//***************************************************************************
+/****************************************************************************
+ * Internal functions
+ ****************************************************************************/
 private:
-  //***************************************************************************
-  // returns F(t), Eq. (11) of Eberly
-  //***************************************************************************
+  /****************************************************************************
+   * returns F(t), Eq. (11) of Eberly
+   ***************************************************************************/
   double F(double t, Vec2D y) {
     double p1 = ellipse.e0*y[0]/(t + ellipse.e0*ellipse.e0);
     double p2 = ellipse.e1*y[1]/(t + ellipse.e1*ellipse.e1);
     return p1*p1 + p2*p2 - 1.0;
   }
 
-  //***************************************************************************
-  //Brent method for root-finding (bisection and Secant)
-  //***************************************************************************
+  /****************************************************************************
+   *Brent method for root-finding (bisection and Secant)
+   ***************************************************************************/
   double GetRoot(Vec2D y, double t0, double t1, double f0, double f1, double tol) {
 
-    int maxIts = 1000;
+    int maxIts = 10000;
     double root;
 
     if(f0==0.0)
@@ -276,7 +281,7 @@ private:
       }
 
       if(it==maxIts) {
-        fprintf(stderr,"*** Warning: Root-finding method failed to converge after %d iterations.\n", it);
+        fprintf(stdout,"*** Warning: Root-finding method failed to converge after %d iterations.\n", it);
         root = 0.5*(t0+t1);
       }
     }
@@ -297,9 +302,9 @@ class DistanceFromPointToSpheroid {
 
 public:
 
-  //***************************************************************************
-  // Constructor 
-  //***************************************************************************
+  /****************************************************************************
+   * Constructor 
+   ***************************************************************************/
   DistanceFromPointToSpheroid(double *C_, double *U0_, double *U1_, double *U2_,
                               double e0_, double e1_, double e2_) : type(NONE)
   {
@@ -343,7 +348,7 @@ public:
     else if(ellipsoid.e1 == ellipsoid.e2)
       type = PROLATE;
     else {
-      fprintf(stderr,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
+      fprintf(stdout,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
               ellipsoid.e0, ellipsoid.e1, ellipsoid.e2);
       type = NONE;
     }
@@ -357,12 +362,12 @@ public:
 
 
 
-  //***************************************************************************
-  // Constructor
-  //***************************************************************************
-  DistanceFromPointToSpheroid(double *C_, double *U0_, double length, double diameter) : type(NONE)
+  /****************************************************************************
+   * Constructor
+   ***************************************************************************/
+  DistanceFromPointToSpheroid(double *C_, double *U0_, double semi_length, double radius) : type(NONE)
   {
-    ellipsoid.SetupSpheroid(Vec3D(C_), Vec3D(U0_), length, diameter);
+    ellipsoid.SetupSpheroid(Vec3D(C_), Vec3D(U0_), semi_length, radius);
 
     // figure out the type
     if(ellipsoid.e0 == ellipsoid.e1 && ellipsoid.e1 == ellipsoid.e2)
@@ -372,7 +377,7 @@ public:
     else if(ellipsoid.e1 == ellipsoid.e2)
       type = PROLATE;
     else {
-      fprintf(stderr,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
+      fprintf(stdout,"*** Error: Found a general ellipsoid instead of a spheroid (%e, %e, %e).\n", 
               ellipsoid.e0, ellipsoid.e1, ellipsoid.e2);
       type = NONE;
     }
@@ -385,10 +390,10 @@ public:
 
   }
 
-  //***************************************************************************
-  //calculate signed distance (>0 outside) from an arbitrary point Q to the ellipsoid, 
-  //including the closest point (P)
-  //***************************************************************************
+  /***************************************************************************
+   * calculate signed distance (>0 outside) from an arbitrary point Q to the ellipsoid, 
+   * including a closest point (P) (may not be unique)
+   ***************************************************************************/
   double Calculate(double *Q_, double *P = NULL) {
 
     Vec3D Q(Q_);

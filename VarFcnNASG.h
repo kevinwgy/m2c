@@ -5,8 +5,8 @@
 #include <fstream>
 
 /********************************************************************************
- * This class is the VarFcn class for the Noble-Abel Stiffened Gas EOS in Euler
- * Equations. Only elementary functions are declared and/or defined here.
+ * This class is the VarFcn class for the Noble-Abel Stiffened Gas equation of
+ * state (EOS). Only elementary functions are declared and/or defined here.
  * All arguments must be pertinent to only a single grid node or a single
  * state.
  *
@@ -35,6 +35,7 @@ private:
   double q; 
   double qprime;
   double cv; //!< specific heat at constant volume
+  double bigC; // Constant of integration. Maybe set to 0;
 
   double gam1;    //!< gamma-1
   double invgam1; //!< 1/(gamma-1)
@@ -47,28 +48,28 @@ public:
   ~VarFcnNASG() {}
 
   //! ----- EOS-Specific Functions -----
-  inline double GetPressure(double rho, double e) const {return gam1*(e-q)/(1.0/rho - b) - gam_pc;}
-  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {return invgam1*(p+gam_pc)*(1.0/rho-b) + q;}
-  inline double GetDensity(double p, double e) const {return 1.0/(gam1*(e-q)/(p+gam_pc) + b);}
-  inline double GetDpdrho(double rho, double e) const {double V = 1.0/rho; return gam1*V*V*(e-q)/((V-b)*(V-b));}
-  inline double GetBigGamma(double rho, double e) const {return gam1/(1.0 - b*rho);}
+  inline double GetPressure(double rho, double e) {return gam1*(e-q)/(1.0/rho - b) - gam_pc;}
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) {return invgam1*(p+gam_pc)*(1.0/rho-b) + q;}
+  inline double GetDensity(double p, double e) {return 1.0/(gam1*(e-q)/(p+gam_pc) + b);}
+  inline double GetDpdrho(double rho, double e) {double V = 1.0/rho; return gam1*V*V*(e-q)/((V-b)*(V-b));}
+  inline double GetBigGamma(double rho, [[maybe_unused]] double e) {return gam1/(1.0 - b*rho);}
 
-  inline double GetTemperature(double rho, double e) const {return invcv*(e - q - pc*(1.0/rho - b));}
+  inline double GetTemperature(double rho, double e) {double V = 1.0/rho; return invcv*(V-b)*((e - q)/(V-b) - pc - pow((bigC/(V-b)),gam)/gam1);}
 
-  inline double GetReferenceTemperature() const {return 0.0;}
-  inline double GetReferenceInternalEnergyPerUnitMass() const {return 0.0;}
+  inline double GetReferenceTemperature() {return 0.0;}
+  inline double GetReferenceInternalEnergyPerUnitMass() {return 0.0;}
 
-  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const {return cv*T+pc*(1.0/rho-b)+q;}
+  inline double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) {double V = 1.0/rho; return (cv*T/(V-b) + pc + pow((bigC/(V-b)),gam)/gam1) * (V-b) + q;}
   
-  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const {
+  inline double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) {
     double V = 1.0/rho;  return ((h+gam_pc*V)*(V-b)+V*gam1*q)/(gam*V-b);}
 
 
   //! Verify hyperbolicity (i.e. c^2 > 0): Report error if rho < 0 or p + pc < 0 (Not p + gamma*pc). 
-  inline bool CheckState(double rho, double p, bool silence = false) const {
+  inline bool CheckState(double rho, double p, bool silence = false) {
     if(!std::isfinite(rho) || !std::isfinite(p)) {
       if(!silence)
-        fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);
+        fprintf(stdout, "*** Error: CheckState failed. rho = %e, p = %e.\n", rho, p);
       return true;
     }
     if(rho <= 0.0 || p+pc <= 0.0){ //if p+pc<=0, c^2<=0
@@ -83,11 +84,10 @@ public:
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-inline
 VarFcnNASG::VarFcnNASG(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::NOBLE_ABEL_STIFFENED_GAS){
-    fprintf(stderr, "*** Error: MaterialModelData is not of type NOBLE_ABEL_STIFFENED_GAS.\n");
+    fprintf(stdout, "*** Error: MaterialModelData is not of type NOBLE_ABEL_STIFFENED_GAS.\n");
     exit(-1);
   }
 
@@ -100,7 +100,7 @@ VarFcnNASG::VarFcnNASG(MaterialModelData &data) : VarFcnBase(data) {
   b      = data.nasgModel.volumeConstant;
 
   cv     = data.nasgModel.cv;
-
+  bigC   = data.nasgModel.integrationConstant;
   gam1 = gam -1.0;
   invgam1 = 1.0/gam1;
   gam_pc = gam*pc;

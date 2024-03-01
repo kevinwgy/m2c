@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _FLUX_FCN_BASE_H_
 #define _FLUX_FCN_BASE_H_
 
@@ -57,9 +62,17 @@ public:
 
   /** The following function(s) depend on the numerical method for flux calculation.
     * Should be defined in derived classes. */
-  virtual void ComputeNumericalFluxAtCellInterface(int dir/*0~x,1~y,2~z*/,double *Vminus/*left*/, double *Vplus/*right*/, int id, 
-                                                   double *F) {
+  virtual void ComputeNumericalFluxAtCellInterface([[maybe_unused]] int dir/*0~x,1~y,2~z*/, [[maybe_unused]] double *Vminus/*left*/, 
+                                                   [[maybe_unused]] double *Vplus/*right*/, [[maybe_unused]] int id, 
+                                                   [[maybe_unused]] double *F) {
     print_error("*** Error: ComputeNumericalFluxAtCellInterface function not defined.\n"); 
+    exit_mpi();}
+
+  //! Computes flux across material interface. Currently, only available in the case of Local Lax-Friedrichs (LLF)
+  virtual void ComputeNumericalFluxAtMaterialInterface([[maybe_unused]] int dir/*0~x,1~y,2~z*/, [[maybe_unused]] double *Vminus/*left*/,
+                                                       [[maybe_unused]] int idm, [[maybe_unused]] double *Vplus/*right*/,
+                                                       [[maybe_unused]] int idp, [[maybe_unused]] double *F) {
+    print_error("*** Error: ComputeNumericalFluxAtMaterialInterface function not defined.\n"); 
     exit_mpi();}
 
 };
@@ -123,7 +136,7 @@ void FluxFcnBase::EvaluateEigensOfJacobian_F(double *V, int id,
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_F. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_F. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -176,7 +189,7 @@ void FluxFcnBase::EvaluateEigensOfJacobian_G(double *V, int id,
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_G. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_G. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -229,7 +242,7 @@ void FluxFcnBase::EvaluateEigensOfJacobian_H(double *V, int id,
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_H. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateEigensOfJacobian_H. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -277,7 +290,7 @@ void FluxFcnBase::EvaluateMaxEigenvalues(double *V, int id, double &lam_f_max, d
   double c = vf[id]->ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in EvaluateMaxEigenvalues. V = %e, %e, %e, %e, %e, ID = %d.\n",
+    fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in EvaluateMaxEigenvalues. V = %e, %e, %e, %e, %e, ID = %d.\n",
             c, V[0], V[1], V[2], V[3], V[4], id);            
     exit_mpi();
   } else
@@ -300,7 +313,7 @@ void FluxFcnBase::PrimitiveToPrimitiveCharacteristic(int dir/*0~x/F,1~y/G,2~z/H*
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveToPrimitiveCharacteristic. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveToPrimitiveCharacteristic. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else
@@ -360,7 +373,7 @@ void FluxFcnBase::PrimitiveCharacteristicToPrimitive(int dir/*0~x/F,1~y/G,2~z/H*
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveCharacteristicToPrimitive. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in PrimitiveCharacteristicToPrimitive. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else
@@ -416,7 +429,7 @@ void FluxFcnBase::ConservativeToConservativeCharacteristic(int dir/*0~x/F,1~y/G,
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in ConservativeToConservativeCharacteristic. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in ConservativeToConservativeCharacteristic. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else
@@ -466,7 +479,7 @@ void FluxFcnBase::ConservativeCharacteristicToConservative(int dir/*0~x/F,1~y/G,
   double e0 = vf[id]->GetInternalEnergyPerUnitMass(V0[0],V0[4]);
   double c0 = vf[id]->ComputeSoundSpeedSquare(V0[0], e0);
   if(c0<0) {
-    fprintf(stderr,"*** Error: c0^2 (square of sound speed) = %e in ConservativeCharacteristicToConservative. "
+    fprintf(stdout,"*** Error: c0^2 (square of sound speed) = %e in ConservativeCharacteristicToConservative. "
                    "V0 = %e, %e, %e, %e, %e, ID = %d.\n", c0, V0[0], V0[1], V0[2], V0[3], V0[4], id);            
     exit_mpi();
   } else

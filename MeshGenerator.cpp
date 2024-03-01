@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <MeshGenerator.h>
 using std::pair;
 using std::vector;
@@ -116,14 +121,14 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
 
 
   // Print mesh statistics to the screen
-  print("\nMesh Statistics:\n");
+  print("\n- Mesh Statistics:\n");
   print("  X-Direction: [%e, %e], %d nodes/cells, dx_min = %e, dx_max = %e.\n", x0, xmax, x.size(), 
          *std::min_element(dx.begin(), dx.end()), *std::max_element(dx.begin(), dx.end()));
   print("  Y-Direction: [%e, %e], %d nodes/cells, dy_min = %e, dy_max = %e.\n", y0, ymax, y.size(), 
          *std::min_element(dy.begin(), dy.end()), *std::max_element(dy.begin(), dy.end()));
   print("  Z-Direction: [%e, %e], %d nodes/cells, dz_min = %e, dz_max = %e.\n", z0, zmax, z.size(), 
          *std::min_element(dz.begin(), dz.end()), *std::max_element(dz.begin(), dz.end()));
-  print("  Total number of nodes/cells: %d.\n", x.size()*y.size()*z.size());
+  print("  Total number of nodes/cells: %lld.\n", (long long)x.size()*y.size()*z.size());
 
   if(iod_mesh.type == MeshData::CYLINDRICAL) 
     print("  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.\n");
@@ -198,10 +203,10 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
     xi[k+1] = (a==0.0) ? xi[k] + b/kappa : (xi[k] + b/a)*exp(a/kappa) - b/a;
 
     if(xi[k+1] >= xp2) {
-      if(k+1==N && i+1 == xpoints.size()-1) {//done
+      if(k+1==N && i+1 == (int)xpoints.size()-1) {//done
         xi[k+1] = xp2;
         break;
-      } else if(k+1==N || i+1 == xpoints.size()-1) {
+      } else if(k+1==N || i+1 == (int)xpoints.size()-1) {
         print_error("*** Error: Cannot generate mesh (possibly a software bug)\n");
         exit_mpi();
       }
@@ -224,7 +229,7 @@ void MeshGenerator::ComputeMesh1DNonUniform(double x0, double xmax,
       }
     }
 
-    //fprintf(stderr,"xi[%d] = %e\n", k+1, xi[k+1]);
+    //fprintf(stdout,"xi[%d] = %e\n", k+1, xi[k+1]);
 
   }
   

@@ -1,10 +1,18 @@
-#include <Utils.h>
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <SpaceOperator.h>
+#include <Utils.h>
+#include <FluxFcnLLF.h>
 #include <Vector3D.h>
 #include <Vector5D.h>
 #include <GeoTools.h>
 #include <DistancePointToSpheroid.h>
+#include <DistancePointToParallelepiped.h>
 #include <EmbeddedBoundaryDataSet.h>
+#include <EmbeddedBoundaryOperator.h>
 #include <algorithm> //std::upper_bound
 #include <cfloat> //DBL_MAX
 #include <KDTree.h>
@@ -36,6 +44,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
                              bool screenout) 
   : comm(comm_), dm_all(dm_all_),
     iod(iod_), varFcn(varFcn_), fluxFcn(fluxFcn_), riemann(riemann_),
+    interfluxFcn(NULL),
     coordinates(comm_, &(dm_all_.ghosted1_3dof)),
     delta_xyz(comm_, &(dm_all_.ghosted1_3dof)),
     volume(comm_, &(dm_all_.ghosted1_1dof)), global_mesh(global_mesh_),
@@ -48,7 +57,8 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Vf(comm_, &(dm_all_.ghosted1_5dof)),
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
     Tag(comm_, &(dm_all_.ghosted1_1dof)),
-    symm(NULL), visco(NULL), heat_diffusion(NULL), smooth(NULL)
+    symm(NULL), visco(NULL), heat_diffusion(NULL), heo(NULL), smooth(NULL),
+    frozen_nodes_ptr(NULL)
 {
   
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -68,6 +78,14 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
     smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
     
+  if(iod.multiphase.flux == MultiPhaseData::LOCAL_LAX_FRIEDRICHS) {
+    if(iod.multiphase.phasechange_type == MultiPhaseData::RIEMANN_SOLUTION) {
+      print_error("*** Error: MultiPhase::Flux = LocalLaxFriedrichs is incompatible with PhaseChange = RiemannSolution.\n");
+      exit_mpi();
+    }
+    interfluxFcn = new FluxFcnLLF(varFcn, iod);
+  }
+
 }
 
 //-----------------------------------------------------
@@ -78,6 +96,7 @@ SpaceOperator::~SpaceOperator()
   if(visco) delete visco;
   if(heat_diffusion) delete heat_diffusion;
   if(smooth) delete smooth;
+  if(interfluxFcn) delete interfluxFcn;
 }
 
 //-----------------------------------------------------
@@ -154,7 +173,7 @@ void SpaceOperator::SetupMesh(vector<double> &x, vector<double> &y, vector<doubl
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
         vol[k][j][i] /*volume of cv*/ = dxyz[k][j][i][0]*dxyz[k][j][i][1]*dxyz[k][j][i][2];
-//        fprintf(stderr,"(%d,%d,%d), dx = %e, dy = %e, dz = %e, vol = %e.\n", i,j,k, dxyz[k][j][i][0], dxyz[k][j][i][1], dxyz[k][j][i][2], vol[k][j][i]);
+//        fprintf(stdout,"(%d,%d,%d), dx = %e, dy = %e, dz = %e, vol = %e.\n", i,j,k, dxyz[k][j][i][0], dxyz[k][j][i][1], dxyz[k][j][i][2], vol[k][j][i]);
       }
 
 
@@ -480,6 +499,10 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
             ghost_nodes_outer.push_back(GhostPoint(Int3(i,j,k), image, GhostPoint::VERTEX,
                                         proj, out_normal, 0));
 
+          // collect ghost nodes along overset boundaries if any (FACE only)
+          if(bcType==MeshData::OVERSET && counter==1)
+            ghost_overset.push_back(std::make_pair(Int3(i,j,k), Vec5D(0.0)));
+
         } 
         else //inside physical domain
           ghost_nodes_inner.push_back(GhostPoint(i,j,k));
@@ -506,17 +529,23 @@ void SpaceOperator::CreateGhostNodeLists(bool screenout)
   MPI_Allreduce(MPI_IN_PLACE, &nInner, 1, MPI_INT, MPI_SUM, comm);
   MPI_Allreduce(MPI_IN_PLACE, &nOuter, 1, MPI_INT, MPI_SUM, comm);
   if(screenout) {
-    print(comm,"- Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
+    print(comm,"  o Number of ghost nodes inside computational domain (overlapping between subdomains): %d\n",
           nInner);
-    print(comm,"- Number of ghost nodes outside computational domain: %d\n",
+    print(comm,"  o Number of ghost nodes outside computational domain: %d\n",
           nOuter);
     print(comm,"\n");
   }
 
 /*
   for(int i=0; i<ghost_nodes_outer.size(); i++)
-    fprintf(stderr,"Ghost %d: (%d, %d, %d) | Image: (%d, %d, %d) | ProjType = %d | BcType = %d | Proj: (%e, %e, %e), (%e, %e, %e)\n", i, ghost_nodes_outer[i].ijk[0], ghost_nodes_outer[i].ijk[1], ghost_nodes_outer[i].ijk[2], ghost_nodes_outer[i].image_ijk[0], ghost_nodes_outer[i].image_ijk[1], ghost_nodes_outer[i].image_ijk[2], ghost_nodes_outer[i].type_projection, ghost_nodes_outer[i].bcType, ghost_nodes_outer[i].boundary_projection[0], ghost_nodes_outer[i].boundary_projection[1], ghost_nodes_outer[i].boundary_projection[2], ghost_nodes_outer[i].outward_normal[0], ghost_nodes_outer[i].outward_normal[1], ghost_nodes_outer[i].outward_normal[2]);
+    fprintf(stdout,"Ghost %d: (%d, %d, %d) | Image: (%d, %d, %d) | ProjType = %d | BcType = %d | Proj: (%e, %e, %e), (%e, %e, %e)\n", i, ghost_nodes_outer[i].ijk[0], ghost_nodes_outer[i].ijk[1], ghost_nodes_outer[i].ijk[2], ghost_nodes_outer[i].image_ijk[0], ghost_nodes_outer[i].image_ijk[1], ghost_nodes_outer[i].image_ijk[2], ghost_nodes_outer[i].type_projection, ghost_nodes_outer[i].bcType, ghost_nodes_outer[i].boundary_projection[0], ghost_nodes_outer[i].boundary_projection[1], ghost_nodes_outer[i].boundary_projection[2], ghost_nodes_outer[i].outward_normal[0], ghost_nodes_outer[i].outward_normal[1], ghost_nodes_outer[i].outward_normal[2]);
 */
+
+  // figure out whether the entire domain has overset ghosts...
+  int overset_count = ghost_overset.size();
+  MPI_Allreduce(MPI_IN_PLACE, &overset_count, 1, MPI_INT, MPI_SUM, comm);
+  domain_has_overset = overset_count>0;
+
 
   coordinates.RestoreDataPointerToLocalVector();
 }
@@ -605,9 +634,9 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
         if(checkState) {
           if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {
-            fprintf(stderr, "\033[0;31m*** Error: State variables at (%e,%e,%e) violate hyperbolicity." 
+            fprintf(stdout, "\033[0;31m*** Error: State variables at (%e,%e,%e) violate hyperbolicity." 
                     " matid = %d.\n\033[0m", coords[k][j][i][0],coords[k][j][i][1],coords[k][j][i][2], (int)id[k][j][i]);
-            fprintf(stderr, "\033[0;31mv[%d(i),%d(j),%d(k)] = [%e, %e, %e, %e, %e]\n\033[0m", 
+            fprintf(stdout, "\033[0;31mv[%d(i),%d(j),%d(k)] = [%e, %e, %e, %e, %e]\n\033[0m", 
                     i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
             exit(-1);
           }
@@ -632,7 +661,8 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
 
 //-----------------------------------------------------
 //assign interpolator and gradien calculator (pointers) to the viscosity operator
-void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_)
+void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, GradientCalculatorBase *grad_,
+                                           bool with_embedded_boundary)
 {
   bool hasViscosity = false;
   for(auto it = iod.eqs.materials.dataMap.begin(); it != iod.eqs.materials.dataMap.end(); it++) {
@@ -645,8 +675,8 @@ void SpaceOperator::SetupViscosityOperator(InterpolatorBase *interpolator_, Grad
   if(hasViscosity) {
     assert(interpolator_); //make sure it is not NULL
     assert(grad_);
-    visco = new ViscosityOperator(comm, dm_all, iod.eqs, varFcn, coordinates, delta_xyz,
-                                  *interpolator_, *grad_);
+    visco = new ViscosityOperator(comm, dm_all, iod, varFcn, global_mesh, coordinates, delta_xyz,
+                                  volume, *interpolator_, *grad_, with_embedded_boundary);
   }
 }
 
@@ -671,1135 +701,81 @@ void SpaceOperator::SetupHeatDiffusionOperator(InterpolatorBase *interpolator_, 
 }
 
 //-----------------------------------------------------
-
-//apply IC within the real domain
-multimap<int, pair<int,int> > 
-SpaceOperator::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS)
-{
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-
-  Vec5D*** v = (Vec5D***) V.GetDataPointer();
-  double*** id = (double***) ID.GetDataPointer();
-
-  //! apply the inlet (i.e. farfield) state
-  if(iod.bc.inlet.materialid != 0) {
-    print_error(comm, "*** Error: Material at the inlet boundary should have MaterialID = 0. (Found %d instead.)\n", 
-                iod.bc.inlet.materialid);
-    exit_mpi();
-  }
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) {
-        v[k][j][i][0] = iod.bc.inlet.density;
-        v[k][j][i][1] = iod.bc.inlet.velocity_x;
-        v[k][j][i][2] = iod.bc.inlet.velocity_y;
-        v[k][j][i][3] = iod.bc.inlet.velocity_z;
-        v[k][j][i][4] = iod.bc.inlet.pressure;
-        id[k][j][i]   = iod.bc.inlet.materialid;
-      }
-
-
-  //! apply user-specified function
-  if(iod.ic.apply_user_file_before_geometries==IcData::YES)
-    ApplyUserSpecifiedInitialConditionFile(coords, v, id);
-
-
-
-  //! apply i.c. based on geometric objects (planes, cylinder-cones, spheres)
-  MultiInitialConditionsData &ic(iod.ic.multiInitialConditions);
-
-  // planes
-  for(auto it=ic.planeMap.dataMap.begin(); it!=ic.planeMap.dataMap.end(); it++) {
-
-    print(comm, "- Applying initial condition on one side of a plane (material id: %d).\n\n", 
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-    double dist;
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0)*dir;
-          if(dist>0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-  // cylinder-cone
-  for(auto it=ic.cylinderconeMap.dataMap.begin(); it!=ic.cylinderconeMap.dataMap.end(); it++) {
-
-    print(comm, "- Applying initial condition within a cylinder-cone (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-
-    double L = it->second->L; //cylinder height
-    double R = it->second->r; //cylinder radius
-    double tan_alpha = tan(it->second->opening_angle_degrees/180.0*acos(-1.0));//opening angle
-    double Hmax = R/tan_alpha;
-    double H = min(it->second->cone_height, Hmax); //cone's height
-
-    double x, r;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          x = (coords[k][j][i]-x0)*dir;
-          r = (coords[k][j][i] - x0 - x*dir).norm();
-          if( (x>0 && x<L && r<R) || (x>=L && x<L+H && r<(L+Hmax-x)*tan_alpha) ) {//inside
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  // cylinder with spherical cap(s)
-  for(auto it=ic.cylindersphereMap.dataMap.begin(); it!=ic.cylindersphereMap.dataMap.end(); it++) {
-
-    print(comm, "- Applying initial condition within a cylinder-sphere (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
-    dir /= dir.norm();
-
-    double L = it->second->L; //cylinder height
-    double R = it->second->r; //cylinder & sphere's radius
-    double Lhalf = 0.5*L;
-    bool front_cap = (it->second->front_cap == CylinderSphereData::On);
-    bool back_cap = (it->second->back_cap == CylinderSphereData::On);
-
-    Vec3D xf = x0 + Lhalf*dir;
-    Vec3D xb = x0 - Lhalf*dir;
-    double x, r;
-    bool inside;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          inside = false;
-          x = (coords[k][j][i]-x0)*dir;
-          r = (coords[k][j][i] - x0 - x*dir).norm();
-          if(x>-Lhalf && x<Lhalf && r<R)
-            inside = true;
-          else if(front_cap && x>=Lhalf && (coords[k][j][i]-xf).norm() < R)
-            inside = true;
-          else if(back_cap && x<=-Lhalf && (coords[k][j][i]-xb).norm() < R)
-            inside = true;
-
-          if(inside) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  // spheres
-  for(auto it=ic.sphereMap.dataMap.begin(); it!=ic.sphereMap.dataMap.end(); it++) {
-
-    print(comm, "- Applying initial condition within a sphere (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    double dist;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = (coords[k][j][i]-x0).norm() - it->second->radius;
-          if (dist<0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  // spheroids 
-  for(auto it=ic.spheroidMap.dataMap.begin(); it!=ic.spheroidMap.dataMap.end(); it++) {
-
-    print(comm, "- Applying initial condition within a spheroid (material id: %d).\n\n",
-          it->second->initialConditions.materialid);
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
-    Vec3D axis(it->second->axis_x, it->second->axis_y, it->second->axis_z);
-    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
-    double dist;
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
-          if (dist<0) {
-            v[k][j][i][0] = it->second->initialConditions.density;
-            v[k][j][i][1] = it->second->initialConditions.velocity_x;
-            v[k][j][i][2] = it->second->initialConditions.velocity_y;
-            v[k][j][i][3] = it->second->initialConditions.velocity_z;
-            v[k][j][i][4] = it->second->initialConditions.pressure;
-            id[k][j][i]   = it->second->initialConditions.materialid;
-          }
-        }
-  }
-
-
-  //Now, deal with embedded boundaries
-  vector<double***> color;
-
-  //! assign dummy state and "INACTIVE_MATERIAL_ID" to regions enclosed by any embedded surface
-  if(EBDS != nullptr) {
-
-    color.assign(EBDS->size(), NULL);
-    for(int i=0; i<EBDS->size(); i++) {
-      assert((*EBDS)[i]->Color_ptr);
-      color[i] = (*EBDS)[i]->Color_ptr->GetDataPointer();
-    }
-
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) {
-
-          for(int surf=0; surf<color.size(); surf++) {
-            if(color[surf][k][j][i] <= 0) {//occluded or enclosed
-              v[k][j][i][0] = iod.eqs.dummy_state.density;
-              v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
-              v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
-              v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
-              v[k][j][i][4] = iod.eqs.dummy_state.pressure;
-              id[k][j][i] = INACTIVE_MATERIAL_ID;
-              break;
-            }
-          }
-        }
-  }
-
-
-  //! specify point-based initial condition
-  if(!ic.pointMap.dataMap.empty() && EBDS == nullptr) {
-    print_error(comm, "*** Error: Unable to specify point-based initial conditions without embedded boundaries.\n"
-                "           Background state can be specified using the 'Farfield' or 'Inlet' structure, even\n"
-                "           if the domain does not contain a far-field or inlet boundary.\n");
-    exit_mpi();
-  }
-
-  multimap<int, pair<int,int> > id2closure;
-  if(EBDS != nullptr) {
-
-    for(auto it=ic.pointMap.dataMap.begin(); it!=ic.pointMap.dataMap.end(); it++) {
-
-      print(comm, "- Applying initial condition based on flood-fill; origin: %e %e %e (material id: %d).\n\n",
-            it->second->x, it->second->y, it->second->z, it->second->initialConditions.materialid);
-
-      id2closure.insert(ApplyPointBasedInitialCondition(*it->second, *EBDS, color, v, id));
-    }
-
-    // Verification (can be deleted): occluded nodes should have inactive_material_id
-    int i,j,k;
-    for(int surf=0; surf<EBDS->size(); surf++) {
-      set<Int3> *occluded = (*EBDS)[surf]->occluded_ptr;
-      set<Int3> *imposed_occluded = (*EBDS)[surf]->imposed_occluded_ptr;
-      for(auto it = occluded->begin(); it != occluded->end(); it++) {
-        i = (*it)[0];
-        j = (*it)[1];
-        k = (*it)[2];
-        if(!coordinates.IsHere(i,j,k,false))
-          continue;
-        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
-      }
-      for(auto it = imposed_occluded->begin(); it != imposed_occluded->end(); it++) {
-        i = (*it)[0];
-        j = (*it)[1];
-        k = (*it)[2];
-        if(!coordinates.IsHere(i,j,k,false))
-          continue;
-        assert(id[k][j][i] == INACTIVE_MATERIAL_ID);
-      }
-    }
-
-  }
-
-  if(EBDS != nullptr) {
-    for(int i=0; i<EBDS->size(); i++)
-      (*EBDS)[i]->Color_ptr->RestoreDataPointerToLocalVector();
-  }
-
-
-  //! apply user-specified function
-  if(iod.ic.apply_user_file_before_geometries==IcData::NO)
-    ApplyUserSpecifiedInitialConditionFile(coords, v, id);
-
-
-  V.RestoreDataPointerAndInsert();
-  ID.RestoreDataPointerAndInsert();
-  coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
-
-  //! Apply boundary condition to populate ghost nodes (no need to do this for ID)
-  ClipDensityAndPressure(V, ID);
-  ApplyBoundaryConditions(V);   
-
-  return id2closure;
-
-}
-
-//-----------------------------------------------------
-
-void
-SpaceOperator::ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** v, double*** id)
-{
-
-  if(iod.ic.type != IcData::NONE) {
-
-    //! Get coordinates
-    Vec3D    x0(iod.ic.x0[0], iod.ic.x0[1], iod.ic.x0[2]); 
-
-    if (iod.ic.type == IcData::PLANAR || iod.ic.type == IcData::CYLINDRICAL) {
-
-      if(iod.ic.type == IcData::PLANAR)
-        print(comm, "- Applying the initial condition specified in %s (planar).\n", 
-              iod.ic.user_specified_ic);
-      else
-        print(comm, "- Applying the initial condition specified in %s (with cylindrical symmetry).\n", 
-              iod.ic.user_specified_ic);
- 
-      Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
-      dir /= dir.norm();
-
-      double x = 0.0;
-      int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user (in the axial dir)
-
-      double r = 0.0;
-      int nrad = iod.ic.user_data2[IcData::COORDINATE].size(); //!< number of data points in the radial dir.
-
-      int t0, t1;    
-      double a0, a1;
-
-      for(int k=k0; k<kmax; k++)
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-
-            x = (coords[k][j][i] - x0)*dir; //!< projection onto the 1D axis
-//            cout << "coords: " << coords[j][i][0] << ", " << coords[j][i][1] << "; x = " << x << endl;
-            if(x<0 || x>iod.ic.user_data[IcData::COORDINATE][n-1])
-              continue;
-
-            if(nrad>0) {
-              r = (coords[k][j][i] - x0 - x*dir).norm();
-              if(r>iod.ic.user_data2[IcData::COORDINATE][nrad-1])
-                continue;
-            }
- 
-            //! Find the first 1D coordinate greater than x
-            auto upper_it = std::upper_bound(iod.ic.user_data[IcData::COORDINATE].begin(),
-                                             iod.ic.user_data[IcData::COORDINATE].end(),
-                                             x); 
-            t1 = (int)(upper_it - iod.ic.user_data[IcData::COORDINATE].begin());
-
-            if(t1==0) // exactly the first node in 1D
-              t1 = 1;
-
-            t0 = t1 - 1;
-
-            //! calculate interpolation weights
-            a0 = (iod.ic.user_data[IcData::COORDINATE][t1] - x) /
-                 (iod.ic.user_data[IcData::COORDINATE][t1] - iod.ic.user_data[IcData::COORDINATE][t0]);
-            a1 = 1.0 - a0;
-
-            //! specify i.c. on node (cell center)
-            if(iod.ic.specified[IcData::DENSITY])
-              v[k][j][i][0] = a0*iod.ic.user_data[IcData::DENSITY][t0]  
-                            + a1*iod.ic.user_data[IcData::DENSITY][t1];
-            if(iod.ic.specified[IcData::VELOCITY]) {
-              v[k][j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] 
-                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[0];
-              v[k][j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][t0]
-                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[1];
-              v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] 
-                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
-            }
-            if(iod.ic.specified[IcData::PRESSURE]) 
-              v[k][j][i][4] = a0*iod.ic.user_data[IcData::PRESSURE][t0]
-                            + a1*iod.ic.user_data[IcData::PRESSURE][t1];
-            if(iod.ic.specified[IcData::MATERIALID])
-              id[k][j][i]   = std::round(a0*iod.ic.user_data[IcData::MATERIALID][t0] 
-                                       + a1*iod.ic.user_data[IcData::MATERIALID][t1]);
-
-            //! apply radial variation (if provided by user)
-            if(nrad>0) { 
- 
-              //! Find the first radial coordinate greater than r
-              auto upper_it = std::upper_bound(iod.ic.user_data2[IcData::COORDINATE].begin(),
-                                               iod.ic.user_data2[IcData::COORDINATE].end(),
-                                               r); 
-              t1 = (int)(upper_it - iod.ic.user_data2[IcData::COORDINATE].begin());
-
-              if(t1==0) // exactly the first node
-                t1 = 1;
-
-              t0 = t1 - 1;
-
-              //! calculate interpolation weights
-              a0 = (iod.ic.user_data2[IcData::COORDINATE][t1] - r) /
-                   (iod.ic.user_data2[IcData::COORDINATE][t1] - iod.ic.user_data2[IcData::COORDINATE][t0]);
-              a1 = 1.0 - a0;
-
-              if(iod.ic.specified[IcData::DENSITY])
-                v[k][j][i][0] *= a0*iod.ic.user_data2[IcData::DENSITY][t0] 
-                               + a1*iod.ic.user_data2[IcData::DENSITY][t1];
-              if(iod.ic.specified[IcData::VELOCITY])
-                for(int p=1; p<=3; p++)
-                  v[k][j][i][p] *= a0*iod.ic.user_data2[IcData::VELOCITY][t0] 
-                                 + a1*iod.ic.user_data2[IcData::VELOCITY][t1];
-              if(iod.ic.specified[IcData::PRESSURE])
-                v[k][j][i][4] *= a0*iod.ic.user_data2[IcData::PRESSURE][t0]
-                               + a1*iod.ic.user_data2[IcData::PRESSURE][t1];
-            }
-          }
-
-    }
-
-    else if (iod.ic.type == IcData::GENERALCYLINDRICAL) {
-
-      Vec3D dir(iod.ic.dir[0], iod.ic.dir[1], iod.ic.dir[2]); 
-      dir /= dir.norm();
-
-      int N = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
-
-      print(comm, "- Applying the initial condition specified in %s (%d points, cylindrical symmetry).\n", 
-            iod.ic.user_specified_ic, N);
-
-      //Store sample points in a KDTree (K = 2)
-      Vec2D *xy = new Vec2D[N]; 
-      PointIn2D *p = new PointIn2D[N];
-      for(int i=0; i<N; i++) {
-        xy[i] = Vec2D(iod.ic.user_data[IcData::COORDINATE][i], iod.ic.user_data[IcData::RADIALCOORDINATE][i]);
-        p[i]  = PointIn2D(i, xy[i]);
-      }
-      KDTree<PointIn2D,2/*dim*/> tree(N, p); //"tree" uses "p" and changes its ordering. "p" cannot be deleted before "tree"
-      print(comm, "    o Constructed a KDTree (K=2) to store the data points.\n");
-
-      int numPoints = 15; //this is the number of points for interpolation
-      int maxCand = numPoints*20;
-      PointIn2D candidates[maxCand*10]; //maxCand may be temporarily increased for fail-safe
-
-
-      // tentative cutoff distance --- will be adjusted
-      double cutoff = sqrt((iod.ic.xmax[0]-iod.ic.xmin[0])*(iod.ic.xmax[1]-iod.ic.xmin[1])/N);
-
-      Vec2D pnode;
-      for(int k=k0; k<kmax; k++)
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-
-            //3D -> 2D
-            pnode[0] = (coords[k][j][i] - x0)*dir; //!< projection onto the 1D axis
-            if(pnode[0]<iod.ic.xmin[0] || pnode[0]>iod.ic.xmax[0])
-              continue;
-            pnode[1] = (coords[k][j][i] - x0 - pnode[0]*dir).norm();
-            if(pnode[1]<iod.ic.xmin[1] || pnode[1]>iod.ic.xmax[1])
-              continue;
- 
-            //RBF interpolation w/ KDTree
-            int nFound = 0, counter = 0;
-            double low_cut = 0.0, high_cut = DBL_MAX;
-            while(nFound<numPoints || nFound>maxCand) {
-              if(++counter>2000) {
-                fprintf(stderr,"*** Error: Cannot find required number of sample points for "
-                               "interpolation (by RBF) after %d iterations. "
-                               "Coord(3D):%e %e %e  | Coord(2D):%e %e. "
-                               "Candidates: %d, cutoff = %e.\n", 
-                               counter, coords[k][j][i][0], coords[k][j][i][1], coords[k][j][i][2],
-                               pnode[0], pnode[1], nFound, cutoff);
-                exit(-1);
-              }
-              nFound = tree.findCandidatesWithin(pnode, candidates, maxCand, cutoff);
-
-              if(nFound<numPoints) {
-                low_cut = std::max(low_cut, cutoff);
-                if(high_cut>0.5*DBL_MAX)
-                  cutoff *= 4.0;
-                else
-                  cutoff = 0.5*(low_cut + high_cut);
-              }
-              else if(nFound>maxCand) {
-                high_cut = std::min(high_cut, cutoff);
-                cutoff = 0.5*(low_cut + high_cut);
-              }
-
-              if((high_cut - low_cut)/high_cut<1e-6) { //fail-safe
-                nFound = tree.findCandidatesWithin(pnode, candidates, 10*maxCand, high_cut);
-                if(nFound>10*maxCand) {
-                  fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points at any"
-                                 " cutoff distance.\n\033[0m");
-                  exit(-1);
-                }
-
-                assert(nFound>=numPoints);
-                fprintf(stderr,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
-                               "(node: %e %e).\n\033[0m", nFound, high_cut, pnode[0], pnode[1]);
-                break;
-              }
-            }
-
-            //figure out the actual points for interpolation (numPoints)
-            vector<pair<double,int> > dist2node;
-            for(int i=0; i<nFound; i++) 
-              dist2node.push_back(std::make_pair((candidates[i].x-pnode).norm(), candidates[i].id));
-
-            if(nFound>numPoints)
-              sort(dist2node.begin(), dist2node.end());         
-            dist2node.resize(numPoints);
-
-            //prepare to interpolate
-            double xd[2*numPoints];
-            for(int i=0; i<numPoints; i++) {
-              xd[2*i]   = xy[dist2node[i].second][0];
-              xd[2*i+1] = xy[dist2node[i].second][1];
-            }
-            double r0; //smaller than maximum separation, larger than typical separation
-            r0 = dist2node.front().first + dist2node.back().first;
-            double fd[numPoints];
-            double *rbf_weight, *interp;
-
-            //choose a radial basis function
-            void (*phi)(int, double[], double, double[]); //a function pointer
-            switch (iod.ic.rbf) {
-              case IcData::MULTIQUADRIC :
-                phi = MathTools::phi1;  break;
-              case IcData::INVERSE_MULTIQUADRIC :
-                phi = MathTools::phi2;  break;
-              case IcData::THIN_PLATE_SPLINE :
-                phi = MathTools::phi3;  break;
-              case IcData::GAUSSIAN :
-                phi = MathTools::phi4;  break;
-              default : 
-                phi = MathTools::phi1;  break;
-            }
-
-            if(iod.ic.specified[IcData::DENSITY]) {
-              for(int i=0; i<numPoints; i++)
-                fd[i] = iod.ic.user_data[IcData::DENSITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
-              v[k][j][i][0] = interp[0];
-
-              delete [] rbf_weight;
-              delete [] interp;
-            }
-
-            if(iod.ic.specified[IcData::VELOCITY] || iod.ic.specified[IcData::RADIALVELOCITY])
-              v[k][j][i][1] = v[k][j][i][2] = v[k][j][i][3] = 0.0;
-
-            if(iod.ic.specified[IcData::VELOCITY]) {
-              for(int i=0; i<numPoints; i++)
-                fd[i] = iod.ic.user_data[IcData::VELOCITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
-              v[k][j][i][1] = interp[0]*dir[0]; 
-              v[k][j][i][2] = interp[0]*dir[1]; 
-              v[k][j][i][3] = interp[0]*dir[2];
-
-              delete [] rbf_weight;
-              delete [] interp;
-            }
-
-            if(iod.ic.specified[IcData::RADIALVELOCITY]) {
-              for(int i=0; i<numPoints; i++)
-                fd[i] = iod.ic.user_data[IcData::RADIALVELOCITY][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
-              Vec3D dir2 = coords[k][j][i] - x0 - pnode[0]*dir;
-              if(dir2.norm()>0)
-                dir2 /= dir2.norm();
-              v[k][j][i][1] += interp[0]*dir2[0]; 
-              v[k][j][i][2] += interp[0]*dir2[1]; 
-              v[k][j][i][3] += interp[0]*dir2[2];
-
-              delete [] rbf_weight;
-              delete [] interp;
-            }
-
-            if(iod.ic.specified[IcData::PRESSURE]) {
-              for(int i=0; i<numPoints; i++)
-                fd[i] = iod.ic.user_data[IcData::PRESSURE][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
-              v[k][j][i][4] = interp[0];
-
-              delete [] rbf_weight;
-              delete [] interp;
-            }
-
-            if(iod.ic.specified[IcData::MATERIALID]) {
-              for(int i=0; i<numPoints; i++)
-                fd[i] = iod.ic.user_data[IcData::MATERIALID][dist2node[i].second];
-              rbf_weight = MathTools::rbf_weight(2, numPoints, xd, r0, phi, fd);
-              interp = MathTools::rbf_interp(2, numPoints, xd, r0,
-                                             phi, rbf_weight,
-                                             1, pnode);
-              id[k][j][i] = std::round(interp[0]);
-
-              delete [] rbf_weight;
-              delete [] interp;
-            }
-
-          }
-
-      delete [] xy;
-      delete [] p;
-
-    }
-
-    else if (iod.ic.type == IcData::SPHERICAL) {
-
-      print(comm, "- Applying the initial condition specified in %s (with spherical symmetry).\n", 
-            iod.ic.user_specified_ic);
- 
-      double x;
-      int n = iod.ic.user_data[IcData::COORDINATE].size(); //!< number of data points provided by user
-      Vec3D dir;
-
-      int t0, t1;    
-      double a0, a1;
-
-      for(int k=k0; k<kmax; k++)
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-
-            dir = coords[k][j][i] - x0;
-            x = dir.norm();
-            dir /= x;
-   
-//            cout << "coords: " << coords[j][i][0] << ", " << coords[j][i][1] << "; x = " << x << endl;
-            if(x>iod.ic.user_data[IcData::COORDINATE][n-1])
-              continue;
- 
-            //! Find the first 1D coordinate greater than x
-            auto upper_it = std::upper_bound(iod.ic.user_data[IcData::COORDINATE].begin(),
-                                             iod.ic.user_data[IcData::COORDINATE].end(),
-                                             x); 
-            t1 = (int)(upper_it - iod.ic.user_data[IcData::COORDINATE].begin());
-
-            if(t1==0) // exactly the first node in 1D
-              t1 = 1;
-
-            t0 = t1 - 1;
-
-            //! calculate interpolation weights
-            a0 = (iod.ic.user_data[IcData::COORDINATE][t1] - x) /
-                 (iod.ic.user_data[IcData::COORDINATE][t1] - iod.ic.user_data[IcData::COORDINATE][t0]);
-            a1 = 1.0 - a0;
-
-            //! specify i.c. on node (cell center)
-            if(iod.ic.specified[IcData::DENSITY])
-              v[k][j][i][0] = a0*iod.ic.user_data[IcData::DENSITY][t0]
-                            + a1*iod.ic.user_data[IcData::DENSITY][t1];
-            if(iod.ic.specified[IcData::VELOCITY]) {
-              v[k][j][i][1] = (a0*iod.ic.user_data[IcData::VELOCITY][t0]
-                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[0];
-              v[k][j][i][2] = (a0*iod.ic.user_data[IcData::VELOCITY][t0] 
-                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[1];
-              v[k][j][i][3] = (a0*iod.ic.user_data[IcData::VELOCITY][t0]
-                            +  a1*iod.ic.user_data[IcData::VELOCITY][t1])*dir[2];
-            }
-            if(iod.ic.specified[IcData::PRESSURE])
-              v[k][j][i][4] = a0*iod.ic.user_data[IcData::PRESSURE][t0]
-                            + a1*iod.ic.user_data[IcData::PRESSURE][t1];
-            if(iod.ic.specified[IcData::MATERIALID])
-              id[k][j][i]   = std::round(a0*iod.ic.user_data[IcData::MATERIALID][t0] 
-                                       + a1*iod.ic.user_data[IcData::MATERIALID][t1]);
-          }
-
-    }
-  }
-
-}
-
-//-----------------------------------------------------
-//! Apply boundary condition based on user-specified point and "flood-fill"
-pair<int, pair<int,int> > 
-SpaceOperator::ApplyPointBasedInitialCondition(PointData& point,
-                                               vector<unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
-                                               vector<double***> &color,
-                                               Vec5D*** v, double*** id)
-{
-  assert(EBDS.size()>0);
-
-  //Step 1. Locate the point within the mesh
-  Vec3D this_point(point.x, point.y, point.z);
-  Int3 ijk0;
-  bool validpoint = global_mesh.FindElementCoveringPoint(this_point, ijk0, NULL, true);
-  if(!validpoint) {
-    print_error(comm, "*** Error: User-specified point (%e %e %e) is outside the computational domain.\n",
-                point.x, point.y, point.z);
-    exit_mpi();
-  }
-  vector<Int3> vertices; 
-  vertices.reserve(8);
-  vector<bool> owner;
-  owner.reserve(8);
-
-  int i,j,k;
-  for(int dk=0; dk<=1; dk++)
-    for(int dj=0; dj<=1; dj++)
-      for(int di=0; di<=1; di++) {
-        i = ijk0[0] + di;
-        j = ijk0[1] + dj;
-        k = ijk0[2] + dk;
-        vertices.push_back(Int3(i,j,k));
-        owner.push_back(coordinates.IsHere(i,j,k,false));
-      }
-
-
-  //Step 2. Loop through embedded boundaries and determine the color at user-specified point from each boundary
-  vector<int> mycolor(EBDS.size(), INT_MIN);
-  for(int surf = 0; surf < EBDS.size(); surf++) {
-
-    vector<int> max_color(vertices.size(), INT_MIN);
-    vector<int> min_color(vertices.size(), INT_MAX);
-    vector<int> occluded(vertices.size(), 0);
-
-    for(int n=0; n<8; n++) {
-      if(owner[n]) {
-        i = vertices[n][0];
-        j = vertices[n][1];
-        k = vertices[n][2];
-        max_color[n] = color[surf][k][j][i];
-        min_color[n] = color[surf][k][j][i];
-        if(color[surf][k][j][i]==0)
-          occluded[n] = 1;
-      }
-    }
-
-    MPI_Allreduce(MPI_IN_PLACE, max_color.data(), 8, MPI_INT, MPI_MAX, comm);
-    MPI_Allreduce(MPI_IN_PLACE, min_color.data(), 8, MPI_INT, MPI_MIN, comm);
-    MPI_Allreduce(MPI_IN_PLACE, occluded.data(), 8, MPI_INT, MPI_MAX, comm);
-
-    // check if any node in the box is occluded. If yes, exit.
-    for(int n=0; n<8; n++) {
-      if(occluded[n]>0) {
-        print_error(comm, "*** Error: User-specified point (%e %e %e) is too close to embedded surface %d.\n",
-                    point.x, point.y, point.z, surf);
-        exit_mpi();
-      }
-    }
-
-    // determine mycolor[surf]
-    mycolor[surf] = INT_MIN;
-    for(int n=0; n<8; n++) {
-      if(max_color[n] != INT_MIN) {
-        mycolor[surf] = max_color[n];
-        break;
-      }
-    }
-    if(mycolor[surf] == INT_MIN) {
-      print_error(comm, "*** Error: Unable to determine the 'color' of point (%e %e %e) from surface %d.\n",
-                  point.x, point.y, point.z, surf);
-      exit_mpi();
-    }
-    for(int n=0; n<8; n++) {
-      if(max_color[n] != INT_MIN && max_color[n] != mycolor[surf]) {
-        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), using surface %d.\n",
-                    mycolor[surf], max_color[n], point.x, point.y, point.z, surf);
-        print_error(comm, "           This point may be too close to the embedded surface.\n");
-        exit_mpi();
-      }
-    }
-    for(int n=0; n<8; n++) {
-      if(min_color[n] != INT_MAX && min_color[n] != mycolor[surf]) {
-        print_error(comm, "*** Error: Found different colors (%d and %d) around point (%e %e %e), using embedded surface %d.\n",
-                    mycolor[surf], min_color[n], point.x, point.y, point.z, surf);
-        print_error(comm, "           This point may be too close to the embedded surface.\n");
-        exit_mpi();
-      }
-    }
-
-  }
-
-  //Step 3: Determine the "ruling surface" and color of this point.
-  int ruling_surface = -1;
-  int mycolor_final = INT_MIN;
-  for(i=0; i<mycolor.size(); i++) {
-    assert(mycolor[i] != 0);
-    if(mycolor[i]<0) { 
-      if(ruling_surface == -1) {
-        ruling_surface = i;
-        mycolor_final = mycolor[i];
-      }
-      else { //need to resolve a "conflict"
-        if((*EBDS[i]->ColorReachesBoundary_ptr)[-mycolor[i]] == 0) {
-          if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 0)
-            print_warning(comm, "Warning: User-specified point (%e %e %e) is inside isolated regions in "
-                          "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
-                          ruling_surface, i);
-          ruling_surface = i;
-          mycolor_final = mycolor[i];
-        }
-        else {
-          if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 1) {
-            print_warning(comm, "Warning: User-specified point (%e %e %e) is inside isolated(*) regions in "
-                          "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
-                          ruling_surface, i);
-            ruling_surface = i;
-            mycolor_final = mycolor[i];
-          }
-        }
-      }
-    }
-  }
-  if(ruling_surface<0) {
-    print_error(comm, "*** Error: Unable to impose boundary condition based on point (%e %e %e). This point is connected"
-                " to the far-field.\n", point.x, point.y, point.z);
-    exit_mpi();
-  }
-
-
-  //Step 4: Update state variables and ID
-  double*** ruling_colors = color[ruling_surface];
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-        if (ruling_colors[k][j][i] == mycolor_final) { 
-            v[k][j][i][0] = point.initialConditions.density;
-            v[k][j][i][1] = point.initialConditions.velocity_x;
-            v[k][j][i][2] = point.initialConditions.velocity_y;
-            v[k][j][i][3] = point.initialConditions.velocity_z;
-            v[k][j][i][4] = point.initialConditions.pressure;
-            id[k][j][i]   = point.initialConditions.materialid;
-          }
-        }
-
-  return make_pair(point.initialConditions.materialid, make_pair(ruling_surface, mycolor_final));
-}
-
-//-----------------------------------------------------
 //! Apply boundary conditions by populating the ghost cells.
 void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 {
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
 
-  //! Left boundary
-  if(ii0==-1) { 
-    switch (iod.mesh.bc_x0) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] = iod.bc.inlet.density;
-            v[k][j][ii0][1] = iod.bc.inlet.velocity_x;
-            v[k][j][ii0][2] = iod.bc.inlet.velocity_y;
-            v[k][j][ii0][3] = iod.bc.inlet.velocity_z;
-            v[k][j][ii0][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] = iod.bc.outlet.density;
-            v[k][j][ii0][1] = iod.bc.outlet.velocity_x;
-            v[k][j][ii0][2] = iod.bc.outlet.velocity_y;
-            v[k][j][ii0][3] = iod.bc.outlet.velocity_z;
-            v[k][j][ii0][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] =      v[k][j][ii0+1][0];
-            v[k][j][ii0][1] = -1.0*v[k][j][ii0+1][1];
-            v[k][j][ii0][2] =      v[k][j][ii0+1][2];
-            v[k][j][ii0][3] =      v[k][j][ii0+1][3]; 
-            v[k][j][ii0][4] =      v[k][j][ii0+1][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][ii0][0] =      v[k][j][ii0+1][0];
-            v[k][j][ii0][1] = -1.0*v[k][j][ii0+1][1];
-            v[k][j][ii0][2] = -1.0*v[k][j][ii0+1][2];
-            v[k][j][ii0][3] = -1.0*v[k][j][ii0+1][3]; 
-            v[k][j][ii0][4] =      v[k][j][ii0+1][4];
-          }
-        break;
-       default :
-        print_error(comm, "*** Error: Boundary condition at x=x0 cannot be specified!\n");
-        exit_mpi();
+  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (edge or vertex) nodes are not populated
+
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+
+    if(it->bcType == (int)MeshData::INLET) {
+      v[k][j][i][0] = iod.bc.inlet.density;
+      v[k][j][i][1] = iod.bc.inlet.velocity_x;
+      v[k][j][i][2] = iod.bc.inlet.velocity_y;
+      v[k][j][i][3] = iod.bc.inlet.velocity_z;
+      v[k][j][i][4] = iod.bc.inlet.pressure;
     }
+    else if(it->bcType == (int)MeshData::OUTLET) {
+      v[k][j][i][0] = iod.bc.outlet.density;
+      v[k][j][i][1] = iod.bc.outlet.velocity_x;
+      v[k][j][i][2] = iod.bc.outlet.velocity_y;
+      v[k][j][i][3] = iod.bc.outlet.velocity_z;
+      v[k][j][i][4] = iod.bc.outlet.pressure;
+    }
+    else if(it->bcType == MeshData::SLIPWALL ||
+            it->bcType == MeshData::SYMMETRY) {
+
+      int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+      for(int p=0; p<5; p++)
+        v[k][j][i][p] = v[im_k][im_j][im_i][p];
+
+      switch (it->side) {
+        case GhostPoint::LEFT :
+        case GhostPoint::RIGHT :
+          v[k][j][i][1] *= -1.0;
+          break;
+        case GhostPoint::BOTTOM :
+        case GhostPoint::TOP :
+          v[k][j][i][2] *= -1.0;
+          break;
+        case GhostPoint::BACK :
+        case GhostPoint::FRONT :
+          v[k][j][i][3] *= -1.0;
+          break;
+        default :
+          fprintf(stdout,"*** Error: Unknown 'side' tag for GhostPoint (%d).\n", (int)it->side); 
+          exit(-1);
+      }
+    } 
+    else if(it->bcType == MeshData::STICKWALL) {
+      int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+      v[k][j][i][0] =      v[im_k][im_j][im_i][0];
+      v[k][j][i][1] = -1.0*v[im_k][im_j][im_i][1];
+      v[k][j][i][2] = -1.0*v[im_k][im_j][im_i][2];
+      v[k][j][i][3] = -1.0*v[im_k][im_j][im_i][3];
+      v[k][j][i][4] =      v[im_k][im_j][im_i][4];
+    } 
+    else if(it->bcType == MeshData::OVERSET) {
+
+      // nothing to be done here. ghost nodes will be populated below
+      
+    } else {
+      fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
+      exit(-1);
+    }
+
   }
 
-  //! Right boundary
-  if(iimax==NX+1) { 
-    switch (iod.mesh.bc_xmax) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] = iod.bc.inlet.density;
-            v[k][j][iimax-1][1] = iod.bc.inlet.velocity_x;
-            v[k][j][iimax-1][2] = iod.bc.inlet.velocity_y;
-            v[k][j][iimax-1][3] = iod.bc.inlet.velocity_z;
-            v[k][j][iimax-1][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] = iod.bc.outlet.density;
-            v[k][j][iimax-1][1] = iod.bc.outlet.velocity_x;
-            v[k][j][iimax-1][2] = iod.bc.outlet.velocity_y;
-            v[k][j][iimax-1][3] = iod.bc.outlet.velocity_z;
-            v[k][j][iimax-1][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] =      v[k][j][iimax-2][0];
-            v[k][j][iimax-1][1] = -1.0*v[k][j][iimax-2][1];
-            v[k][j][iimax-1][2] =      v[k][j][iimax-2][2];
-            v[k][j][iimax-1][3] =      v[k][j][iimax-2][3]; 
-            v[k][j][iimax-1][4] =      v[k][j][iimax-2][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
-            v[k][j][iimax-1][0] =      v[k][j][iimax-2][0];
-            v[k][j][iimax-1][1] = -1.0*v[k][j][iimax-2][1];
-            v[k][j][iimax-1][2] = -1.0*v[k][j][iimax-2][2];
-            v[k][j][iimax-1][3] = -1.0*v[k][j][iimax-2][3]; 
-            v[k][j][iimax-1][4] =      v[k][j][iimax-2][4];
-          }
-        break;
-       default :
-        print_error(comm, "*** Error: Boundary condition at x=xmax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
+  // update overset ghosts (if any)
+  for(auto&& g : ghost_overset)
+    v[g.first[2]][g.first[1]][g.first[0]] = g.second;
 
-  //! Bottom boundary
-  if(jj0==-1) { 
-    switch (iod.mesh.bc_y0) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] = iod.bc.inlet.density;
-            v[k][jj0][i][1] = iod.bc.inlet.velocity_x;
-            v[k][jj0][i][2] = iod.bc.inlet.velocity_y;
-            v[k][jj0][i][3] = iod.bc.inlet.velocity_z;
-            v[k][jj0][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] = iod.bc.outlet.density;
-            v[k][jj0][i][1] = iod.bc.outlet.velocity_x;
-            v[k][jj0][i][2] = iod.bc.outlet.velocity_y;
-            v[k][jj0][i][3] = iod.bc.outlet.velocity_z;
-            v[k][jj0][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] =      v[k][jj0+1][i][0];
-            v[k][jj0][i][1] =      v[k][jj0+1][i][1];
-            v[k][jj0][i][2] = -1.0*v[k][jj0+1][i][2];
-            v[k][jj0][i][3] =      v[k][jj0+1][i][3]; 
-            v[k][jj0][i][4] =      v[k][jj0+1][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jj0][i][0] =      v[k][jj0+1][i][0];
-            v[k][jj0][i][1] = -1.0*v[k][jj0+1][i][1];
-            v[k][jj0][i][2] = -1.0*v[k][jj0+1][i][2];
-            v[k][jj0][i][3] = -1.0*v[k][jj0+1][i][3]; 
-            v[k][jj0][i][4] =      v[k][jj0+1][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at y=y0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Top boundary
-  if(jjmax==NY+1) { 
-    switch (iod.mesh.bc_ymax) {
-      case MeshData::INLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] = iod.bc.inlet.density;
-            v[k][jjmax-1][i][1] = iod.bc.inlet.velocity_x;
-            v[k][jjmax-1][i][2] = iod.bc.inlet.velocity_y;
-            v[k][jjmax-1][i][3] = iod.bc.inlet.velocity_z;
-            v[k][jjmax-1][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] = iod.bc.outlet.density;
-            v[k][jjmax-1][i][1] = iod.bc.outlet.velocity_x;
-            v[k][jjmax-1][i][2] = iod.bc.outlet.velocity_y;
-            v[k][jjmax-1][i][3] = iod.bc.outlet.velocity_z;
-            v[k][jjmax-1][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] =      v[k][jjmax-2][i][0];
-            v[k][jjmax-1][i][1] =      v[k][jjmax-2][i][1];
-            v[k][jjmax-1][i][2] = -1.0*v[k][jjmax-2][i][2];
-            v[k][jjmax-1][i][3] =      v[k][jjmax-2][i][3]; 
-            v[k][jjmax-1][i][4] =      v[k][jjmax-2][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
-            v[k][jjmax-1][i][0] =      v[k][jjmax-2][i][0];
-            v[k][jjmax-1][i][1] = -1.0*v[k][jjmax-2][i][1];
-            v[k][jjmax-1][i][2] = -1.0*v[k][jjmax-2][i][2];
-            v[k][jjmax-1][i][3] = -1.0*v[k][jjmax-2][i][3]; 
-            v[k][jjmax-1][i][4] =      v[k][jjmax-2][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at y=ymax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Back boundary (z min)
-  if(kk0==-1) { 
-    switch (iod.mesh.bc_z0) {
-      case MeshData::INLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] = iod.bc.inlet.density;
-            v[kk0][j][i][1] = iod.bc.inlet.velocity_x;
-            v[kk0][j][i][2] = iod.bc.inlet.velocity_y;
-            v[kk0][j][i][3] = iod.bc.inlet.velocity_z;
-            v[kk0][j][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] = iod.bc.outlet.density;
-            v[kk0][j][i][1] = iod.bc.outlet.velocity_x;
-            v[kk0][j][i][2] = iod.bc.outlet.velocity_y;
-            v[kk0][j][i][3] = iod.bc.outlet.velocity_z;
-            v[kk0][j][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] =      v[kk0+1][j][i][0];
-            v[kk0][j][i][1] =      v[kk0+1][j][i][1];
-            v[kk0][j][i][2] =      v[kk0+1][j][i][2];
-            v[kk0][j][i][3] = -1.0*v[kk0+1][j][i][3]; 
-            v[kk0][j][i][4] =      v[kk0+1][j][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kk0][j][i][0] =      v[kk0+1][j][i][0];
-            v[kk0][j][i][1] = -1.0*v[kk0+1][j][i][1];
-            v[kk0][j][i][2] = -1.0*v[kk0+1][j][i][2];
-            v[kk0][j][i][3] = -1.0*v[kk0+1][j][i][3]; 
-            v[kk0][j][i][4] =      v[kk0+1][j][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at z=z0 cannot be specified!\n");
-        exit_mpi();
-    }
-  }
-
-  //! Front boundary (z max)
-  if(kkmax==NZ+1) { 
-    switch (iod.mesh.bc_zmax) {
-      case MeshData::INLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] = iod.bc.inlet.density;
-            v[kkmax-1][j][i][1] = iod.bc.inlet.velocity_x;
-            v[kkmax-1][j][i][2] = iod.bc.inlet.velocity_y;
-            v[kkmax-1][j][i][3] = iod.bc.inlet.velocity_z;
-            v[kkmax-1][j][i][4] = iod.bc.inlet.pressure;
-          }
-        break;
-      case MeshData::OUTLET :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] = iod.bc.outlet.density;
-            v[kkmax-1][j][i][1] = iod.bc.outlet.velocity_x;
-            v[kkmax-1][j][i][2] = iod.bc.outlet.velocity_y;
-            v[kkmax-1][j][i][3] = iod.bc.outlet.velocity_z;
-            v[kkmax-1][j][i][4] = iod.bc.outlet.pressure;
-          }
-        break; 
-      case MeshData::SLIPWALL :
-      case MeshData::SYMMETRY :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] =      v[kkmax-2][j][i][0];
-            v[kkmax-1][j][i][1] =      v[kkmax-2][j][i][1];
-            v[kkmax-1][j][i][2] =      v[kkmax-2][j][i][2];
-            v[kkmax-1][j][i][3] = -1.0*v[kkmax-2][j][i][3]; 
-            v[kkmax-1][j][i][4] =      v[kkmax-2][j][i][4];
-          }
-        break;
-      case MeshData::STICKWALL :
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
-            v[kkmax-1][j][i][0] =      v[kkmax-2][j][i][0];
-            v[kkmax-1][j][i][1] = -1.0*v[kkmax-2][j][i][1];
-            v[kkmax-1][j][i][2] = -1.0*v[kkmax-2][j][i][2];
-            v[kkmax-1][j][i][3] = -1.0*v[kkmax-2][j][i][3]; 
-            v[kkmax-1][j][i][4] =      v[kkmax-2][j][i][4];
-          }
-        break;
-      default :
-        print_error(comm, "*** Error: Boundary condition at z=zmax cannot be specified!\n");
-        exit_mpi();
-    }
-  }
 
   ApplyBoundaryConditionsGeometricEntities(v);
 
@@ -1864,10 +840,13 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
          }
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int j=jj0; j<jjmax; j++) {
 
-            for(int p=0; p<mydisks.size(); p++) {
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(ii0,j,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][j][ii0][1], coords[k][j][ii0][2],
                                mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
                 v[k][j][ii0][0] = mydisks[p]->state.density;
@@ -1878,7 +857,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][j][ii0][1], coords[k][j][ii0][2],
                                     myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
                 v[k][j][ii0][0] = myrects[p]->state.density;
@@ -1916,10 +895,13 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int j=j0; j<jmax; j++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int j=jj0; j<jjmax; j++) {
 
-            for(int p=0; p<mydisks.size(); p++) {
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(iimax-1,j,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][j][iimax-1][1], coords[k][j][iimax-1][2],
                                mydisks[p]->cen_y, mydisks[p]->cen_z, mydisks[p]->radius)){
                 v[k][j][iimax-1][0] = mydisks[p]->state.density;
@@ -1930,7 +912,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][j][iimax-1][1], coords[k][j][iimax-1][2],
                                     myrects[p]->cen_y, myrects[p]->cen_z, myrects[p]->a, myrects[p]->b)){
                 v[k][j][iimax-1][0] = myrects[p]->state.density;
@@ -1968,10 +950,13 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
         }
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int i=ii0; i<iimax; i++) {
 
-            for(int p=0; p<mydisks.size(); p++) {
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,jj0,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][jj0][i][2], coords[k][jj0][i][0],
                                mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
                 v[k][jj0][i][0] = mydisks[p]->state.density;
@@ -1982,7 +967,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][jj0][i][2], coords[k][jj0][i][0],
                                     myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
                 v[k][jj0][i][0] = myrects[p]->state.density;
@@ -2020,10 +1005,13 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int k=k0; k<kmax; k++)
-          for(int i=i0; i<imax; i++) {
+        for(int k=kk0; k<kkmax; k++)
+          for(int i=ii0; i<iimax; i++) {
 
-            for(int p=0; p<mydisks.size(); p++) {
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,jjmax-1,k))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[k][jjmax-1][i][2], coords[k][jjmax-1][i][0],
                                mydisks[p]->cen_z, mydisks[p]->cen_x, mydisks[p]->radius)){
                 v[k][jjmax-1][i][0] = mydisks[p]->state.density;
@@ -2034,7 +1022,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[k][jjmax-1][i][2], coords[k][jjmax-1][i][0],
                                     myrects[p]->cen_z, myrects[p]->cen_x, myrects[p]->a, myrects[p]->b)){
                 v[k][jjmax-1][i][0] = myrects[p]->state.density;
@@ -2073,10 +1061,13 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
+        for(int j=jj0; j<jjmax; j++)
+          for(int i=ii0; i<iimax; i++) {
 
-            for(int p=0; p<mydisks.size(); p++) {
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,kk0))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[kk0][j][i][0], coords[kk0][j][i][1],
                                mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
                 v[kk0][j][i][0] = mydisks[p]->state.density;
@@ -2087,7 +1078,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[kk0][j][i][0], coords[kk0][j][i][1],
                                     myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
                 v[kk0][j][i][0] = myrects[p]->state.density;
@@ -2126,10 +1117,13 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
       if(mydisks.size() || myrects.size()) {
 
-        for(int j=j0; j<jmax; j++)
-          for(int i=i0; i<imax; i++) {
+        for(int j=jj0; j<jjmax; j++)
+          for(int i=ii0; i<iimax; i++) {
 
-            for(int p=0; p<mydisks.size(); p++) {
+            if(coordinates.OutsidePhysicalDomainAndUnpopulated(i,j,kkmax-1))
+              continue; //skip corner nodes
+
+            for(int p=0; p<(int)mydisks.size(); p++) {
               if(IsPointInDisk(coords[kkmax-1][j][i][0], coords[kkmax-1][j][i][1],
                                mydisks[p]->cen_x, mydisks[p]->cen_y, mydisks[p]->radius)){
                 v[kkmax-1][j][i][0] = mydisks[p]->state.density;
@@ -2140,7 +1134,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
               }
             }
 
-            for(int p=0; p<myrects.size(); p++) {
+            for(int p=0; p<(int)myrects.size(); p++) {
               if(IsPointInRectangle(coords[kkmax-1][j][i][0], coords[kkmax-1][j][i][1],
                                     myrects[p]->cen_x, myrects[p]->cen_y, myrects[p]->a, myrects[p]->b)){
                 v[kkmax-1][j][i][0] = myrects[p]->state.density;
@@ -2201,7 +1195,7 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
                             varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
 
         if(c<0) {
-          fprintf(stderr,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. V = %e, %e, %e, %e, %e, ID = %d.\n",
+          fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. V = %e, %e, %e, %e, %e, ID = %d.\n",
                   c, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], myid);
           exit_mpi();
         } else
@@ -2215,9 +1209,9 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
         fluxFcn.EvaluateMaxEigenvalues(v[k][j][i], myid, lam_f, lam_g, lam_h);
         char_speed_max = max(max(max(char_speed_max, lam_f), lam_g), lam_h);
 
-        dx_over_char_speed_min = min(dx_over_char_speed_min, 
-                                     min(dxyz[k][j][i][0]/lam_f, 
-                                         min(dxyz[k][j][i][1]/lam_g, dxyz[k][j][i][2]/lam_h) ) );
+        if(global_mesh.x_glob.size()>1)  dx_over_char_speed_min = min(dx_over_char_speed_min, dxyz[k][j][i][0]/lam_f);
+        if(global_mesh.y_glob.size()>1)  dx_over_char_speed_min = min(dx_over_char_speed_min, dxyz[k][j][i][1]/lam_g);
+        if(global_mesh.z_glob.size()>1)  dx_over_char_speed_min = min(dx_over_char_speed_min, dxyz[k][j][i][2]/lam_h);
       }
     }
   }
@@ -2237,8 +1231,17 @@ void SpaceOperator::FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVa
 
 //-----------------------------------------------------
 
-void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl)
+void
+SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                   SpaceVariable3D *LocalDt)
 {
+
+  if(LocalDt) { //local time-stepping, dealt with separately.
+    assert(iod.ts.timestep<=0.0); //shouldn't have constant time-step size.
+    ComputeLocalTimeStepSizes(V,ID,dt,cfl,*LocalDt);
+    return;
+  }
+
   double Vmin[5], Vmax[5], cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min; 
   FindExtremeValuesOfFlowVariables(V, ID, Vmin, Vmax, cmin, cmax, Machmax, char_speed_max, dx_over_char_speed_min);
 
@@ -2254,13 +1257,118 @@ void SpaceOperator::ComputeTimeStepSize(SpaceVariable3D &V, SpaceVariable3D &ID,
     dt = cfl*dx_over_char_speed_min;
   }
 
+  if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {
+    double dt_surfaceTension = 0.9*ComputeTimeStepSizeSurfaceTension(V, ID); // 0.9 is a safety factor 
+    if(dt>dt_surfaceTension) {
+      dt = dt_surfaceTension;
+      cfl = dt/dx_over_char_speed_min;
+    }
+  }
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID, double &dt, double &cfl,
+                                         SpaceVariable3D &LocalDt)
+{
+
+  cfl = iod.ts.cfl;
+
+  Vec5D*** v    = (Vec5D***)V.GetDataPointer();
+  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  double*** id  = ID.GetDataPointer();
+  double*** dtl = LocalDt.GetDataPointer(); 
+
+  double cmin(DBL_MAX), dx_over_char_speed_min(DBL_MAX);
+  double cmax(-DBL_MAX), Machmax(-DBL_MAX), char_speed_max(-DBL_MAX);
+  double Vmin[5], Vmax[5];
+  for(int i=0; i<5; i++) {
+    Vmin[i] = DBL_MAX; //max. double precision number
+    Vmax[i] = -DBL_MAX;
+  }
+
+  // Loop through the real domain (excluding the ghost layer)
+  double c, mach, lam_f, lam_g, lam_h, dx_over_char_speed_local;
+  int myid;
+  for(int k=k0; k<kmax; k++) {
+    for(int j=j0; j<jmax; j++) {
+      for(int i=i0; i<imax; i++) {
+
+        myid = id[k][j][i];
+
+        if(myid == INACTIVE_MATERIAL_ID)
+          continue;
+
+        for(int p=0; p<5; p++) {
+          Vmin[p] = min(Vmin[p], v[k][j][i][p]);
+          Vmax[p] = max(Vmax[p], v[k][j][i][p]);
+        }
+
+        c = varFcn[myid]->ComputeSoundSpeedSquare(v[k][j][i][0]/*rho*/,
+                            varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0],v[k][j][i][4])/*e*/);
+
+        if(c<0) {
+          fprintf(stdout,"*** Error: c^2 (square of sound speed) = %e in SpaceOperator. "
+                         "V = %e, %e, %e, %e, %e, ID = %d.\n",
+                  c, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4], myid);
+          exit_mpi();
+        } else
+          c = sqrt(c);  
+
+
+        cmin = min(cmin, c);
+        cmax = max(cmax, c);
+        mach = varFcn[myid]->ComputeMachNumber(v[k][j][i]);
+        Machmax = max(Machmax, mach);
+
+        fluxFcn.EvaluateMaxEigenvalues(v[k][j][i], myid, lam_f, lam_g, lam_h);
+        char_speed_max = max(max(max(char_speed_max, lam_f), lam_g), lam_h);
+
+        dx_over_char_speed_local = DBL_MAX;
+        if(global_mesh.x_glob.size()>1)
+          dx_over_char_speed_local = min(dx_over_char_speed_local, dxyz[k][j][i][0]/lam_f);
+        if(global_mesh.y_glob.size()>1)
+          dx_over_char_speed_local = min(dx_over_char_speed_local, dxyz[k][j][i][1]/lam_g);
+        if(global_mesh.z_glob.size()>1)
+          dx_over_char_speed_local = min(dx_over_char_speed_local, dxyz[k][j][i][2]/lam_h);
+        dx_over_char_speed_min = min(dx_over_char_speed_min, dx_over_char_speed_local);
+
+        // calculates local time-step size
+        dtl[k][j][i] = cfl*dx_over_char_speed_local;
+
+      }
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, Vmin, 5, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, Vmax, 5, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &cmin, 1, MPI_DOUBLE, MPI_MIN, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &cmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &Machmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &char_speed_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &dx_over_char_speed_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  // global min dt
+  dt = cfl*dx_over_char_speed_min; 
+
+  if(verbose>1)
+    print(comm, "- Maximum values: rho = %e, p = %e, c = %e, Mach = %e, char. speed = %e.\n",
+          Vmax[0], Vmax[4], cmax, Machmax, char_speed_max);
+
+  V.RestoreDataPointerToLocalVector();
+  delta_xyz.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();  
+
+  LocalDt.RestoreDataPointerAndInsert();
+
 }
 
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                           vector<SpaceVariable3D*> *Phi,
+                                           vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                            vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
   //------------------------------------
@@ -2303,13 +1411,21 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
   // Extract level set gradient data
   //------------------------------------
-  vector<double***> phi;
+  vector<double***> phi, kappaPhi;
   if(Phi && ls_mat_id) {
     phi.assign(Phi->size(), NULL);
-    for(int i=0; i<phi.size(); i++)
+    for(int i=0; i<(int)phi.size(); i++) {
       phi[i] = (*Phi)[i]->GetDataPointer();
+    }
   }
- 
+  
+  if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {
+    kappaPhi.assign(KappaPhi->size(), NULL);
+    for(int i=0; i<(int)kappaPhi.size(); i++) {
+      kappaPhi[i] = (*KappaPhi)[i]->GetDataPointer();
+    }
+  }
+
   //------------------------------------
   // Extract intersection data
   //------------------------------------
@@ -2348,11 +1464,14 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   double area = 0.0;
   Int3 ind;
 
-  // Count the riemann solver errors. Note that when this occurs, (1) it may be that the Riemann problem does NOT
-  // have a solution, and (2) the solver returns an "approximate" solution (i.e. code may keep running)
+  // Count the riemann solver errors. Note that when this occurs, it could be that
+  // (1) the Riemann problem does NOT have a solution, and 
+  // (2) the solver returns an "approximate" solution (i.e. code may keep running)
   int riemann_errors = 0; 
   int err;
 
+  bool use_LLF_at_interface = (iod.multiphase.flux == MultiPhaseData::LOCAL_LAX_FRIEDRICHS);
+  
   // Loop through the domain interior, and the right, top, and front ghost layers. For each cell, calculate the
   // numerical flux across the left, lower, and back cell boundaries/interfaces
   Vec3D vwallf(0.0), vwallb(0.0), nwallf(0.0), nwallb(0.0);
@@ -2372,39 +1491,47 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           // See KW's notes for the decision algorithm
           //
           if(EBDS &&
-             FindEdgeSurfaceIntersections(0,i,j,k,surfaces,intersections,xf,xb,vwallf,vwallb,nwallf,nwallb)) { //wall
+             FindEdgeSurfaceIntersections(0,i,j,k,surfaces,intersections,xf,xb,vwallf,vwallb,nwallf,nwallb)) { 
+             //wall
 
             if(neighborid != INACTIVE_MATERIAL_ID) {
               Vec3D dir = GetNormalForOneSidedRiemann(0, 1, nwallf);
-              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeOneSidedRiemannSolution(dir, v[k][j][i-1], neighborid, vwallf, Vmid, midid, Vsm);
+              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {
+                //switch back to constant reconstruction (i.e. v)
+                err = riemann.ComputeOneSidedRiemannSolution(dir, v[k][j][i-1], neighborid, vwallf, 
+                                                             Vmid, midid, Vsm);
                 if(err)
                   riemann_errors++;
                 varFcn[neighborid]->ClipDensityAndPressure(Vsm);
                 varFcn[neighborid]->CheckState(Vsm);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid,
+                                                            localflux1);
               } 
               else {//linear reconstruction w/ limiter
-                err = riemann.ComputeOneSidedRiemannSolution(dir, vr[k][j][i-1], neighborid, vwallf, Vmid, midid, Vsm);
+                err = riemann.ComputeOneSidedRiemannSolution(dir, vr[k][j][i-1], neighborid, vwallf,
+                                                             Vmid, midid, Vsm);
                 if(err) 
                   riemann_errors++;
                 varFcn[neighborid]->ClipDensityAndPressure(Vsm);
                 varFcn[neighborid]->CheckState(Vsm);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid,
+                                                            localflux1);
               }
-              //fprintf(stderr,"Vsm = %e %e %e %e %e.\n", Vsm[0], Vsm[1], Vsm[2], Vsm[3], Vsm[4]);
+              //fprintf(stdout,"Vsm = %e %e %e %e %e.\n", Vsm[0], Vsm[1], Vsm[2], Vsm[3], Vsm[4]);
             } else
               localflux1 = 0.0;
 
             if(myid != INACTIVE_MATERIAL_ID) {
               Vec3D dir = GetNormalForOneSidedRiemann(0,-1, nwallb);
-              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {
+                //switch back to constant reconstruction (i.e. v)
                 err = riemann.ComputeOneSidedRiemannSolution(dir, v[k][j][i], myid, vwallb, Vmid, midid, Vsp);
                 if(err)
                   riemann_errors++;
                 varFcn[myid]->ClipDensityAndPressure(Vsp);
                 varFcn[myid]->CheckState(Vsp);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid,
+                                                            localflux2);
               } 
               else {//linear reconstruction w/ limiter
                 err = riemann.ComputeOneSidedRiemannSolution(dir, vl[k][j][i], myid, vwallb, Vmid, midid, Vsp);
@@ -2412,9 +1539,10 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                   riemann_errors++;
                 varFcn[myid]->ClipDensityAndPressure(Vsp);
                 varFcn[myid]->CheckState(Vsp);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux2);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid,
+                                                            localflux2);
               }
-              //fprintf(stderr,"Vsp = %e %e %e %e %e.\n", Vsp[0], Vsp[1], Vsp[2], Vsp[3], Vsp[4]);
+              //fprintf(stdout,"Vsp = %e %e %e %e %e.\n", Vsp[0], Vsp[1], Vsp[2], Vsp[3], Vsp[4]);
             } else
               localflux2 = 0.0;
           }
@@ -2423,44 +1551,75 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             if(neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) {
 
-              // determine the axis/direction of the 1D Riemann problem
-              Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
-              //Solve 1D Riemann problem
-              if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              else//linear reconstruction w/ limitor
-                err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-
-              if(err)
-                riemann_errors++;
-
-              //Clip Riemann solution and check it
-              varFcn[neighborid]->ClipDensityAndPressure(Vsm);
-              varFcn[neighborid]->CheckState(Vsm);
-              varFcn[myid]->ClipDensityAndPressure(Vsp);
-              varFcn[myid]->CheckState(Vsp);
-
-              if(riemann_solutions && !err) {//store Riemann solution for "phase-change update" 
-                ind[0] = k; ind[1] = j; ind[2] = i;
-                riemann_solutions->left[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
-                ind[2] = i-1;
-                riemann_solutions->right[ind] = std::make_pair((Vec5D)Vsp, myid); 
-              }
-
-              if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
-                fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux1);
+              if(use_LLF_at_interface) {
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                  //switch back to constant reconstruction (i.e. v)
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(0/*F*/,v[k][j][i-1]/*Vm*/,neighborid,
+                                                                        v[k][j][i]/*Vp*/, myid, localflux1);
+                else
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(0/*F*/,vr[k][j][i-1]/*Vm*/,neighborid,
+                                                                        vl[k][j][i]/*Vp*/, myid, localflux1);
                 localflux2 = localflux1;
-              } else {//Numerical flux function
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                } else {//linear reconstruction w/ limiter
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux2);
+              } 
+              else { 
+                // determine the axis/direction of the 1D Riemann problem
+                Vec3D dir = GetNormalForBimaterialRiemann(0/*i-1/2*/,i,j,k,coords,dxyz,myid,neighborid,
+                                                          ls_mat_id,&phi);
+                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {//no surface tension
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                    //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp);
+                  else//linear reconstruction w/ limitor
+                    err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp);
+                }
+                else {//with surface tension
+		  double curvature = CalculateCurvatureAtCellInterface(0, phi[0], kappaPhi[0], i, j, k);
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                    //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j][i-1], neighborid, v[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp, curvature);
+                  else//linear reconstruction w/ limitor
+                    err = riemann.ComputeRiemannSolution(dir, vr[k][j][i-1], neighborid, vl[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp, curvature);
+                }
+                if(err)
+                  riemann_errors++;
+
+                //Clip Riemann solution and check it
+                varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+                varFcn[neighborid]->CheckState(Vsm);
+                varFcn[myid]->ClipDensityAndPressure(Vsp);
+                varFcn[myid]->CheckState(Vsp);
+
+                if(riemann_solutions && !err) {//store Riemann solution for "phase-change update" 
+                  ind[0] = k; ind[1] = j; ind[2] = i;
+                  riemann_solutions->left[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+                  ind[2] = i-1;
+                  riemann_solutions->right[ind] = std::make_pair((Vec5D)Vsp, myid); 
+                }
+
+                if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+                  fluxFcn.EvaluateFluxFunction_F(Vmid, midid, localflux1);
+                  localflux2 = localflux1;
+                } else {//Numerical flux function
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {
+                    //switch back to constant reconstruction (i.e. v)
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, v[k][j][i-1]/*Vm*/, Vsm/*Vp*/, 
+                                                                neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/,
+                                                                myid, localflux2);
+                  } else {//linear reconstruction w/ limiter
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, Vsm/*Vp*/,
+                                                                neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, Vsp/*Vm*/, vl[k][j][i]/*Vp*/,
+                                                                myid, localflux2);
+                  }
                 }
               }
-
             } else { // This should only occur when embedded surface has an issue (skip)
               localflux1 = 0.0;
               localflux2 = 0.0;
@@ -2469,7 +1628,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           else { //neighborid==myid (i.e. same material)
             if(myid!=INACTIVE_MATERIAL_ID) {
-              fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/, myid, localflux1);
+              fluxFcn.ComputeNumericalFluxAtCellInterface(0/*F*/, vr[k][j][i-1]/*Vm*/, vl[k][j][i]/*Vp*/,
+                                                          myid, localflux1);
               localflux2 = localflux1;
             } else { // This should only occur when embedded surface has an issue (skip)
               localflux1 = 0.0;
@@ -2492,38 +1652,46 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           neighborid = id[k][j-1][i];
 
           if(EBDS &&
-             FindEdgeSurfaceIntersections(1,i,j,k,surfaces,intersections,xf,xb,vwallf,vwallb,nwallf,nwallb)) { //wall
+             FindEdgeSurfaceIntersections(1,i,j,k,surfaces,intersections,xf,xb,vwallf,vwallb,nwallf,nwallb)) { 
+            //wall
 
             if(neighborid != INACTIVE_MATERIAL_ID) {
               Vec3D dir = GetNormalForOneSidedRiemann(1, 1, nwallf);
-              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeOneSidedRiemannSolution(dir, v[k][j-1][i], neighborid, vwallf, Vmid, midid, Vsm);
+              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {
+                //switch back to constant reconstruction (i.e. v)
+                err = riemann.ComputeOneSidedRiemannSolution(dir, v[k][j-1][i], neighborid, vwallf, Vmid,
+                                                             midid, Vsm);
                 if(err)
                   riemann_errors++;
                 varFcn[neighborid]->ClipDensityAndPressure(Vsm);
                 varFcn[neighborid]->CheckState(Vsm);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid,
+                                                            localflux1);
               }
               else {//linear reconstruction w/ limiter
-                err = riemann.ComputeOneSidedRiemannSolution(dir, vt[k][j-1][i], neighborid, vwallf, Vmid, midid, Vsm);
+                err = riemann.ComputeOneSidedRiemannSolution(dir, vt[k][j-1][i], neighborid, vwallf, Vmid,
+                                                             midid, Vsm);
                 if(err)
                   riemann_errors++;
                 varFcn[neighborid]->ClipDensityAndPressure(Vsm);
                 varFcn[neighborid]->CheckState(Vsm);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid,
+                                                            localflux1);
               }
             } else
               localflux1 = 0.0;
 
             if(myid != INACTIVE_MATERIAL_ID) {
               Vec3D dir = GetNormalForOneSidedRiemann(1,-1, nwallb);
-              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {
+                //switch back to constant reconstruction (i.e. v)
                 err = riemann.ComputeOneSidedRiemannSolution(dir, v[k][j][i], myid, vwallb, Vmid, midid, Vsp);
                 if(err)
                   riemann_errors++;
                 varFcn[myid]->ClipDensityAndPressure(Vsp);
                 varFcn[myid]->CheckState(Vsp);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid,
+                                                            localflux2);
               }
               else {//linear reconstruction w/ limiter
                 err = riemann.ComputeOneSidedRiemannSolution(dir, vb[k][j][i], myid, vwallb, Vmid, midid, Vsp);
@@ -2531,7 +1699,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                   riemann_errors++;
                 varFcn[myid]->ClipDensityAndPressure(Vsp);
                 varFcn[myid]->CheckState(Vsp);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux2);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/, myid,
+                                                            localflux2);
               }
             } else
               localflux2 = 0.0;
@@ -2541,44 +1710,76 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             if(neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) {
 
-              // determine the axis/direction of the 1D Riemann problem
-              Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
-              //Solve 1D Riemann problem
-              if(iod.multiphase.recon == MultiPhaseData::CONSTANT)//switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              else
-                err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-
-              if(err)
-                riemann_errors++;
-
-              //Clip Riemann solution and check it
-              varFcn[neighborid]->ClipDensityAndPressure(Vsm);
-              varFcn[neighborid]->CheckState(Vsm);
-              varFcn[myid]->ClipDensityAndPressure(Vsp);
-              varFcn[myid]->CheckState(Vsp);
-
-              if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
-                ind[0] = k; ind[1] = j; ind[2] = i;
-                riemann_solutions->bottom[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
-                ind[1] = j-1;
-                riemann_solutions->top[ind] = std::make_pair((Vec5D)Vsp, myid); 
-              }
-
-              if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
-                fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux1);
+              if(use_LLF_at_interface) {
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                  //switch back to constant reconstruction (i.e. v)
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(1/*G*/,v[k][j-1][i]/*Vm*/,neighborid,
+                                                                        v[k][j][i]/*Vp*/, myid, localflux1);
+                else
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(1/*G*/,vt[k][j-1][i]/*Vm*/,neighborid,
+                                                                        vb[k][j][i]/*Vp*/, myid, localflux1);
                 localflux2 = localflux1;
-              } else {//Numerical flux function
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                } else {
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux2);
+              }
+              else {
+                // determine the axis/direction of the 1D Riemann problem
+                Vec3D dir = GetNormalForBimaterialRiemann(1/*j-1/2*/,i,j,k,coords,dxyz,myid,neighborid,
+                                                          ls_mat_id,&phi);
+                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {//no surface tension
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                    //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp);
+                }
+                else { 
+		  double curvature = CalculateCurvatureAtCellInterface(1, phi[0], kappaPhi[0], i, j, k);
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                    //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k][j-1][i], neighborid, v[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp, curvature);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vt[k][j-1][i], neighborid, vb[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp, curvature);
+                }
+
+                if(err)
+                  riemann_errors++;
+
+                //Clip Riemann solution and check it
+                varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+                varFcn[neighborid]->CheckState(Vsm);
+                varFcn[myid]->ClipDensityAndPressure(Vsp);
+                varFcn[myid]->CheckState(Vsp);
+
+                if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
+                  ind[0] = k; ind[1] = j; ind[2] = i;
+                  riemann_solutions->bottom[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+                  ind[1] = j-1;
+                  riemann_solutions->top[ind] = std::make_pair((Vec5D)Vsp, myid); 
+                }
+
+                if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+                  fluxFcn.EvaluateFluxFunction_G(Vmid, midid, localflux1);
+                  localflux2 = localflux1;
+                } else {//Numerical flux function
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {
+                    //switch back to constant reconstruction (i.e. v)
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, v[k][j-1][i]/*Vm*/, Vsm/*Vp*/, 
+                                                                neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/,
+                                                                myid, localflux2);
+                  } else {
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, Vsm/*Vp*/,
+                                                                neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, Vsp/*Vm*/, vb[k][j][i]/*Vp*/,
+                                                                myid, localflux2);
+                  }
                 }
               }
-
             } else { // This should only occur when embedded surface has an issue (skip)
               localflux1 = 0.0;
               localflux2 = 0.0;
@@ -2587,7 +1788,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           else { //neighborid==myid (i.e. same material)
             if(myid!=INACTIVE_MATERIAL_ID) {
-              fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/, myid, localflux1);
+              fluxFcn.ComputeNumericalFluxAtCellInterface(1/*G*/, vt[k][j-1][i]/*Vm*/, vb[k][j][i]/*Vp*/,
+                                                          myid, localflux1);
               localflux2 = localflux1;
             } else { // This should only occur when embedded surface has an issue (skip)
               localflux1 = 0.0;
@@ -2609,38 +1811,46 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           neighborid = id[k-1][j][i];
 
           if(EBDS &&
-             FindEdgeSurfaceIntersections(2,i,j,k,surfaces,intersections,xf,xb,vwallf,vwallb,nwallf,nwallb)) { //wall
+             FindEdgeSurfaceIntersections(2,i,j,k,surfaces,intersections,xf,xb,vwallf,vwallb,nwallf,nwallb)) { 
+            //wall
 
             if(neighborid != INACTIVE_MATERIAL_ID) {
               Vec3D dir = GetNormalForOneSidedRiemann(2, 1, nwallf);
-              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeOneSidedRiemannSolution(dir, v[k-1][j][i], neighborid, vwallf, Vmid, midid, Vsm);
+              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {
+                //switch back to constant reconstruction (i.e. v)
+                err = riemann.ComputeOneSidedRiemannSolution(dir, v[k-1][j][i], neighborid, vwallf, Vmid,
+                                                             midid, Vsm);
                 if(err)
                   riemann_errors++;
                 varFcn[neighborid]->ClipDensityAndPressure(Vsm);
                 varFcn[neighborid]->CheckState(Vsm);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid,
+                                                            localflux1);
               }
               else {//linear reconstruction w/ limiter
-                err = riemann.ComputeOneSidedRiemannSolution(dir, vf[k-1][j][i], neighborid, vwallf, Vmid, midid, Vsm);
+                err = riemann.ComputeOneSidedRiemannSolution(dir, vf[k-1][j][i], neighborid, vwallf, Vmid,
+                                                             midid, Vsm);
                 if(err)
                   riemann_errors++;
                 varFcn[neighborid]->ClipDensityAndPressure(Vsm);
                 varFcn[neighborid]->CheckState(Vsm);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid,
+                                                            localflux1);
               }
             } else
               localflux1 = 0.0;
 
             if(myid != INACTIVE_MATERIAL_ID) {
               Vec3D dir = GetNormalForOneSidedRiemann(2,-1, nwallb);
-              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
+              if(iod.ebm.recon == EmbeddedBoundaryMethodData::CONSTANT) {
+                //switch back to constant reconstruction (i.e. v)
                 err = riemann.ComputeOneSidedRiemannSolution(dir, v[k][j][i], myid, vwallb, Vmid, midid, Vsp);
                 if(err)
                   riemann_errors++;
                 varFcn[myid]->ClipDensityAndPressure(Vsp);
                 varFcn[myid]->CheckState(Vsp);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid,
+                                                            localflux2);
               }
               else {//linear reconstruction w/ limiter
                 err = riemann.ComputeOneSidedRiemannSolution(dir, vk[k][j][i], myid, vwallb, Vmid, midid, Vsp);
@@ -2648,7 +1858,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
                   riemann_errors++;
                 varFcn[myid]->ClipDensityAndPressure(Vsp);
                 varFcn[myid]->CheckState(Vsp);
-                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux2);
+                fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/, myid,
+                                                            localflux2);
               }
             } else
               localflux2 = 0.0;
@@ -2658,41 +1869,74 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
             if(neighborid!=INACTIVE_MATERIAL_ID && myid!=INACTIVE_MATERIAL_ID) {
 
-              // determine the axis/direction of the 1D Riemann problem
-              Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,ls_mat_id,&phi);
-
-              //Solve 1D Riemann problem
-              if(iod.multiphase.recon == MultiPhaseData::CONSTANT) //switch back to constant reconstruction (i.e. v)
-                err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-              else
-                err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid, Vmid, midid, Vsm, Vsp);
-
-              if(err)
-                riemann_errors++;
-
-              //Clip Riemann solution and check it
-              varFcn[neighborid]->ClipDensityAndPressure(Vsm);
-              varFcn[neighborid]->CheckState(Vsm);
-              varFcn[myid]->ClipDensityAndPressure(Vsp);
-              varFcn[myid]->CheckState(Vsp);
-
-              if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
-                ind[0] = k; ind[1] = j; ind[2] = i;
-                riemann_solutions->back[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
-                ind[0] = k-1;
-                riemann_solutions->front[ind] = std::make_pair((Vec5D)Vsp, myid); 
-              }
-
-              if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
-                fluxFcn.EvaluateFluxFunction_H(Vmid, midid, localflux1);
+              if(use_LLF_at_interface) {
+                if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                  //switch back to constant reconstruction (i.e. v)
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(2/*H*/,v[k-1][j][i]/*Vm*/,neighborid,
+                                                                        v[k][j][i]/*Vp*/, myid, localflux1);
+                else
+                  interfluxFcn->ComputeNumericalFluxAtMaterialInterface(2/*H*/,vf[k-1][j][i]/*Vm*/,neighborid,
+                                                                        vk[k][j][i]/*Vp*/, myid, localflux1);
                 localflux2 = localflux1;
-              } else {//Numerical flux function
-                if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {//switch back to constant reconstruction (i.e. v)
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/, myid, localflux2);
-                } else {
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/, neighborid, localflux1);
-                  fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux2);
+              }
+              else {
+                // determine the axis/direction of the 1D Riemann problem
+                Vec3D dir = GetNormalForBimaterialRiemann(2/*k-1/2*/,i,j,k,coords,dxyz,myid,neighborid,
+                                                          ls_mat_id,&phi);
+                if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::NO) {//no surface tension
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                    //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp);
+                }
+                else {
+		  double curvature = CalculateCurvatureAtCellInterface(2, phi[0], kappaPhi[0], i, j, k);
+                  //Solve 1D Riemann problem
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT)
+                    //switch back to constant reconstruction (i.e. v)
+                    err = riemann.ComputeRiemannSolution(dir, v[k-1][j][i], neighborid, v[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp, curvature);
+                  else
+                    err = riemann.ComputeRiemannSolution(dir, vf[k-1][j][i], neighborid, vk[k][j][i], myid,
+                                                         Vmid, midid, Vsm, Vsp, curvature);
+                }
+
+                if(err)
+                  riemann_errors++;
+
+                //Clip Riemann solution and check it
+                varFcn[neighborid]->ClipDensityAndPressure(Vsm);
+                varFcn[neighborid]->CheckState(Vsm);
+                varFcn[myid]->ClipDensityAndPressure(Vsp);
+                varFcn[myid]->CheckState(Vsp);
+
+                if(riemann_solutions && !err) {//store Riemann solution for "phase-change update"
+                  ind[0] = k; ind[1] = j; ind[2] = i;
+                  riemann_solutions->back[ind] = std::make_pair((Vec5D)Vsm, neighborid); 
+                  ind[0] = k-1;
+                  riemann_solutions->front[ind] = std::make_pair((Vec5D)Vsp, myid); 
+                }
+
+                if(iod.multiphase.flux == MultiPhaseData::EXACT) { //Godunov-type flux
+                  fluxFcn.EvaluateFluxFunction_H(Vmid, midid, localflux1);
+                  localflux2 = localflux1;
+                } else {//Numerical flux function
+                  if(iod.multiphase.recon == MultiPhaseData::CONSTANT) {
+                    //switch back to constant reconstruction (i.e. v)
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, v[k-1][j][i]/*Vm*/, Vsm/*Vp*/,
+                                                                neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, v[k][j][i]/*Vp*/,
+                                                                myid, localflux2);
+                  } else {
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, Vsm/*Vp*/,
+                                                                neighborid, localflux1);
+                    fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, Vsp/*Vm*/, vk[k][j][i]/*Vp*/,
+                                                                myid, localflux2);
+                  }
                 }
               }
             } else { // This should only occur when embedded surface has an issue (skip)
@@ -2703,7 +1947,8 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           else { //neighborid==myid (i.e. same material)
             if(myid!=INACTIVE_MATERIAL_ID) {
-              fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/, myid, localflux1);
+              fluxFcn.ComputeNumericalFluxAtCellInterface(2/*H*/, vf[k-1][j][i]/*Vm*/, vk[k][j][i]/*Vp*/,
+                                                          myid, localflux1);
               localflux2 = localflux1;
             } else { // This should only occur when embedded surface has an issue (skip)
               localflux1 = 0.0;
@@ -2731,8 +1976,15 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
   //------------------------------------
 
   if(Phi && ls_mat_id) {
-    for(int i=0; i<Phi->size(); i++)
+    for(int i=0; i<(int)Phi->size(); i++) {
       (*Phi)[i]->RestoreDataPointerToLocalVector();
+    }
+  }
+
+  if(iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {
+    for(int i=0; i<(int)KappaPhi->size(); i++) {
+      (*KappaPhi)[i]->RestoreDataPointerToLocalVector();
+    }
   }
 
   if(xf.size()>0) {
@@ -2774,7 +2026,7 @@ SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
   for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
            it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
     if(it->second->conRec_depth>0) {
-      if(!EBDS || EBDS->size()<=it->first || (*EBDS)[it->first]->Phi_nLayer<1) {
+      if(!EBDS || (int)EBDS->size()<=it->first || (*EBDS)[it->first]->Phi_nLayer<1) {
         print_error(comm, "*** Error: Cannot impose constant reconstruction for cells near Embedded Surface %d.\n",
                     it->first);
         exit_mpi();
@@ -2843,7 +2095,7 @@ SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
         for(int i=i0; i<imax; i++) {
           if(tag[k][j][i] == 0)
             continue;
-          for(int ls=0; ls<phi.size(); ls++) {
+          for(int ls=0; ls<(int)phi.size(); ls++) {
             if(fabs(phi[ls][k][j][i])<depth[ls]) {
               tag[k][j][i] = 0;
               break;
@@ -2868,11 +2120,12 @@ SpaceOperator::TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi,
 //-----------------------------------------------------
 // Note that there is also a function in LevelSetOperator (ComputeNormalDirection) that does similar things
 Vec3D
-SpaceOperator::GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
-                                             int myid, int neighborid, vector<int> *ls_mat_id,
+SpaceOperator::GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
+                                             Vec3D*** dxyz, int myid, int neighborid, vector<int> *ls_mat_id,
                                              vector<double***> *phi)
 {
   Vec3D dir(0.0,0.0,0.0);
+
   if(iod.multiphase.riemann_normal == MultiPhaseData::MESH) //use mesh-based normal
     dir[d] = 1.0;
   else { //LEVEL_SET or AVERAGE
@@ -2889,19 +2142,20 @@ SpaceOperator::GetNormalForBimaterialRiemann(int d/*0,1,2*/, int i, int j, int k
 //-----------------------------------------------------
 
 Vec3D
-SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords, Vec3D*** dxyz,
+SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
+                                               Vec3D*** dxyz,
                                                int myid, int neighborid, vector<int> *ls_mat_id,
                                                vector<double***> *phi)
 {
 
   //If any of them is NULL, something is wrong...
-  assert(ls_mat_id);
+  assert(ls_mat_id && ls_mat_id->size()>0);
   assert(phi);
 
   int my_ls    = (myid==0) ?       neighborid : myid;
   int neigh_ls = (neighborid==0) ? myid       : neighborid;
   bool found1(false), found2(false);
-  for(int s=0; s<ls_mat_id->size(); s++) {
+  for(int s=0; s<(int)ls_mat_id->size(); s++) {
     if(!found1 && (*ls_mat_id)[s] == my_ls) {
       my_ls = s;
       found1 = true;
@@ -2943,7 +2197,7 @@ SpaceOperator::CalculateGradPhiAtCellInterface(int d/*0,1,2*/, int i, int j, int
 
   if(dir[d]<0.0) {
     if(verbose>=1)  //if dir[d] is very close to zero (but negative), it might be fine 
-      fprintf(stderr,"Warning: (%d,%d,%d)(%d): dir = %e %e %e, myid = %d, neighid = %d.\n", 
+      fprintf(stdout,"Warning: (%d,%d,%d)(%d): dir = %e %e %e, myid = %d, neighid = %d.\n", 
               i,j,k, d, dir[0], dir[1], dir[2], myid, neighborid);  
     dir[d] *= -1.0; //make sure it is aligned with the positive grid axis
   }
@@ -3224,14 +2478,14 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
         }
 
         if(error) {
-          fprintf(stderr, "\033[0;31m*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\033[0m\n", i,j,k, myid);
-          fprintf(stderr, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
-          fprintf(stderr, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
-          fprintf(stderr, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
-          fprintf(stderr, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
-          fprintf(stderr, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
-          fprintf(stderr, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
-          fprintf(stderr, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
+          fprintf(stdout, "\033[0;31m*** Error: Reconstructed state at (%d,%d,%d) violates hyperbolicity. matid = %d.\033[0m\n", i,j,k, myid);
+          fprintf(stdout, "v[%d,%d,%d]  = [%e, %e, %e, %e, %e]\n", i,j,k, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+          fprintf(stdout, "vl[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vl[k][j][i][0], vl[k][j][i][1], vl[k][j][i][2], vl[k][j][i][3], vl[k][j][i][4]);
+          fprintf(stdout, "vr[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vr[k][j][i][0], vr[k][j][i][1], vr[k][j][i][2], vr[k][j][i][3], vr[k][j][i][4]);
+          fprintf(stdout, "vb[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vb[k][j][i][0], vb[k][j][i][1], vb[k][j][i][2], vb[k][j][i][3], vb[k][j][i][4]);
+          fprintf(stdout, "vt[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vt[k][j][i][0], vt[k][j][i][1], vt[k][j][i][2], vt[k][j][i][3], vt[k][j][i][4]);
+          fprintf(stdout, "vk[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vk[k][j][i][0], vk[k][j][i][1], vk[k][j][i][2], vk[k][j][i][3], vk[k][j][i][4]);
+          fprintf(stdout, "vf[%d,%d,%d] = [%e, %e, %e, %e, %e]\n", i,j,k, vf[k][j][i][0], vf[k][j][i][1], vf[k][j][i][2], vf[k][j][i][3], vf[k][j][i][4]);
           exit(-1);
         } 
       }
@@ -3254,9 +2508,11 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
+                                    [[maybe_unused]] double time,
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
-                                    vector<SpaceVariable3D*> *Phi,
-                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS, bool run_heat)
+                                    vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
+                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                    SpaceVariable3D *Xi, bool run_heat)
 {
 
 #ifdef LEVELSET_TEST
@@ -3269,67 +2525,48 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
-  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, EBDS);
+  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, KappaPhi, EBDS);
 
   if(visco)
-    visco->AddDiffusionFluxes(V, ID, EBDS, R);
+    visco->AddDiffusionFluxes(V, ID, EBDS, R); //including extra terms from cylindrical symmetry
 
   if(heat_diffusion && run_heat)
     heat_diffusion->AddDiffusionFluxes(V, ID, EBDS, R);
   else if(heat_diffusion)
-    print("Skipping heat diffusion.\n");
+    print("Skipping heat diffusion. \n");
 
-  if(symm) {//cylindrical or spherical symmetry
-    if(visco) {
-      print_error(comm, "*** Error: SymmetryOperator must be extended to account for diffusion fluxes.\n");
-      exit_mpi();
-    }
+  if(heo) {
+    assert(Xi);
+#ifdef HYPERELASTICITY_TEST
+    heo->PrescribeVelocityForTesting(V, time);
+#endif
+
+    heo->AddHyperelasticityFluxes(V, ID, *Xi, EBDS, R);
+  }
+
+  if(symm) {//cylindrical or spherical symmetry (symm only handles the sink terms from advective fluxes)
     if(heat_diffusion && run_heat)
       heat_diffusion->AddSymmetryDiffusionTerms(V, ID, R);
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
   }
 
-  // -------------------------------------------------
-  // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
-  // -------------------------------------------------
+
   Vec5D***    r = (Vec5D***) R.GetDataPointer();
   double*** vol = (double***)volume.GetDataPointer();
 
+  if(frozen_nodes_ptr) {
+    for(auto&& fn : *frozen_nodes_ptr)
+      r[fn[2]][fn[1]][fn[0]] = 0.0; //re-set residual to 0 for frozen nodes/cells
+  }
 
-  Vec5D fluxsum(0.0);
-  Vec5D R_ghost, R_ghost_nm1;
-  double PI = acos(0.0)*2.0;
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++) {
-        fluxsum += r[k][j][i];
-        if(i==-1 || j == -1 || k == -1 || i == NX || j == NY || k == NZ){
-          //double scale = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-          double scale = 1.0;
-          R_ghost += r[k][j][i]*scale;
-        }
-      }
-  //fluxsum += R_ghost_nm1;
-  R_ghost_nm1 = R_ghost;
-  
-  MPI_Allreduce(MPI_IN_PLACE, &fluxsum, 5, MPI_DOUBLE, MPI_SUM, comm);
-  MPI_Allreduce(MPI_IN_PLACE, &R_ghost, 5, MPI_DOUBLE, MPI_SUM, comm);
-
-  //residual_file << R_ghost[4]  << "    " << std::setw(8) << fluxsum[4] << std::endl;
-
-  //coordinates.RestoreDataPointerToLocalVector();
-  //delta_xyz.RestoreDataPointerToLocalVector();
-
-  //fprintf(stderr,"I am here. fluxsum = %e %e %e %e %e.\n", fluxsum[0], fluxsum[1], fluxsum[2], fluxsum[3], fluxsum[4]);
-  //fprintf(stderr,"I am here. ghost fluxsum = %e %e %e %e %e.\n", R_ghost_nm1[0], R_ghost_nm1[1], R_ghost_nm1[2], R_ghost_nm1[3], R_ghost_nm1[4]);
-
+  // -------------------------------------------------
+  // multiply flux by -1, and divide by cell volume (for cells within the actual domain)
+  // -------------------------------------------------
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++) 
       for(int i=i0; i<imax; i++) {
-        fluxsum += r[k][j][i];
         r[k][j][i] /= -vol[k][j][i];
       }
-  //fprintf(stderr,"I am here. Interior fluxsum = %e %e %e %e %e.\n", fluxsum[0], fluxsum[1], fluxsum[2], fluxsum[3], fluxsum[4]);
 
   // restore spatial variables
   R.RestoreDataPointerToLocalVector(); //NOTE: although R has been updated, there is no need of 
@@ -3337,9 +2574,27 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
                                        //      update the global vec.
 
 
-  
-
   volume.RestoreDataPointerToLocalVector();
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::UpdateOversetGhostNodes(SpaceVariable3D &V)
+{
+
+  if(!domain_has_overset)
+    return; //nothing to be done
+
+  assert(V.NumDOF()==5);
+
+  Vec5D*** v = (Vec5D***) V.GetDataPointer();
+
+  for(auto&& g : ghost_overset)
+    g.second = v[g.first[2]][g.first[1]][g.first[0]];
+
+  V.RestoreDataPointerToLocalVector();
+
 }
 
 
@@ -3357,7 +2612,7 @@ SpaceOperator::FindEdgeSurfaceIntersections(int dir/*0~x,1~y,2~z*/, int i, int j
   tuple<int, int, double> fwd_intersection(std::make_tuple(-1,-1,DBL_MAX));
   tuple<int, int, double> bwd_intersection(std::make_tuple(-1,-1,-DBL_MAX));
   int xid;
-  for(int s=0; s<surfaces.size(); s++) {
+  for(int s=0; s<(int)surfaces.size(); s++) {
     xid = xf[s][k][j][i][dir];
     if(xid>=0) {
       double dist = (*intersections[s])[xid].dist;
@@ -3438,7 +2693,7 @@ SpaceOperator::GetNormalForOneSidedRiemann(int d, int forward_or_backward, Vec3D
       dir /= dir.norm(); 
       break;
     default :
-      fprintf(stderr, "\033[0;31m*** Error: Undefined Riemann normal code: %d.\n\033[0m", 
+      fprintf(stdout, "\033[0;31m*** Error: Undefined Riemann normal code: %d.\n\033[0m", 
               (int)iod.ebm.riemann_normal);
       exit(-1);
   }
@@ -3448,6 +2703,115 @@ SpaceOperator::GetNormalForOneSidedRiemann(int d, int forward_or_backward, Vec3D
 
 //-----------------------------------------------------
 
+double
+SpaceOperator::CalculateCurvatureAtCellInterface(int d /*0,1,2*/, double*** phi, double*** kappaPhi,
+                                                 int i, int j, int k)
+{
+  double ans = 0.;
+  if (d == 0) { // x-direction
+    ans = ( kappaPhi[k][j][i-1]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j][i-1]) ) /
+          ( fabs(phi[k][j][i-1]) + fabs(phi[k][j][i]) ); 
+  } else if(d == 1) { // y-direction
+    ans = ( kappaPhi[k][j-1][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k][j-1][i]) ) /
+          ( fabs(phi[k][j-1][i]) + fabs(phi[k][j][i]) ); 
+  } else if(d == 2) { // z-direction
+    ans = ( kappaPhi[k-1][j][i]*fabs(phi[k][j][i]) + kappaPhi[k][j][i]*fabs(phi[k-1][j][i]) ) /
+          ( fabs(phi[k-1][j][i]) + fabs(phi[k][j][i]) ); 
+  }
+  return ans;
+}
+
+//-----------------------------------------------------
+
+double
+SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID)
+{
+
+  double sigma = riemann.GetSurfaceTensionCoefficient(); //assume const surface tension coefficient (TODO)
+  if(sigma==0.0)
+    return DBL_MAX; //no surface tension
+
+  //------------------------------------
+  // Extract data
+  //------------------------------------
+  Vec5D*** v  = (Vec5D***) V.GetDataPointer();
+  double*** id = (double***) ID.GetDataPointer();
+
+  int myid;
+  int neighborid = -1;
+  double my_dx = 0.;  
+  double dt_min_surfaceTension = DBL_MAX;  
+
+  // Loop through the domain interior, and the right, top, and front ghost layers. For each pair of cells 
+  // occupied by different fluid materials, calculate the time step size due to surface tension.
+  for(int k=k0; k<kkmax; k++) {
+    for(int j=j0; j<jjmax; j++) {
+      for(int i=i0; i<iimax; i++) {
+
+        myid = id[k][j][i];
+        if(myid==INACTIVE_MATERIAL_ID)
+          continue;
+
+        my_dx = global_mesh.GetMinDXYZ(Int3(i,j,k));
+
+	//**********************************************
+	//cell interfaces perpendicular to x-direction
+	//**********************************************
+        if(k!=kkmax-1 && j!=jjmax-1) {
+          neighborid = id[k][j][i-1];
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = global_mesh.GetMinDXYZ(Int3(i-1,j,k));
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j][i-1][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension);
+          }
+        }
+
+        //**********************************************
+        //cell interfaces perpendicular to y-direction
+        //**********************************************
+        if(k!=kkmax-1 && i!=iimax-1) {
+          neighborid = id[k][j-1][i];
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = global_mesh.GetMinDXYZ(Int3(i,j-1,k));
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k][j-1][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+          }
+        }
+
+        //**********************************************
+        //cell interfaces perpendicular to z-direction
+        //**********************************************
+        if(j!=jjmax-1 && i!=iimax-1) {
+          neighborid = id[k-1][j][i];
+          if(neighborid!=myid && neighborid!=INACTIVE_MATERIAL_ID) { //active material interface
+            double neighbor_dx = global_mesh.GetMinDXYZ(Int3(i,j,k-1));
+            double dx = min(my_dx, neighbor_dx);
+            double dt_surfaceTension = sqrt( (v[k][j][i][0]+v[k-1][j][i][0]) * dx*dx*dx / (4.*M_PI*sigma ) );
+            dt_min_surfaceTension = min(dt_min_surfaceTension, dt_surfaceTension); 
+          }
+        }
+      }
+    }
+  }
+        
+  
+  MPI_Allreduce(MPI_IN_PLACE, &dt_min_surfaceTension, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+  //------------------------------------
+  // Restore Spatial Variables
+  //------------------------------------
+  ID.RestoreDataPointerToLocalVector(); //no changes
+  V.RestoreDataPointerToLocalVector();
+
+  return dt_min_surfaceTension; 
+
+}
+
+
+  
+ 
 
 //-----------------------------------------------------
 

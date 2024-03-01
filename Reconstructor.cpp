@@ -1,5 +1,11 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <Reconstructor.h>
 #include <DistancePointToSpheroid.h>
+#include <DistancePointToParallelepiped.h>
 #include <memory> //std::unique_ptr
 using std::round;
 
@@ -25,6 +31,7 @@ Reconstructor::Reconstructor(MPI_Comm &comm_, DataManagers3D &dm_all_, Reconstru
   }
 
   if(iod_rec.fixes.sphereMap.dataMap.empty() &&
+     iod_rec.fixes.parallelepipedMap.dataMap.empty() &&
      iod_rec.fixes.spheroidMap.dataMap.empty() &&
      iod_rec.fixes.cylindersphereMap.dataMap.empty() &&
      iod_rec.fixes.cylinderconeMap.dataMap.empty())
@@ -76,7 +83,7 @@ void Reconstructor::Setup(vector<GhostPoint> *inner, vector<GhostPoint> *outer)
         K[k][j][i][1] = CalculateSlopeLimiterCoefficientK(A[k][j][i][1],B[k][j][i][1]);    
         K[k][j][i][2] = CalculateSlopeLimiterCoefficientK(A[k][j][i][2],B[k][j][i][2]);    
 
-        //fprintf(stderr,"(%d,%d,%d): A = %e %e %e, B = %e %e %e, k = %e %e %e\n", i,j,k, A[k][j][i][0], A[k][j][i][1], A[k][j][i][2], B[k][j][i][0], B[k][j][i][1], B[k][j][i][2], K[k][j][i][0], K[k][j][i][1], K[k][j][i][2]);
+        //fprintf(stdout,"(%d,%d,%d): A = %e %e %e, B = %e %e %e, k = %e %e %e\n", i,j,k, A[k][j][i][0], A[k][j][i][1], A[k][j][i][2], B[k][j][i][0], B[k][j][i][1], B[k][j][i][2], K[k][j][i][0], K[k][j][i][1], K[k][j][i][2]);
       }
     }
   }
@@ -139,6 +146,11 @@ void Reconstructor::TagNodesFixedByUser()
     print(comm, "- Applying constant reconstruction within sphere %d:\n", it->first);
     print(comm, "  o center: %e %e %e;  radius: %e.\n", x0[0], x0[1], x0[2], it->second->radius);
 
+    if(it->second->side != SphereData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
     double dist;
     // loop through the subdomain interior (i.e. No tags applied to ghost nodes outside physical domain)
     for(int k=k0; k<kmax; k++)
@@ -150,6 +162,43 @@ void Reconstructor::TagNodesFixedByUser()
         } 
   }
 
+  // parallelepipeds
+  for(auto it=iod_rec.fixes.parallelepipedMap.dataMap.begin(); 
+          it!=iod_rec.fixes.parallelepipedMap.dataMap.end(); it++) {
+  
+    Vec3D x0(it->second->x0, it->second->y0, it->second->z0);
+    Vec3D oa(it->second->ax, it->second->ay, it->second->az); oa -= x0;
+    Vec3D ob(it->second->bx, it->second->by, it->second->bz); ob -= x0;
+    Vec3D oc(it->second->cx, it->second->cy, it->second->cz); oc -= x0;
+
+    print(comm, "- Applying constant reconstruction within parallelepiped %d:\n", it->first);
+    print(comm, "  o origin: %e %e %e;  edge 1: %e %e %e.\n", x0[0], x0[1], x0[2], oa[0], oa[1], oa[2]);
+    print(comm, "  o edge 2: %e %e %e;  edge 3: %e %e %e.\n", ob[0], ob[1], ob[2], oc[0], oc[1], oc[2]);
+
+    if(oa.norm()==0 || ob.norm()==0 || oc.norm()==0 || (oa^ob)*oc<=0.0) {
+      print_error(comm, "*** Error: Detected error in a user-specified parallelepiped. "
+                  "Overlapping vertices or violation of right-hand rule.\n");
+      exit_mpi();
+    }
+
+    if(it->second->side != ParallelepipedData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    GeoTools::DistanceFromPointToParallelepiped distCal(x0, oa, ob, oc);
+
+    double dist;
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          dist = distCal.Calculate(coords[k][j][i]); //>0 outside the spheroid
+          if (dist<0)
+            fixed[k][j][i] = 1;
+        }
+  }   
+
+
   // spheroids
   for(auto it=iod_rec.fixes.spheroidMap.dataMap.begin(); 
           it!=iod_rec.fixes.spheroidMap.dataMap.end(); it++) {
@@ -159,9 +208,14 @@ void Reconstructor::TagNodesFixedByUser()
 
     print(comm, "- Applying constant reconstruction within spheroid %d:\n", it->first);
     print(comm, "  o center: %e %e %e;  axis: %e %e %e.\n", x0[0], x0[1], x0[2], axis[0], axis[1], axis[2]);
-    print(comm, "  o length: %e;  diameter: %e.\n", it->second->length, it->second->diameter);
+    print(comm, "  o semi-length: %e;  radius: %e.\n", it->second->semi_length, it->second->radius);
 
-    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->length, it->second->diameter);
+    if(it->second->side != SpheroidData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
+    GeoTools::DistanceFromPointToSpheroid distCal(x0, axis, it->second->semi_length, it->second->radius);
 
     double dist;
     for(int k=k0; k<kmax; k++)
@@ -193,6 +247,11 @@ void Reconstructor::TagNodesFixedByUser()
     print(comm, "  o cylinder height %e;  radius: %e;  openning angle: %e.\n", 
           L, R, it->second->opening_angle_degrees);
 
+    if(it->second->side != CylinderConeData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
+
     double x, r;
     for(int k=k0; k<kmax; k++)
       for(int j=j0; j<jmax; j++)
@@ -209,7 +268,7 @@ void Reconstructor::TagNodesFixedByUser()
   for(auto it=iod_rec.fixes.cylindersphereMap.dataMap.begin(); 
           it!=iod_rec.fixes.cylindersphereMap.dataMap.end(); it++) {
 
-    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
+    Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z); //base center
     Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
     dir /= dir.norm();
 
@@ -219,10 +278,17 @@ void Reconstructor::TagNodesFixedByUser()
     bool front_cap = (it->second->front_cap == CylinderSphereData::On);
     bool back_cap = (it->second->back_cap == CylinderSphereData::On);
 
+    x0 += Lhalf*dir; //now, x0 becomes the center of the cylinder
+
     print(comm, "- Applying constant reconstruction within cylinder-sphere %d:\n", it->first);
     print(comm, "  o cylinder center: %e %e %e;  axis: %e %e %e.\n", 
           x0[0], x0[1], x0[2], dir[0], dir[1], dir[2]);
     print(comm, "  o cylinder height %e;  radius: %e.\n", L, R);
+
+    if(it->second->side != CylinderSphereData::INTERIOR) {
+      print_error(comm, "*** Error: Only supports Side = Interior at the moment.\n");
+      exit_mpi();
+    }
 
     Vec3D xf = x0 + Lhalf*dir;
     Vec3D xb = x0 - Lhalf*dir;
@@ -314,7 +380,7 @@ void Reconstructor::Reconstruct(SpaceVariable3D &V, SpaceVariable3D &Vl, SpaceVa
   Vec3D*** A    = (Vec3D***)CoeffA.GetDataPointer();
   Vec3D*** B    = (Vec3D***)CoeffB.GetDataPointer();
   Vec3D*** K    = (Vec3D***)CoeffK.GetDataPointer();
-  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
+  //Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   //user-specified "Fixes"
   double*** fixed = FixedByUser ? FixedByUser->GetDataPointer() : NULL;
@@ -591,7 +657,7 @@ RETRY:
           }
 
           if(xf.size()>0) {
-            for(int s=0; s<xf.size(); s++) {
+            for(int s=0; s<(int)xf.size(); s++) {
               if(xf[s][k][j][i][0]>=0 || (i+1<NX && xf[s][k][j][i+1][0]>=0))
                 setValue(sigmax, 0.0, nDOF);
               if(xf[s][k][j][i][1]>=0 || (j+1<NY && xf[s][k][j+1][i][1]>=0))
@@ -656,7 +722,7 @@ RETRY:
         if(ID && nDOF==5) { //reconstructing the fluid state variables
           int myid = (int)id[k][j][i];
           if((*varFcn)[myid]->CheckState(&vl[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], 5);
             else {
@@ -665,7 +731,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vr[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], 5);
             else {
@@ -674,7 +740,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vb[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], 5);
             else {
@@ -683,7 +749,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vt[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], 5);
             else {
@@ -692,7 +758,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vk[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], 5);
             else {
@@ -701,7 +767,7 @@ RETRY:
             }
           }
           else if((*varFcn)[myid]->CheckState(&vf[k][j][i*nDOF])) {
-            if(verbose>1) fprintf(stderr,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
+            if(verbose>1) fprintf(stdout,"Warning: Found nonphysical reconstructed state (vType = %d). Retrying...\n", vType);
             if(vType == ReconstructionData::PRIMITIVE) // constant rec...
               copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], 5);
             else {
@@ -760,14 +826,27 @@ RETRY:
       case MeshData::OUTLET :
         //constant reconstruction (Dirichlet b.c.)
       
-        if     (i<0)   copyarray(&v[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF);
-        else if(i>=NX) copyarray(&v[kk][jj][ii*nDOF], &vl[k][j][i*nDOF], nDOF);
-        else if(j<0)   copyarray(&v[kk][jj][ii*nDOF], &vt[k][j][i*nDOF], nDOF);
-        else if(j>=NY) copyarray(&v[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF);
-        else if(k<0)   copyarray(&v[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF);
-        else if(k>=NZ) copyarray(&v[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF);
+        if     (i<0)   copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], nDOF);
+        else if(i>=NX) copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], nDOF);
+        else if(j<0)   copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], nDOF);
+        else if(j>=NY) copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], nDOF);
+        else if(k<0)   copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], nDOF);
+        else if(k>=NZ) copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], nDOF);
 
         break;
+
+      case MeshData::OVERSET :
+        //constant reconstruction (Dirichlet b.c.)
+      
+        if     (i<0)   copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], nDOF);
+        else if(i>=NX) copyarray(&v[k][j][i*nDOF], &vl[k][j][i*nDOF], nDOF);
+        else if(j<0)   copyarray(&v[k][j][i*nDOF], &vt[k][j][i*nDOF], nDOF);
+        else if(j>=NY) copyarray(&v[k][j][i*nDOF], &vb[k][j][i*nDOF], nDOF);
+        else if(k<0)   copyarray(&v[k][j][i*nDOF], &vf[k][j][i*nDOF], nDOF);
+        else if(k>=NZ) copyarray(&v[k][j][i*nDOF], &vk[k][j][i*nDOF], nDOF);
+
+        break;
+
 
       case MeshData::SYMMETRY :
       case MeshData::SLIPWALL :
@@ -793,7 +872,7 @@ RETRY:
         break;
 
       default :
-        fprintf(stderr,"*** Error: Cannot perform reconstruction for b.c. %d.\n",
+        fprintf(stdout,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
                 gp->bcType);
     }
   }
@@ -810,7 +889,7 @@ RETRY:
   CoeffB.RestoreDataPointerToLocalVector(); //!< no changes to vector
   CoeffK.RestoreDataPointerToLocalVector(); //!< no changes to vector
   V.RestoreDataPointerToLocalVector(); //!< no changes to vector
-  delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
+  //delta_xyz.RestoreDataPointerToLocalVector(); //!< no changes to vector
 
   if(FixedByUser) FixedByUser->RestoreDataPointerToLocalVector();
 
@@ -979,19 +1058,38 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
         //constant reconstruction (Dirichlet b.c.)
       
         if(dir==0) {
-          if     (i<0)   copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
-          else if(i>=NX) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+          if     (i<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(i>=NX) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
         }
         else if(dir==1) {
-          if     (j<0)   copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
-          else if(j>=NY) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+          if     (j<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(j>=NY) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
         }
         else if(dir==2) {
-          if(k<0)        copyarray(&u[kk][jj][ii*nDOF], &up[k][j][i*nDOF], nDOF);
-          else if(k>=NZ) copyarray(&u[kk][jj][ii*nDOF], &um[k][j][i*nDOF], nDOF);
+          if(k<0)        copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(k>=NZ) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
         }
         if(slope) setValue(&slope[k][j][i*nDOF], 0.0, nDOF);
         break;
+
+      case MeshData::OVERSET :
+        //constant reconstruction (Dirichlet b.c.)
+      
+        if(dir==0) {
+          if     (i<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(i>=NX) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        else if(dir==1) {
+          if     (j<0)   copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(j>=NY) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        else if(dir==2) {
+          if(k<0)        copyarray(&u[k][j][i*nDOF], &up[k][j][i*nDOF], nDOF);
+          else if(k>=NZ) copyarray(&u[k][j][i*nDOF], &um[k][j][i*nDOF], nDOF);
+        }
+        if(slope) setValue(&slope[k][j][i*nDOF], 0.0, nDOF);
+        break;
+
 
       case MeshData::SYMMETRY :
       case MeshData::SLIPWALL :
@@ -1018,7 +1116,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
         break;
 
       default :
-        fprintf(stderr,"*** Error: Cannot perform reconstruction for b.c. %d.\n",
+        fprintf(stdout,"\033[0;31m*** Error: Cannot perform reconstruction for b.c. %d.\033[0m\n",
                 gp->bcType);
     }
   }

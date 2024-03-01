@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <CrackingSurface.h>
 #include <Vector3D.h>
 
@@ -72,7 +77,7 @@ PhantomElement *PhantomElement::readCrackingData(std::ifstream& restart_file) {
 
 CrackingSurface::CrackingSurface(int eType, int nUsed, int nTotal, int nUsedNd, int nTotNodes): elemType(eType) {
   if(eType != 4) {
-    fprintf(stderr, "*** Error: ElemType(%d) is not supported for CrackingSurface!\n", eType);
+    fprintf(stdout, "*** Error: ElemType(%d) is not supported for CrackingSurface!\n", eType);
     exit(1);
   }
   nTotalNodes = nTotNodes;
@@ -121,7 +126,7 @@ CrackingSurface::~CrackingSurface() {
 
 int CrackingSurface::splitQuads(int *quadTopo, int nQuads, int *triaTopo) {
   if(nQuads != nUsedQuads) {
-    fprintf(stderr, "Software bug in CrackingSurface::splitQuads!\n");
+    fprintf(stdout, "Software bug in CrackingSurface::splitQuads!\n");
     exit(-1);
   }
   int count = 0;
@@ -170,7 +175,7 @@ int CrackingSurface::updateCracking(int numConnUpdate, int numLSUpdate, int *con
     return 0;
   }
   if(gotNewCracking) {
-    fprintf(stderr, "*** Warning: last cracking update hasn't been pushed to intersector!\n");
+    fprintf(stdout, "*** Warning: last cracking update hasn't been pushed to intersector!\n");
   }
   gotNewCracking = true;
   latest.phantomQuads.clear();
@@ -195,13 +200,13 @@ int CrackingSurface::updateCracking(int numConnUpdate, int numLSUpdate, int *con
     itor = temp.find(quadId);
     if(already_cracked) {
       if(itor != temp.end()) {
-        fprintf(stderr, "*** Warning: Shouldn't modify the levelset of a previously-cracked element!\n");
+        fprintf(stdout, "*** Warning: Shouldn't modify the levelset of a previously-cracked element!\n");
       }
       phantoms[quadId]->update(&(connUpdate[5 * i + 1]), itor == temp.end() ? NULL : & (phi[itor->second]));
     }
     else {
       if(itor == temp.end()) {
-        fprintf(stderr, "*** Error: Need the level-set for a new cracked element!\n");
+        fprintf(stdout, "*** Error: Need the level-set for a new cracked element!\n");
         exit(-1);
       }
       int ind = itor->second;
@@ -216,7 +221,7 @@ int CrackingSurface::updateCracking(int numConnUpdate, int numLSUpdate, int *con
     if(quadId >= nUsedQuads) { // this is a new quad
       nNewQuad++;
       if(quadId > nUsedQuads + numConnUpdate / 2) {
-        fprintf(stderr, "*** Error: nUsed = %d, newConn/2 = %d, currentId = %d!\n", nUsedQuads, numConnUpdate / 2, quadId + 1);
+        fprintf(stdout, "*** Error: nUsed = %d, newConn/2 = %d, currentId = %d!\n", nUsedQuads, numConnUpdate / 2, quadId + 1);
         exit(-1);
       }
       nNew += 2;
@@ -246,13 +251,13 @@ int CrackingSurface::updateCracking(int numConnUpdate, int numLSUpdate, int *con
     latest.phantomNodes[new2old[2 * i]] = new2old[2 * i + 1];
   }
   if(maxQuad + 1 != nUsedQuads + nNewQuad) {
-    fprintf(stderr, "*** Error: Inconsistency in the number of structure quad elements (%d %d %d)! (Could be a software bug.)\n", maxQuad, nUsedQuads,
+    fprintf(stdout, "*** Error: Inconsistency in the number of structure quad elements (%d %d %d)! (Could be a software bug.)\n", maxQuad, nUsedQuads,
             nNewQuad);
     exit(-1);
   }
   nUsedQuads += nNewQuad;
   if(maxtrId + 1 != nUsedTrias + nNew) {
-    fprintf(stderr, "SOFTWARE BUG: Violated the ordering of new elements (%d v.s. %d)\n", maxtrId + 1, nUsedTrias + 2 * nNew);
+    fprintf(stdout, "SOFTWARE BUG: Violated the ordering of new elements (%d v.s. %d)\n", maxtrId + 1, nUsedTrias + 2 * nNew);
     exit(-1);
   }
   nUsedTrias += nNew;
@@ -265,7 +270,7 @@ int CrackingSurface::updateCracking(int numConnUpdate, int numLSUpdate, int *con
 
 bool CrackingSurface::hasCracked(int trId) {
   if(trId >= nUsedTrias) {
-    fprintf(stderr, "*** Error: Unable to access Triangle %d of the embedded surface(%d)!\n", trId + 1, nUsedTrias);
+    fprintf(stdout, "*** Error: Unable to access Triangle %d of the embedded surface(%d)!\n", trId + 1, nUsedTrias);
     exit(-1);
   }
   if(cracked[tria2quad[trId][0]]) {
@@ -280,7 +285,7 @@ bool CrackingSurface::hasCracked(int trId) {
 
 double CrackingSurface::getPhi(int trId, double xi1, double xi2, bool *hasCracked, bool debug) {
   if(trId >= nUsedTrias) {
-    fprintf(stderr, "*** Error: Unable to access Triangle %d of the embedded surface(%d)!\n", trId + 1, nUsedTrias);
+    fprintf(stdout, "*** Error: Unable to access Triangle %d of the embedded surface(%d)!\n", trId + 1, nUsedTrias);
     exit(-1);
   }
   if(!cracked[tria2quad[trId][0]]) { // no cracking
@@ -288,7 +293,7 @@ double CrackingSurface::getPhi(int trId, double xi1, double xi2, bool *hasCracke
       *hasCracked = false;
     }
     if(debug)
-      fprintf(stderr, "--- Debug info: trId = %d, tria2quad = %d/%d, cracked = %d, phi = 1.0.\n",
+      fprintf(stdout, "--- Debug info: trId = %d, tria2quad = %d/%d, cracked = %d, phi = 1.0.\n",
               trId, tria2quad[trId][0] + 1, tria2quad[trId][1], *hasCracked);
     return 1.0;
   }
@@ -297,7 +302,7 @@ double CrackingSurface::getPhi(int trId, double xi1, double xi2, bool *hasCracke
     *hasCracked = true;
   }
   if(phantoms.find(tria2quad[trId][0]) == phantoms.end()) {
-    fprintf(stderr, "*** Error:Triangle %d (in Quad %d) contains no cracking!\n", trId, tria2quad[trId][0]);
+    fprintf(stdout, "*** Error:Triangle %d (in Quad %d) contains no cracking!\n", trId, tria2quad[trId][0]);
     exit(-1);
   }
   double *phi = phantoms[tria2quad[trId][0]]->phi;
@@ -306,18 +311,18 @@ double CrackingSurface::getPhi(int trId, double xi1, double xi2, bool *hasCracke
     case 0: // This triangle is ABC
       xi3 = 1.0 - xi1 - xi2;
       if(debug)
-        fprintf(stderr, "--- Now in getPhi! input:(%d,%e,%e), Quad %d/%d, phi = (%e %e %e %e), phix = %e\n",
+        fprintf(stdout, "--- Now in getPhi! input:(%d,%e,%e), Quad %d/%d, phi = (%e %e %e %e), phix = %e\n",
                 trId + 1, xi1, xi2, tria2quad[trId][0] + 1, tria2quad[trId][1], phi[0], phi[1], phi[2], phi[3],
                 phi[0]*xi1 * (1.0 - xi3) + phi[1] * (1.0 - xi1) * (1.0 - xi3) + phi[2] * (1.0 - xi1)*xi3 + phi[3]*xi1 * xi3);
       return phi[0] * xi1 * (1.0 - xi3) + phi[1] * (1.0 - xi1) * (1.0 - xi3) + phi[2] * (1.0 - xi1) * xi3 + phi[3] * xi1 * xi3;
     case 1: // This triangle is ACD
       if(debug)
-        fprintf(stderr, "--- Now in getPhi! input:(%d,%e,%e), Quad %d/%d, phi = (%e %e %e %e), phix = %e\n",
+        fprintf(stdout, "--- Now in getPhi! input:(%d,%e,%e), Quad %d/%d, phi = (%e %e %e %e), phix = %e\n",
                 trId + 1, xi1, xi2, tria2quad[trId][0] + 1, tria2quad[trId][1], phi[0], phi[1], phi[2], phi[3],
                 phi[0]*xi1 * (1.0 - xi2) + phi[1]*xi1 * xi2 + phi[2] * (1.0 - xi1)*xi2 + phi[3] * (1.0 - xi1) * (1.0 - xi2));
       return phi[0] * xi1 * (1.0 - xi2) + phi[1] * xi1 * xi2 + phi[2] * (1.0 - xi1) * xi2 + phi[3] * (1.0 - xi1) * (1.0 - xi2);
     default:
-      fprintf(stderr, "Software bug in the cracking surface...\n");
+      fprintf(stdout, "Software bug in the cracking surface...\n");
       exit(-1);
   }
 }
@@ -326,7 +331,7 @@ double CrackingSurface::getPhi(int trId, double xi1, double xi2, bool *hasCracke
 
 bool CrackingSurface::purelyPhantom(int trId) {
   if(trId >= nUsedTrias) {
-    fprintf(stderr, "*** Error: Unable to access Triangle %d of the embedded surface(%d)!\n", trId + 1, nUsedTrias);
+    fprintf(stdout, "*** Error: Unable to access Triangle %d of the embedded surface(%d)!\n", trId + 1, nUsedTrias);
     exit(-1);
   }
   return deleted[tria2quad[trId][0]];

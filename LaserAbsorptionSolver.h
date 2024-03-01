@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _LASER_ABSORPTION_SOLVER_H_
 #define _LASER_ABSORPTION_SOLVER_H_
 
@@ -35,6 +40,7 @@ struct SourceGeometry {
   Vec3D  dir;   //!< central axis 
   double R;     //!< radius of curvature (infinite for parallel laser)
   Vec3D  O;     //!< origin of the sector (relevant only for angle != 0)
+  double depth; //!< depth of the layer in front of source that will get source radiance
   inline void GetDirection(Vec3D& x, Vec3D& d) { //!< calc. laser dir at x (assuming x is inside/near laser domain)
     if(angle==0) {d = dir; return;}
     if(angle>0)  {d = O - x; d /= d.norm(); return;}
@@ -169,7 +175,7 @@ public:
                                      SpaceVariable3D *V = NULL); //if NULL, use stored temperature
 
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin
-    return id<absorption.size() ?
+    return id<(int)absorption.size() ?
              std::get<0>(absorption[id])*(T - std::get<1>(absorption[id])) + std::get<2>(absorption[id])
            : 0.0; //could get here if there are "inactive" nodes
   }
@@ -181,6 +187,9 @@ private:
   void CalculateGlobalMeshInfo();
 
   void CalculateLaserInfo();
+
+  double SpecifySourceDepth(vector<double> *x_ptr = NULL, vector<double> *y_ptr = NULL,
+                            vector<double> *dx_ptr = NULL, vector<double> *dy_ptr = NULL);
 
   //! Create/partion a new sub-mesh for laser calculation
   void SetupLoadBalancing(SpaceVariable3D &coordinates_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
@@ -233,8 +242,7 @@ private:
   void ComputeErrorsInLaserDomain(double*** lold, double*** lnew, double &max_error, double &avg_error);
 
   void RunMeanFluxMethodOneIteration(double*** l, double*** T, Vec3D*** coords, Vec3D*** 
-                                     dxyz, double*** vol, double*** id, double*** level, double*** phi,
-                                     double alpha, double relax);
+                                     dxyz, double*** vol, double*** id, double alpha, double relax);
 
   void ComputeLaserHeating(double*** l, double*** T, double*** id, double*** s);
 
@@ -248,7 +256,7 @@ private:
   
 /*
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin
-    return id<absorption.size() ? 
+    return id<(int)absorption.size() ? 
              std::get<0>(absorption[id])*(T - std::get<1>(absorption[id])) + std::get<2>(absorption[id])
            : 0.0; //could get here if there are "inactive" nodes
   }

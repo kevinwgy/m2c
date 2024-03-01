@@ -1,8 +1,14 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _EXACT_RIEMANN_SOLVER_BASE_H_
 #define _EXACT_RIEMANN_SOLVER_BASE_H_
 
 #include <VarFcnBase.h>
 #include <vector>
+
 /*****************************************************************************************
  * Base class for solving one-dimensional, single- or two-material Riemann problems
  *****************************************************************************************/
@@ -23,17 +29,24 @@ protected:
   std::vector<std::vector<double> > integrationPath1; // first index: 1-pressure, 2-density, 3-velocity
   std::vector<std::vector<double> > integrationPath3;
 
+  bool surface_tension; // an indicator of whether consider surface tension
+
 public:
+
   ExactRiemannSolverBase(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_);
+
   virtual ~ExactRiemannSolverBase() {}
 
+  virtual double GetSurfaceTensionCoefficient();
+
   virtual int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
-                                     double *Vp, int idp /*"right" state*/, 
+                                     double *Vp, int idp /*"right" state*/,
                                      double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
                                      double *Vsm /*left 'star' solution*/,
-                                     double *Vsp /*right 'star' solution*/);
+                                     double *Vsp /*right 'star' solution*/,
+                                     double curvature = 0.0);
 
-  void PrintStarRelations(double rhol, double ul, double pl, int idl,
+  virtual void PrintStarRelations(double rhol, double ul, double pl, int idl,
                           double rhor, double ur, double pr, int idr,
                           double pmin, double pmax, double dp);
 
@@ -69,17 +82,17 @@ protected: //internal functions
     double rho, p, e, ps, es, pavg, one_over_rho;
   };
 
-  bool FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,
+  virtual bool FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
 
-  bool FindInitialFeasiblePoints(double rhol, double ul, double pl, double el, double cl, int idl,
+  virtual bool FindInitialFeasiblePoints(double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
 
-  int FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl, double el, double cl, int idl,
+  virtual int FindInitialFeasiblePointsByAcousticTheory(double rhol, double ul, double pl, double el, double cl, int idl,
            double rhor, double ur, double pr, double er, double cr, int idr, /*inputs*/
            double &p0, double &rhol0, double &rhor0, double &ul0, double &ur0,
            double &p1, double &rhol1, double &rhor1, double &ul1, double &ur1/*outputs*/);
@@ -97,7 +110,7 @@ protected: //internal functions
                             double &rho, double &u, double &p, double &xi /*output*/,
                             double & uErr, double & rhoErr /*output: absolute error in us*/);
 
-  void FinalizeSolution(double *dir, double *Vm, double *Vp,
+  virtual void FinalizeSolution(double *dir, double *Vm, double *Vp,
            double rhol, double ul, double pl, int idl,
            double rhor, double ur, double pr, int idr,
            double rhol2, double rhor2, double u2, double p2,
@@ -124,7 +137,7 @@ protected: //internal functions
                                   double &rhos, double &ps/*outputs*/,
                                   bool *trans_rare, double *Vrare_x0/*filled only if found tran rf*/);
 
-  void FinalizeOneSidedSolution(double *dir, double *Vm, double rhol, double ul, double pl, int idl, double ustar,
+  void FinalizeOneSidedSolution(double *dir, double *Vm, double rhol, double ul, double pl, int idl,
                                 double rhol2, double u2/*ustar*/, double p2,
                                 bool trans_rare, double Vrare_x0[3], /*inputs*/
                                 double *Vs, int &id, double *Vsm /*outputs*/);
@@ -145,10 +158,11 @@ public:
   ExactRiemannSolverNonAdaptive(std::vector<VarFcnBase*> &vf_, ExactRiemannSolverData &iod_riemann_) : ExactRiemannSolverBase(vf_, iod_riemann_) {};
 
   int ComputeRiemannSolution(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
-                                     double *Vp, int idp /*"right" state*/, 
-                                     double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
-                                     double *Vsm /*left 'star' solution*/,
-                                     double *Vsp /*right 'star' solution*/);
+                             double *Vp, int idp /*"right" state*/, 
+                             double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
+                             double *Vsm /*left 'star' solution*/,
+                             double *Vsp /*right 'star' solution*/,
+                             double curvature = 0.0);
 
 protected:
   bool ComputeRhoUStar(int wavenumber /*1 or 3*/,

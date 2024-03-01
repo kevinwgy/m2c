@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _VAR_FCN_JWL_H
 #define _VAR_FCN_JWL_H
 
@@ -7,8 +12,8 @@
 using namespace boost::math::tools;
 
 /********************************************************************************
- * This class is the VarFcn class for the JWL EOS in Euler
- * Equations. Only elementary functions are declared and/or defined here.
+ * This class is the VarFcn class for the JWL equation of state (EOS)
+ * Only elementary functions are declared and/or defined here.
  * All arguments must be pertinent to only a single grid node or a single
  * state.
  *
@@ -41,14 +46,15 @@ public:
   ~VarFcnJWL() {}
 
   //! ----- EOS-Specific Functions -----
-  inline double GetPressure(double rho, double e) const {return omega*rho*e + Fun(rho);}
-  inline double GetInternalEnergyPerUnitMass(double rho, double p) const {return (p-Fun(rho))/(omega*rho);}
-  inline double GetDensity(double p, double e) const; 
-  inline double GetDpdrho(double rho, double e) const; 
-  inline double GetBigGamma(double rho, double e) const {return omega;}
+  inline double GetPressure(double rho, double e) {return omega*rho*e + Fun(rho);}
+  inline double GetInternalEnergyPerUnitMass(double rho, double p) {return (p-Fun(rho))/(omega*rho);}
+  double GetDensity(double p, double e); 
+  double GetDpdrho(double rho, double e); 
+  inline double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {return omega;}
+  inline double GetTemperature([[maybe_unused]] double rho, [[maybe_unused]] double e) {return 0.0;} //TODO
 
 protected:
-  inline double Fun(double rho) const {
+  inline double Fun(double rho) {
     return  A1*(1.0-omega_over_R1rho0*rho)*exp(-R1rho0/rho) 
           + A2*(1.0-omega_over_R2rho0*rho)*exp(-R2rho0/rho);}
 
@@ -74,11 +80,11 @@ protected:
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-inline
+
 VarFcnJWL::VarFcnJWL(MaterialModelData &data) : VarFcnBase(data) {
 
   if(data.eos != MaterialModelData::JWL){
-    fprintf(stderr, "*** Error: MaterialModelData is not of type JWL\n");
+    fprintf(stdout, "*** Error: MaterialModelData is not of type JWL\n");
     exit(-1);
   }
 
@@ -100,8 +106,7 @@ VarFcnJWL::VarFcnJWL(MaterialModelData &data) : VarFcnBase(data) {
 
 //------------------------------------------------------------------------------
 
-inline
-double VarFcnJWL::GetDensity(double p, double e) const
+double VarFcnJWL::GetDensity(double p, double e) 
 {
 
   DensityEquation equation(p, e, omega*e, A1, A2, R1rho0, R2rho0, 
@@ -126,8 +131,7 @@ double VarFcnJWL::GetDensity(double p, double e) const
 
 //------------------------------------------------------------------------------
 
-inline 
-double VarFcnJWL::GetDpdrho(double rho, double e) const
+double VarFcnJWL::GetDpdrho(double rho, double e) 
 {
   return  omega*e 
         + A1*(-omega_over_R1rho0 + R1rho0/(rho*rho) - omega_over_R1rho0*R1rho0/rho)*exp(-R1rho0/rho)

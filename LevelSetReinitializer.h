@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _LEVELSET_REINITIALIZER_H_
 #define _LEVELSET_REINITIALIZER_H_
 
@@ -85,10 +90,11 @@ public:
 
   void Destroy();
 
-  void ReinitializeFullDomain(SpaceVariable3D &Phi); //reinitialize phi in the entire domain
+  void ReinitializeFullDomain(SpaceVariable3D &Phi, int special_maxIts = 0); //reinitialize phi in the entire domain
 
   void ReinitializeInBand(SpaceVariable3D &Phi, SpaceVariable3D &Level, SpaceVariable3D &UsefulG2,
-                          SpaceVariable3D &Active, vector<Int3> &useful_nodes, vector<Int3> &active_nodes);
+                          SpaceVariable3D &Active, vector<Int3> &useful_nodes, vector<Int3> &active_nodes,
+                          int special_maxIts = 0);
 
   // For narrow-band level set method
   void ConstructNarrowBand(SpaceVariable3D &Phi,
@@ -156,7 +162,7 @@ private:
 
   void UpdatePhiMaxAndPhiMinInBand(SpaceVariable3D &Phi, vector<Int3> &useful_nodes);
 
-  void CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes);
+  void CreateUsefulNodesPlusOneLayer(vector<Int3> &useful_nodes, SpaceVariable3D &UsefulG2);
 
   void AXPlusBYInBandPlusOne(double a, SpaceVariable3D &X, double b, SpaceVariable3D &Y, bool workOnGhost = false);
 

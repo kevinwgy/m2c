@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _SPACEVARIABLE_
 #define _SPACEVARIABLE_
 #include <petscdmda.h>
@@ -19,6 +24,7 @@ public:
   DM ghosted1_4dof;  
   DM ghosted1_5dof;  
   DM ghosted1_6dof;  
+  DM ghosted1_9dof;  
 
   DM ghosted2_1dof;
   DM ghosted2_3dof;
@@ -39,7 +45,10 @@ public:
  *       is filled with 0.
  *******************************************
  */
+class GlobalMeshInfo;
+
 class SpaceVariable3D {
+
   MPI_Comm*  comm; 
   DM*        dm;   
   Vec        globalVec;  //!< each process only stores a local portion, without ghost
@@ -63,9 +72,9 @@ class SpaceVariable3D {
   int        internal_ghost_imax, internal_ghost_jmax, internal_ghost_kmax; //!< include internal ghosts
   int        ghost_nx, ghost_ny, ghost_nz; //!< width of the ghosted subdomain in x, y and z directions
 
-  int        numNodes0; //number of interior nodes
-  int        numNodes1; //number of interior nodes + internal ghost nodes
-  int        numNodes2; //number of interior nodes + internal & external ghost nodes
+  long long  numNodes0; //number of interior nodes
+  long long  numNodes1; //number of interior nodes + internal ghost nodes
+  long long  numNodes2; //number of interior nodes + internal & external ghost nodes
 
 public:
   SpaceVariable3D(MPI_Comm &comm_, DM *dm_);
@@ -89,6 +98,8 @@ public:
 
   void StoreMeshCoordinates(SpaceVariable3D &coordinates);
   void WriteToVTRFile(const char *filename, const char *varname = NULL); //!< write vector to file (w/o mesh info)
+  void WriteToCGNSFile(const char *filename, const char *varname = NULL);
+  void WriteToMatlabFile(const char *filename, const char *varname = NULL);
   void SetOutputVariableName(const char *name); //!< give it a name, which will show up in output files (VTR/VTK)
 
   inline void GetCornerIndices(int *i0_, int *j0_, int *k0_, int *imax_=0, int *jmax_=0, int *kmax_=0) {
@@ -128,7 +139,8 @@ public:
   inline void NumProcs(int *nProcX_, int *nProcY_, int *nProcZ_) {*nProcX_ = nProcX; *nProcY_ = nProcY; *nProcZ_ = nProcZ;}
   inline void GetGlobalSize(int *NX_, int *NY_, int *NZ_) {*NX_ = NX; *NY_ = NY; *NZ_ = NZ;}
  
-  inline Vec& GetRefToGlobalVec() {return globalVec;}
+  inline Vec& GetRefToGlobalVec() {return globalVec;} //!< call SyncLocalToGlobal if globalVec gets modified!
+  void SyncLocalToGlobal(); //!< should be called when globalVec is updated (e.g., by some PETSc function)
 
   inline bool OutsidePhysicalDomain(int i, int j, int k) {return (i<0 || i>=NX || j<0 || j>=NY || k<0 || k>=NZ);}
 
@@ -136,14 +148,14 @@ public:
 
   double CalculateGlobalMax(int mydof = 0, bool workOnGhost = false);
 
-  inline int NumInternalNodes() {return numNodes0;}
-  inline int NumNodesIncludingInternalGhosts() {return numNodes1;}
-  inline int NumNodesIncludingGhosts() {return numNodes2;}
+  inline long long NumInternalNodes() {return numNodes0;}
+  inline long long NumNodesIncludingInternalGhosts() {return numNodes1;}
+  inline long long NumNodesIncludingGhosts() {return numNodes2;}
 
   inline bool OutsidePhysicalDomainAndUnpopulated(int i, int j, int k)
   {
     int count = 0;
-    if(i<0 || j>=NX) count++;
+    if(i<0 || i>=NX) count++;
     if(j<0 || j>=NY) count++;
     if(k<0 || k>=NZ) count++;
     if(count>1)
@@ -170,6 +182,9 @@ public:
            k>=internal_ghost_k0 && k<internal_ghost_kmax;
   }
 
+  inline bool IsHereOrConnectedGhost(int i, int j, int k)
+  {return int(i<i0 || i>=imax) + int(j<j0 || j>=jmax) + int(k<k0 || k>=kmax) <= 1;}
+
   //! operators
   void AXPlusB(double a, double b, bool workOnGhost = false); //!< self = a*self + b;
   void AXPlusBY(double a, double b, SpaceVariable3D &y, bool workOnGhost = false); //!< self = a*self + b*vector_y
@@ -177,6 +192,21 @@ public:
                 std::vector<int>& Yindices, bool workOnGhost = false); //!< customized version
   void SetConstantValue(double a, bool workOnGhost = false); //!< set value to a
   
+  //! calculate vector norms using PETSc functions
+  double CalculateVectorOneNorm();
+  double CalculateVectorTwoNorm();
+  double CalculateVectorInfNorm();
+
+  //! calculate function L1 and L2 and Linf norms (const. reconstruction within cells)
+  void CalculateFunctionNormsConRec(SpaceVariable3D &volume, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
+  void CalculateFunctionNormsConRec(SpaceVariable3D &ID, SpaceVariable3D &volume, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
+  void CalculateFunctionNormsConRec(GlobalMeshInfo &global_mesh, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
+  void CalculateFunctionNormsConRec(SpaceVariable3D &ID, GlobalMeshInfo &global_mesh, std::vector<double> &norm1_dofs,
+                                    std::vector<double> &norm2_dofs, std::vector<double> &norminf_dofs);
+
 };
 
 #endif

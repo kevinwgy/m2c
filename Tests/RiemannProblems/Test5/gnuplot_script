@@ -1,0 +1,52 @@
+plot "exact/RiemannSolution.txt" using (0.3+2.4e-4*$1):2 with l lw 2 lc rgb "blue" title "Exact"
+replot "results/line_0001.txt" using 1:2 with p pointtype 6 ps 2 lc rgb "red" title "Numerical"
+set key left top
+set xrange[0:1]
+set yrange[0:1000]
+set xlabel "x"
+set ylabel "density"
+set grid
+set term png size 1280,960 font "arial,24"
+set output "test5_density.png"
+replot
+
+
+plot "exact/RiemannSolution.txt" using (0.3+2.4e-4*$1):3 with l lw 2 lc rgb "blue" title "Exact"
+replot "results/line_0001.txt" using 1:3 with p pointtype 6 ps 2 lc rgb "red" title "Numerical"
+set key right bottom 
+set xrange[0:1]
+set yrange[-500:50]
+set xlabel "x"
+set ylabel "velocity"
+set grid
+set term png size 1280,960 font "arial,24"
+set output "test5_velocity.png"
+replot
+
+
+plot "exact/RiemannSolution.txt" using (0.3+2.4e-4*$1):4 with l lw 2 lc rgb "blue" title "Exact"
+replot "results/line_0001.txt" using 1:6 with p pointtype 6 ps 2 lc rgb "red" title "Numerical"
+set key left top
+set xrange[0:1]
+set yrange[0:1.0e9]
+set xlabel "x"
+set ylabel "pressure"
+set grid
+set term png size 1280,960 font "arial,24"
+set output "test5_pressure.png"
+replot
+
+plot "exact/RiemannSolution.txt" using (0.3+2.4e-4*$1):2 with l lw 2 lc rgb "blue" title "Exact"
+replot "results/line_0001.txt" using 1:2 with p pointtype 6 ps 2 lc rgb "red" title "Numerical"
+set key left top
+set xrange[0.14:0.22]
+set yrange[0:900]
+set xlabel "x"
+set ylabel "density"
+set grid
+set term png size 1280,960 font "arial,24"
+set output "test5_density_2.png"
+replot
+
+
+

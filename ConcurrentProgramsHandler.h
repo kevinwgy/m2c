@@ -1,9 +1,16 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _CONCURRENT_PROGRAMS_HANDLER_
 #define _CONCURRENT_PROGRAMS_HANDLER_
 
 #include<IoData.h>
 #include<SpaceVariable.h>
 #include<AerosMessenger.h>
+#include<AerofMessenger.h>
+#include<M2CTwinMessenger.h>
 
 /***********************************************************************
 * Class ConcurrentProgramsHandler is responsible for splitting the MPI
@@ -22,7 +29,7 @@
 //! Concurrent programs handler
 class ConcurrentProgramsHandler {
 
-  ConcurrentProgramsData &iod_concurrent; //!< user inputs
+  IoData &iod; //!< user inputs
 
   bool coupled; //!< whether M2C is coupled to (i.e. running concurrently w/) any other programs
 
@@ -47,8 +54,16 @@ class ConcurrentProgramsHandler {
   MPI_Comm aeros_comm;  //!< this is just c[aeros_color], a communicator that includes
                         //!< M2C and AERO-S processes
 
-  //! TODO: other software/programs can be added later
+  AerofMessenger *aerof;
+  MPI_Comm aerof_comm;
 
+  M2CTwinMessenger *m2c_twin;
+  MPI_Comm m2c_twin_comm;
+
+public:
+  enum TwinningStatus {NONE = 0, LEADER = 1, FOLLOWER = 2};
+private:
+  TwinningStatus twinning_status;
   
 public:
 
@@ -59,15 +74,27 @@ public:
   void InitializeMessengers(TriangulatedSurface *surf_, vector<Vec3D> *F_);
   void Destroy();
 
-  bool Coupled() {return coupled;}
-  double GetTimeStepSize() {return dt;}
-  double GetMaxTime() {return tmax;}
+  inline bool Coupled() {return coupled;}
+  inline enum TwinningStatus GetTwinningStatus() {return twinning_status;}
+  inline double GetTimeStepSize() {return dt;}
+  inline double GetMaxTime() {return tmax;}
 
   //! The main functions that handle communications
-  void CommunicateBeforeTimeStepping(); //!< called before the 1st time step
-  void FirstExchange(); //!< called at the the 1st time step
-  void Exchange(); //!< called every time step (except 1st and last)
-  void FinalExchange(); //!< at the last time step
+  void CommunicateBeforeTimeStepping(SpaceVariable3D *coordinates_ = NULL, DataManagers3D *dms_ = NULL,
+                                     std::vector<GhostPoint> *ghost_nodes_inner_ = NULL,
+                                     std::vector<GhostPoint> *ghost_nodes_outer_ = NULL,
+                                     GlobalMeshInfo *global_mesh_ = NULL,
+                                     SpaceVariable3D *V = NULL, SpaceVariable3D *ID = NULL,
+                                     std::set<Int3> *spo_frozen_nodes = NULL); 
+
+
+  void FirstExchange(SpaceVariable3D *V = NULL, double dt0 = -1.0,
+                     double tmax0 = -1.0); //!< called at the the 1st time step
+
+  void Exchange(SpaceVariable3D *V = NULL, double dt0 = -1.0,
+                double tmax0 = -1.0); //!< called every time step (except 1st and last)
+
+  void FinalExchange(SpaceVariable3D *V = NULL); //!< at the last time step
 
 private:
 

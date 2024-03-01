@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _VECTOR3D_H_
 #define _VECTOR3D_H_
 
@@ -47,6 +52,7 @@ struct Vec3D {
   Vec3D(double x[3]) { v[0] = x[0]; v[1] = x[1]; v[2] = x[2]; }
   Vec3D(double x, double y, double z) { v[0] = x; v[1] = y; v[2] = z; }
   Vec3D(const Vec3D &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; v[2] = v2.v[2]; }
+  Vec3D(const Int3 &v2) { v[0] = v2.v[0]; v[1] = v2.v[1]; v[2] = v2.v[2]; }
   Vec3D(double x) { v[0] = v[1] = v[2] = x; }
   ~Vec3D() {}
 
@@ -75,6 +81,10 @@ struct Vec3D {
   void print(const char *msg = "") { fprintf(stdout, "%s(%e %e %e)\n", msg, v[0], v[1], v[2]); }
 
   double norm() { return(sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2])); }
+
+  double norm1() { return fabs(v[0])+fabs(v[1])+fabs(v[2]); }
+  double norm2() { return norm(); }
+  double norminf() { return std::max(fabs(v[0]), std::max(fabs(v[1]), fabs(v[2]))); }
 };
 
 //------------------------------------------------------------------------------
@@ -335,7 +345,7 @@ public:
   PointIn3D() {}
   PointIn3D(int i, Vec3D &xin) {id = i; x = xin;}
   double val(int i) const {return x[i];}
-  double width(int i) const {return 0.0;}
+  double width([[maybe_unused]] int i) const {return 0.0;}
   int pid() const {return id;}
 };
 

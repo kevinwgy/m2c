@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<MultiPhaseOperator.h>
 #include<SpaceOperator.h>
 #include<LevelSetOperator.h>
@@ -35,7 +40,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
 
-  for(int i=0; i<lso.size(); i++)
+  for(int i=0; i<(int)lso.size(); i++)
     ls2matid[i] = lso[i]->GetMaterialID();
 
   // Initialize phase/material transition functions (if specified by user)
@@ -49,7 +54,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
     for(auto it = iod.eqs.transitions.dataMap.begin(); it != iod.eqs.transitions.dataMap.end(); it++) {
       int i = it->second->from_id;
       int j = it->second->to_id;
-      if(i<0 || i>=varFcn.size() || j<0 || j>=varFcn.size() || i==j) {
+      if(i<0 || i>=(int)varFcn.size() || j<0 || j>=(int)varFcn.size() || i==j) {
         print_error("*** Error: Detected input error in Material/Phase Transition [%d] (%d -> %d).\n", it->first,
                     i, j); 
         exit_mpi();
@@ -68,7 +73,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
       int j = it->second->to_id;
       if(i!=0) {
         bool found = false;
-        for(int ls = 0; ls < lso.size(); ls++) {
+        for(int ls = 0; ls < (int)lso.size(); ls++) {
           if(ls2matid[ls] == i) {
             found = true;
             break;
@@ -82,7 +87,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
       }
       if(j!=0) {
         bool found = false;
-        for(int ls = 0; ls < lso.size(); ls++) {
+        for(int ls = 0; ls < (int)lso.size(); ls++) {
           if(ls2matid[ls] == j) {
             found = true;
             break;
@@ -115,7 +120,7 @@ MultiPhaseOperator::Destroy()
 
   Lambda.Destroy();
 
-  for(int i=0; i<trans.size(); i++)
+  for(int i=0; i<(int)trans.size(); i++)
     for(auto it = trans[i].begin(); it != trans[i].end(); it++)
       delete *it;
 }
@@ -179,7 +184,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
         for(auto&& ls_status : swept) {
           if(ls_status.second == -1) {
             if(myls!=-1) {
-              fprintf(stderr,"\033[0;31m*** Error: Node (%d,%d,%d) belongs to two material subdomains. "
+              fprintf(stdout,"\033[0;31m*** Error: Node (%d,%d,%d) belongs to two material subdomains. "
                              "phi[%d(matid:%d)] = %e, phi[%d(matid:%d)] = %e.\033[0m\n", i,j,k, myls, ls2matid[myls],
                              phi[myls][k][j][i], ls_status.first, ls2matid[ls_status.first],
                              phi[ls_status.first][k][j][i]); 
@@ -189,7 +194,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
           } 
         }
 
-     //   fprintf(stderr,"(%d,%d,%d)(%e,%e,%e) is swept, phi0: %e -> %e, phi1: %e -> %e. myls = %d\n", i,j,k,
+     //   fprintf(stdout,"(%d,%d,%d)(%e,%e,%e) is swept, phi0: %e -> %e, phi1: %e -> %e. myls = %d\n", i,j,k,
      //           global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k),
      //           phi0[0][k][j][i], phi[0][k][j][i], phi0[1][k][j][i], phi[1][k][j][i], myls);
 
@@ -255,7 +260,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
 
             neighborid = id[neighk][neighj][neighi];
 
-            //fprintf(stderr,"(%d,%d,%d): neighbor (%d %d %d), id = %d.\n", i,j,k, neighi, neighj, neighk, neighborid);
+            //fprintf(stdout,"(%d,%d,%d): neighbor (%d %d %d), id = %d.\n", i,j,k, neighi, neighj, neighk, neighborid);
 
             if(neighborid==INACTIVE_MATERIAL_ID)
               continue; //this neighbor is occluded
@@ -284,11 +289,11 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
         id[k][j][i] = *(matid_cands.begin());  //take the first one, if multiple
         tag[k][j][i] = 0;
         remaining_nodes.erase(remaining_nodes.find(ijk));
-        //fprintf(stderr,"  o Giving node (%d,%d,%d) ID %d.\n", i,j,k, (int)id[k][j][i]);
+        //fprintf(stdout,"  o Giving node (%d,%d,%d) ID %d.\n", i,j,k, (int)id[k][j][i]);
         progress++;
 
         if(matid_cands.size()>1)
-          fprintf(stderr,"\033[0;35mWarning: Detected a node with multiple possible material IDs (%d,%d,%d), "
+          fprintf(stdout,"\033[0;35mWarning: Detected a node with multiple possible material IDs (%d,%d,%d), "
                   "setting to %d.\n\033[0m\n", i,j,k, (int)id[k][j][i]);
       }
     }
@@ -357,7 +362,7 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
 
   vector<double***> phi; //may remain empty if there are no orphans
   vector<double***> phi_ebm; //..
-  for(int ls=0; ls<Phi.size(); ls++) 
+  for(int ls=0; ls<(int)Phi.size(); ls++) 
     phi.push_back(Phi[ls]->GetDataPointer());
   for(auto&& ebds : *EBDS)
     phi_ebm.push_back(ebds->Phi_ptr->GetDataPointer()); //unsigned distance, always>=0
@@ -377,14 +382,14 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
           // update phi first (id will be switched back later)
           // first, we determine the absolute value of phi (checking both level sets and dist to surf)
           double newphi = DBL_MAX;
-          for(int ls=0; ls<phi.size(); ls++)
+          for(int ls=0; ls<(int)phi.size(); ls++)
             newphi = std::min(newphi, fabs(phi[ls][k][j][i]));
           for(auto&& phis : phi_ebm)
             newphi = std::min(newphi, phis[k][j][i]);
           if(newphi==0)
             newphi = 1.0e-20; //avoid exactly 0
 
-          for(int ls=0; ls<phi.size(); ls++) {
+          for(int ls=0; ls<(int)phi.size(); ls++) {
             if(ls2matid[ls] == id[k][j][i]) { //this is the ID we are swtiching away from
               assert(phi[ls][k][j][i]<0.0); 
               phi[ls][k][j][i] = newphi; //make it positive
@@ -424,16 +429,16 @@ MultiPhaseOperator::ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*
 
   // Restore
   IDn.RestoreDataPointerToLocalVector();
-  for(int surf=0; surf<phi_ebm.size(); surf++)
+  for(int surf=0; surf<(int)phi_ebm.size(); surf++)
     (*EBDS)[surf]->Phi_ptr->RestoreDataPointerToLocalVector();
 
   if(total_corrected>0) {
-    for(int ls=0; ls<phi.size(); ls++) //phi may be empty, which is fine here.
+    for(int ls=0; ls<(int)phi.size(); ls++) //phi may be empty, which is fine here.
       Phi[ls]->RestoreDataPointerAndInsert();
     ID.RestoreDataPointerAndInsert();
   }  
   else {
-    for(int ls=0; ls<phi.size(); ls++) //phi may be empty, which is fine here.
+    for(int ls=0; ls<(int)phi.size(); ls++) //phi may be empty, which is fine here.
       Phi[ls]->RestoreDataPointerToLocalVector();
     ID.RestoreDataPointerToLocalVector();
   }
@@ -525,8 +530,9 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
         tag[k][j][i] = 0;
 
 
+
   // --------------------------------------------------------
-  // Step 2: Make sure occluded cells have INACTIVE id
+  // Step 2: Update occluded cells 
   // --------------------------------------------------------
   int has_occ(0);
   for(auto&& ebds : *EBDS) {
@@ -542,18 +548,80 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   MPI_Allreduce(MPI_IN_PLACE, &has_occ, 1, MPI_INT, MPI_MAX, comm);
 
   if(has_occ) {
-    double*** id  = ID.GetDataPointer();
-    for(auto&& ebds : *EBDS) {
-      for(auto&& ijk : *ebds->occluded_ptr) {
-        id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
-        tag[ijk[2]][ijk[1]][ijk[0]] = 1;
+    double*** id = ID.GetDataPointer();
+    Vec5D***  v  = (Vec5D***) V.GetDataPointer();
+    int ls_size = Phi.size();
+    vector<double***> phi(ls_size, NULL);
+    for(int ls=0; ls<ls_size; ls++) 
+      phi[ls] = Phi[ls]->GetDataPointer();
+
+    int i,j,k;
+    int phi_updated = 0;
+    for(int surf=0; surf<(int)EBDS->size(); surf++) {
+      for(auto&& ijk : *(*EBDS)[surf]->occluded_ptr) {
+        i = ijk[0];
+        j = ijk[1];
+        k = ijk[2];
+
+        if(!ID.IsHere(i,j,k,false))
+          continue; //this is an internal ghost of this subdomain
+
+        id[k][j][i]   = INACTIVE_MATERIAL_ID;
+        v[k][j][i][0] = iod.eqs.dummy_state.density;
+        v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
+	v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
+        v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
+        v[k][j][i][4] = iod.eqs.dummy_state.pressure;
+
+        // Fix any issues in phi: phi must be non-negative
+        for(int ls=0; ls<ls_size; ls++) {
+          if(phi[ls][k][j][i]<0) {
+            phi[ls][k][j][i] = phi_ebm[surf][k][j][i];
+            if(phi_updated == 0)
+              phi_updated = 1;
+          }
+        }
+
+        tag[k][j][i] = -1;
       }
-      for(auto&& ijk : *ebds->imposed_occluded_ptr) {
-        id[ijk[2]][ijk[1]][ijk[0]] = INACTIVE_MATERIAL_ID;
-        tag[ijk[2]][ijk[1]][ijk[0]] = 1;
+
+      for(auto&& ijk : *(*EBDS)[surf]->imposed_occluded_ptr) {
+        i = ijk[0];
+        j = ijk[1];
+        k = ijk[2];
+
+        if(!ID.IsHere(i,j,k,false))
+          continue; //this is an internal ghost of this subdomain
+
+        id[k][j][i]   = INACTIVE_MATERIAL_ID;
+        v[k][j][i][0] = iod.eqs.dummy_state.density;
+        v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
+	v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
+        v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
+        v[k][j][i][4] = iod.eqs.dummy_state.pressure;
+
+        // Fix any issues in phi: phi must be non-negative
+        for(int ls=0; ls<ls_size; ls++) {
+          if(phi[ls][k][j][i]<0) {
+            phi[ls][k][j][i] = phi_ebm[surf][k][j][i];
+            if(phi_updated == 0)
+              phi_updated = 1;
+          }
+        }
+
+        tag[k][j][i] = -2;
       }
     }  
     ID.RestoreDataPointerAndInsert();
+    V.RestoreDataPointerAndInsert();
+    MPI_Allreduce(MPI_IN_PLACE, &phi_updated, 1, MPI_INT, MPI_MAX, comm);
+    if(phi_updated>0) {
+      for(int ls=0; ls<ls_size; ls++) 
+        Phi[ls]->RestoreDataPointerAndInsert();
+    } else {
+      for(int ls=0; ls<ls_size; ls++) 
+        Phi[ls]->RestoreDataPointerToLocalVector();
+    }
   }
 
 
@@ -562,11 +630,12 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   // --------------------------------------------------------
   for(auto&& sub : swept)
     for(auto&& ijk : sub) {
-      if(tag[ijk[2]][ijk[1]][ijk[0]] != 0)
-        fprintf(stderr,"\033[0;35mWarning: Node (%d %d %d) is swept by multiple (>1) embedded surfaces.\n\033[0m",
+      if(tag[ijk[2]][ijk[1]][ijk[0]]>0)
+        fprintf(stdout,"\033[0;35mWarning: Node (%d %d %d) is swept by multiple (>1) embedded surfaces.\n\033[0m",
                 ijk[0], ijk[1], ijk[2]);
 
-      tag[ijk[2]][ijk[1]][ijk[0]] = 1; 
+      else if(tag[ijk[2]][ijk[1]][ijk[0]]==0)
+        tag[ijk[2]][ijk[1]][ijk[0]] = 1; 
     }
 
 
@@ -574,12 +643,12 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   // Step 4: Find out external ghosts that need to be updated at the end.
   // --------------------------------------------------------
   std::list<int> ghosts;
-  for(int i=0; i<ghost_nodes_outer->size(); i++) {
+  for(int i=0; i<(int)ghost_nodes_outer->size(); i++) {
     GhostPoint& g((*ghost_nodes_outer)[i]);
     if(g.type_projection != GhostPoint::FACE)
       continue;
     int im_i(g.image_ijk[0]), im_j(g.image_ijk[1]), im_k(g.image_ijk[2]);
-    if(tag[im_k][im_j][im_i] != 0)
+    if(tag[im_k][im_j][im_i] > 0)
       ghosts.push_back(i);
   }
 
@@ -635,15 +704,33 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
     //      Note: One node should not be swept by multiple surfaces!
     int i,j,k,i2,j2,k2;
     vector<std::pair<Int3,bool> > neighbors; //useful neighbors, paired w/ connected or not
-    for(int surf=0; surf<swept.size(); surf++) {
+    for(int surf=0; surf<(int)swept.size(); surf++) {
       for(auto it = swept[surf].begin(); it != swept[surf].end();) {
         i = (*it)[0];
         j = (*it)[1];
         k = (*it)[2];
 
+        if(tag[k][j][i]==0) {
+          //It is possible (but uncommon) that a swept node is also imposed-occluded.
+          //It should have already been updated in Step 2.
+          it = swept[surf].erase(it);
+          progress++;
+          continue;
+        }
+
+/*
+        bool gotyou = false;
+        if(i==9 && j==45 && k==0)
+          gotyou = true;
+*/
+
         // Preparation: Collect useful neighbors and intersection info
-        FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,neighbors);
+        FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,
+                                          *(*EBDS)[surf]->occluded_ptr,
+                                          *(*EBDS)[surf]->imposed_occluded_ptr,
+                                          neighbors);
  
+          
         // Determine its id: Check the ID of "valid" neighbors
         set<int> tmp_id_s;
         for(auto&& nei : neighbors)
@@ -664,13 +751,13 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
               if(nei.second) //connected
                 id_votes[id[nei.first[2]][nei.first[1]][nei.first[0]]]++;
             int myvote = 0;
-            for(int s=0; s<id_votes.size(); s++)
+            for(int s=0; s<(int)id_votes.size(); s++)
               if(id_votes[s]>myvote) {
                 myid = s;
                 myvote = id_votes[s];
               }
             if(myid==-1) {
-              fprintf(stderr,"\033[0;31m*** Error: Unable to determine the material ID at (%d,%d,%d).\n\033[0m",
+              fprintf(stdout,"\033[0;31m*** Error: Unable to determine the material ID at (%d,%d,%d).\n\033[0m",
                       i,j,k);
               exit(-1);
             }
@@ -701,7 +788,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
             continue;  //not ready to update this node
           }
           else {
-            fprintf(stderr,"\033[0;31m*** Error: Unable to determine the state at (%d,%d,%d), id:%d.\n\033[0m",
+            fprintf(stdout,"\033[0;31m*** Error: Unable to determine the state at (%d,%d,%d), id:%d.\n\033[0m",
                     i,j,k, myid);
             exit(-1);
           }
@@ -1014,11 +1101,11 @@ MultiPhaseOperator::LocalUpdateByRiemannSolutions(int i, int j, int k, int id, V
     v /= sum_weight;
   else if(upwind) {
     if(verbose>1) 
-      fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions"
+      fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions"
               " w/ upwinding. Retrying.\033[0m\n", i,j,k);
   } else {
     if(verbose>1) 
-      fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions."
+      fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d) by Riemann solutions."
               " Retrying.\033[0m\n", i,j,k);
   }
 
@@ -1120,10 +1207,10 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
         if(sum_weight==0) {
           if(verbose>1) {
             if(iod.multiphase.phasechange_dir == MultiPhaseData::ALL) 
-              fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+              fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
                       "by extrapolation.\n\033[0m", i,j,k, x0[0],x0[1],x0[2]);
             else
-              fprintf(stderr,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+              fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
                       "by extrapolation w/ upwinding.\n\033[0m", i,j,k, x0[0],x0[1],x0[2]);
           }
           unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
@@ -1272,7 +1359,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
     if(iod.multiphase.phasechange_dir == MultiPhaseData::UPWIND) {
       if(sum_weight>0) {
         v[k][j][i] /= sum_weight; //Done!
-        if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. (2nd attempt)\n",
+        if(verbose>1) fprintf(stdout,"*** (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. (2nd attempt)\n",
                               i,j,k);
         continue;
       }
@@ -1281,7 +1368,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
     // if still unresolved, try to apply an averaging w/o     
     if(sum_weight2>0) {
       v[k][j][i] = vtmp/sum_weight2; //Done!
-      if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated state variables by extrapolation w/o enforcing upwinding."
+      if(verbose>1) fprintf(stdout,"*** (%d,%d,%d): Updated state variables by extrapolation w/o enforcing upwinding."
                             " (2nd attempt)\n", i,j,k);
       continue;
     }
@@ -1345,7 +1432,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
       if(sum_weight>0) {
         v[k][j][i][0] = density/sum_weight;
-        if(verbose>1) fprintf(stderr,"*** (%d,%d,%d): Updated density by interpolation w/ stencil width = %d: %e %e %e %e %e\n",
+        if(verbose>1) fprintf(stdout,"*** (%d,%d,%d): Updated density by interpolation w/ stencil width = %d: %e %e %e %e %e\n",
                             i,j,k, layer, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
         break; //done with this node
       }
@@ -1360,14 +1447,14 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
       //Treatment 2: apply a constant density.
 
       if(id[k][j][i]!=0 || apply_failsafe_density) {
-        fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). "
+        fprintf(stdout,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e) with pre-specified density (%e). "
                        "Id:%d->%d. No valid neighbors within %d layers.\033[0m\n", 
                        i,j,k, coords[k][j][i][0], coords[k][j][i][1],
                        coords[k][j][i][2], varFcn[id[k][j][i]]->failsafe_density, (int)idn[k][j][i], (int)id[k][j][i], 
                        max_layer);
         v[k][j][i][0] = varFcn[id[k][j][i]]->failsafe_density;
       } else { //id[k][j][i] = 0 && not applying failsafe
-        fprintf(stderr,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e). "
+        fprintf(stdout,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e). "
                        "Id:%d->%d. No valid neighbors within %d layers. Trying to correct the level set functions\033[0m\n", 
                        i,j,k, coords[k][j][i][0], coords[k][j][i][1],
                        coords[k][j][i][2], (int)idn[k][j][i], (int)id[k][j][i], max_layer);
@@ -1442,7 +1529,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
           double p  = varFcn[myid]->GetPressure(v[k][j][i][0], e);
           v[k][j][i][4] = p;
           if(coords[k][j][i].norm()<0.015)
-            fprintf(stderr,"Changing state at (%d,%d,%d) p: %e->%e, T: %e->%e, h: %e->%e\n", i,j,k, 
+            fprintf(stdout,"Changing state at (%d,%d,%d) p: %e->%e, T: %e->%e, h: %e->%e\n", i,j,k, 
                     p0, p, T0, T, e0 + p0/v[k][j][i][0], e + p/v[k][j][i][0]);
         }
       }
@@ -1468,7 +1555,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
           continue;
 
 //        if(lam[k][j][i]>0)
-//          fprintf(stderr,"lam[%d][%d][%d] = %e.\n", k,j,i, lam[k][j][i]);
+//          fprintf(stdout,"lam[%d][%d][%d] = %e.\n", k,j,i, lam[k][j][i]);
 
         for(auto it = trans[myid].begin(); it != trans[myid].end(); it++) {
 
@@ -1498,7 +1585,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             double p1 = v[k][j][i][4];
             double e1 = varFcn[(*it)->toID]->GetInternalEnergyPerUnitMass(rho1, p1);
             double T1 = varFcn[(*it)->toID]->GetTemperature(rho1, e1);
-            fprintf(stderr,"Detected phase transition at (%d,%d,%d)(%d->%d). rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
+            fprintf(stdout,"Detected phase transition at (%d,%d,%d)(%d->%d). rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
                     i,j,k, myid, (*it)->toID, rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
             // ------------------------------------------------------------------------
 
@@ -1564,7 +1651,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   // Step 2: Figure out which level set functions
   //         need to be updated
   //---------------------------------------------
-  for(int ls = 0; ls < Phi.size(); ls++)
+  for(int ls = 0; ls < (int)Phi.size(); ls++)
     phi_updated[ls] = (affected_ids.find(ls2matid[ls]) != affected_ids.end());
   MPI_Allreduce(MPI_IN_PLACE, (int*)phi_updated.data(), Phi.size(), MPI_INT, MPI_MAX, comm);
 
@@ -1692,7 +1779,7 @@ MultiPhaseOperator::ResolveConflictsInLevelSets(int time_step, vector<SpaceVaria
             //1. find a unique owner
             int new_owner = owner[0];
             double max_phi = fabs(phi[owner[0]][k][j][i]);
-            for(int ind=1; ind<owner.size(); ind++) {
+            for(int ind=1; ind<(int)owner.size(); ind++) {
               if(fabs(phi[owner[ind]][k][j][i])>max_phi) {
                 new_owner = owner[ind];
                 max_phi = fabs(phi[owner[ind]][k][j][i]);
@@ -2047,7 +2134,7 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
   Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
   double*** id  = ID.GetDataPointer();
 
-  for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
+  for(int ls = 0; ls<(int)Phi.size(); ls++) {//loop through all the level set functions
   
     if(phi_updated[ls] == 0)
       continue; //this level set function is not involved
@@ -2120,7 +2207,7 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
   }
 
   // For debug only
-  for(int ls = 0; ls<Phi.size(); ls++) {//loop through all the level set functions
+  for(int ls = 0; ls<(int)Phi.size(); ls++) {//loop through all the level set functions
   
     if(phi_updated[ls] == 0)
       continue; //this level set function is not involved
@@ -2196,8 +2283,9 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
 //-----------------------------------------------------
 
 void
-MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
-                                                      vector<Intersector*> *intersector,
+MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, [[maybe_unused]] double*** id,
+                                                      vector<Intersector*> *intersector, set<Int3> &occluded,
+                                                      set<Int3> &imposed_occluded,
                                                       vector<std::pair<Int3,bool> > &neighbors)
 {
   neighbors.clear();
@@ -2218,6 +2306,12 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
         if(tag[k2][j2][i2] != 0) //swept, and unresolved yet
           continue;
 
+        Int3 ijk2(i2,j2,k2);
+        if(occluded.find(ijk2) != occluded.end())
+          continue; //ignore occluded neighbors
+        if(imposed_occluded.find(ijk2) != imposed_occluded.end())
+          continue; //ignore occluded neighbors
+
         bool connected = true;
         X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
         for(auto&& xter : *intersector) {
@@ -2227,7 +2321,7 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
           }
         }
 
-        neighbors.push_back(std::make_pair(Int3(i2,j2,k2), connected));
+        neighbors.push_back(std::make_pair(ijk2, connected));
       }
 }
 

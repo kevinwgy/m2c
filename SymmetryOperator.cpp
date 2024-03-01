@@ -1,13 +1,18 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <SymmetryOperator.h>
 #include <Vector5D.h>
 #include <cassert>
 
 //--------------------------------------------------------------------------
 
-SymmetryOperator::SymmetryOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, MeshData &iod_mesh_,
+SymmetryOperator::SymmetryOperator(MPI_Comm &comm_, [[maybe_unused]] DataManagers3D &dm_all_, MeshData &iod_mesh_,
                                    vector<VarFcnBase*> &varFcn_, SpaceVariable3D &coordinates_,
                                    SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_)
-                 : iod_mesh(iod_mesh_), varFcn(varFcn_), 
+                 : comm(comm_), iod_mesh(iod_mesh_), varFcn(varFcn_), 
                    coordinates(coordinates_), delta_xyz(delta_xyz_), volume(volume_)
 {
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);

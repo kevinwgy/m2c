@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<SahaEquationSolver.h>
 #include<fstream>
 #include<boost/math/tools/roots.hpp>
@@ -93,7 +98,7 @@ SahaEquationSolver::~SahaEquationSolver()
 
 void
 SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne, 
-                          map<int, vector<double> >& alpha_rj)
+                          map<int, vector<double> >& alpha_rj, [[maybe_unused]] double* lambD)
 {
   //nh = T>0 ? v[4]/(kb*T) : 0; //for dummy solver, there may not be a temperature law --> T = 0
 
@@ -103,7 +108,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     nh = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (it==alpha_rj.begin() && r==0) ? 1.0 : 0.0;
     }
     return;
@@ -118,7 +123,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -144,7 +149,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     zav1 /= 2.0;
   }
   if(!found_initial_interval) {
-    fprintf(stderr,"\033[0;31m*** Error: Saha equation solver failed. "
+    fprintf(stdout,"\033[0;31m*** Error: Saha equation solver failed. "
             "Cannot find an initial bracketing interval. (p = %e, T = %e)\n\033[0m", v[4], T);
     exit(-1);
   }
@@ -187,7 +192,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -206,14 +211,14 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
     int j = it->first; //element id
     vector<double> &alpha = it->second; //alpha_r
 
-    if(j>=elem.size()) {//this material does not have element j
-      for(int r=0; r<alpha.size(); r++)
+    if(j>=(int)elem.size()) {//this material does not have element j
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = 0.0;
       continue;
     }
 
     double zej = fun.GetZej(zav, j);
-    //fprintf(stderr,"zej = %e for j = %d.\n", zej, j);
+    //fprintf(stdout,"zej = %e for j = %d.\n", zej, j);
     double denom = 0.0;
     double zav_power = 1.0;
     for(int i=1; i<=elem[j].rmax; i++) {
@@ -225,7 +230,7 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
       alpha[0] = zej/denom;
     else {
       alpha[0] = 1.0;
-      for(int r=1; r<alpha.size(); r++)
+      for(int r=1; r<(int)alpha.size(); r++)
         alpha[r] = 0.0;
       return;
     }
@@ -247,10 +252,11 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
       alpha[max_size] = 0;
 
     //too many slots? put 0
-    for(int r=max_size+1; r<alpha.size(); r++)
+    for(int r=max_size+1; r<(int)alpha.size(); r++)
       alpha[r] = 0.0;
   }
 
+  //lambD is not calculated in the case of ideal Saha
 }
 
 //--------------------------------------------------------------------------
@@ -268,7 +274,7 @@ SahaEquationSolver::ZavEquation::ZavEquation(double kb, double T, double nh, dou
   // compute fprod
   fprod.assign(elem.size(), vector<double>());
   double Ur0, Ur1, f1;
-  for(int j=0; j<fprod.size(); j++) {
+  for(int j=0; j<(int)fprod.size(); j++) {
 
     fprod[j].resize(elem[j].rmax+1, 0);
 
@@ -279,7 +285,7 @@ SahaEquationSolver::ZavEquation::ZavEquation(double kb, double T, double nh, dou
     for(int r=0; r<elem[j].rmax; r++) {
       Ur1 = elem[j].CalculatePartitionFunction(r+1, T);
       f1 = 2.0*Ur1/Ur0*fcore*exp(-elem[j].I[r]/kbT);
-      //if(j==1) fprintf(stderr,"f(%d,%d) = %e, Ur1 = %e, Ur0 = %e, exp = %e.\n", r+1, j, f1, Ur1, Ur0, exp(-elem[j].I[r]/kbT));
+      //if(j==1) fprintf(stdout,"f(%d,%d) = %e, Ur1 = %e, Ur0 = %e, exp = %e.\n", r+1, j, f1, Ur1, Ur0, exp(-elem[j].I[r]/kbT));
       fprod[j][r+1] = fprod[j][r]*f1;
 
       if(fprod[j][r+1]<0) {
@@ -300,7 +306,7 @@ SahaEquationSolver::ZavEquation::ComputeRHS(double zav)
 {
   double rhs = 0.0;
 
-  for(int j=0; j<elem.size(); j++)
+  for(int j=0; j<(int)elem.size(); j++)
     rhs += ComputeRHS_ElementJ(zav, j);
 
   return rhs;

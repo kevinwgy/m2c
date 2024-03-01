@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _HEAT_DIFFUSION_OPERATOR_H_
 #define _HEAT_DIFFUSION_OPERATOR_H_
 
@@ -6,7 +11,7 @@
 #include <GradientCalculatorBase.h>
 #include <VarFcnBase.h>
 #include <Interpolator.h>
-#include <HeatDiffuFcn.h>
+#include <HeatDiffusionFcn.h>
 #include <memory>
 
 class EmbeddedBoundaryDataSet;
@@ -28,7 +33,7 @@ class HeatDiffusionOperator
   vector<VarFcnBase*>& varFcn; //!< each material has a varFcn
    
   //! Heat diffusion function (one for each material)
-  vector<HeatDiffuFcnBase*> heatdiffFcn;
+  vector<HeatDiffusionFcnBase*> heatdiffFcn;
 
   //! Mesh info
   SpaceVariable3D &coordinates;

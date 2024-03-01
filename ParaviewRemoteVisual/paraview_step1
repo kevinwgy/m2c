@@ -1,0 +1,8 @@
+ssh -t kevinw3@198.82.249.13 ". /etc/bashrc;
+module load slurm;
+sbatch --output=/dev/null --error=/dev/null paraview.sh;
+bash -l"
+
+### Note: 198.82.249.13 is the IP address of tinkercliffs1.arc.vt.edu (09/2023)
+###       --output=/dev/null and --error=/dev/null can be removed, if one would
+###       like to see the output files of the job (usually not needed).

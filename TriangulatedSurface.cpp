@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <TriangulatedSurface.h>
 #include <map>
 #include <cassert>
@@ -72,7 +77,7 @@ void TriangulatedSurface::CalculateNormalsAndAreas()
       elemNorm[i] /= nrm;
       elemArea[i] = 0.5*nrm;
     } else {
-      fprintf(stderr, "*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
+      fprintf(stdout, "*** Error: area (length) of triangle (edge) %d is %e.\n", i+1, nrm);
       exit(-1);
     }
   }
@@ -81,12 +86,12 @@ void TriangulatedSurface::CalculateNormalsAndAreas()
   if(degenerate) {
     for(int i=0; i<nElems; i++)
       if(n2!=n3) {
-        fprintf(stderr, "*** Error: Cannot handle a mix of triangles and line segments.\n");
+        fprintf(stdout, "*** Error: Cannot handle a mix of triangles and line segments.\n");
         exit(-1);
       }
-    for(int i=0; i<X.size(); i++)
+    for(int i=0; i<(int)X.size(); i++)
       if(X[i][2] != 0) {
-        fprintf(stderr, "*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
+        fprintf(stdout, "*** Error: A degenerated triangulated surface must be on the x-y plane. Found z = %e.\n", 
                      X[i][2]);
         exit(-1);
       }
@@ -112,7 +117,7 @@ TriangulatedSurface::CheckSurfaceOrientation()
   assert(!degenerate);
 
   map<iipair, ibpair> edgeMap;
-  for (int iTriangle=0; iTriangle<elems.size(); iTriangle++) {
+  for (int iTriangle=0; iTriangle<(int)elems.size(); iTriangle++) {
     int from1, to1, from2, to2, from3, to3;
     from1 = elems[iTriangle][0];  to1 = elems[iTriangle][1];
     from2 = elems[iTriangle][1];  to2 = elems[iTriangle][2];
@@ -148,7 +153,7 @@ TriangulatedSurface::CheckSurfaceOrientationAndClosedness()
 
   std::multimap<int,int> edges;
   int p1, p2;
-  for(int i=0; i<elems.size(); i++) {
+  for(int i=0; i<(int)elems.size(); i++) {
     for(int j=0; j<3; j++) {//loop through the three edges
       p1 = elems[i][j];
       p2 = elems[i][(j+1)%3];
@@ -178,7 +183,7 @@ TriangulatedSurface::CheckSurfaceClosedness()
 
   std::multimap<int,int> edges;
   int p1, p2;
-  for(int i=0; i<elems.size(); i++) {
+  for(int i=0; i<(int)elems.size(); i++) {
     for(int j=0; j<3; j++) {//loop through the three edges
       p1 = elems[i][j];
       p2 = elems[i][(j+1)%3];

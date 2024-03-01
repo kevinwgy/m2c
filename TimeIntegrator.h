@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _TIME_INTEGRATOR_H_
 #define _TIME_INTEGRATOR_H_
 
@@ -8,6 +13,8 @@
 #include <RiemannSolutions.h>
 #include <EmbeddedBoundaryOperator.h>
 #include <HyperelasticityOperator.h>
+#include <PrescribedMotionOperator.h>
+#include <SteadyStateOperator.h>
 using std::vector;
 
 /********************************************************************
@@ -15,18 +22,19 @@ using std::vector;
  *******************************************************************/
 class TimeIntegratorBase
 {
+
 protected:
+
+  enum Type {NONE = 0, FORWARD_EULER = 1, RUNGE_KUTTA_2 = 2, RUNGE_KUTTA_3 = 3,
+             SIMPLE = 4, SIMPLER = 5, SIMPLEC = 6, PISO = 7} type;
+
+
   MPI_Comm&       comm;
   IoData&         iod;
   SpaceOperator&  spo;
 
   vector<LevelSetOperator*>& lso;
   MultiPhaseOperator& mpo;  
-
-  SpaceVariable3D& volume;
-
-  int i0, j0, k0, imax, jmax, kmax;
-  int ii0, jj0, kk0, iimax, jjmax, kkmax;
 
   //! Laser absorption solver (NULL if laser is not activated)
   LaserAbsorptionSolver* laser;
@@ -37,44 +45,66 @@ protected:
   //! Hyperelaticity operator (NULL if not activated)
   HyperelasticityOperator* heo;
 
-  //!< Internal variable to temporarily store old ID
+  //! Prescribed motion operator (NULL if not activated)
+  PrescribedMotionOperator* pmo;
+ 
+  //! Internal variable to temporarily store old ID
   SpaceVariable3D IDn;
 
-  //!< Internal variable to temporarily store Phi (e.g., for material ID updates)
+  //! Internal variable to temporarily store Phi (e.g., for material ID updates)
   vector<SpaceVariable3D*> Phi_tmp;
 
-  //!< Internal variable to store the mat. ID tracked by each level set
+  //! Internal variable to store the mat. ID tracked by each level set
   vector<int> ls_mat_id;
 
-  //!< Solutions of exact Riemann problems
+  //! Solutions of exact Riemann problems
   RiemannSolutions riemann_solutions;
+
+  //! Variables for steady-state analysis
+  SteadyStateOperator *sso;
+  bool local_time_stepping;
 
 public:
   TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_, 
                      vector<LevelSetOperator*>& lso_, MultiPhaseOperator& mpo_,
                      LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                     HyperelasticityOperator* heo_);
+                     HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
 
   virtual ~TimeIntegratorBase();
 
-  // Integrate the ODE system for one time-step. Implemented in derived classes
-  virtual void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                  vector<SpaceVariable3D*> &Phi,
-                                  SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                                  double dt, int time_step, int subcycle, double dts) {
+  //! Integrate the ODE system for one time-step. Implemented in derived classes
+  virtual void AdvanceOneTimeStep([[maybe_unused]] SpaceVariable3D &V, [[maybe_unused]] SpaceVariable3D &ID, 
+                                  [[maybe_unused]] vector<SpaceVariable3D*> &Phi,
+                                  [[maybe_unused]] vector<SpaceVariable3D*> &NPhi,
+                                  [[maybe_unused]] vector<SpaceVariable3D*> &KappaPhi,
+                                  [[maybe_unused]] SpaceVariable3D *L, [[maybe_unused]] SpaceVariable3D *Xi,
+                                  [[maybe_unused]] SpaceVariable3D *LocalDt,
+                                  [[maybe_unused]] double time, [[maybe_unused]] double dt,
+                                  [[maybe_unused]] int time_step,
+                                  [[maybe_unused]] int subcycle, [[maybe_unused]] double dts) {
     print_error("*** Error: AdvanceOneTimeStep function not defined.\n");
     exit_mpi();}
 
   virtual void Destroy();
 
-  // all the tasks that are done at the end of a time-step, independent of 
-  // time integrator
+  //! All the tasks that are done at the end of a time-step, independent of time integrator
   void UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
                                        vector<SpaceVariable3D*> &Phi,
                                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                        SpaceVariable3D *L,
                                        double time, int time_step, int subcycle, double dts);
                                         
+  //! Functions pertaining to steady-state computation
+  bool Converged() {return sso ? sso->Converged() : false;} //only for steady-state simulations
+  double GetRelativeResidual1Norm() {assert(sso); return sso->GetRelativeResidual1Norm();} //function L1 norm
+  double GetRelativeResidual2Norm() {assert(sso); return sso->GetRelativeResidual2Norm();} //function L2 norm
+  double GetRelativeResidualInfNorm() {assert(sso); return sso->GetRelativeResidualInfNorm();}
+
+protected:
+
+  //! compute U += a*dt*R, where dt can be different for different cells (for steady-state computation)
+  void AddFluxWithLocalTimeStep(SpaceVariable3D &U, double a, SpaceVariable3D *Dt, SpaceVariable3D &R);
+
 };
 
 /********************************************************************
@@ -94,13 +124,14 @@ public:
   TimeIntegratorFE(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                    vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
                    LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                   HyperelasticityOperator* heo_);
+                   HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
   ~TimeIntegratorFE();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                          vector<SpaceVariable3D*>& Phi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                          double dt, int time_step, int subcycle, double dts);
+                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
+                          vector<SpaceVariable3D*> &KappaPhi,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
 
@@ -131,13 +162,14 @@ public:
   TimeIntegratorRK2(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
                     LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                    HyperelasticityOperator* heo_);
+                    HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
   ~TimeIntegratorRK2();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                          double dt, int time_step, int subcycle, double dts);
+                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
+                          vector<SpaceVariable3D*> &KappaPhi,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 
 
@@ -169,13 +201,14 @@ public:
   TimeIntegratorRK3(MPI_Comm &comm_, IoData& iod_, DataManagers3D& dms_, SpaceOperator& spo_,
                     vector<LevelSetOperator*>& lso_, MultiPhaseOperator &mpo_,
                     LaserAbsorptionSolver* laser_, EmbeddedBoundaryOperator* embed_,
-                    HyperelasticityOperator* heo_);
+                    HyperelasticityOperator* heo_, PrescribedMotionOperator* pmo_);
   ~TimeIntegratorRK3();
 
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
-                          vector<SpaceVariable3D*>& Phi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, double time,
-                          double dt, int time_step, int subcycle, double dts);
+                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
+                          vector<SpaceVariable3D*> &KappaPhi,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 
 

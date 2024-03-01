@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<AtomicIonizationData.h>
 #include<fstream>
 using std::vector;
@@ -67,22 +72,26 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
 
   // Step 3: Read excitation energy files
   E.resize(atomic_number);
-  int max_size = 0;
-  for(int i=0; i<atomic_number; i++) {
+  int max_size = 0, i;
+  for(i=0; i<atomic_number; i++) {
     std::string filename = std::string(iod_aim->excitation_energy_files_prefix) 
                          + std::to_string(i)
                          + std::string(iod_aim->excitation_energy_files_suffix);
     file.open(filename.c_str(), std::fstream::in);
     if(!file.is_open()) {
-      print_error("*** Error: Cannot open excitation energy file %s.\n", filename.c_str());
-      exit_mpi();
+      if(i<rmax) 
+        print_warning("Warning: Cannot open excitation energy file %s. Skipping higher "
+                      "states of ionization.\n", filename.c_str());
+      //if i>=rmax, no need to throw a warning.
+      E.resize(i);
+      break;
     }
     GetDataInFile(file, E[i], 10000, true);
     file.close();
-    if(max_size<E[i].size())
+    if(max_size<(int)E[i].size())
       max_size = E[i].size();
   }
-  print("    * Read %d excitation energy files: %sX%s. Max excited state: %d.\n", atomic_number,
+  print("    * Read %d excitation energy files: %sX%s. Max excited state: %d.\n", i,
         iod_aim->excitation_energy_files_prefix, 
         iod_aim->excitation_energy_files_suffix, max_size);
 
@@ -90,21 +99,25 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
   // Step 4: Read degeneracy files ("g") 
   g.resize(atomic_number);
   max_size = 0;
-  for(int i=0; i<atomic_number; i++) {
+  for(i=0; i<atomic_number; i++) {
     std::string filename = std::string(iod_aim->degeneracy_files_prefix)
                          + std::to_string(i)
                          + std::string(iod_aim->degeneracy_files_suffix);
     file.open(filename.c_str(), std::fstream::in);
     if(!file.is_open()) {
-      print_error("*** Error: Cannot open degeneracy file %s.\n", filename.c_str());
-      exit_mpi();
+      if(i<rmax) 
+        print_warning("Warning: Cannot open degeneracy file %s. Skipping higher "
+                    "states of ionization.\n", filename.c_str());
+      //if i>=rmax, no need to throw a warning.
+      g.resize(i);
+      break;
     }
     GetDataInFile(file, g[i], 10000, true);
     file.close();
-    if(max_size<g[i].size())
+    if(max_size<(int)g[i].size())
       max_size = g[i].size();
   }
-  print("    * Read %d degeneracy files: %sX%s. Max excited state: %d.\n", atomic_number,
+  print("    * Read %d degeneracy files: %sX%s. Max excited state: %d.\n", i,
         iod_aim->degeneracy_files_prefix, 
         iod_aim->degeneracy_files_suffix, max_size);
 
@@ -133,6 +146,8 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
   sample_Tmin = sample_Tmin_;
   sample_Tmax = sample_Tmax_;
   sample_size = sample_size_;
+  assert(isfinite(sample_size));
+
   if(interpolation) {
     assert(comm);
     InitializeInterpolation(*comm);
@@ -191,7 +206,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
   std::tuple<double,double,double>& coeffs(UsCoeffs[r]);
 
   double factor(0);
-  for(int i=0; i<E[r].size(); i++){
+  for(int i=0; i<(int)E[r].size(); i++){
     factor = -E[r][i]/kb;
     if(factor!=0)
       break;
@@ -215,6 +230,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
 
   int block_size = floor((double)sample_size/(double)mpi_size);
   int remainder = sample_size - block_size*mpi_size;
+  assert(remainder>=0 && remainder<mpi_size);
 
   //prepare for comm.
   int* counts = new int[mpi_size];
@@ -223,6 +239,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
     counts[i] = (i<remainder) ? block_size + 1 : block_size;
     displacements[i] = (i<remainder) ? (block_size+1)*i : block_size*i + remainder;
   }
+  assert(displacements[mpi_size-1]+counts[mpi_size-1] == sample_size);
 
   int my_start_id = displacements[mpi_rank];
   int my_block_size = counts[mpi_rank];
@@ -232,7 +249,7 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
     T[i] = (my_start_id+i==0) ? sample_Tmin : factor/log(expmin+(my_start_id+i)*delta_exp); 
             //expmin can be 0 if Tmin is small (but nonzero)
                 
-  for(int k=0; k<U.size(); k++) {
+  for(int k=0; k<(int)U.size(); k++) {
 
     for(int i=0; i<my_block_size; i++)
       U[k][my_start_id+i] = CalculatePartitionFunctionOnTheFly2(r, T[i], max_terms[r] - k); 
@@ -258,7 +275,8 @@ AtomicIonizationData::CalculatePartitionFunction(int r, double T, double deltaI)
 {
   assert(r<=rmax);
 
-  if(r==atomic_number)
+  //if(r==atomic_number)
+  if(r==rmax) //if rmax<atomic_number, we need to avoid accessing non-existent E & g...
     return 1.0; //per Shafquat
 
   if(interpolation && T>=sample_Tmin && T<=sample_Tmax)
@@ -279,7 +297,15 @@ AtomicIonizationData::CalculatePartitionFunctionOnTheFly(int r, double T, double
   int nsize = std::min(int(std::upper_bound(E[r].begin(), E[r].end(), I[r]-deltaI) - E[r].begin()),
                        (int)g[r].size());
 
-  //fprintf(stderr,"I[%d] = %e, nsize = %d, E[%d][%d] = %e, Ieff-E = %e | %e.\n", r, I[r], nsize, r, 
+/*
+  //TEST: TRUNCATION IS IGNORED!
+  int nsize = std::min(g[r].size(), E[r].size());
+  //END OF TEST
+  
+*/
+
+
+  //fprintf(stdout,"I[%d] = %e, nsize = %d, E[%d][%d] = %e, Ieff-E = %e | %e.\n", r, I[r], nsize, r, 
   //        nsize-1, E[r][nsize-1],
   //        I[r]-deltaI-E[r][nsize-1], I[r]-deltaI-E[r][std::min(nsize, (int)E[r].size()-1)]);
 
@@ -325,7 +351,7 @@ AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T,
     int nsize = std::min(int(std::upper_bound(E[r].begin(), E[r].end(), I[r]-deltaI) - E[r].begin()),
                          (int)g[r].size());
     k = max_terms[r] - nsize;
-    assert(k>=0 && k<spline[r].size());
+    assert(k>=0 && k<(int)spline[r].size());
   }
 
   if(interpolation==1) 
@@ -348,7 +374,7 @@ AtomicIonizationData::CalculatePartitionFunctionByInterpolation(int r, double T,
     return (1.0-d)*Us[r][k][i] + d*Us[r][k][i+1];
 
   } else {
-    fprintf(stderr,"\033[0;31m*** Error: Encountered unknown interpolation code (%d).\n\033[0m", 
+    fprintf(stdout,"\033[0;31m*** Error: Encountered unknown interpolation code (%d).\n\033[0m", 
             interpolation);
     exit(-1);
   }

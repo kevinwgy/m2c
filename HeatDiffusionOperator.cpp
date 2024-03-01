@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <HeatDiffusionOperator.h>
 #include <EmbeddedBoundaryDataSet.h>
 #include <Vector5D.h>
@@ -36,26 +41,26 @@ HeatDiffusionOperator::HeatDiffusionOperator(MPI_Comm &comm_, DataManagers3D &dm
   // Creat a HeatDiffusionFcn for each material.
   // For problems involving multiple materials, it could happen that the user specified heat diffusion model
   // for only some of the materials, but not all. In this case, we still create a dummy (i.e. base)
-  // HeatDiffusionFcn for those materials without heat diffusion. If all the materials are not specified heat
-  // diffusion, this constructor should not be called in the first place.
+  // HeatDiffusionFcn for those materials without heat diffusion. If heat diffusion is not specified for
+  // any material, this constructor should not be called in the first place.
   //
   heatdiffFcn.resize(varFcn.size(), NULL);
   for(auto it = iod_eqs.materials.dataMap.begin(); it != iod_eqs.materials.dataMap.end(); it++){
     int matid = it->first;
-    if(matid < 0 || matid >= heatdiffFcn.size()) {
+    if(matid < 0 || matid >= (int)heatdiffFcn.size()) {
       print_error("*** Error: Detected error in the specification of material indices (id = %d).\n", matid);
     }
     switch (it->second->heat_diffusion.type) {
       case HeatDiffusionModelData::NONE :
-        heatdiffFcn[matid] = new HeatDiffuFcnBase();
+        heatdiffFcn[matid] = new HeatDiffusionFcnBase();
         break;
       case HeatDiffusionModelData::CONSTANT :
-        heatdiffFcn[matid] = new HeatDiffuFcnConstant(it->second->heat_diffusion);
+        heatdiffFcn[matid] = new HeatDiffusionFcnConstant(it->second->heat_diffusion);
     }
   }
   for(auto&& diff : heatdiffFcn)
     if(!diff)
-     diff = new HeatDiffuFcnBase();
+     diff = new HeatDiffusionFcnBase();
 
 
 }
@@ -64,7 +69,7 @@ HeatDiffusionOperator::HeatDiffusionOperator(MPI_Comm &comm_, DataManagers3D &dm
 
 HeatDiffusionOperator::~HeatDiffusionOperator()
 {
-  for(int i =0; i<heatdiffFcn.size();i++)
+  for(int i =0; i<(int)heatdiffFcn.size();i++)
     delete heatdiffFcn[i];
 }
 
@@ -84,7 +89,7 @@ HeatDiffusionOperator::Destroy()
 // Add diffusion fluxes on the left hand side of the N-S equations
 void
 HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, 
-                                          vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                          [[maybe_unused]] vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                           SpaceVariable3D &R)
 {
 
@@ -98,14 +103,10 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
-
-        //if(v[k][j][i][0] - 0.0 < 1e-13)
-        //   std::cout << "before rho = " << v[k][j][i][0] << "p = " << v[k][j][i][4] << std::endl;
-
         myid = id[k][j][i]; 
         e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
         Te[k][j][i] = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
-  }
+      }
   
   T.RestoreDataPointerToLocalVector(); 
   
@@ -123,15 +124,12 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
   Vec5D*** res  = (Vec5D***)R.GetDataPointer();
 
   double dx = 0.0, dy = 0.0, dz = 0.0;
-  Vec5D flux(0.0);
+  double flux(0.0);
   int neighid = 0;
-  double myk = 0.0;
-  double neighk = 0.0;
+  double myk = 0.0; //diffusivity
+  double neighk = 0.0; //neighbor's diffusivity
   double denom = 0.0;
-  double myp, myrho;
-  double rhomin, rhomax, pmin, pmax;
-  double plimit;
-  int limit_factor = 1000;
+
   for(int k=k0; k<kkmax; k++)
     for(int j=j0; j<jjmax; j++)
       for(int i=i0; i<iimax; i++) {
@@ -145,87 +143,46 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         dy   = dxyz[k][j][i][1];
         dz   = dxyz[k][j][i][2];
 
-        myk = heatdiffFcn[myid]->conduct;
+        myk = heatdiffFcn[myid]->GetDiffusivity();
 
-        myp = v[k][j][i][4];
-        myrho = v[k][j][i][0];
-      /*
-      if(myid == 1){
-        rhomin = varFcn[myid]->rhomin;
-        rhomax = varFcn[myid]->rhomax;
-        pmin = varFcn[myid]->pmin;
-        pmax = varFcn[myid]->pmax;
-        if(pmin <0)
-           plimit = pmin/limit_factor;
-        else
-           plimit = pmin*limit_factor;
-
-        if(myp < plimit){
-          myk = 0.0;
-         // fprintf(stderr,"Warning: The pressure at node (%d %d %d) is %e which is too low, so the diffusivity is set to %e\n", k, j, i, myp, myk);
-        }
-        if(myrho < limit_factor*rhomin){
-          myk = 0.0;
-         // fprintf(stderr,"Warning: The density at node (%d %d %d) is %e which is too low, so the diffusivity is set to %e\n", k, j, i, myrho, myk);
-        }
-       if(myp > pmax/limit_factor){
-          myk = 0.0;
-         // fprintf(stderr,"Warning: The pressure at node (%d %d %d) is %e which is too high, so the diffusivity is set to zero\n", k, j, i, myp);
-        }
-        if(myrho > rhomax/limit_factor){
-          myk = 0.0;
-         // fprintf(stderr,"Warning: The density at node (%d %d %d) is %e which is too high, so the diffusivity is set to zero\n", k, j, i, myrho);
-        }
-      }
-      */
 
         //*****************************************
         // calculate flux function F_{i-1/2,j,k}
         //*****************************************
         if(k!=kkmax-1 && j!=jjmax-1) {
           neighid = id[k][j][i-1];
-          neighk = heatdiffFcn[neighid]->conduct;
+          neighk = heatdiffFcn[neighid]->GetDiffusivity();
           denom = myk + neighk;
-          flux[4] = (denom == 0) ? 0.0 : 2*myk*neighk/denom*dTdx_i[k][j][i]; //If neigh is "iactive", neighk = 0, so flux = 0
+          flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdx_i[k][j][i]; //If both are inactive, flux is 0
           flux *= dy*dz;
-          res[k][j][i]   += flux;
-          res[k][j][i-1] -= flux;
+          res[k][j][i][4]   += flux;
+          res[k][j][i-1][4] -= flux;
         }
-        //Debug
-        //if(j == 300)
-         // fprintf(stderr,"- Node (%d, %d, %d), heat diffusivity is %e \n, diffusivity of its neighbor is %e, diffusion flux at i-1/2 is: %e.\n", i,j,k,myk,neighk,flux[4]);
         
         //*****************************************
         //calculate flux function G_{i,j-1/2,k}
         //*****************************************
         if(i!=iimax-1 && k!=kkmax-1) {
           neighid = id[k][j-1][i];
-          neighk = heatdiffFcn[neighid]->conduct;
-          flux[4] = (denom == 0) ? 0.0 : 2*myk*neighk/denom*dTdy_j[k][j][i];
+          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdy_j[k][j][i];
           flux *= dx*dz;
-          res[k][j][i]   += flux;
-          res[k][j-1][i] -= flux;
+          res[k][j][i][4]   += flux;
+          res[k][j-1][i][4] -= flux;
         }
-        //Debug
-        //if(j == 300)
-          //fprintf(stderr,"diffusivity of its neighbor is %e, heat diffusion flux at j-1/2 is: %e.\n", neighk, flux[4]);
-
 
         //*****************************************
         //calculate flux function H_{i,j,k-1/2}
         //*****************************************   
         if(i!=iimax-1 && j!=jjmax-1) {
           neighid = id[k-1][j][i];
-          neighk = heatdiffFcn[neighid]->conduct;
-          flux[4] = (denom == 0) ? 0.0 : 2*myk*neighk/denom*dTdz_k[k][j][i];
+          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdz_k[k][j][i];
           flux *= dx*dy;
-          res[k][j][i]   += flux;
-          res[k-1][j][i] -= flux;
+          res[k][j][i][4]   += flux;
+          res[k-1][j][i][4] -= flux;
         }
-        //debug
-        //if(j == 300)
-          //fprintf(stderr,"diffusivity of its neighbor is %e, heat diffusion flux at k-1/2 is: %e.\n", neighk, flux[4]);
-  }
+      }
 
   dTdx_i_minus_half.RestoreDataPointerToLocalVector();
   dTdy_j_minus_half.RestoreDataPointerToLocalVector();
@@ -243,7 +200,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
 
 //--------------------------------------------------------------------------
 // The symmetry terms are placed on the left-hand-side of the N-S equations,
-// // and *added* to residual R (which is assumed to be on the left-hand-side)
+// and *added* to residual R (which is assumed to be on the left-hand-side)
 void
 HeatDiffusionOperator::AddSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
 {
@@ -253,7 +210,10 @@ HeatDiffusionOperator::AddSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariab
     AddCylindricalSymmetryDiffusionTerms(V, ID, R);
 }
 
-void HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
+//--------------------------------------------------------------------------
+
+void
+HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
 {
   //Get mesh data
   double***    vol = (double***)volume.GetDataPointer();
@@ -270,12 +230,10 @@ void HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
-
         myid = id[k][j][i];
         e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
         Te[k][j][i] = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
-  }
-
+      }
   T.RestoreDataPointerToLocalVector();
 
   //Get \partial(T)/partial(r)
@@ -296,7 +254,7 @@ void HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &
         coeff = vol[k][j][i]*2.0/radial;
  
         myid = id[k][j][i];
-        myk = heatdiffFcn[myid]->conduct; 
+        myk = heatdiffFcn[myid]->GetDiffusivity();
 
         r[k][j][i][4] -= coeff*myk*dTdx[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
       }
@@ -313,7 +271,10 @@ void HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &
 
 }
 
-void HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
+//--------------------------------------------------------------------------
+
+void
+HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
 {
 
   //Get data
@@ -328,12 +289,11 @@ void HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
-
         myid = id[k][j][i];
         e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
         Te[k][j][i] = varFcn[myid]->GetTemperature(v[k][j][i][0], e);
-  }
-  T.RestoreDataPointerAndInsert();
+      }
+  T.RestoreDataPointerToLocalVector();
 
   //Get \partial(T)/partial(r)
   std::vector<int> Ti0{0};
@@ -366,8 +326,7 @@ void HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D
         //fprintf(stderr,"Check at (%d,%d,%d) coeff = %e\n", i,j,k,coeff);
 
         myid = id[k][j][i];
-        myk = heatdiffFcn[myid]->conduct;
-        //fprintf(stderr,"Check at (%d,%d,%d) myk = %e\n", i,j,k,myk);
+        myk = heatdiffFcn[myid]->GetDiffusivity();
 
         r[k][j][i][4] -= coeff*myk*dTdy[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
         //fprintf(stderr,"Check at (%d,%d,%d) R[4] = %e\n", i,j,k,r[k][j][i][4]);

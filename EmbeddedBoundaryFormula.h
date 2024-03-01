@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _EMBEDDED_BOUNDARY_FORMULA_H_
 #define _EMBEDDED_BOUNDARY_FORMULA_H_
 
@@ -22,7 +27,7 @@ class EmbeddedBoundaryFormula {
 
 public:
 
-  enum Operation {MIRRORING = 0};
+  enum Operation {MIRRORING = 0, LINEAR_EXTRAPOLATION = 1};
 
   enum ImageScenario {NODE = 0, EDGE_SHARED = 1, EDGE_REMOTE = 2,
                       FACE_SHARED = 3, FACE_REMOTE = 4, 
@@ -37,19 +42,22 @@ private:
 
   std::vector<Int3> node;
   std::vector<double> coeff; //!< Note: sizes of node and coeff are the same
-  double constant; //!< constant term in the affine function (often 0).
+  double constant; //!< MIRRORING: constant in affine function; EXTRAP: abs((ghost-interface)/(ghost-image))
   
 public:
 
-  EmbeddedBoundaryFormula(double eps_ = 1.0e-12);
+  EmbeddedBoundaryFormula(Operation operation_ = MIRRORING, double eps_ = 1.0e-12);
   ~EmbeddedBoundaryFormula();
 
   //! Explicitly specify the formula
   void SpecifyFormula(Operation op, ImageScenario sc, std::vector<Int3> &node_, std::vector<double> &coeff_,
                       double constant_ = 0.0);
 
-  //! Build the formula
-  void BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& xi);
+  //! Build the mirroring formula
+  void BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& xi, double constant_ = 0.0);
+
+  //! Build the linear extrapolation formula
+  void BuildLinearExtrapolationFormula(Int3& ghost, Int3& image, Vec3D& xi, double constant_); 
 
   //! Get Info
   Operation            GetOperationType() {return operation;}
@@ -60,10 +68,12 @@ public:
   double               GetConstant()      {return constant;}
 
   //! Apply the formula
-  double Evaluate(double*** v); //!< the 3D data structure (stored in SpaceVariable3D)
+  double Evaluate(double*** v, double vin=0.0); //!< the 3D data structure (stored in SpaceVariable3D)
+  Vec3D Evaluate3D(Vec3D*** v, Vec3D vin=0.0);
 
   //! Apply the formula
-  double Evaluate(std::vector<double>& v); //!< v must have the same size as "node", and the correct order.
+  double Evaluate(std::vector<double>& v, double vin=0.0); //!< v must have the same size as "node", and the correct order.
+  Vec3D Evaluate3D(std::vector<Vec3D>& v, Vec3D vin=0.0);
 
 private:
 

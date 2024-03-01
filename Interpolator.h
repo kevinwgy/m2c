@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _INTERPOLATOR_H__
 #define _INTERPOLATOR_H__
 
@@ -31,9 +36,9 @@ public:
   virtual ~InterpolatorBase() { }
 
   //! Interpolate at cell interfaces
-  virtual void InterpolateAtCellInterfaces(int dir/*0~x,1~y,2~z*/,
-                                           SpaceVariable3D &Vin, std::vector<int> &input_dof, 
-                                           SpaceVariable3D &Vout, std::vector<int> &output_dof) {
+  virtual void InterpolateAtCellInterfaces([[maybe_unused]] int dir/*0~x,1~y,2~z*/,
+                                           [[maybe_unused]] SpaceVariable3D &Vin, [[maybe_unused]] std::vector<int> &input_dof, 
+                                           [[maybe_unused]] SpaceVariable3D &Vout, [[maybe_unused]] std::vector<int> &output_dof) {
     print_error("*** Error: InterpolateAtCellInterfaces not defined\n");
     exit_mpi();
   }

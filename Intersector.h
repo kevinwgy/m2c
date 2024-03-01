@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _INTERSECTOR_H_
 #define _INTERSECTOR_H_
 
@@ -89,7 +94,7 @@ class Intersector {
   KDTree<MyTriangle, 3> *tree_1; //!< a KDTree that organizes the triangles in scope (does not store its own copy)
 
 
-  //! Infrastructure #1. N(>1) layer of neighbors
+  //! Infrastructure #2. N(>1) layer of neighbors
   SpaceVariable3D BBmin_n, BBmax_n; 
   Vec3D subD_bbmin_n, subD_bbmax_n;
   std::vector<MyTriangle> scope_n;
@@ -173,9 +178,9 @@ public:
   bool Intersects(Vec3D &X0, Vec3D &X1);
 
   //! Interface tracking functions
-  void TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers);
+  double TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers);
 
-  void RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
+  double RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
 
 
 /** Below is like the a la carte menu. Try to use the pre-defined "combos" above as much as you can. 
@@ -208,7 +213,7 @@ public:
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
   void RefillAfterSurfaceUpdate();
 
-  void CalculateUnsignedDistanceNearSurface(int nL); //!< Calculate "Phi" for small "nL"
+  double CalculateUnsignedDistanceNearSurface(int nL); //!< Calculate "Phi" for small "nL"
 
   //! Find the elements of the embedded surface that constitute the boundary of a "color". For each element in\n
   //! in this set, determine which side(s) of it faces the interior of this color. "status" has the size of\n

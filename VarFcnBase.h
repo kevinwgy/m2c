@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _VAR_FCN_BASE_H_
 #define _VAR_FCN_BASE_H_
 
@@ -32,8 +37,10 @@ class VarFcnBase {
 
 public:
   
-  enum Type{STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, JWL = 3, 
-            ANEOS_BIRCH_MURNAGHAN_DEBYE = 4, DUMMY = 5} type;
+  enum Type{STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, 
+            EXTENDED_MIE_GRUNEISEN = 3, TILLOTSON = 4,
+            JWL = 5, ANEOS_BIRCH_MURNAGHAN_DEBYE = 6,
+            HOMOGENEOUS_INCOMPRESSIBLE = 7, DUMMY = 8} type;
 
   double rhomin,pmin;
   double rhomax,pmax;
@@ -48,96 +55,103 @@ public:
     failsafe_density = data.failsafe_density;
   }
 
-  VarFcnBase(StateVariable &sv) {} //only used to construct VarFcnDummy
+  VarFcnBase() {} //only used to construct VarFcnDummy
 
   virtual ~VarFcnBase() {}
  
   //----- EOS-Specific Functions -----//
   //! get pressure from density (rho) and internal energy per unit mass (e)
-  virtual double GetPressure(double rho, double e) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetPressure Function not defined\n\033[0m");
+  virtual double GetPressure([[maybe_unused]] double rho, [[maybe_unused]] double e) {
+    fprintf(stdout,"\033[0;31m*** Error: GetPressure Function not defined.\033[0m\n");
+    exit(-1); return 0.0;}
+
+  //! some (but not all) material models have a reference pressure, e.g., incompressible materials
+  virtual double GetReferencePressure() {
+    fprintf(stdout,"\033[0;31m*** Error: GetPressure Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! get e (internal energy per unit mass) from density (rho) and pressure (p)
-  virtual double GetInternalEnergyPerUnitMass(double rho, double p) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetInternalEnergyPerUnitMass Function not defined\n\033[0m");
+  virtual double GetInternalEnergyPerUnitMass([[maybe_unused]] double rho, [[maybe_unused]] double p) {
+    fprintf(stdout,"\033[0;31m*** Error: GetInternalEnergyPerUnitMass Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! get e - e0 from density (rho) and pressure (p)
-  virtual double GetReferenceInternalEnergyPerUnitMass() const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetReferenceInternalEnergyPerUnitMass Function not defined\n\033[0m");
+  virtual double GetReferenceInternalEnergyPerUnitMass() {
+    fprintf(stdout,"\033[0;31m*** Error: GetReferenceInternalEnergyPerUnitMass Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! get rho (density) from p (pressure) and p (internal energy per unit mass)
-  virtual double GetDensity(double p, double e) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetDensity Function not defined\n\033[0m");
+  virtual double GetDensity([[maybe_unused]] double p, [[maybe_unused]] double e) {
+    fprintf(stdout,"\033[0;31m*** Error: GetDensity Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! dpdrho = \frac{\partial p(\rho,e)}{\partial \rho}
-  virtual double GetDpdrho(double rho, double e) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetDpdrho Function not defined\n\033[0m");
+  virtual double GetDpdrho([[maybe_unused]] double rho, [[maybe_unused]] double e) {
+    fprintf(stdout,"\033[0;31m*** Error: GetDpdrho Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! BigGamma = 1/rho*(\frac{\partial p(\rho,e)}{\partial e})
   //  It is called "BigGamma" to distinguish it from the small "gamma" in perfect and stiffened EOS.
-  virtual double GetBigGamma(double rho, double e) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetBigGamma Function not defined\n\033[0m");
+  virtual double GetBigGamma([[maybe_unused]] double rho, [[maybe_unused]] double e) {
+    fprintf(stdout,"\033[0;31m*** Error: GetBigGamma Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! temperature law, defined separately for each EOS
-  virtual double GetTemperature(double rho, double e) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetTemperature Function not defined\n\033[0m");
+  virtual double GetTemperature([[maybe_unused]] double rho, [[maybe_unused]] double e) {
+    fprintf(stdout,"\033[0;31m*** Error: GetTemperature Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! temperature law, defined separately for each EOS
-  virtual double GetReferenceTemperature() const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetReferenceTemperature Function not defined\n\033[0m");
+  virtual double GetReferenceTemperature() {
+    fprintf(stdout,"\033[0;31m*** Error: GetReferenceTemperature Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! temperature law, defined separately for each EOS
-  virtual double GetInternalEnergyPerUnitMassFromTemperature(double rho, double T) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetInternalEnergyPerUnitMassFromTemperature Function not defined\n\033[0m");
+  virtual double GetInternalEnergyPerUnitMassFromTemperature([[maybe_unused]] double rho, [[maybe_unused]] double T) {
+    fprintf(stdout,"\033[0;31m*** Error: GetInternalEnergyPerUnitMassFromTemperature Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //! calculate e from rho and h
-  virtual double GetInternalEnergyPerUnitMassFromEnthalpy(double rho, double h) const{
-    fprintf(stderr,"\033[0;31m*** Error:  GetInternalEnergyPerUnitMassFromEnthalpy Function not defined\n\033[0m");
+  virtual double GetInternalEnergyPerUnitMassFromEnthalpy([[maybe_unused]] double rho, [[maybe_unused]] double h) {
+    fprintf(stdout,"\033[0;31m*** Error: GetInternalEnergyPerUnitMassFromEnthalpy Function not defined.\033[0m\n");
     exit(-1); return 0.0;}
 
   //checks that the Euler equations are still hyperbolic
-  virtual bool CheckState(double rho, double p, bool silence = false) const{
+  virtual bool CheckState(double rho, double p, bool silence = false) {
     if(!std::isfinite(rho) || !std::isfinite(p)) {
       if(!silence)
-        fprintf(stderr, "*** Error: CheckState failed. rho = %e, p = %e.\n\033[0m", rho, p);
+        fprintf(stdout, "*** Error: CheckState failed. rho = %e, p = %e.\033[0m\n", rho, p);
       return true;
     }
     if(rho <= 0.0) {
       if(!silence && verbose>1)
-        fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
+        fprintf(stdout, "Warning: Negative density. rho = %e, p = %e.\n", rho, p);
       return true;
     }
     double e = GetInternalEnergyPerUnitMass(rho,p);
     double c2 = GetDpdrho(rho, e) + p/rho*GetBigGamma(rho, e);
     if(c2<=0){
       if(!silence && verbose>1)
-        fprintf(stdout, "Warning: Negative density or violation of hyperbolicity. rho = %e, p = %e.\n", rho, p);
+        fprintf(stdout, "Warning: Violation of hyperbolicity. rho = %e, p = %e, c^2 = %e.\n", rho, p, c2);
       return true;
     }
     return false;
   }
 
   //checks that the Euler equations are still hyperbolic
-  virtual bool CheckState(double *V, bool silence = false) const{
-    if(!std::isfinite(V[0]) || !std::isfinite(V[1]) || !std::isfinite(V[2]) || !std::isfinite(V[3]) || !std::isfinite(V[4])){
+  virtual bool CheckState(double *V, bool silence = false) {
+    if(!std::isfinite(V[0]) || !std::isfinite(V[1]) || !std::isfinite(V[2]) || !std::isfinite(V[3]) ||
+       !std::isfinite(V[4])){
       if(!silence)
-        fprintf(stderr, "\033[0;31m*** Error: CheckState failed. V = %e %e %e %e %e\n\033[0m", V[0], V[1], V[2], V[3], V[4]);
+        fprintf(stdout, "\033[0;31m*** Error: CheckState failed. V = %e %e %e %e %e.\033[0m\n",
+                V[0], V[1], V[2], V[3], V[4]);
       return true;
     }
-    return CheckState(V[0], V[4]); 
+    return CheckState(V[0], V[4], silence); 
   }
  
   //check for phase transitions
-  virtual bool CheckPhaseTransition(int id/*id of the other phase*/) const{
+  virtual bool CheckPhaseTransition([[maybe_unused]] int id/*id of the other phase*/) {
     return false; //by default, phase transition is not allowed/considered
   }
 
@@ -198,8 +212,8 @@ double VarFcnBase::ComputeSoundSpeed(double rho, double e)
 {
   double c2 = GetDpdrho(rho, e) + GetPressure(rho,e)/rho*GetBigGamma(rho, e);
   if(c2<=0) {
-    fprintf(stderr,"\033[0;31m*** Error: Cannot calculate speed of sound (Square-root of a negative number): rho = %e, e = %e.\n\033[0m",
-            rho, e);
+    fprintf(stdout,"\033[0;31m*** Error: Cannot calculate speed of sound (Square-root of a negative number): "
+            "rho = %e, e = %e.\033[0m\n", rho, e);
     exit(-1);
   }
   return sqrt(c2);
@@ -222,8 +236,8 @@ double VarFcnBase::ComputeMachNumber(double *V)
   double c = ComputeSoundSpeedSquare(V[0], e);
 
   if(c<0) {
-    fprintf(stderr,"\033[0;31m*** Error: c^2 (square of sound speed) = %e in ComputeMachNumber. V = %e, %e, %e, %e, %e.\n\033[0m",
-            c, V[0], V[1], V[2], V[3], V[4]);
+    fprintf(stdout,"\033[0;31m*** Error: c^2 (square of sound speed) = %e in ComputeMachNumber. "
+            "V = %e, %e, %e, %e, %e.\033[0m\n", c, V[0], V[1], V[2], V[3], V[4]);
     exit(-1);
   } else
     c = sqrt(c);
@@ -260,7 +274,7 @@ bool VarFcnBase::ClipDensityAndPressure(double *V, double *U)
 
   if(V[0]<rhomin){
 //    if(verbose)
-//      fprintf(stderr,"clip density from %e to %e.\n", V[0], rhomin);
+//      fprintf(stdout,"clip density from %e to %e.\n", V[0], rhomin);
     V[0] = rhomin;
     clip = true;
   }

@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<ReferenceMapOperator.h>
 #include<GradientCalculatorFD3.h>
 #include<GeoTools.h>
@@ -12,7 +17,7 @@ ReferenceMapOperator::ReferenceMapOperator(MPI_Comm &comm_, DataManagers3D &dm_a
                                            std::vector<GhostPoint> &ghost_nodes_outer_)
                     : comm(comm_), iod(iod_), coordinates(coordinates_), global_mesh(global_mesh_),
                       ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
-                      scalarG2(comm_, &(dm_all_.ghosted2_3dof)),    
+                      vectorG2(comm_, &(dm_all_.ghosted2_3dof)),    
                       Xil(comm_, &(dm_all_.ghosted1_3dof)),
                       Xir(comm_, &(dm_all_.ghosted1_3dof)),
                       Xib(comm_, &(dm_all_.ghosted1_3dof)),
@@ -46,7 +51,7 @@ ReferenceMapOperator::~ReferenceMapOperator()
 void
 ReferenceMapOperator::Destroy()
 {
-  scalarG2.Destroy();
+  vectorG2.Destroy();
   Xil.Destroy();
   Xir.Destroy();
   Xib.Destroy();
@@ -74,7 +79,8 @@ ReferenceMapOperator::TagExternalGhostNodes()
     if(it->bcType == MeshData::SYMMETRY) {
       ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 0;
     }
-    else if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+    else if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET ||
+            it->bcType == MeshData::OVERSET) {
       ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;      
     }
     else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::STICKWALL) {
@@ -165,7 +171,7 @@ ReferenceMapOperator::TagExternalGhostNodes()
 
     }
     else {
-      fprintf(stderr,"\033[0;31m*** Error: Detected unknown boundary type (%d).\033[0m\n",(int)it->bcType);
+      fprintf(stdout,"\033[0;31m*** Error: Detected unknown boundary type (%d).\033[0m\n",(int)it->bcType);
       exit(-1);
     }
 
@@ -178,7 +184,48 @@ ReferenceMapOperator::TagExternalGhostNodes()
 void
 ReferenceMapOperator::SetInitialCondition(SpaceVariable3D &Xi)
 {
+
+#if HYPERELASTICITY_TEST == 1
+  // assume time t = 1.0
+  double time = 1.0;
+  double pi = acos(-1.0);
+  double dmax = 0.5, Rmax = 1.0;
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec3D*** xi     = (Vec3D***)Xi.GetDataPointer();
+  double z, r;
+
+  if(iod.mesh.type == MeshData::CYLINDRICAL) {
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
+          z = coords[k][j][i][0];        
+          r = coords[k][j][i][1];        
+          xi[k][j][i][0] = r<=Rmax ? z - dmax*sin(pi*r/(2.0*Rmax))*time : z;
+          xi[k][j][i][1] = r;
+          xi[k][j][i][2] = coords[k][j][i][2];
+        }
+  }
+  else { //true 3D
+    for(int k=kk0; k<kkmax; k++)
+      for(int j=jj0; j<jjmax; j++)
+        for(int i=ii0; i<iimax; i++) {
+          z = coords[k][j][i][2];
+          r = sqrt(coords[k][j][i][0]*coords[k][j][i][0] +
+                   coords[k][j][i][1]*coords[k][j][i][1]);        
+          xi[k][j][i][0] = coords[k][j][i][0];
+          xi[k][j][i][1] = coords[k][j][i][1];
+          xi[k][j][i][2] = r<=Rmax ? z - dmax*sin(pi*r/(2.0*Rmax))*time : z;
+        }
+  }
+
+  Xi.RestoreDataPointerAndInsert();
+  coordinates.RestoreDataPointerToLocalVector();
+  return;
+#endif
+
+  // ------------------------------------------
   Xi.AXPlusBY(0.0, 1.0, coordinates, true); //also populating ghost nodes
+  // ------------------------------------------
 }
 
 //-------------------------------------------------------------------
@@ -278,7 +325,7 @@ ReferenceMapOperator::ApplyBoundaryConditions(SpaceVariable3D &Xi)
         break;
       
       default:
-        fprintf(stderr,"\033[0;31m*** Error: Unable to impose boundary conditions "
+        fprintf(stdout,"\033[0;31m*** Error: Unable to impose boundary conditions "
                        "for reference map.\033[0m\n");
         exit(-1);
     }
@@ -302,19 +349,19 @@ ReferenceMapOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &Xi, S
   //***************************************************************
   vector<int> ind0{0,1,2};
 
-  Vec3D*** s = (Vec3D***)scalarG2.GetDataPointer();
+  Vec3D*** s = (Vec3D***)vectorG2.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++)
         s[k][j][i] = xi[k][j][i];
-  scalarG2.RestoreDataPointerAndInsert(); //need to exchange
+  vectorG2.RestoreDataPointerAndInsert(); //need to exchange
 
-  grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, Xil, ind0);
-  grad_plus->CalculateFirstDerivativeAtNodes(0/*x*/, scalarG2, ind0, Xir, ind0);
-  grad_minus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, Xib, ind0);
-  grad_plus->CalculateFirstDerivativeAtNodes(1/*y*/, scalarG2, ind0, Xit, ind0);
-  grad_minus->CalculateFirstDerivativeAtNodes(2/*z*/, scalarG2, ind0, Xik, ind0);
-  grad_plus->CalculateFirstDerivativeAtNodes(2/*z*/, scalarG2, ind0, Xif, ind0); 
+  grad_minus->CalculateFirstDerivativeAtNodes(0/*x*/, vectorG2, ind0, Xil, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(0/*x*/, vectorG2, ind0, Xir, ind0);
+  grad_minus->CalculateFirstDerivativeAtNodes(1/*y*/, vectorG2, ind0, Xib, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(1/*y*/, vectorG2, ind0, Xit, ind0);
+  grad_minus->CalculateFirstDerivativeAtNodes(2/*z*/, vectorG2, ind0, Xik, ind0);
+  grad_plus->CalculateFirstDerivativeAtNodes(2/*z*/, vectorG2, ind0, Xif, ind0); 
 
 
   //***************************************************************

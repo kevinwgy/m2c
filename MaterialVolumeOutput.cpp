@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <MaterialVolumeOutput.h>
 #include <IoData.h>
 
@@ -20,6 +25,12 @@ MaterialVolumeOutput::MaterialVolumeOutput(MPI_Comm &comm_, IoData &iod,
     char *full_fname = new char[spn + strlen(iod.output.materialVolumes.filename)];
     sprintf(full_fname, "%s%s", iod.output.prefix, iod.output.materialVolumes.filename);
     file = fopen(full_fname, "w");
+
+    if(!file) {
+      print_error("*** Error: Cannot open file '%s' for output.\n", full_fname);
+      exit_mpi();
+    }
+
     print(file, "## Number of physical materials: %d (0 - %d); ID for ghost/inactive cells: %d.\n",
                 numMaterials-1, numMaterials-2, numMaterials-1);
     print(file, "## Total volume of computational domain: %e.\n",
@@ -27,6 +38,7 @@ MaterialVolumeOutput::MaterialVolumeOutput(MPI_Comm &comm_, IoData &iod,
                 (iod.mesh.zmax-iod.mesh.z0));
     print(file, "## The last column is the sum over all material subdomains "
                 "(including ghost/inactive).\n");
+    mpi_barrier();
     fflush(file);
     delete [] full_fname;
   } 
@@ -66,6 +78,7 @@ MaterialVolumeOutput::WriteSolution(double time, double dt, int time_step, Space
     sum += vol[i];
   }
   print(file, "%16.8e\n", sum);
+  mpi_barrier();
   fflush(file);
 
   last_snapshot_time = time;
@@ -95,7 +108,7 @@ MaterialVolumeOutput::ComputeMaterialVolumes(SpaceVariable3D& ID, double* vol)
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i]; 
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n", 
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n", 
                   myid);
           exit(-1);
         }

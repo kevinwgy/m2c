@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<DynamicLoadCalculator.h>
 #include<EmbeddedBoundaryOperator.h>
 #include<rbf_interp.hpp>
@@ -15,7 +20,9 @@ DynamicLoadCalculator::DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_,
                                              ConcurrentProgramsHandler &concurrent_)
                      : comm(comm_), iod(iod_), concurrent(concurrent_), 
                        lagout(comm_, iod_.special_tools.transient_input.output),
-                       S0(NULL), S1(NULL), tree0(NULL), tree1(NULL), id0(-INT_MAX), id1(-INT_MAX)
+                       S0(NULL), S1(NULL), tree0(NULL), tree1(NULL), id0(-INT_MAX), id1(-INT_MAX),
+                       force_calculator(std::make_tuple(nullptr,nullptr,nullptr))
+
 { }
 
 //-----------------------------------------------------------------
@@ -23,6 +30,14 @@ DynamicLoadCalculator::DynamicLoadCalculator(IoData &iod_, MPI_Comm &comm_,
 DynamicLoadCalculator::~DynamicLoadCalculator()
 { 
   //the smart pointers ("shared_ptr") are deleted automatically
+
+  //delete user-specified force calculator
+  if(std::get<0>(force_calculator)) {
+    assert(std::get<2>(force_calculator)); //this is the destruction function
+    (std::get<2>(force_calculator))(std::get<0>(force_calculator)); //use the destruction function to destroy the calculator
+    assert(std::get<1>(force_calculator));
+    dlclose(std::get<1>(force_calculator));
+  }
 }
 
 //-----------------------------------------------------------------
@@ -30,15 +45,12 @@ DynamicLoadCalculator::~DynamicLoadCalculator()
 void
 DynamicLoadCalculator::Run()
 {
-  print("\n");
-  print("----------------------------------------------------\n");
-  print("- Activated special tool: Dynamic load calculator. -\n");
-  print("----------------------------------------------------\n");
-  print("\n");
 
   prefix = string(iod.special_tools.transient_input.snapshot_file_prefix);
   suffix = string(iod.special_tools.transient_input.snapshot_file_suffix);
-  ReadMetaFile(string(iod.special_tools.transient_input.metafile));
+
+  if(strcmp(iod.special_tools.transient_input.metafile, "") != 0)
+    ReadMetaFile(string(iod.special_tools.transient_input.metafile));
 
   if(iod.concurrent.aeros.fsi_algo != AerosCouplingData::NONE)
     RunForAeroS();
@@ -75,6 +87,9 @@ DynamicLoadCalculator::RunForAeroS()
   F0.assign(surface->X.size(), Vec3D(0.0));
   F1.assign(surface->X.size(), Vec3D(0.0)); //note that X may contain unused nodes (e.g., in fracture)
 
+  // Setup user-defined force calculator (if provided)
+  SetupUserDefinedForces();
+
   // ---------------------------------------------------
   // Main time loop (mimics the time loop in Main.cpp
   // ---------------------------------------------------
@@ -83,9 +98,9 @@ DynamicLoadCalculator::RunForAeroS()
   ComputeForces(surface, force, t);
 
   lagout.OutputTriangulatedMesh(surface->X0, surface->elems);
-  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, true);
+  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, NULL, true);
 
-  concurrent.CommunicateBeforeTimeStepping();
+  concurrent.CommunicateBeforeTimeStepping(); 
   dt   = concurrent.GetTimeStepSize();
   tmax = concurrent.GetMaxTime();
 
@@ -115,15 +130,63 @@ DynamicLoadCalculator::RunForAeroS()
     dt   = concurrent.GetTimeStepSize();
     tmax = concurrent.GetMaxTime(); //set to a small number at final time-step
 
-    lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, false);
+    lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, NULL, false);
   }
 
   concurrent.FinalExchange();
 
-  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, true);
+  lagout.OutputResults(t, dt, time_step, surface->X0, surface->X, *force, NULL, true);
 
   if(embed)
     delete embed;
+}
+
+//-----------------------------------------------------------------
+
+void
+DynamicLoadCalculator::SetupUserDefinedForces()
+{
+  
+  for(auto it = iod.ebm.embed_surfaces.surfaces.dataMap.begin();
+           it != iod.ebm.embed_surfaces.surfaces.dataMap.end(); it++) {
+    int index = it->first;
+    if(index != 0)
+      continue; // Externally provided embedded surface must have id = 0
+
+    if(strcmp(it->second->force_calculator, "") == 0)
+      return; // user did not specify a force calculator
+
+    // setup the calculator: dynamically load the object
+    std::get<1>(force_calculator) = dlopen(it->second->force_calculator, RTLD_NOW);
+    if(!std::get<1>(force_calculator)) {
+      print_error("*** Error: Unable to load object %s.\n", it->second->force_calculator);
+      exit_mpi();
+    }
+    dlerror();
+    CreateUDF* create = (CreateUDF*) dlsym(std::get<1>(force_calculator), "Create");
+    const char* dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Create in %s.\n",
+                  it->second->force_calculator);
+      exit_mpi();
+    }
+    std::get<2>(force_calculator) = (DestroyUDF*) dlsym(std::get<1>(force_calculator), "Destroy");
+    dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Destroy in %s.\n",
+                  it->second->force_calculator);
+      exit_mpi();
+    }
+
+    //This is the actual calculator
+    std::get<0>(force_calculator) = create();
+
+    print("- Loaded user-defined force calculator for surface %d from %s.\n",
+          index, it->second->force_calculator);
+
+    return; //done!
+  } 
+
 }
 
 //-----------------------------------------------------------------
@@ -284,7 +347,7 @@ DynamicLoadCalculator::ReadSnapshot(string filename, vector<vector<double> >& S)
     }
     if(done)
       break;
-    if(r>=S.size())
+    if(r>=(int)S.size())
       S.resize(S.size() + initial_size, vector<double>(nCol,0.0));
     for(int i=0; i<nCol; i++)
       S[r][i] = data[i];
@@ -296,7 +359,7 @@ DynamicLoadCalculator::ReadSnapshot(string filename, vector<vector<double> >& S)
 //-----------------------------------------------------------------
 
 void
-DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3>* &tree, vector<PointIn3D>& p)
+DynamicLoadCalculator::BuildKDTree(vector<vector<double> >& S, KDTree<PointIn3D,3>* tree, vector<PointIn3D>& p)
 {
   if(tree)
     delete tree; //build a new tree
@@ -347,8 +410,9 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
   MPI_Comm_rank(comm, &mpi_rank);
   MPI_Comm_size(comm, &mpi_size);
 
-  int block_size = floor((double)active_nodes/(double)mpi_size); 
+  int block_size = active_nodes/mpi_size;
   int remainder = active_nodes - block_size*mpi_size;
+  assert(remainder>=0 && remainder<mpi_size);
 
   int* counts = new int[mpi_size];
   int* displacements = new int[mpi_size];
@@ -356,12 +420,13 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
     counts[i] = (i<remainder) ? block_size + 1 : block_size;
     displacements[i] = (i<remainder) ? (block_size+1)*i : block_size*i + remainder;
   }
+  assert(displacements[mpi_size-1]+counts[mpi_size-1] == active_nodes);
 
   int my_start_id = displacements[mpi_rank];
   int my_block_size = counts[mpi_rank];  
 
 
-  //fprintf(stderr,"[%d] my_start_id = %d, my_block_size = %d.\n", mpi_rank, my_start_id, my_block_size);
+  //fprintf(stdout,"[%d] my_start_id = %d, my_block_size = %d.\n", mpi_rank, my_start_id, my_block_size);
   //MPI_Barrier(comm);
  
 
@@ -396,17 +461,17 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
     double low_cut = 0.0, high_cut = DBL_MAX;
     while(nFound<numPoints || nFound>maxCand) {
       if(++counter>maxIt) {
-        fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points for "
+        fprintf(stdout,"\033[0;31m*** Error: Cannot find required number of sample points for "
                        "interpolation (by RBF) after %d iterations. "
                        "Coord(3D):%e %e %e, Candidates: %d, cutoff = %e.\n\033[0m",
                         counter, pnode[0], pnode[1], pnode[2], nFound, cutoff);
         for(int i=0; i<std::min(nFound,maxCand); i++)
-          fprintf(stderr,"%d  %d  %e  %e  %e  d = %e.\n", i, candidates[i].id, candidates[i].x[0],
+          fprintf(stdout,"%d  %d  %e  %e  %e  d = %e.\n", i, candidates[i].id, candidates[i].x[0],
                   candidates[i].x[1], candidates[i].x[2], (candidates[i].x-pnode).norm());
 
-        fprintf(stderr,"low_cut = %e, high_cut = %e.\n", low_cut, high_cut);
+        fprintf(stdout,"low_cut = %e, high_cut = %e.\n", low_cut, high_cut);
 //        for(int i=0; i<counter-1; i++)
-//          fprintf(stderr,"%d  %d  %e.\n", i, founds[i], cutoffs[i]);
+//          fprintf(stdout,"%d  %d  %e.\n", i, founds[i], cutoffs[i]);
 
         exit(-1);
       }
@@ -431,13 +496,13 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
       if((high_cut - low_cut)/high_cut<1e-6) { //fail-safe
         nFound = tree->findCandidatesWithin(pnode, candidates, 10*maxCand, high_cut);
         if(nFound>10*maxCand) {
-          fprintf(stderr,"\033[0;31m*** Error: Cannot find required number of sample points at any"
+          fprintf(stdout,"\033[0;31m*** Error: Cannot find required number of sample points at any"
                          " cutoff distance.\n\033[0m");
           exit(-1); 
         } 
 
         assert(nFound>=numPoints);
-        fprintf(stderr,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
+        fprintf(stdout,"\033[0;35mWarning: Unusual behavior. Found %d candidates with cutoff = %e "
                        "(node: %e %e %e).\n\033[0m", nFound, high_cut, pnode[0], pnode[1], pnode[2]);
         break; 
       }
@@ -469,9 +534,10 @@ DynamicLoadCalculator::InterpolateInSpace(vector<vector<double> >& S, KDTree<Poi
       for(int i=0; i<numPoints; i++) 
         fd[i] = S[dist2node[i].second][col+dim];
  
-      double *rbf_weight, *interp;
-      rbf_weight = MathTools::rbf_weight(3, numPoints, xd, r0, phi, fd);
-      interp = MathTools::rbf_interp(3, numPoints, xd, r0, phi, rbf_weight, 1, pnode);
+      double *rbf_weight = new double[numPoints];
+      double *interp = new double[numPoints];
+      MathTools::rbf_weight(3, numPoints, xd, r0, phi, fd, rbf_weight);
+      MathTools::rbf_interp(3, numPoints, xd, r0, phi, rbf_weight, 1, pnode, interp);
 
       output[var_dim*index + dim] = interp[0]; 
 
@@ -515,7 +581,13 @@ DynamicLoadCalculator::InterpolateInTime(double t1, double* input1, double t2, d
 void
 DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D> *force, double t)
 {
+
+  if(std::get<0>(force_calculator)) {//User has specified a force calculator
+    ApplyUserDefinedForces(surface, force, t);
+    return;
+  }
   
+
   // find the time interval
   int k0(-1), k1(-1);
   if(t<tmin) {
@@ -529,7 +601,7 @@ DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D>
                   "(outside data interval [%e,%e]).\n", t, tmin, tmax);
   }
   else {
-    for(int k=1; k<stamp.size(); k++) {
+    for(int k=1; k<(int)stamp.size(); k++) {
       if(t<stamp[k].first) {
         k0 = k-1;
         k1 = k;
@@ -589,6 +661,32 @@ DynamicLoadCalculator::ComputeForces(TriangulatedSurface *surface, vector<Vec3D>
   }
 
 }
+
+//-----------------------------------------------------------------
+
+void
+DynamicLoadCalculator::ApplyUserDefinedForces(TriangulatedSurface *surface, 
+                                              std::vector<Vec3D> *force, double t)
+{
+  UserDefinedForces *calculator(std::get<0>(force_calculator));
+  if(!calculator)
+    return;
+
+  vector<Vec3D> &Xs(surface->X);
+  vector<Vec3D> &X0(surface->X0);
+  vector<Int3> &elems(surface->elems);
+
+  calculator->GetUserDefinedForces(t, X0.size(), (double*)X0.data(), (double*)Xs.data(),
+                                   elems.size(), (int*)elems.data(),
+                                   (double*)force->data()); //output
+}
+
+
+
+//-----------------------------------------------------------------
+
+
+
 
 //-----------------------------------------------------------------
 

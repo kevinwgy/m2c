@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<TerminalVisualization.h>
 #include<string.h>
 #include<Vector5D.h>
@@ -146,7 +151,7 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
       dx = dx_max;
   }
   if(iod_terminal.dx>0 && iod_terminal.dx != dx)
-    print(comm, "- Adjusted the resolution for terminal visualization. dx: %e -> %e.\n", 
+    print(comm, "  o Adjusted the resolution for terminal visualization. dx: %e -> %e.\n", 
           iod_terminal.dx, dx);
 
   // determine nrows and ncols
@@ -159,7 +164,6 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
   ijk.resize(nrows*ncols);
   Vec3D xyz;
   xyz[pindex] = coord;
-  double h = hmin, v = vmin;
   for(int j=0; j<nrows; j++) {
     xyz[vindex] = vmax - j*dv;
     for(int i=0; i<ncols; i++) {
@@ -183,7 +187,7 @@ TerminalVisualization::TerminalVisualization(MPI_Comm &comm_, TerminalVisualizat
   if(strcmp(iod_terminal.filename, "")) {
     outfile.open(iod_terminal.filename, std::ofstream::out);
     if(!outfile.is_open()) {
-      fprintf(stderr,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
+      fprintf(stdout,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
       exit(-1);
     }
     buf = outfile.rdbuf();
@@ -559,7 +563,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Density";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -572,7 +576,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Velocity (Magnitude)";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -586,7 +590,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Pressure";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -600,7 +604,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     solution_name = "Temperature";
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
     double*** id = ID.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -617,7 +621,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     int i,j,k;
     solution_name = "Material ID";
     double*** id = ID.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -634,7 +638,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
       exit(-1);
     }
     double*** laser = L->GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -651,7 +655,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
       exit(-1);
     }
     double*** phi = Phi[0]->GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -668,7 +672,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
       exit(-1);
     }
     double*** phi = Phi[1]->GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -686,7 +690,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
     }
     Vec5D*** v = (Vec5D***)V.GetDataPointer();
     double*** id = ID.GetDataPointer();
-    for(int n=0; n<ijk.size(); n++) {
+    for(int n=0; n<(int)ijk.size(); n++) {
       i = ijk[n][0];
       j = ijk[n][1];
       k = ijk[n][2];
@@ -742,7 +746,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
         outfile.open(iod_terminal.filename, std::ofstream::app);
 
       if(!outfile.is_open()) {
-        fprintf(stderr,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
+        fprintf(stdout,"\033[0;31m*** Error: Unable to open file %s for visualization.\n", iod_terminal.filename);
         exit(-1);
       }
       buf = outfile.rdbuf();

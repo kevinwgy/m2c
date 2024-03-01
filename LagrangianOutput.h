@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _LAGRANGIAN_OUTPUT_H_
 #define _LAGRANGIAN_OUTPUT_H_
 
@@ -25,6 +30,7 @@ class LagrangianOutput {
 
   FILE* disp_file;
   FILE* sol_file;
+  FILE* sol2_file;
 
 public:
 
@@ -33,7 +39,7 @@ public:
 
   void OutputTriangulatedMesh(std::vector<Vec3D>& X0, std::vector<Int3>& elems);
   void OutputResults(double t, double dt, int time_step, std::vector<Vec3D>& X0, std::vector<Vec3D>& X, 
-                     std::vector<Vec3D>& F, bool force_write); 
+                     std::vector<Vec3D>& F, std::vector<Vec3D>* F2_ptr, bool force_write); 
                 
 private:
 

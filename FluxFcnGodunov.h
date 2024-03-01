@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _FLUX_FCN_GODUNOV_H_
 #define _FLUX_FCN_GODUNOV_H_
 
@@ -40,7 +45,7 @@ void FluxFcnGodunov::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, do
   normal[dir] = 1.0;
 
   riemann.ComputeRiemannSolution(normal, Vm, id, Vp, id, Vmid, midid, Vsm, Vsp);
-
+ 
   if(dir==0) 
     EvaluateFluxFunction_F(Vmid, id, flux);
   else if(dir == 1)
@@ -48,7 +53,7 @@ void FluxFcnGodunov::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, do
   else if(dir == 2)
     EvaluateFluxFunction_H(Vmid, id, flux);
   else {
-    fprintf(stderr, "*** Error: Dir. (%d) not recognized.\n", dir);
+    fprintf(stdout, "*** Error: Dir. (%d) not recognized.\n", dir);
     exit(-1);
   }
 

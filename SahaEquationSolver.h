@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _SAHA_EQUATION_SOLVER_H_
 #define _SAHA_EQUATION_SOLVER_H_
 
@@ -43,7 +48,8 @@ public:
 
   virtual ~SahaEquationSolver();
 
-  virtual void Solve(double* v, double& zav, double& nh, double& ne, std::map<int, std::vector<double> >& alpha_rj);
+  virtual void Solve(double* v, double& zav, double& nh, double& ne, std::map<int, std::vector<double> >& alpha_rj,
+                     double* lambD = NULL);
 
   int GetNumberOfElements() {return elem.size();}
 
@@ -57,8 +63,8 @@ protected:
     ZavEquation(double kb, double T, double nh, double me, double h, std::vector<AtomicIonizationData>& elem_);
     ~ZavEquation() {}
     double operator() (double zav) {return zav - ComputeRHS(zav);}
-    double GetFProd(int r, int j) {assert(j<fprod.size() && r<fprod[j].size()); return fprod[j][r];}
-    double GetZej(double zav, int j) {assert(j<fprod.size()); return ComputeRHS_ElementJ(zav, j);}
+    double GetFProd(int r, int j) {assert(j<(int)fprod.size() && r<(int)fprod[j].size()); return fprod[j][r];}
+    double GetZej(double zav, int j) {assert(j<(int)fprod.size()); return ComputeRHS_ElementJ(zav, j);}
   private:
     double ComputeRHS(double zav); //!< compute the right-hand-side of the Zav equation
     double ComputeRHS_ElementJ(double zav, int j);

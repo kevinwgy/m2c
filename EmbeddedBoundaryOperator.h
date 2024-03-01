@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #ifndef _EMBEDDED_BOUNDARY_OPERATOR_H_
 #define _EMBEDDED_BOUNDARY_OPERATOR_H_
 
@@ -21,7 +26,6 @@ struct Vec5D;
 class EmbeddedBoundaryOperator {
 
   MPI_Comm &comm;
-  IoData &iod;
 
   bool hasSurfFromOtherSolver; //!< currently, at most 1 surface can come from another solver (to be generalized)
 
@@ -30,7 +34,10 @@ class EmbeddedBoundaryOperator {
   vector<TriangulatedSurface> surfaces; //!< embedded surfaces, usually updated at each time step
   vector<TriangulatedSurface> surfaces_prev; //!< saves the topology and coords in the previous time step
   vector<vector<Vec3D> > F; //!< forces
+  vector<vector<Vec3D> > F_over_A; //!< forces divided by nodal area (calculated when force is calculated)
+  vector<vector<double> > Anodal; //!< nodal area
   vector<vector<Vec3D> > F_prev; //!< forces at the previous time step
+  vector<vector<Vec3D> > F_over_A_prev; 
   vector<EmbeddedSurfaceData::Type> surface_type;
   vector<Intersector*> intersector; //!< one intersector for each embedded surface (initialized to NULL)
  
@@ -54,10 +61,19 @@ class EmbeddedBoundaryOperator {
   std::vector<GhostPoint>* ghost_nodes_outer_ptr;
   GlobalMeshInfo *global_mesh_ptr;
 
+  //! Enable 2D and 2D-cylindrical fluid w/ a 3D structural mesh. Only affects SendForce
+  bool cylindrical_symmetry;
+  vector<bool> twoD_to_threeD; //!< one bool for each embedded surface
+
+
 public:
    
   //! Constructor: Without intersector (pointers are set to NULL) or M2C mesh info
   EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver = false);
+
+  //! Another constructor for tracking a single embedded surface provided using a mesh file
+  EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurfaceData &iod_surface);
+
   ~EmbeddedBoundaryOperator();
 
   void Destroy();
@@ -66,11 +82,11 @@ public:
   bool HasSurfaceFromOtherSolver() {return hasSurfFromOtherSolver;} //!< index of surface from other solver is 0
 
   vector<TriangulatedSurface> *GetPointerToSurfaces() {return &surfaces;}
-  TriangulatedSurface         *GetPointerToSurface(int i) {assert(i>=0 && i<surfaces.size()); return &surfaces[i];}
+  TriangulatedSurface         *GetPointerToSurface(int i) {assert(i>=0 && i<(int)surfaces.size()); return &surfaces[i];}
   vector<vector<Vec3D> >      *GetPointerToForces() {return &F;}
-  vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<F.size()); return &F[i];}
+  vector<Vec3D>               *GetPointerToForcesOnSurface(int i) {assert(i>=0 && i<(int)F.size()); return &F[i];}
   vector<Intersector*>        *GetPointerToIntersectors() {return &intersector;}
-  Intersector                 *GetPointerToIntersector(int i) {assert(i>=0 && i<intersector.size()); return intersector[i];}
+  Intersector                 *GetPointerToIntersector(int i) {assert(i>=0 && i<(int)intersector.size()); return intersector[i];}
 
   std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > GetPointerToEmbeddedBoundaryData();
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToEmbeddedBoundaryData(int i); 
@@ -86,8 +102,8 @@ public:
 
   void ComputeForces(SpaceVariable3D &V, SpaceVariable3D &ID);
 
-  void TrackSurfaces();
-  void TrackUpdatedSurfaces();
+  double TrackSurfaces(int phi_layers = 3); //!< by default, calculate phi for 3 layers on each side
+  double TrackUpdatedSurfaces();
 
   void ApplyUserDefinedSurfaceDynamics(double t, double dt);
 
@@ -99,17 +115,35 @@ public:
   //! Output displacements and nodal forces on embedded surfaces
   void OutputResults(double time, double dt, int time_step, bool force_write=false);
 
+  //! Check if an embedded surface is likely a surface in 3D
+  bool IsEmbeddedSurfaceIn3D(int surf);
+
 private:
 
-  void ReadMeshFile(const char *filename, EmbeddedSurfaceData::Type& surface_type,
-                    vector<Vec3D> &Xs, vector<Int3> &Es);
+  void ReadMeshFile(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
+
+  void ReadMeshFileInTopFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
+
+  void ReadMeshFileInSTLFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
+
+  void ReadMeshFileInOBJFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
 
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
 
+  //! Compute "Fs" and "FAs".
+  void ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs,
+                                      vector<Vec3D> &FAs);
+
+  //! Compute "Fs" and "FAs".
+  void ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs,
+                                    vector<Vec3D> &FAs);
+
+  int CombineSharedGaussPointData(vector<double>& data4d, vector<double>& shared_data2d);
+
   double CalculateLoftingHeight(Vec3D &p, double factor);
 
-  Vec3D CalculateTractionAtPoint(Vec3D &p, int side/*0 or 1*/, double area, Vec3D &normal/*towards the "side"*/, 
-                                 Int3 &tnodes, vector<Vec3D> &Xs, Vec5D*** v, double*** id);
+  //! Compute one-sided traction from the "side" indicated by "normal"
+  Vec3D CalculateTractionAtPoint(Vec3D &p, Vec3D &normal/*towards the "side"*/, Vec5D*** v, double*** id);
 
 };
 

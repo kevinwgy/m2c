@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<NonIdealSahaEquationSolver.h>
 #include<fstream>
 #include<boost/math/tools/roots.hpp>
@@ -21,7 +26,7 @@ NonIdealSahaEquationSolver::NonIdealSahaEquationSolver(MaterialIonizationModel& 
 
   f.resize(elem.size(), vector<double>());
   alpha.resize(elem.size(), vector<double>());
-  for(int j=0; j<f.size(); j++) {
+  for(int j=0; j<(int)f.size(); j++) {
     f[j].resize(elem[j].rmax+1, 0.0);
     alpha[j].resize(elem[j].rmax+1, 0.0);
   }
@@ -35,7 +40,8 @@ NonIdealSahaEquationSolver::~NonIdealSahaEquationSolver()
 //--------------------------------------------------------------------------
 
 double 
-NonIdealSahaEquationSolver::ComputeDeltaI(int r, int j, double T, double one_over_lambD)
+NonIdealSahaEquationSolver::ComputeDeltaI(int r, [[maybe_unused]] int j, double T, double nh, double zav,
+                                          double one_over_lambD)
 {
 
   if(iod_ion_mat->depression == MaterialIonizationModel::NO_DEPRESSION)
@@ -44,12 +50,22 @@ NonIdealSahaEquationSolver::ComputeDeltaI(int r, int j, double T, double one_ove
   double dI(0.0);
   if(iod_ion_mat->depression == MaterialIonizationModel::GRIEM) {
     dI = (r+1.0)*factor_deltaI*one_over_lambD;
-  } else {//Ebeling
+  } 
+  else if(iod_ion_mat->depression == MaterialIonizationModel::EBELING) {//Ebeling
     if(one_over_lambD==0.0)
       dI = 0.0;
     else 
       dI = (r+1.0)*factor_deltaI/(1.0/one_over_lambD + 0.125*factor_LambB/sqrt(T));
   }
+  else if(iod_ion_mat->depression == MaterialIonizationModel::GRIEM_FLETCHER) {
+    if(one_over_lambD==0.0)
+      dI = 0.0;
+    else {
+      double Rr = 2.0/3.0*pow((3.0*(r+1)/(4.0*pi*nh*(1+zav))), 1.0/3.0);
+      dI = (r+1.0)*factor_deltaI/sqrt(1.0/(one_over_lambD*one_over_lambD) + Rr*Rr);
+    }
+  }
+
   assert(std::isfinite(dI));
   return dI;
 }
@@ -83,9 +99,18 @@ NonIdealSahaEquationSolver::ComputeStateForElement(int j, double T, double nh, d
   // compute f_{r,j}, r = 1, ..., rmax
   double Ur0(0.0), Ur1(0.0), deltaI0(0.0), deltaI1(0.0);
   for(int r=0; r<=rmax; r++) {
+
     deltaI0 = deltaI1;
     Ur0     = Ur1;
-    deltaI1 = ComputeDeltaI(r,j,T,one_over_lambD);
+
+    deltaI1 = ComputeDeltaI(r,j,T,nh,zav,one_over_lambD);
+    if(r<rmax && deltaI1>iod_ion_mat->depression_max*elem[j].I[r]) {
+      fprintf(stdout,"\033[0;35mWarning: Depression energy (deltaI) is truncated at %e: [j, r] = [%d, %d], "
+                     "deltaI before truncation = %e, I = %e.\033[0m\n", iod_ion_mat->depression_max*elem[j].I[r],
+                     j, r, deltaI1, elem[j].I[r]);
+      deltaI1 = iod_ion_mat->depression_max*elem[j].I[r];
+    }
+
     Ur1     = elem[j].CalculatePartitionFunction(r, T, deltaI1);
 
     f[j][r] = r==0 ? 0.0 //f[j][0] is not used anyway
@@ -117,22 +142,22 @@ NonIdealSahaEquationSolver::ComputeStateForElement(int j, double T, double nh, d
   else { 
     zej = numerator/denominator;
     if(!std::isfinite(zej)) {
-      fprintf(stderr,"\033[0;31m*** Error: Non-Ideal Saha equation solver failed. "
+      fprintf(stdout,"\033[0;31m*** Error: Non-Ideal Saha equation solver failed. "
                      "Z for element %d is not finite.\n\033[0m", j);
       exit(-1);
     }
     if(zej<0.0) {
-      fprintf(stderr, "\033[0;35mWarning: Found negative Z (%e) for element %d. Setting it to 0.\n\033[0m",
+      fprintf(stdout, "\033[0;35mWarning: Found negative Z (%e) for element %d. Setting it to 0.\n\033[0m",
               zej, j);
       zej = 0.0;
     } else if (zej>rmax){
-      fprintf(stderr, "\033[0;35mWarning: Found Z greater than rmax (%e vs. %d) for element %d. Setting it to %d.\n\033[0m",
+      fprintf(stdout, "\033[0;35mWarning: Found Z greater than rmax (%e vs. %d) for element %d. Setting it to %d.\n\033[0m",
               zej, rmax, j, rmax);
       zej = (double)rmax;
     }
   }
   zej *= elem[j].molar_fraction;
-  //fprintf(stderr,"Zej = %e for j = %d.\n", zej, j);
+  //fprintf(stdout,"Zej = %e for j = %d.\n", zej, j);
 
   //compute molar fractions if needed
   if(compute_alpha) {
@@ -174,7 +199,7 @@ NonIdealSahaEquationSolver::ComputeStateForElement(int j, double T, double nh, d
 
 void
 NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne, 
-                                  map<int, vector<double> >& alpha_rj)
+                                  map<int, vector<double> >& alpha_rj, double* lambD)
 {
 
   if(!iod_ion_mat) { //dummy solver 
@@ -183,7 +208,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     nh = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (it==alpha_rj.begin() && r==0) ? 1.0 : 0.0;
     }
     return;
@@ -198,7 +223,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -241,7 +266,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     }
   }
   if(!found_initial_interval) {
-    fprintf(stderr,"\033[0;31m*** Error: Non-ideal Saha equation solver failed. "
+    fprintf(stdout,"\033[0;31m*** Error: Non-ideal Saha equation solver failed. "
             "Cannot find an initial bracketing interval. (T = %e, nh = %e)\n\033[0m",
             T, nh);
     exit(-1);
@@ -286,7 +311,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
   //*******************************************************************
 
 #if DEBUG_SAHA_SOLVER == 1
-  fprintf(stderr,"-- Non-Ideal Saha equation solver terminated in %d iterations, Zav = %.12e,"
+  fprintf(stdout,"-- Non-Ideal Saha equation solver terminated in %d iterations, Zav = %.12e,"
           " 1/lambD = %.12e.\n",
           (int)maxit, zav, one_over_lambD);
 #endif
@@ -298,7 +323,7 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     ne = 0.0;
     for(auto it = alpha_rj.begin(); it != alpha_rj.end(); it++) {
       vector<double> &alpha = it->second;
-      for(int r=0; r<alpha.size(); r++)
+      for(int r=0; r<(int)alpha.size(); r++)
         alpha[r] = (r==0) ? elem[it->first].molar_fraction : 0.0;
     }
     return;
@@ -312,8 +337,8 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
     int j = it->first; //element id
     vector<double> &my_alpha = it->second; //alpha_r
 
-    if(j>=elem.size()) {//this material does not have element j
-      for(int r=0; r<my_alpha.size(); r++)
+    if(j>=(int)elem.size()) {//this material does not have element j
+      for(int r=0; r<(int)my_alpha.size(); r++)
         my_alpha[r] = 0.0;
       continue;
     }
@@ -333,10 +358,17 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
       my_alpha[max_size] = 0;
 
     //too many slots? put 0
-    for(int r=max_size+1; r<my_alpha.size(); r++)
+    for(int r=max_size+1; r<(int)my_alpha.size(); r++)
       my_alpha[r] = 0.0;
   }
 
+  if(lambD) {
+    if(one_over_lambD==0 || !std::isfinite(one_over_lambD))
+      *lambD = 0.0;
+    else
+      *lambD = 1.0/one_over_lambD;
+  }
+ 
 }
 
 //--------------------------------------------------------------------------
@@ -379,7 +411,7 @@ LambDEquation::operator()(double one_over_lambD)
     zav1 /= 2.0;
   }
   if(!found_initial_interval) {
-    fprintf(stderr,"\033[0;31m*** Error: Non-ideal Saha equation solver failed (1). "
+    fprintf(stdout,"\033[0;31m*** Error: Non-ideal Saha equation solver failed (1). "
             "Cannot find an initial bracketing interval. (T = %e, nh = %e, one_over_lambD = %e)\n\033[0m",
             T, nh, one_over_lambD);
     exit(-1);
@@ -441,13 +473,13 @@ double NonIdealSahaEquationSolver::
 LambDEquation::ComputeRHS(double one_over_lambD, double zav)
 {
   double summation = zav; 
-  for(int j=0; j<saha.elem.size(); j++) {
+  for(int j=0; j<(int)saha.elem.size(); j++) {
     saha.ComputeStateForElement(j, T, nh, zav, one_over_lambD, true);  //we need alphas 
     for(int r=1; r<=saha.elem[j].rmax; r++)
       summation += r*r*saha.alpha[j][r];
   }
 
-  return factor_lambD*sqrt(nh*summation);
+  return sqrt(factor_lambD*nh*summation);
 }
 
 //--------------------------------------------------------------------------
@@ -466,7 +498,7 @@ double NonIdealSahaEquationSolver::LambDEquation::
 ZavEquation::ComputeRHS(double zav)
 {
   double rhs = 0.0;
-  for(int j=0; j<saha.elem.size(); j++)
+  for(int j=0; j<(int)saha.elem.size(); j++)
     rhs += saha.ComputeStateForElement(j, T, nh, zav, one_over_lambD, false); //we don't need alpha here
 
   return rhs;

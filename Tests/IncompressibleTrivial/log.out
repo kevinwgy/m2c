@@ -1,0 +1,119 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: 968dc85+ | Branch: main | Tag: 
+Computation started at: 2024-02-15.16:58:37 EDT
+Using 1 processor cores (including concurrent programs).
+Command: /home/kevinw3/tinkercliffs/zoey6/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+
+- Mesh Statistics:
+  X-Direction: [0.000000e+00, 1.000000e+01], 100 nodes/cells, dx_min = 1.000000e-01, dx_max = 1.000000e-01.
+  Y-Direction: [0.000000e+00, 1.000000e+01], 100 nodes/cells, dy_min = 1.000000e-01, dy_max = 1.000000e-01.
+  Z-Direction: [-5.000000e-01, 5.000000e-01], 1 nodes/cells, dz_min = 1.000000e+00, dz_max = 1.000000e+00.
+  Total number of nodes/cells: 10000.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 0
+  o Number of ghost nodes outside computational domain: 21212
+
+
+- Initializing the state variables (V) and material id. (ID).
+- Setting up a semi-implicit time integrator.
+  o Linear solver for velocity: fgmres, Preconditioner: bjacobi.
+  o Linear solver for pressure: fgmres, Preconditioner: bjacobi.
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+Step 1: t = 0.000000e+00, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 3.0000e-02 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 17 iterations.
+    * Solver of the y-momentum equation converged in 0 iterations.
+    * Solver of the pressure correction equation converged in 110 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 8.300267e-06.
+- Wrote solution at 1.000000e-01 to solution_0001.vtr.
+Step 2: t = 1.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 8.0000e-02 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 16 iterations.
+    * Solver of the pressure correction equation converged in 127 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 2.806558e-06.
+- Wrote solution at 2.000000e-01 to solution_0002.vtr.
+Step 3: t = 2.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 1.4000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 0 iterations.
+    * Solver of the y-momentum equation converged in 15 iterations.
+    * Solver of the pressure correction equation converged in 97 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 2.807217e-06.
+- Wrote solution at 3.000000e-01 to solution_0003.vtr.
+Step 4: t = 3.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 1.8000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 1 iterations.
+    * Solver of the y-momentum equation converged in 14 iterations.
+    * Solver of the pressure correction equation converged in 133 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 1.363521e-06.
+- Wrote solution at 4.000000e-01 to solution_0004.vtr.
+Step 5: t = 4.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 2.4000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 0 iterations.
+    * Solver of the y-momentum equation converged in 15 iterations.
+    * Solver of the pressure correction equation converged in 92 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 1.350308e-06.
+- Wrote solution at 5.000000e-01 to solution_0005.vtr.
+Step 6: t = 5.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 2.9000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 0 iterations.
+    * Solver of the y-momentum equation converged in 14 iterations.
+    * Solver of the pressure correction equation converged in 82 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 1.343967e-06.
+- Wrote solution at 6.000000e-01 to solution_0006.vtr.
+Step 7: t = 6.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 3.3000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 0 iterations.
+    * Solver of the y-momentum equation converged in 14 iterations.
+    * Solver of the pressure correction equation converged in 69 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 1.341716e-06.
+- Wrote solution at 7.000000e-01 to solution_0007.vtr.
+Step 8: t = 7.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 3.7000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 0 iterations.
+    * Solver of the y-momentum equation converged in 14 iterations.
+    * Solver of the pressure correction equation converged in 70 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 1.340354e-06.
+- Wrote solution at 8.000000e-01 to solution_0008.vtr.
+Step 9: t = 8.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 4.1000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 0 iterations.
+    * Solver of the y-momentum equation converged in 14 iterations.
+    * Solver of the pressure correction equation converged in 76 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 1.339312e-06.
+- Wrote solution at 9.000000e-01 to solution_0009.vtr.
+Step 10: t = 9.000000e-01, dt = 1.000000e-01, cfl = 1.0000e+00. Computation time: 4.5000e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 1.000000e+12).
+    * Solver of the x-momentum equation converged in 0 iterations.
+    * Solver of the y-momentum equation converged in 14 iterations.
+    * Solver of the pressure correction equation converged in 74 iterations.
+  o Converged after 1 iterations. Relative error in velocity (2-norm): 1.338764e-06.
+- Wrote solution at 1.000000e+00 to solution_0010.vtr.
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 1.000000e+00)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 0.490000 sec.
+

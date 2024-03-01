@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include<FloodFill.h>
 #include<Utils.h>
 
@@ -46,21 +51,23 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
   MPI_Comm_size(comm, &mpi_size);
   MPI_Comm_rank(comm, &mpi_rank);
 
+  assert(Obs.NumDOF() == 3);
+
   Vec3D***     ob = (Vec3D***) Obs.GetDataPointer();
   double*** color = Color.GetDataPointer();
 
 /*
   if(mpi_rank==1) {
-  fprintf(stderr,"ii0 = %d, jj0= %d, kk0 = %d, iimax_in = %d, jjmax_in = %d, kkmax_in = %d.\n", ii0, jj0, kk0, iimax_in, jjmax_in, kkmax_in);
+  fprintf(stdout,"ii0 = %d, jj0= %d, kk0 = %d, iimax_in = %d, jjmax_in = %d, kkmax_in = %d.\n", ii0, jj0, kk0, iimax_in, jjmax_in, kkmax_in);
   for(int k=kk0; k<kkmax_in; k++)
     for(int j=jj0; j<jjmax_in; j++)
       for(int i=ii0; i<iimax_in; i++) {
         if(ob[k][j][i][0] != non_obstruction_flag)
-          fprintf(stderr,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k,j,i-1, k,j,i);
+          fprintf(stdout,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k,j,i-1, k,j,i);
         if(ob[k][j][i][1] != non_obstruction_flag)
-          fprintf(stderr,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k,j-1,i, k,j,i);
+          fprintf(stdout,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k,j-1,i, k,j,i);
         if(ob[k][j][i][2] != non_obstruction_flag)
-          fprintf(stderr,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k-1,j,i, k,j,i);
+          fprintf(stdout,"[%d][%d][%d] --/-- [%d][%d][%d].\n", k-1,j,i, k,j,i);
       }
   }
 */
@@ -136,7 +143,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
 
   // store local colors at inner ghost nodes (used in Part II)
   vector<int> ghost_nodes_inner_color(ghost_nodes_inner.size(), -1);
-  for(int i=0; i<ghost_nodes_inner.size(); i++) {
+  for(int i=0; i<(int)ghost_nodes_inner.size(); i++) {
     Int3 &ijk(ghost_nodes_inner[i].ijk);
     ghost_nodes_inner_color[i] = color[ijk[2]][ijk[1]][ijk[0]];
   }
@@ -159,7 +166,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
   set<Int3> equiv; //[0]: local color;  [1]: owner id;  [2]: color from owner
   vector<bool> unique_color(mycolor+1, true); //whether color is uniquely inside subdomain
 
-  for(int i=0; i<ghost_nodes_inner.size(); i++) {
+  for(int i=0; i<(int)ghost_nodes_inner.size(); i++) {
     Int3 &ijk(ghost_nodes_inner[i].ijk);
     if(ghost_nodes_inner_color[i] == 0) {//occluded
       assert(color[ijk[2]][ijk[1]][ijk[0]]==0); //should be occluded from owner
@@ -189,12 +196,12 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
       it_next++;
       for(auto it2 = it_next; it2 != equiv.end(); it2++) {
         if((*it)[0] == (*it2)[0] && (*it)[1] == (*it2)[1] && (*it)[2] != (*it2)[2]) {
-          fprintf(stderr,"\033[0;31m*** Error: Detected inconsistent colors. Proc.%d (me): %d = Proc.%d, %d or %d.\n\033[0m",
+          fprintf(stdout,"\033[0;31m*** Error: Detected inconsistent colors. Proc.%d (me): %d = Proc.%d, %d or %d.\n\033[0m",
                          mpi_rank, (*it)[0], (*it)[1], (*it)[2], (*it2)[2]);
           exit(-1);
         }
         if((*it)[0] != (*it2)[0] && (*it)[1] == (*it2)[1] && (*it)[2] == (*it2)[2]) {
-          fprintf(stderr,"\033[0;31m*** Error: Detected inconsistent colors. Proc.%d (me): %d or %d = Proc.%d, %d.\n\033[0m",
+          fprintf(stdout,"\033[0;31m*** Error: Detected inconsistent colors. Proc.%d (me): %d or %d = Proc.%d, %d.\n\033[0m",
                          mpi_rank, (*it)[0], (*it2)[0], (*it)[1], (*it)[2]);
           exit(-1);
         }
@@ -230,7 +237,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
   counter = 0;
   if(mpi_rank == worker) {
     displacements.resize(mpi_size,-1); 
-    for(int i=0; i<displacements.size(); i++) {
+    for(int i=0; i<(int)displacements.size(); i++) {
       displacements[i] = counter;
       counter += counts[i];
     }
@@ -243,7 +250,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
     MPI_Gatherv(my_data.data(), my_data_count, MPI_INT, all_data.data(), counts.data(), displacements.data(), MPI_INT, worker, comm);
 /*
     for(int i=0; i<counter/4; i++)
-      fprintf(stderr,"[%d] %d = [%d] %d.\n", all_data[4*i], all_data[4*i+1], all_data[4*i+2], all_data[4*i+3]);
+      fprintf(stdout,"[%d] %d = [%d] %d.\n", all_data[4*i], all_data[4*i+1], all_data[4*i+2], all_data[4*i+3]);
 */
   } else {//sender
     MPI_Gatherv(my_data.data(), my_data_count, MPI_INT, NULL, NULL, NULL, MPI_INT, worker, comm);
@@ -312,7 +319,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
 /*
     for(int i=0; i<mpi_size; i++)
       for(auto it = loc2glob[i].begin(); it != loc2glob[i].end(); it++)
-        fprintf(stderr,"[%d] loc %d --> glob %d.\n", i, it->first, it->second);
+        fprintf(stdout,"[%d] loc %d --> glob %d.\n", i, it->first, it->second);
 */
   }
 
@@ -364,7 +371,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
     assert(old_color>0 && old_color<=mycolor);
     assert(old2new[old_color]==-1); //no conflicts.
     old2new[old_color] = new_color;
-    //fprintf(stderr,"[%d] old color %d --> new color %d.\n", mpi_rank, old_color, new_color);
+    //fprintf(stdout,"[%d] old color %d --> new color %d.\n", mpi_rank, old_color, new_color);
   } 
     
   for(int k=k0; k<kmax; k++)
