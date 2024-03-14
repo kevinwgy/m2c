@@ -2909,7 +2909,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 26+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 27+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -2942,6 +2942,10 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                              reinterpret_cast<int OutputData::*>(&OutputData::delta_internal_energy), 2,
                              "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "LaserRadiance", this,
+                             reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,
+                             "Off", 0, "On", 1);
+  //KW: "laser_radiance" is actually irradiance. There used to be a misnomer.
+  new ClassToken<OutputData>(ca, "LaserIrradiance", this,
                              reinterpret_cast<int OutputData::*>(&OutputData::laser_radiance), 2,
                              "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "ReferenceMap", this,
@@ -3064,7 +3068,7 @@ Probes::Probes() {
 void Probes::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 20, father);
+  ClassAssigner *ca = new ClassAssigner(name, 21, father);
 
   new ClassInt<Probes>(ca, "Frequency", this, &Probes::frequency);
   new ClassDouble<Probes>(ca, "TimeInterval", this, &Probes::frequency_dt);
@@ -3077,6 +3081,8 @@ void Probes::setup(const char *name, ClassAssigner *father)
   new ClassStr<Probes>(ca, "VelocityZ", this, &Probes::velocity_z);
   new ClassStr<Probes>(ca, "MaterialID", this, &Probes::materialid);
   new ClassStr<Probes>(ca, "LaserRadiance", this, &Probes::laser_radiance);
+  //KW: laser_radiance is actually irradiance. (A misnomer in the past)
+  new ClassStr<Probes>(ca, "LaserIrradiance", this, &Probes::laser_radiance);
   new ClassStr<Probes>(ca, "LevelSet0", this, &Probes::levelset0);
   new ClassStr<Probes>(ca, "LevelSet1", this, &Probes::levelset1);
   new ClassStr<Probes>(ca, "LevelSet2", this, &Probes::levelset2);
@@ -3163,7 +3169,7 @@ PlanePlot::PlanePlot() {
 Assigner* PlanePlot::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 22, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 23, nullAssigner);
 
   new ClassInt<PlanePlot>(ca, "Frequency", this, &PlanePlot::frequency);
   new ClassDouble<PlanePlot>(ca, "TimeInterval", this, &PlanePlot::frequency_dt);
@@ -3184,6 +3190,8 @@ Assigner* PlanePlot::getAssigner()
   new ClassStr<PlanePlot>(ca, "Velocity", this, &PlanePlot::velocity);
   new ClassStr<PlanePlot>(ca, "MaterialID", this, &PlanePlot::materialid);
   new ClassStr<PlanePlot>(ca, "LaserRadiance", this, &PlanePlot::laser_radiance);
+  //KW: laser_radiance is actually irradiance (Used to have a misnomer.)
+  new ClassStr<PlanePlot>(ca, "LaserIrradiance", this, &PlanePlot::laser_radiance);
   new ClassStr<PlanePlot>(ca, "LevelSet0", this, &PlanePlot::levelset0);
   new ClassStr<PlanePlot>(ca, "LevelSet1", this, &PlanePlot::levelset1);
   new ClassStr<PlanePlot>(ca, "LevelSet2", this, &PlanePlot::levelset2);
@@ -3508,8 +3516,9 @@ void TerminalVisualizationData::setup(const char *name, ClassAssigner *father)
       &TerminalVisualizationData::filename);
 
   new ClassToken<TerminalVisualizationData> (ca, "Variable", this,
-      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::variable), 9,
+      reinterpret_cast<int TerminalVisualizationData::*>(&TerminalVisualizationData::variable), 10,
       "Density", 0, "Velocity", 1, "Pressure", 2, "Temperature", 3, "MaterialID", 4, "LaserRadiance", 5,
+      "LaserIrradiance", 5,
       "LevelSet0", 6, "LevelSet1", 7, "MeanCharge", 8);
 
   new ClassDouble<TerminalVisualizationData>(ca, "HorizontalMin", this, 

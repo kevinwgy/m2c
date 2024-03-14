@@ -1289,7 +1289,7 @@ struct Probes {
   const char *temperature;
   const char *delta_temperature;
   const char *materialid;
-  const char *laser_radiance;
+  const char *laser_radiance; //!< note: this is actually irradiance
   const char *levelset0;
   const char *levelset1;
   const char *levelset2;

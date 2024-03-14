@@ -126,7 +126,7 @@ PlaneOutput::PlaneOutput(MPI_Comm &comm_, OutputData &iod_output_, PlanePlot &io
     if(mpi_rank == WORKER_PROC) {
       FILE *file = fopen(filename[PlanePlot::LASERRADIANCE].c_str(), "w");
       assert(file); //if file is not opened, the pointer would be NULL
-      fprintf(file, "Scalar LaserRadiance under load for SurfaceNodes\n");
+      fprintf(file, "Scalar LaserIrradiance under load for SurfaceNodes\n");
       fclose(file);
     }
   }

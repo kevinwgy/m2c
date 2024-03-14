@@ -19,6 +19,9 @@
 * Class LaserAbsorptionSolver is responsible for solving the
 * laser radiation equation and coupling it with the Navier-
 * Stokes equations.
+*
+* Note: The term "radiance" in this class is actually irradiance
+*
 **************************************************************/
 
 //! Structure of nodal status
