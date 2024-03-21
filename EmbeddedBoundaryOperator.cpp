@@ -217,12 +217,22 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
   // determine twoD_to_threeD (in the constructor, it is set to false by default)
   assert(global_mesh_ptr);
   if(global_mesh_ptr->IsMesh2D()) {
-    if(!global_mesh_ptr->two_dimensional_xy) {
-      print_error("*** Error: 2D Mesh must be in x-y plane. (EmbeddedBoundaryOperator.cpp)\n");
-      exit_mpi();
-    }
-    for(int surf=0; surf<(int)twoD_to_threeD.size(); surf++)
+    bool involves_2D_3D_mapping = false;
+    for(int surf=0; surf<(int)twoD_to_threeD.size(); surf++) {
       twoD_to_threeD[surf] = IsEmbeddedSurfaceIn3D(surf);
+      if(twoD_to_threeD[surf])
+        involves_2D_3D_mapping = true;
+    }
+
+    if(involves_2D_3D_mapping) {
+      print("- Detected embedded surface(s) in 3D, while M2C domain is in 2D.\n");
+      if(!global_mesh_ptr->two_dimensional_xy) {
+        print_error("*** Error: 2D Mesh must be in x-y plane (for 2D->3D mapping).\n");
+        exit_mpi();
+      }
+      else
+        print("  o Activated 2D->3D mapping in load calculation.\n");
+    }
   }
 
 }
@@ -232,35 +242,30 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
 bool
 EmbeddedBoundaryOperator::IsEmbeddedSurfaceIn3D(int surf)
 {
-
-  bool is3D = false;
-
   assert(surf<(int)surfaces.size());
   vector<Vec3D> &X(surfaces[surf].X);
   assert(X.size()>0);
 
-  bool nontrivial[3] = {false,false,false};
-  std::set<float> xyz[3]; //double->float (ignore tiny differences)
+  std::set<double> xyz[3]; //using *set* to eliminate duplicates
+  for(auto&& x : X)
+    for(int d=0; d<3; d++)
+      xyz[d].insert(x[d]);
 
-  for(auto&& x : X) {
-    for(int d=0; d<3; d++) {
+  for(int d=0; d<3; d++) {
+    if(xyz[d].size()<3)
+      return false; //this dimension is not discretized. Cannot be 3D.
 
-      if(nontrivial[d])
-        continue;    
+    vector<double> coords(xyz[d].begin(), xyz[d].end()); //build a vector to store the coords
+    std::sort(coords.begin(), coords.end()); //increasing order
+    double hmax = 0.0;
+    for(int i=0; i<(int)coords.size()-1; i++)
+      hmax = std::max(hmax, coords[i+1]-coords[i]);
 
-      xyz[d].insert((float)x[d]);
-      if(xyz[d].size()>=3)
-        nontrivial[d] = true;
-    }
-
-    if(nontrivial[0] && nontrivial[1] && nontrivial[2]) {
-      is3D = true;
-      break;
-    }
+    if(hmax>0.99*(coords.back() - coords.front())) //direction d has not been discretized
+      return false; //not 3D
   }
 
-  return is3D;
-
+  return true;
 } 
 
 //------------------------------------------------------------------------------------------------
@@ -361,7 +366,8 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
       }
 
       if(twoD_to_threeD[surf])
-        fprintf(stdout,"- Warning (Outputing wetted surface): Out-of-domain elements may not have the correct status.\n");
+        fprintf(stdout,"- Warning (Outputing wetted surface): Out-of-domain elements may not have "
+                "the correct status.\n");
 
       vector<Vec3D>&  Xs(surfaces[surf].X);
       vector<Int3>&   Es(surfaces[surf].elems);
@@ -1251,6 +1257,10 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
     // traction at each Gauss point, (-pI + tau)n --> a Vec3D
     vector<Vec3D> tg(np, 0.0); 
 
+    // whether the fraction of area "controlled" by this Gauss point should be calculated by this cpu core.
+    // Only affects An and FAs, not Fs
+    vector<bool> calculate_An(np, false);
+
     assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
 
     for(int side=0; side<2; side++) { //loop through the two sides
@@ -1268,6 +1278,9 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
           continue; //before lofting, we need to make sure the original Gauss point is in the domain.
                     //otherwise, there can be complexities.
 
+        if(coordinates_ptr->IsHere(ijk0[0],ijk0[1],ijk0[2],false))
+          calculate_An[p] = true;  //this is to avoid double-counting area
+        
         // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
         double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
         xg += loft*normal;
@@ -1295,7 +1308,6 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
         if(!coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
           continue;
 
-//        fprintf(stdout,"[%d] Working on triangle %d, side %d.\n", mpi_rank, tid, side);
         // Calculate traction at Gauss point on this "side"
         if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
           tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
@@ -1306,9 +1318,6 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
 
     }
 
-//    fprintf(stdout,"[%d] Triangle %d: tg = %e %e %e, mag = %e.\n", mpi_rank, tid, tg[0][0], tg[0][1], tg[0][2],
-//            tg[0].norm());
-
     // Now, tg carries traction from both sides of the triangle
 
     // Integrate (See KW's notes for the formula)
@@ -1318,7 +1327,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
       for(int node=0; node<3; node++) {
         double coeff = gweight[p]*gbary[p][node];
         Fs[n[node]] += coeff*tg[p];
-        An[n[node]] += coeff*As[tid];
+        if(calculate_An[p])
+          An[n[node]] += coeff*As[tid];
       } 
     }
   }
