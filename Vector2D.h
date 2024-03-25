@@ -22,6 +22,17 @@ struct Int2 {
   Int2 operator-(const Int2& v2) {Int2 res; for(int i=0; i<2; i++) res.v[i] = v[i] - v2.v[i]; return res;}
   int &operator[](int i) {return v[i];}
   int operator[](int i) const {return v[i];}
+
+  bool operator<(const Int2& v2) const {
+    if     (v[0]<v2.v[0]) {return true;} else if(v[0]>v2.v[0]) {return false;}
+    else if(v[1]<v2.v[1]) {return true;} else return false;
+  }
+
+  bool operator==(const Int2& v2) const {
+    if     (v[0] != v2.v[0])   return false;
+    else if(v[1] != v2.v[1])   return false;
+    else                       return true;
+  }
 };
 
 //------------------------------------------------------------------------------
