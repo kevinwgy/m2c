@@ -1163,7 +1163,7 @@ void ViscosityModelData::setup(const char *name, ClassAssigner *father) {
 HeatDiffusionModelData::HeatDiffusionModelData()
 {
   type = NONE;
-  diffusivity = 0.0;
+  conductivity = 0.0;
 }
 
 //------------------------------------------------------------------------------
@@ -1177,7 +1177,7 @@ void HeatDiffusionModelData::setup(const char *name, ClassAssigner *father) {
            "None",     HeatDiffusionModelData::NONE,
            "Constant", HeatDiffusionModelData::CONSTANT);
 
-  new ClassDouble<HeatDiffusionModelData>(ca, "Diffusivity", this, &HeatDiffusionModelData::diffusivity);
+  new ClassDouble<HeatDiffusionModelData>(ca, "Conductivity", this, &HeatDiffusionModelData::conductivity);
 } 
 
 //------------------------------------------------------------------------------
@@ -3009,6 +3009,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   probes.setup("Probes", ca);
 
+  energy_integration.setup("EnergyIntegration", ca);
+
   linePlots.setup("LinePlot", ca);
 
   planePlots.setup("CutPlane", ca);
@@ -3093,6 +3095,55 @@ void Probes::setup(const char *name, ClassAssigner *father)
   new ClassStr<Probes>(ca, "PrincipalElasticStresses", this, &Probes::principal_elastic_stresses);
 
   myNodes.setup("Node", ca);
+
+}
+
+//------------------------------------------------------------------------------
+EnergyIntegrationData::EnergyIntegrationData()
+{
+  frequency = -100;
+  frequency_dt = -1;
+
+  volume = "";
+  mass = "";
+  total_energy = "";
+  total_enthalpy = "";
+  kinetic_energy = "";
+  internal_energy = "";
+  potential_energy = "";
+  laser_radiation = "";
+
+  x_min = -5;
+  x_max = 5;
+  y_min = 5;
+  y_max = 0;
+  z_min = -2;
+  z_max = 2;
+
+}
+
+//------------------------------------------------------------------------------
+void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 16, father);
+
+  new ClassInt<EnergyIntegrationData>(ca, "Frequency", this, &EnergyIntegrationData::frequency);
+  new ClassDouble<EnergyIntegrationData>(ca, "TimeInterval", this, &EnergyIntegrationData::frequency_dt);
+  new ClassStr<EnergyIntegrationData>(ca, "Volume", this, &EnergyIntegrationData::volume);
+  new ClassStr<EnergyIntegrationData>(ca, "Mass", this, &EnergyIntegrationData::mass);
+  new ClassStr<EnergyIntegrationData>(ca, "TotalEnergy", this, &EnergyIntegrationData::total_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "TotalEnthalpy", this, &EnergyIntegrationData::total_enthalpy);
+  new ClassStr<EnergyIntegrationData>(ca, "KineticEnergy", this, &EnergyIntegrationData::kinetic_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "InternalEnergy", this, &EnergyIntegrationData::internal_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "PotentialEnergy", this, &EnergyIntegrationData::potential_energy);
+  new ClassStr<EnergyIntegrationData>(ca, "LaserRadiation", this, &EnergyIntegrationData::laser_radiation);
+  
+  new ClassDouble<EnergyIntegrationData>(ca, "Xmin", this, &EnergyIntegrationData::x_min);
+  new ClassDouble<EnergyIntegrationData>(ca, "Xmax", this, &EnergyIntegrationData::x_max);
+  new ClassDouble<EnergyIntegrationData>(ca, "Ymin", this, &EnergyIntegrationData::y_min);
+  new ClassDouble<EnergyIntegrationData>(ca, "Ymax", this, &EnergyIntegrationData::y_max);
+  new ClassDouble<EnergyIntegrationData>(ca, "Zmin", this, &EnergyIntegrationData::z_min);
+  new ClassDouble<EnergyIntegrationData>(ca, "Zmax", this, &EnergyIntegrationData::z_max);
 
 }
 

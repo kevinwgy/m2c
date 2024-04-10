@@ -139,7 +139,7 @@ public:
                        vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
                        vector<SpaceVariable3D*> *KappaPhi = NULL,
                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr,
-                       SpaceVariable3D *Xi = NULL);
+                       SpaceVariable3D *Xi = NULL, bool run_heat = true);
 
   SpaceVariable3D& GetMeshCoordinates() {return coordinates;}
   SpaceVariable3D& GetMeshDeltaXYZ()    {return delta_xyz;}

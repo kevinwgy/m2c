@@ -20,15 +20,15 @@ class HeatDiffusionFcnBase {
 protected:
 
   enum Type {NONE = 0, CONSTANT = 1} type;
-  double diffusivity;
+  double conductivity;
 
 public:
 
-  HeatDiffusionFcnBase() : type(NONE), diffusivity(0.0) {}
+  HeatDiffusionFcnBase() : type(NONE), conductivity(0.0) {}
   virtual ~HeatDiffusionFcnBase() {}   
 
   inline int GetDiffusionFunctionType() {return (int)type;}
-  inline double GetDiffusivity() {return diffusivity;}
+  inline double GetConductivity() {return conductivity;}
 
 };
 
@@ -41,7 +41,7 @@ public:
   HeatDiffusionFcnConstant(HeatDiffusionModelData &heatdiff) : HeatDiffusionFcnBase() {
     assert(heatdiff.type == HeatDiffusionModelData::CONSTANT);
     type = CONSTANT;
-    diffusivity = heatdiff.diffusivity;
+    conductivity = heatdiff.conductivity;
   }
 
   ~HeatDiffusionFcnConstant() {}

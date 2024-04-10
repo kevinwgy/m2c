@@ -10,6 +10,10 @@ using std::cout;
 using std::endl;
 using std::unique_ptr;
 
+//extern std::ofstream lam_file;
+//extern std::ofstream de_file;
+//extern std::ofstream residual_file;
+
 //----------------------------------------------------------------------------
 // BASE
 //----------------------------------------------------------------------------
@@ -175,6 +179,9 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
+   //de_file << std::setw(8) << std::scientific << time << "    " << std::setw(8) << std::scientific << dt  << "       "  << std::setw(8);
+   //residual_file << std::setw(8) << std::scientific << time << "    " << std::setw(8) << std::scientific << dt  << "       "  << std::setw(8);
+
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
@@ -328,10 +335,12 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
+  //Temporary feature for the stability of Heat Diffusion solver
+  bool run_heat = time < 41;
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
   spo.ComputeResidual(V, ID, R, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(),
-                      Xi); //->R(V(n))
+                      Xi, run_heat); //->R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -383,7 +392,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   //compute R(V1) using prev.Phi, "loose coupling"
-  spo.ComputeResidual(V1, ID, R, time, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
+  spo.ComputeResidual(V1, ID, R, time, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1, run_heat);
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time);
@@ -781,6 +790,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
 
   // Check for phase transitions
+  //lam_file << std::setw(8) << std::scientific << time << "    " << std::setw(8);
   if(lso.size()) {
     vector<int> phi_updated(lso.size(), 0); //0 or 1
     vector<Int3> new_useful_nodes[lso.size()];

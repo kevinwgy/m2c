@@ -126,8 +126,8 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
   double dx = 0.0, dy = 0.0, dz = 0.0;
   double flux(0.0);
   int neighid = 0;
-  double myk = 0.0; //diffusivity
-  double neighk = 0.0; //neighbor's diffusivity
+  double myk = 0.0; //conductivity
+  double neighk = 0.0; //neighbor's conductivity
   double denom = 0.0;
 
   for(int k=k0; k<kkmax; k++)
@@ -143,7 +143,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         dy   = dxyz[k][j][i][1];
         dz   = dxyz[k][j][i][2];
 
-        myk = heatdiffFcn[myid]->GetDiffusivity();
+        myk = heatdiffFcn[myid]->GetConductivity();
 
 
         //*****************************************
@@ -151,7 +151,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         //*****************************************
         if(k!=kkmax-1 && j!=jjmax-1) {
           neighid = id[k][j][i-1];
-          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          neighk = heatdiffFcn[neighid]->GetConductivity();
           denom = myk + neighk;
           flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdx_i[k][j][i]; //If both are inactive, flux is 0
           flux *= dy*dz;
@@ -164,7 +164,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         //*****************************************
         if(i!=iimax-1 && k!=kkmax-1) {
           neighid = id[k][j-1][i];
-          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          neighk = heatdiffFcn[neighid]->GetConductivity();
           flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdy_j[k][j][i];
           flux *= dx*dz;
           res[k][j][i][4]   += flux;
@@ -176,7 +176,7 @@ HeatDiffusionOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &I
         //*****************************************   
         if(i!=iimax-1 && j!=jjmax-1) {
           neighid = id[k-1][j][i];
-          neighk = heatdiffFcn[neighid]->GetDiffusivity();
+          neighk = heatdiffFcn[neighid]->GetConductivity();
           flux = (denom == 0) ? 0.0 : 2.0*myk*neighk/denom*dTdz_k[k][j][i];
           flux *= dx*dy;
           res[k][j][i][4]   += flux;
@@ -254,7 +254,7 @@ HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &V, Sp
         coeff = vol[k][j][i]*2.0/radial;
  
         myid = id[k][j][i];
-        myk = heatdiffFcn[myid]->GetDiffusivity();
+        myk = heatdiffFcn[myid]->GetConductivity();
 
         r[k][j][i][4] -= coeff*myk*dTdx[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
       }
@@ -276,9 +276,6 @@ HeatDiffusionOperator::AddSphericalSymmetryDiffusionTerms(SpaceVariable3D &V, Sp
 void
 HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R)
 {
-  //Get mesh data
-  double***    vol = (double***)volume.GetDataPointer();
-  Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
 
   //Get data
   Vec5D***  v  = (Vec5D***) V.GetDataPointer();
@@ -286,6 +283,7 @@ HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, 
   Vec5D***   r = (Vec5D***) R.GetDataPointer();
   double*** Te  = (double***)T.GetDataPointer();
 
+  
   int myid = 0;
   double e;
   for(int k=kk0; k<kkmax; k++)
@@ -301,23 +299,41 @@ HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, 
   std::vector<int> Ti0{0};
   grad.CalculateFirstDerivativeAtNodes(1, T, Ti0, dTdr, Ti0);
 
+  //Get mesh data
+  double***    vol = (double***)volume.GetDataPointer();
+  Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
+
   //Loop through the interior of the subdomain
   double*** dTdy = (double***)dTdr.GetDataPointer();
   double radial; //radial coord.
   double coeff;
   double myk = 0.0;
+  
+  //fprintf(stderr,"i0-imax: %d->%d, j0-jmax: %d->%d, k0-kmax: %d->%d", i0, imax, j0, jmax, k0, kmax);
+  //fprintf(stderr,"ii0-iimax: %d->%d, jj0-jjmax: %d->%d, kk0-kkmax: %d->%d", ii0, iimax, jj0, jjmax, kk0, kkmax);
+
+  
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
 
-        radial = coords[k][j][i][0];
+        
+        radial = coords[k][j][i][1];
         assert(radial>0);
+        
         coeff = vol[k][j][i]/radial;
 
+        //fprintf(stderr,"Check at (%d,%d,%d) coeff = %e\n", i,j,k,coeff);
+
         myid = id[k][j][i];
-        myk = heatdiffFcn[myid]->GetDiffusivity();
+        myk = heatdiffFcn[myid]->GetConductivity();
 
         r[k][j][i][4] -= coeff*myk*dTdy[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
+        //fprintf(stderr,"Check at (%d,%d,%d) R[4] = %e\n", i,j,k,r[k][j][i][4]);
+        
+
+//        if((imax-i == 1 && jmax-jmax==1)&& (kmax-k == 1))
+//          fprintf(stderr,"Get the end point of subdomain!\n");
       }
 
   //Restore data

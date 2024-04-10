@@ -6,6 +6,8 @@
 #ifndef _OUTPUT_H_
 #define _OUTPUT_H_
 #include <ProbeOutput.h>
+#include <EnergyIntegrationOutput.h>
+#include <LaserAbsorptionSolver.h>
 #include <PlaneOutput.h>
 #include <MaterialVolumeOutput.h>
 #include <TerminalVisualization.h>
@@ -31,6 +33,9 @@ class Output
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
 
+  //! Laser absorption solver
+  LaserAbsorptionSolver* laser;
+
   //! Hyperelasticity solver (Used here optionally, as a post-processor)
   HyperelasticityOperator *heo;
   
@@ -48,6 +53,7 @@ class Output
   ProbeOutput probe_output;
   std::vector<ProbeOutput*> line_outputs;
 
+  EnergyIntegrationOutput energy_output;
   std::vector<PlaneOutput*> plane_outputs;
 
   MaterialVolumeOutput matvol_output;
@@ -56,9 +62,10 @@ class Output
 
 public:
 
-  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
-         std::vector<GhostPoint>* ghost_nodes_outer_, std::vector<VarFcnBase*> &vf_, SpaceVariable3D &cell_volume,
+  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_, std::vector<GhostPoint>* ghost_nodes_outer_,
+         vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
          IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL);
+
   ~Output();
 
   void InitializeOutput(SpaceVariable3D &coordinates); //!< attach mesh

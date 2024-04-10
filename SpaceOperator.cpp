@@ -33,6 +33,8 @@ using namespace GeoTools;
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
 
+//extern std::ofstream residual_file;
+
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -620,6 +622,15 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
       for(int i=myi0; i<myimax; i++) {
 
         nClipped += (int)varFcn[id[k][j][i]]->ClipDensityAndPressure(v[k][j][i]);
+
+        //Temporary change for Solid
+        /*
+        if(coords[k][j][i][0] < 0.7+1e-8 && coords[k][j][i][0] > -0.3-1e-8 && coords[k][j][i][1] < 0.5){
+           v[k][j][i][1] = 0;
+           v[k][j][i][2] = 0;
+           v[k][j][i][3] = 0;
+        }
+        */
 
         if(checkState) {
           if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {
@@ -2501,12 +2512,15 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                     vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                     vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
-                                    SpaceVariable3D *Xi)
+                                    SpaceVariable3D *Xi, bool run_heat)
 {
 
 #ifdef LEVELSET_TEST
   return; //testing the level set solver without solving the N-S / Euler equations
 #endif
+
+  //Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  //Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
 
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
@@ -2516,8 +2530,10 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   if(visco)
     visco->AddDiffusionFluxes(V, ID, EBDS, R); //including extra terms from cylindrical symmetry
 
-  if(heat_diffusion)
+  if(heat_diffusion && run_heat)
     heat_diffusion->AddDiffusionFluxes(V, ID, EBDS, R);
+  else if(heat_diffusion)
+    print("Skipping heat diffusion. \n");
 
   if(heo) {
     assert(Xi);
@@ -2529,6 +2545,8 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   }
 
   if(symm) {//cylindrical or spherical symmetry (symm only handles the sink terms from advective fluxes)
+    if(heat_diffusion && run_heat)
+      heat_diffusion->AddSymmetryDiffusionTerms(V, ID, R);
     symm->AddSymmetryTerms(V, ID, R); //These terms are placed on the left-hand-side
   }
 
