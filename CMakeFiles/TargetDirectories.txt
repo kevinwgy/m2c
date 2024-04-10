@@ -1,5 +1,0 @@
-/home/xuningzhao/tinkercliffs/m2c_032023/CMakeFiles/rebuild_cache.dir
-/home/xuningzhao/tinkercliffs/m2c_032023/CMakeFiles/edit_cache.dir
-/home/xuningzhao/tinkercliffs/m2c_032023/CMakeFiles/m2c.dir
-/home/xuningzhao/tinkercliffs/m2c_032023/CMakeFiles/extern_lib.dir
-/home/xuningzhao/tinkercliffs/m2c_032023/CMakeFiles/VersionHeader.dir
