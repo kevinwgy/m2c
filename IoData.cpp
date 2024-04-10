@@ -3099,6 +3099,7 @@ void Probes::setup(const char *name, ClassAssigner *father)
 }
 
 //------------------------------------------------------------------------------
+
 EnergyIntegrationData::EnergyIntegrationData()
 {
   frequency = -100;
@@ -3113,16 +3114,17 @@ EnergyIntegrationData::EnergyIntegrationData()
   potential_energy = "";
   laser_radiation = "";
 
-  x_min = -5;
-  x_max = 5;
-  y_min = 5;
-  y_max = 0;
-  z_min = -2;
-  z_max = 2;
+  x_min = -DBL_MAX;
+  x_max = DBL_MAX;
+  y_min = -DBL_MAX;
+  y_max = DBL_MAX;
+  z_min = -DBL_MAX;
+  z_max = DBL_MAX;
 
 }
 
 //------------------------------------------------------------------------------
+
 void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
 {
   ClassAssigner *ca = new ClassAssigner(name, 16, father);
@@ -3132,11 +3134,14 @@ void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
   new ClassStr<EnergyIntegrationData>(ca, "Volume", this, &EnergyIntegrationData::volume);
   new ClassStr<EnergyIntegrationData>(ca, "Mass", this, &EnergyIntegrationData::mass);
   new ClassStr<EnergyIntegrationData>(ca, "TotalEnergy", this, &EnergyIntegrationData::total_energy);
-  new ClassStr<EnergyIntegrationData>(ca, "TotalEnthalpy", this, &EnergyIntegrationData::total_enthalpy); //total_enthalpy = kinetic + internal + potential
+  new ClassStr<EnergyIntegrationData>(ca, "TotalEnthalpy", this, &EnergyIntegrationData::total_enthalpy);
+                //total_enthalpy = kinetic + internal + potential
   new ClassStr<EnergyIntegrationData>(ca, "KineticEnergy", this, &EnergyIntegrationData::kinetic_energy);
   new ClassStr<EnergyIntegrationData>(ca, "InternalEnergy", this, &EnergyIntegrationData::internal_energy);
-  new ClassStr<EnergyIntegrationData>(ca, "PotentialEnergy", this, &EnergyIntegrationData::potential_energy); //pressure potential
-  new ClassStr<EnergyIntegrationData>(ca, "LaserRadiation", this, &EnergyIntegrationData::laser_radiation); // integration of eta*L
+  new ClassStr<EnergyIntegrationData>(ca, "PotentialEnergy", this, &EnergyIntegrationData::potential_energy);
+                //pressure potential
+  new ClassStr<EnergyIntegrationData>(ca, "LaserRadiation", this, &EnergyIntegrationData::laser_radiation);
+                // integration of eta*L
   
   new ClassDouble<EnergyIntegrationData>(ca, "Xmin", this, &EnergyIntegrationData::x_min);
   new ClassDouble<EnergyIntegrationData>(ca, "Xmax", this, &EnergyIntegrationData::x_max);
