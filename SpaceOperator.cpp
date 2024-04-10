@@ -33,8 +33,6 @@ using namespace GeoTools;
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
 
-//extern std::ofstream residual_file;
-
 //-----------------------------------------------------
 
 SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -622,15 +620,6 @@ int SpaceOperator::ClipDensityAndPressure(SpaceVariable3D &V, SpaceVariable3D &I
       for(int i=myi0; i<myimax; i++) {
 
         nClipped += (int)varFcn[id[k][j][i]]->ClipDensityAndPressure(v[k][j][i]);
-
-        //Temporary change for Solid
-        /*
-        if(coords[k][j][i][0] < 0.7+1e-8 && coords[k][j][i][0] > -0.3-1e-8 && coords[k][j][i][1] < 0.5){
-           v[k][j][i][1] = 0;
-           v[k][j][i][2] = 0;
-           v[k][j][i][3] = 0;
-        }
-        */
 
         if(checkState) {
           if(varFcn[id[k][j][i]]->CheckState(v[k][j][i])) {

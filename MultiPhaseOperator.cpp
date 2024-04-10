@@ -19,9 +19,6 @@ using std::get;
 using std::unique_ptr;
 extern int verbose;
 extern int INACTIVE_MATERIAL_ID;
-
-//extern std::ofstream lam_file;
-
 //-----------------------------------------------------
 
 MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -1539,12 +1536,6 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 */
 
   int myid;
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
-  double*** vol = volume.GetDataPointer();
-  //double lam_sum = 0.0;  
-  double PI = acos(0.0)*2.0;
-
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
@@ -1617,25 +1608,11 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             break;
           }
         }
-
-        
-        //if(lam[k][j][i]>0){
-        //  lam_sum += lam[k][j][i]*v[k][j][i][0]*vol[k][j][i]/dxyz[k][j][i][2]*PI*2.0*coords[k][j][i][1];
-        //}
-        
       }
 
   MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
 
-  //MPI_Allreduce(MPI_IN_PLACE, &lam_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
-  //lam_file << lam_sum << std::endl;
-  //print("- Total latent heat stored in this step: %e.\n", lam_sum);
-
   Lambda.RestoreDataPointerAndInsert();
-
-  coordinates.RestoreDataPointerToLocalVector();
-  volume.RestoreDataPointerToLocalVector();
-  delta_xyz.RestoreDataPointerToLocalVector();
 
   if(counter>0) {
     ID.RestoreDataPointerAndInsert();
@@ -2043,12 +2020,6 @@ MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn
   Vec5D***  v   = (Vec5D***) V.GetDataPointer();
   double*** lam = Lambda.GetDataPointer();
 
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  Vec3D*** dxyz = (Vec3D***)delta_xyz.GetDataPointer();
-  double*** vol = volume.GetDataPointer();
-  double lam_sum = 0.0;
-  double PI = acos(0.0)*2.0;
-
   int myidn, myid;
   int counter = 0;
   for(int k=k0; k<kmax; k++)
@@ -2058,12 +2029,8 @@ MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn
         myidn = (int)idn[k][j][i];
         myid  = (int)id[k][j][i];
 
-        if(myidn == myid){ //id remains the same. Skip
-          if(lam[k][j][i]>0){
-             lam_sum += lam[k][j][i]*v[k][j][i][0]*vol[k][j][i]/dxyz[k][j][i][2]*PI*2.0*coords[k][j][i][1];
-          }
+        if(myidn == myid) //id remains the same. Skip
           continue;
-        }
 
         if(lam[k][j][i]<=0.0) //no latent heat here
           continue;
@@ -2077,12 +2044,11 @@ MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn
           //---------------------------------------------------------------------
           // Now, do the actual work: Add lam to enthalpy
           double rho = v[k][j][i][0];
-          double p   = v[k][j][i][4];
+          //double p   = v[k][j][i][4];
           double e   = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
           //double h   = e + p/rho + lam[k][j][i]; //adding lam
-          e += lam[k][j][i];
+          e += lam[k][j][i]; //Correction of phase-change model (see Xuning JFM)
           lam[k][j][i] = 0.0;
-          //e = varFcn[myid]->GetInternalEnergyPerUnitMassFromEnthalpy(rho, h);
           // update p to account for the increase of enthalpy (rho is fixed)
           v[k][j][i][4] = varFcn[myid]->GetPressure(rho, e);
 
@@ -2090,20 +2056,9 @@ MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn
           //---------------------------------------------------------------------
           
         }
-
-       //if(lam[k][j][i]>0){
-       //  lam_sum += lam[k][j][i]*v[k][j][i][0]*vol[k][j][i]/dxyz[k][j][i][2]*PI*2.0*coords[k][j][i][1];
-       //}
       }
 
   MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
-
-  //MPI_Allreduce(MPI_IN_PLACE, &lam_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
-  //lam_file << lam_sum << std::endl;
-
-  coordinates.RestoreDataPointerToLocalVector();
-  volume.RestoreDataPointerToLocalVector();
-  delta_xyz.RestoreDataPointerToLocalVector();
 
   IDn.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();

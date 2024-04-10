@@ -121,7 +121,7 @@ void EnergyIntegrationOutput::WriteSolutionOfIntegrationEnergy(double time, doub
     print(file[EnergyIntegrationData::VOLUME], "%10d    %16.8e    ", time_step, time);
     double vol[numMaterials];
     double sum = 0.0;
-    IntegrateVolume(V,ID,vol);
+    IntegrateVolume(ID,vol);
     for(int i=0; i<numMaterials; i++) {
       print(file[EnergyIntegrationData::VOLUME], "%16.8e  ", vol[i]);
       sum += vol[i];
@@ -231,9 +231,8 @@ void EnergyIntegrationOutput::WriteSolutionOfIntegrationEnergy(double time, doub
     
 //--------------------------------------------------------------------------------------------------------------
 
-void EnergyIntegrationOutput::IntegrateVolume(SpaceVariable3D &V, SpaceVariable3D &ID, double* vol)     
+void EnergyIntegrationOutput::IntegrateVolume(SpaceVariable3D &ID, double* vol)     
 {
-  Vec5D***  v  = (Vec5D***) V.GetDataPointer();
   double*** id   = (double***)ID.GetDataPointer();
   double*** cell = (double***)cell_volume.GetDataPointer();
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
@@ -279,7 +278,6 @@ void EnergyIntegrationOutput::IntegrateVolume(SpaceVariable3D &V, SpaceVariable3
   //MPI communication
   MPI_Allreduce(MPI_IN_PLACE, vol, numMaterials, MPI_DOUBLE, MPI_SUM, comm);
 
-  V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
   cell_volume.RestoreDataPointerToLocalVector();
   coordinates.RestoreDataPointerToLocalVector();

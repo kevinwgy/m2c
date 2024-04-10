@@ -3132,11 +3132,11 @@ void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
   new ClassStr<EnergyIntegrationData>(ca, "Volume", this, &EnergyIntegrationData::volume);
   new ClassStr<EnergyIntegrationData>(ca, "Mass", this, &EnergyIntegrationData::mass);
   new ClassStr<EnergyIntegrationData>(ca, "TotalEnergy", this, &EnergyIntegrationData::total_energy);
-  new ClassStr<EnergyIntegrationData>(ca, "TotalEnthalpy", this, &EnergyIntegrationData::total_enthalpy);
+  new ClassStr<EnergyIntegrationData>(ca, "TotalEnthalpy", this, &EnergyIntegrationData::total_enthalpy); //total_enthalpy = kinetic + internal + potential
   new ClassStr<EnergyIntegrationData>(ca, "KineticEnergy", this, &EnergyIntegrationData::kinetic_energy);
   new ClassStr<EnergyIntegrationData>(ca, "InternalEnergy", this, &EnergyIntegrationData::internal_energy);
-  new ClassStr<EnergyIntegrationData>(ca, "PotentialEnergy", this, &EnergyIntegrationData::potential_energy);
-  new ClassStr<EnergyIntegrationData>(ca, "LaserRadiation", this, &EnergyIntegrationData::laser_radiation);
+  new ClassStr<EnergyIntegrationData>(ca, "PotentialEnergy", this, &EnergyIntegrationData::potential_energy); //pressure potential
+  new ClassStr<EnergyIntegrationData>(ca, "LaserRadiation", this, &EnergyIntegrationData::laser_radiation); // integration of eta*L
   
   new ClassDouble<EnergyIntegrationData>(ca, "Xmin", this, &EnergyIntegrationData::x_min);
   new ClassDouble<EnergyIntegrationData>(ca, "Xmax", this, &EnergyIntegrationData::x_max);

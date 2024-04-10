@@ -95,7 +95,7 @@ public:
 
         //double h = e + v[4]/v[0]; //enthalpy before phase transition (using vf1)
         //h += lambda; //enthalpy after phase transition
-        e += lambda;
+        e += lambda; //Correction. Check Xuning JFM
         lambda = 0.0;
         //e = vf2.GetInternalEnergyPerUnitMassFromEnthalpy(v[0], h); //rho is always fixed
         v[4] = vf2.GetPressure(v[0], e);

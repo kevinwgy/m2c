@@ -40,9 +40,7 @@ using std::to_string;
 //using std::chrono::duration;
 //using std::chrono::milliseconds;
 
-//std::ofstream lam_file;
-//std::ofstream de_file;
-//std::ofstream residual_file;
+
 
 int verbose;
 double domain_diagonal;
@@ -56,15 +54,6 @@ int INACTIVE_MATERIAL_ID;
  ************************************/
 int main(int argc, char* argv[])
 {
-  //lam_file.open("Lambda.txt");
-  //lam_file << "Time     |        Stored latent heat \n";
-
-  //de_file.open("de.txt");
-  //de_file << "Time      |        dt           |        dm             |             de \n";
-
-  //residual_file.open("residual.txt");
-  //residual_file << "Time      |        dt           |        residual(mass)     |     residual(energy) \n";
-
   start_time = clock(); //for timing purpose only
 
   //! Initialize MPI 
@@ -699,13 +688,8 @@ int main(int argc, char* argv[])
       //----------------------------------------------------
       t      += dt;
       dtleft -= dt;
-//      print("Hi, I am here!\n");
       integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt, t, dt, time_step,
                                      subcycle, dts); 
-//      V.StoreMeshCoordinates(spo.GetMeshCoordinates());
-//      V.WriteToVTRFile("V.vtr");
-//      print("Done!\n");
-//      exit_mpi();
       subcycle++; //do this *after* AdvanceOneTimeStep.
       //----------------------------------------------------
 
@@ -846,10 +830,6 @@ int main(int argc, char* argv[])
 
   PetscFinalize();
   MPI_Finalize();
-
-  //lam_file.close();
-  //de_file.close();
-  //residual_file.close();
 
   return 0;
 }

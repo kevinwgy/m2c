@@ -54,7 +54,7 @@ public:
 
 private:
 
-  void IntegrateVolume(SpaceVariable3D &V, SpaceVariable3D &ID, double* vol);
+  void IntegrateVolume(SpaceVariable3D &ID, double* vol);
   void IntegrateMass(SpaceVariable3D &V, SpaceVariable3D &ID, double* mass);
   void IntegrateTotalEnergy(SpaceVariable3D &V, SpaceVariable3D &ID, double* E);
   void IntegrateTotalEnthalpy(SpaceVariable3D &V, SpaceVariable3D &ID, double* H);
