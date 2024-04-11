@@ -839,7 +839,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
   MPI_Barrier(comm);
 
   if(strcmp(iod_terminal.filename, "") == 0) {
-    sleep(iod_terminal.pause);
+    usleep(1000*1000*iod_terminal.pause); //usleep counts in micro-seconds
   }
 
   iFrame++;

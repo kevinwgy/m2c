@@ -280,7 +280,7 @@ void printHeader(int argc, char *argv[])
     cout << endl;
     cout.flush();
   } else 
-    sleep(0.1); //wait until the message gets printed to the screen
+    usleep(100*1000); //wait (0.1 s) until the message gets printed to the screen
 
   //MPI_Barrier(m2c_comm); //not friendly to concurrent programs
   //
