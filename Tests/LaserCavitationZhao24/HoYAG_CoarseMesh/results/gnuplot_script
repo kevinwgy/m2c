@@ -1,0 +1,9 @@
+plot "internal_integration.txt" using 2:4 with l lw 3 title "Internal energy"
+replot "potential_integration.txt" using 2:4 with l lw 3 title "Pressure potential energy"
+replot "kinetic_integration.txt" using 2:4 with l lw 3 title "Kinetic energy"
+set grid
+set xlabel "Time (s)"
+set ylabel "Energy of vapor phase (g.mm^2/s^2, i.e., nanoJ)"
+set term png size 1280, 800 font "Arial,24"
+set output "vapor_phase_energy.png"
+replot

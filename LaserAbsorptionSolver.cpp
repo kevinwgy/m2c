@@ -483,11 +483,45 @@ LaserAbsorptionSolver::ReadUserSpecifiedPowerFile(const char *source_power_timeh
   }
 
   double time0(-DBL_MAX), time, power;
-  while(input >> time >> power) {
-    assert(time>time0);
+  string line;
+  int line_number = 0;
+
+  while(getline(input, line)) {
+    line_number++;
+
+    auto first_nonspace_id = line.find_first_not_of(" ");
+    if((unsigned)first_nonspace_id<line.size() && line[first_nonspace_id] == '#')
+      continue;  //this line is comment
+
+    std::stringstream linestream(line);
+
+    // read time
+    if(!(linestream >> time)) {
+      print_error("*** Error: File %s may be corrupted around line %d. Unable to read time.\n",
+                  filename, line_number);
+      exit_mpi();
+    }
+    if(time<=time0) {
+      print_error("*** Error: Time points in %s are not in ascending order (%e).\n", filename, time);
+      exit_mpi();
+    }
+
+    // read power
+    if(!(linestream >> power)) {
+      print_error("*** Error: File %s may be corrupted around line %d. Unable to read power.\n",
+                  filename, line_number);
+      exit_mpi();
+    }
+    if(power<0.0) {
+      print_error("*** Error: In %s, detected negative power (%e).\n", filename, power);
+      exit_mpi();
+    }
+ 
     source_power_timehistory.push_back(std::make_pair(time, power));
     time0 = time;
   }
+
+
   print(comm,"- Loaded user-specified laser power file %s, final time: %e.\n", filename, time);
   if(source_power_timehistory[0].first>0) //if the first time stamp is greater than 0, insert one at 0.
     source_power_timehistory.insert(source_power_timehistory.begin(), 
@@ -497,6 +531,7 @@ LaserAbsorptionSolver::ReadUserSpecifiedPowerFile(const char *source_power_timeh
                 source_power_timehistory[0].first);
     exit(-1);
   }
+
 
   delete [] filename;
 }
