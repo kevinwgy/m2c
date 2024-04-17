@@ -2671,7 +2671,7 @@ void LaserData::setup(const char *name, ClassAssigner *father) {
   new ClassDouble<LaserData>(ca, "DirectionZ", this, &LaserData::source_dir_z);
   new ClassDouble<LaserData>(ca, "FocusingAngle", this, &LaserData::focusing_angle_degrees);
   new ClassDouble<LaserData>(ca, "Range", this, &LaserData::range);
-  new ClassDouble<LaserData>(ca, "RadianceCutOff", this, &LaserData::lmin);
+  new ClassDouble<LaserData>(ca, "IrradianceCutOff", this, &LaserData::lmin);
 
   abs.setup("AbsorptionCoefficient", ca);
 

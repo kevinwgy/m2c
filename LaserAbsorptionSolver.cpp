@@ -55,6 +55,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
   // cut-off radiance (L must be positive inside the laser domain)
   lmin = iod.laser.lmin;
+  assert(lmin>=0.0);
 
   // parameters in mean flux method & SOR
   mfm_alpha = iod.laser.alpha;
@@ -132,6 +133,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 
   // cut-off radiance (L must be positive inside the laser domain)
   lmin = iod.laser.lmin;
+  assert(lmin>=0.0);
 
   // parameters in mean flux method & SOR
   mfm_alpha = iod.laser.alpha;
@@ -1663,7 +1665,7 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
     if(l0<lmin) {
       l0 = lmin;
       if(verbose >= OutputData::HIGH)
-        print(comm,"Warning: source radiance (%e) is lower than the cut-off radiance (%e).\n", l0, lmin);
+        print(comm,"Warning: source irradiance (%e) is lower than the cut-off irradiance (%e).\n", l0, lmin);
     }
 
     for(int n=0; n<queueCounter[0]; n++) //level 0
@@ -1724,10 +1726,10 @@ LaserAbsorptionSolver::SetSourceRadiance(double*** l, Vec3D*** coords, double t)
       l[k][j][i] = (2.0*power/(PI*beamwaist*beamwaist))*exp(-2.0*ratio*ratio);
 
       if(l[k][j][i]<lmin) {
-        l[k][j][i] = lmin;
-        if(verbose >= OutputData::HIGH)
-          fprintf(stdout,"Warning: [%d] source radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+        if(verbose >= OutputData::HIGH && l[k][j][i]<lmin*0.9999)
+          fprintf(stdout,"Warning: [%d] source irradiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
+        l[k][j][i] = lmin;
       }
 
     }
@@ -1769,10 +1771,10 @@ LaserAbsorptionSolver::InitializeLaserDomainAndGhostNodes(double*** l, double***
       l[k][j][i] = sum/count;
 
       if(l[k][j][i]<lmin) {
-        l[k][j][i] = lmin;
-        if(verbose >= OutputData::MEDIUM)
-          fprintf(stdout,"Warning: [%d] Initial radiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+        if(verbose >= OutputData::MEDIUM && l[k][j][i]<lmin*0.9999)
+          fprintf(stdout,"Warning: [%d] Initial irradiance at (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
+        l[k][j][i] = lmin;
       }
 
       it++;
@@ -1908,7 +1910,7 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
     l[k][j][i] = it->second.Evaluate(l);
 
     if(l[k][j][i]<lmin) {
-      if(verbose >= OutputData::MEDIUM)
+      if(verbose >= OutputData::MEDIUM && l[k][j][i]<lmin*0.9999)
         fprintf(stdout,"Warning: [%d] Radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                 mpi_rank, i,j,k, l[k][j][i], lmin);
       l[k][j][i] = lmin;
@@ -1926,11 +1928,11 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
       buffer[i] = ebm.friendsGhostNodes[p][i].second.Evaluate(l);
 
       if(buffer[i]<lmin) {
-        buffer[i] = lmin;
-        if(verbose >= OutputData::MEDIUM)
+        if(verbose >= OutputData::MEDIUM && buffer[i]<lmin*0.9999)
           fprintf(stdout,"Warning: [%d] Radiance at friend's ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, ebm.friendsGhostNodes[p][i].first[0], ebm.friendsGhostNodes[p][i].first[1],
                   ebm.friendsGhostNodes[p][i].first[2], buffer[i], lmin);
+        buffer[i] = lmin;
       }
     }
     MPI_Isend(buffer.data(), buffer.size(), MPI_DOUBLE, receiver, mpi_rank, comm, &(send_requests[p]));
@@ -1956,10 +1958,10 @@ LaserAbsorptionSolver::UpdateGhostNodesOneIteration(double ***l)
       int i(ebm.ghostNodes2[p][q][0]), j(ebm.ghostNodes2[p][q][1]), k(ebm.ghostNodes2[p][q][2]);
       l[k][j][i] = buffers[p][q];
       if(l[k][j][i]<lmin) {
-        l[k][j][i] = lmin;
-        if(verbose >= OutputData::MEDIUM)
-          fprintf(stdout,"Warning: [%d] Received radiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
+        if(verbose >= OutputData::MEDIUM && l[k][j][i]<lmin*0.9999)
+          fprintf(stdout,"Warning: [%d] Received irradiance at ghost (%d,%d,%d)(%e) is below cut-off(%e).\n", 
                   mpi_rank, i,j,k, l[k][j][i], lmin);
+        l[k][j][i] = lmin;
       }
 //      fprintf(stdout,"[%d] GN2 l[%d][%d][%d] = %e.\n", mpi_rank, k,j,i, l[k][j][i]);
     }
@@ -2024,7 +2026,7 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D
     }
 
     if(!success)
-      print_error(comm,"*** Error: Laser radiance solver failed to converge.\n");
+      print_error(comm,"*** Error: Laser radiation solver failed to converge.\n");
   }
 
   PopulateRadianceOnNavierStokesMesh(L_);
@@ -2304,10 +2306,10 @@ LaserAbsorptionSolver::RunMeanFluxMethodOneIteration(double*** l, double*** T, V
                  + relax*(-(it->fin)/(vol[k][j][i]*eta + it->fout));
 
       if(l[k][j][i]<lmin) {
-        l[k][j][i] = lmin;
-        if(verbose >= OutputData::HIGH)
-          fprintf(stdout, "Warning: [%d] Applied cut-off radiance (%e) to (%d,%d,%d) (orig:%e).\n", 
+        if(verbose >= OutputData::HIGH && l[k][j][i]<lmin*0.9999)
+          fprintf(stdout, "Warning: [%d] Applied cut-off irradiance (%e) to (%d,%d,%d) (orig:%e).\n", 
                   mpi_rank, lmin, i,j,k, l[k][j][i]);
+        l[k][j][i] = lmin;
       }
 
       it++;
