@@ -984,7 +984,7 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
 }
 
 //--------------------------------------------------------------------------
-
+//TODO: Needs to be updated to include turbulence stress
 void
 IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*** v, double*** id,
                                                     double*** homo, //node is in a homogeneous region?
@@ -1011,6 +1011,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
+  double nu_t; //additional quantities: nu_t = eddy viscosity && S = result from Bousinessq (tau_ij)
+  nu_t = 0.0; //arbitrary constant for now
 
   for(int k=k0; k<kmax; k++) {
     dz  = Dz[dir][k-k0];
@@ -1023,7 +1025,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
       dydz = dy*dz;
       for(int i=i0; i<imax; i++) {
 
-        // insedrt the row
+        // insert the row
         vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
         RowEntries &row(vlin_rows[row_counter]);
         row.SetRow(i,j,k);
@@ -1463,7 +1465,65 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
-        bb[k][j][i] += ap0*v0[k][j][i][dir+1]; //!< +Sc*dx*dy*dz for source terms
+        if (dir == 0) { //X-momentum equation case
+          double xmom_d2udx2,xmom_d2udy2,xmom_d2vdxdy;
+
+          //------------------------------------------------------
+          // Calculating 2nd derivative velocity derivatives of the staggered grid
+          //------------------------------------------------------
+          
+          //X-Momentum gradients
+          xmom_d2udx2 = (v[k][j][i+1][1]-(2*v[k][j][i-1][1]) + v[k][j][i-1][1]) / (dx*dx); 
+          xmom_d2udy2 = (v[k][j+1][i][1]-(2*v[k][j][i][1]) + v[k][j-1][i][1]) / (dy*dy); 
+  
+          double v_btm_right = v[k][j][i][2];
+          double v_btm_left = v[k][j][i-1][2];
+          double v_top_right = v[k][j+1][i][2];
+          double v_top_left = v[k][j+1][i-1][2];
+
+          xmom_d2vdxdy = (v_btm_left+v_top_right-v_btm_right-v_top_left) / (4.0*pow(dx/2.0,2)); //cross derivative 
+        
+          //------------------------------------------------------
+          // Solving for Fluctuating Reynolds stresses Source term (Sc) -- using Boussinesq Approx
+          //------------------------------------------------------
+          double Sc = -2.0*v[k][j][i][0]*nu_t*0.5*((2.0*xmom_d2udx2)+xmom_d2udy2+xmom_d2vdxdy); 
+
+          bb[k][j][i] += Sc*dx*dy*dz; //updates bb
+
+        }
+        if (dir == 1) { //Y-Momentum equation case
+          double ymom_d2vdx2,ymom_d2udxdy,ymom_d2vdy2;
+
+          //------------------------------------------------------
+          // Calculating 2nd derivative velocity derivatives of the staggered grid
+          //------------------------------------------------------
+
+          //Y-Momentum gradients 
+          ymom_d2vdx2 = (v[k][j][i+1][2]-(2*v[k][j][i-1][2]) + v[k][j][i-1][2]) / (dx*dx); 
+          ymom_d2vdy2 = (v[k][j+1][i][1]-(2*v[k][j][i][1]) + v[k][j-1][i][1]) / (dy*dy); 
+  
+          double u_btm_right = v[k][j-1][i-1][1];
+          double u_btm_left = v[k][j-1][i][1];
+          double u_top_right = v[k][j-1][i][1];
+          double u_top_left = v[k][j][i][1];
+
+          ymom_d2udxdy = (u_btm_left+u_top_right-u_btm_right-u_top_left) / (4.0*pow(dy/2.0,2)); //cross derivative 
+        
+          //------------------------------------------------------
+          // Solving for Fluctuating Reynolds stresses (Boussinesq Approx.) 
+          //------------------------------------------------------
+          double Sc = -2.0*v[k][j][i][0]*nu_t*0.5*(ymom_d2vdx2+ymom_d2udxdy+(2.0*ymom_d2vdy2)); 
+
+          bb[k][j][i] += Sc*dx*dy*dz; //updates bb
+        }
+
+
+        bb[k][j][i] += ap0*v0[k][j][i][dir+1]; 
+
+
+        //ADD SOMETHING HERE!
+        // for bb
+
         bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
                        dir==1 ? (v[k][j-1][i][4] - v[k][j][i][4])*dxdz :
                                 (v[k-1][j][i][4] - v[k][j][i][4])*dxdy;
