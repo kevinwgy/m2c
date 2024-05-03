@@ -67,7 +67,16 @@ public:
 
   void BuildVelocityEquationSIMPLE(int dir, //!< dir: 0,1,2 for x,y,z
                                    Vec5D*** v0, Vec5D*** v, double*** id,
+                                   double*** vturb0, //turbulent working term
                                    double*** homo, //wheter each node is in a homogeneous region
+                                   std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, SpaceVariable3D &Ddiag,
+                                   bool SIMPLEC, //!< for SIMPLEC, generates a different Ddiag; otherwise the same
+                                   double Efactor, double dt,
+                                   SpaceVariable3D *LocalDt = NULL); 
+
+  void BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v, double*** id,
+                                   double*** vturb0, double*** vturb,//added SA eddy viscosity working term
+                                   [[maybe_unused]] double*** homo, //wheter each node is in a homogeneous region
                                    std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, SpaceVariable3D &Ddiag,
                                    bool SIMPLEC, //!< for SIMPLEC, generates a different Ddiag; otherwise the same
                                    double Efactor, double dt,

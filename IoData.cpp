@@ -1770,7 +1770,7 @@ SemiImplicitTsData::SemiImplicitTsData()
 void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 7, father);
+  ClassAssigner *ca = new ClassAssigner(name, 8, father);
 
   new ClassToken<SemiImplicitTsData>
     (ca, "Type", this,
@@ -1787,6 +1787,8 @@ void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
   velocity_linear_solver.setup("LinearSolverForVelocity", ca);
 
   pressure_linear_solver.setup("LinearSolverForPressure", ca);
+
+  turbulence_linear_solver.setup("LinearSolverForTurbulenceClosure", ca);
 
 }
 
@@ -2830,6 +2832,31 @@ void IonizationData::setup(const char *name, ClassAssigner *father)
 
   materialMap.setup("Material", ca);
 
+}
+
+//------------------------------------------------------------------------------
+
+RANSTurbulenceModelData::RANSTurbulenceModelData()
+{
+  model = NONE; //by default, no RANS turbulence model 
+  example = GENERAL;
+  example_param_1 = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+void RANSTurbulenceModelData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+
+  new ClassToken<RANSTurbulenceModelData>(ca, "Model", this,
+                reinterpret_cast<int RANSTurbulenceModelData::*>(&RANSTurbulenceModelData::example), 2,
+                "None", 0, "SpalartAllmaras", 1);
+  new ClassToken<RANSTurbulenceModelData>(ca, "ExampleProblem", this,
+                reinterpret_cast<int RANSTurbulenceModelData::*>(&RANSTurbulenceModelData::example), 3,
+                "General", 0, "FlatPlate", 1, "LidDrivenCavity", 2);
+  new ClassDouble<RANSTurbulenceModelData>(ca, "ExampleParameterReal1", this,
+                 &RANSTurbulenceModelData::example_param_1);
 }
 
 //------------------------------------------------------------------------------
@@ -3881,6 +3908,8 @@ void IoData::setupCmdFileVariables()
   multiphase.setup("MultiPhase");
 
   refmap.setup("ReferenceMap");
+
+  rans.setup("RANSTurbulence");
 
   output.setup("Output");
 

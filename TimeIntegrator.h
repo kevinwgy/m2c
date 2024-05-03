@@ -78,6 +78,7 @@ public:
                                   [[maybe_unused]] vector<SpaceVariable3D*> &NPhi,
                                   [[maybe_unused]] vector<SpaceVariable3D*> &KappaPhi,
                                   [[maybe_unused]] SpaceVariable3D *L, [[maybe_unused]] SpaceVariable3D *Xi,
+                                  [[maybe_unused]] SpaceVariable3D *Vturb,
                                   [[maybe_unused]] SpaceVariable3D *LocalDt,
                                   [[maybe_unused]] double time, [[maybe_unused]] double dt,
                                   [[maybe_unused]] int time_step,
@@ -130,7 +131,8 @@ public:
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                           vector<SpaceVariable3D*> &KappaPhi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                          SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
@@ -168,7 +170,8 @@ public:
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                           vector<SpaceVariable3D*> &KappaPhi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                          SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 
@@ -207,7 +210,8 @@ public:
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                           vector<SpaceVariable3D*> &KappaPhi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                          SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy(); 

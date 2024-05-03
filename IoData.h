@@ -943,6 +943,7 @@ struct SemiImplicitTsData {
 
   LinearSolverData velocity_linear_solver;
   LinearSolverData pressure_linear_solver;
+  LinearSolverData turbulence_linear_solver;
   
   SemiImplicitTsData();
   ~SemiImplicitTsData() {}
@@ -1442,6 +1443,21 @@ struct EnergyIntegrationData {
 
 //------------------------------------------------------------------------------
 
+struct RANSTurbulenceModelData {
+
+  enum Model {NONE = 0, SPALART_ALLMARAS = 1} model; 
+  enum ExampleProblem {GENERAL = 0, FLAT_PLATE = 1, LID_CAVITY = 2} example;
+
+  double example_param_1; 
+
+  RANSTurbulenceModelData();
+  ~RANSTurbulenceModelData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
 struct OutputData {
 
   const char *prefix; //!< path
@@ -1765,6 +1781,8 @@ public:
   TsData ts;
 
   ReferenceMapData refmap;
+
+  RANSTurbulenceModelData rans;
 
   OutputData output;
 
