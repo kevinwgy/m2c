@@ -22,6 +22,7 @@ protected:
   IncompressibleOperator &inco;
 
   SpaceVariable3D V0; //!< solution at the previous time step
+  SpaceVariable3D *Vturb0_ptr; //!< solution of turbulence working variables at previous time step
 
   SpaceVariable3D VXstar, VYstar, VZstar, Pprime;
   SpaceVariable3D B; //!< generally used as the right-hand-side of linear systems
@@ -30,9 +31,11 @@ protected:
   SpaceVariable3D DX, DY, DZ; //!< coefficients from momentum equations, later used in pressure-correction
   vector<RowEntries> vlin_rows;
   vector<RowEntries> plin_rows;
+  vector<RowEntries> vturb_lin_rows; //!< for turbulence closure equation(s), if involved
 
   LinearSystemSolver vlin_solver; //!< solves the velocity linear systems
   LinearSystemSolver plin_solver; //!< solves the pressure linear system
+  LinearSystemSolver vturb_lin_solver; //!< solves the turbulence closure equation linear system(s)
 
   SpaceVariable3D *R3_ptr; //!< momentum changes (dof = 3), for steady state only
 
@@ -56,7 +59,8 @@ public:
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                           vector<SpaceVariable3D*> &KappaPhi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                          SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy();
@@ -110,7 +114,8 @@ public:
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                           vector<SpaceVariable3D*> &KappaPhi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                          SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
 protected:
@@ -165,7 +170,8 @@ public:
   void AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                           vector<SpaceVariable3D*> &KappaPhi,
-                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                          SpaceVariable3D *LocalDt,
                           double time, double dt, int time_step, int subcycle, double dts);
 
   void Destroy();

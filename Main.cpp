@@ -256,6 +256,20 @@ int main(int argc, char* argv[])
   std::set<Int3> spo_frozen_nodes;
   spo.SetPointerToFrozenNodes(&spo_frozen_nodes); 
 
+
+  //! Create turbulence working variable(s)
+  SpaceVariable3D* Vturb = NULL;
+  if(incompressible) {
+    if(iod.rans.model == RANSTurbulenceModelData::SPALART_ALLMARAS)
+      Vturb = new SpaceVariable3D(comm, &(dms.ghosted1_1dof));
+  } else {
+    if(iod.rans.model != RANSTurbulenceModelData::NONE) {
+      print_error("*** Error: Currently, only the incompressible flow solver supports turbulence models.\n"); 
+      exit_mpi();
+    }
+  }
+
+
   //! Initialize incompressible flow space operator
   IncompressibleOperator* inco = NULL;
   if(incompressible) {
@@ -689,7 +703,7 @@ int main(int argc, char* argv[])
       t      += dt;
       dtleft -= dt;
 //      print("Hi, I am here!\n");
-      integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, LocalDt, t, dt, time_step,
+      integrator->AdvanceOneTimeStep(V, ID, Phi, NPhi, KappaPhi, L, Xi, Vturb, LocalDt, t, dt, time_step,
                                      subcycle, dts); 
 //      V.StoreMeshCoordinates(spo.GetMeshCoordinates());
 //      V.WriteToVTRFile("V.vtr");
@@ -805,6 +819,8 @@ int main(int argc, char* argv[])
   if(pmo) {pmo->Destroy(); delete pmo;}
 
   if(ghand) {ghand->Destroy(); delete ghand;}
+
+  if(Vturb) {Vturb->Destroy(); delete Vturb;}
 
   out.FinalizeOutput();
   integrator->Destroy();

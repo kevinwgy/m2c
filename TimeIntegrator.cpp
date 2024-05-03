@@ -155,7 +155,9 @@ void
 TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID, 
                                      vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*>& NPhi,
                                      vector<SpaceVariable3D*>& KappaPhi,
-                                     SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Dt,
+                                     SpaceVariable3D *L, SpaceVariable3D *Xi,
+                                     [[maybe_unused]] SpaceVariable3D *Vturb,
+                                     SpaceVariable3D *Dt,
                                      double time, double dt, int time_step, int subcycle, double dts)
 {
 
@@ -307,7 +309,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                       [[maybe_unused]] vector<SpaceVariable3D*>& NPhi,
                                       vector<SpaceVariable3D*>& KappaPhi,
                                       SpaceVariable3D* L, SpaceVariable3D *Xi,
-                                      SpaceVariable3D *Dt,
+                                      [[maybe_unused]] SpaceVariable3D* Vturb, SpaceVariable3D *Dt,
                                       double time, double dt, 
                                       int time_step, int subcycle, double dts)
 {
@@ -512,7 +514,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                       [[maybe_unused]] vector<SpaceVariable3D*>& NPhi,
                                       vector<SpaceVariable3D*>& KappaPhi, 
                                       SpaceVariable3D* L, SpaceVariable3D* Xi,
-                                      SpaceVariable3D *Dt,
+                                      [[maybe_unused]] SpaceVariable3D* Vturb, SpaceVariable3D *Dt,
                                       double time, double dt,
                                       int time_step, int subcycle, double dts)
 { 

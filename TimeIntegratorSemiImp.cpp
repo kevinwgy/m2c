@@ -25,7 +25,9 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                       "velocity"),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver,
                       "pressure"),
-                      R3_ptr(NULL)
+                      vturb_lin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.turbulence_linear_solver,
+                      "turbulence"),
+                      Vturb0_ptr(NULL), R3_ptr(NULL)
 {
   type = SIMPLE;
 
@@ -56,9 +58,18 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
   plin_solver.GetSolverType(&ksp_type, &pc_type);
   print("  o Linear solver for pressure: %s, Preconditioner: %s.\n",
         ksp_type.c_str(), pc_type.c_str());
+  if(iod.rans.model != RANSTurbulenceModelData::NONE) {
+    vturb_lin_solver.GetSolverType(&ksp_type, &pc_type);
+    print("  o Linear solver for turbulence closure equations: %s, Preconditioner: %s.\n",
+          ksp_type.c_str(), pc_type.c_str());
+  }
 
   if(sso)
     R3_ptr = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
+
+  if(iod.rans.model == RANSTurbulenceModelData::SPALART_ALLMARAS)
+    Vturb0_ptr = new SpaceVariable3D(comm_, &(dms_.ghosted1_1dof));
+
 }
 
 //----------------------------------------------------------------------------
@@ -67,6 +78,9 @@ TimeIntegratorSIMPLE::~TimeIntegratorSIMPLE()
 {
   if(R3_ptr)
     delete R3_ptr;
+
+  if(Vturb0_ptr)
+    delete Vturb0_ptr;
 }
 
 //----------------------------------------------------------------------------
@@ -87,9 +101,13 @@ TimeIntegratorSIMPLE::Destroy()
 
   vlin_solver.Destroy();
   plin_solver.Destroy();
+  vturb_lin_solver.Destroy();
 
   if(R3_ptr)
     R3_ptr->Destroy();
+
+  if(Vturb0_ptr)
+    Vturb0_ptr->Destroy();
 
   TimeIntegratorBase::Destroy();
 }
@@ -100,7 +118,8 @@ void
 TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                          vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                                          vector<SpaceVariable3D*> &KappaPhi,
-                                         SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                                         SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                                         SpaceVariable3D *LocalDt,
                                          [[maybe_unused]] double time, double dt, 
                                          int time_step, int subcycle, double dts)
 {
@@ -136,9 +155,19 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   V0.AXPlusBY(0.0, 1.0, V); //V0 = V (only copy nodes inside physical domain)
   Vec5D*** v0 = (Vec5D***)V0.GetDataPointer();
 
+  // Store Vturb0 (if provided)
+  double*** vturb0 = NULL;
+  if(Vturb) {//with turbulence
+    assert(Vturb0_ptr);
+    Vturb0_ptr->AXPlusBY(0.0, 1.0, *Vturb); //Vturb0 = Vturb
+    vturb0 = Vturb0_ptr->GetDataPointer();
+  }
+
+
   for(iter = 0; iter < maxIter; iter++) {
 
-    Vec5D*** v = (Vec5D***)V.GetDataPointer();
+    Vec5D***      v = (Vec5D***)V.GetDataPointer();
+    double*** vturb = Vturb ? Vturb->GetDataPointer() : NULL;
 
     ExtractVariableComponents(v, &VXstar, &VYstar, &VZstar, NULL);
 
@@ -148,7 +177,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the x-momentum equation
     if(global_mesh.x_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -168,7 +197,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the y-momentum equation
     if(global_mesh.y_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -185,7 +214,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the z-momentum equation
     if(global_mesh.z_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -247,6 +276,31 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     }
 */
 
+
+    //-----------------------------------------------------
+    // Step 4: Solve turbulence closure equations
+    //-----------------------------------------------------
+    if(Vturb) {
+      if(iod.rans.model != RANSTurbulenceModelData::SPALART_ALLMARAS) {
+        print_error("*** Error: Found unknown turbulence closure model.\n");
+        exit_mpi();
+      }
+      inco.BuildSATurbulenceEquationSIMPLE(v0, v, id, vturb0, vturb, homo, vturb_lin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
+      Vturb->RestoreDataPointerToLocalVector();
+      vturb_lin_solver.SetLinearOperator(vturb_lin_rows);
+      lin_success = vturb_lin_solver.Solve(B, *Vturb, NULL, &nLinIts, &lin_rnorm);
+      if(!lin_success) {
+        print_warning("    x Warning: Linear solver for the turbulence closure equation failed to converge.\n");
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      } else {
+        if(verbose>=1)
+          print("    * Solver of the turbulence closure equation converged in %d iterations.\n", nLinIts);
+      }
+    }
+
+ 
+
   }
 
   if(converged)
@@ -261,6 +315,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   }
 
   V0.RestoreDataPointerToLocalVector();
+
+  if(Vturb0_ptr)
+    Vturb0_ptr->RestoreDataPointerToLocalVector();
 
   ID.RestoreDataPointerToLocalVector();
   Homo.RestoreDataPointerToLocalVector();
@@ -429,7 +486,8 @@ void
 TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                           vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                                           vector<SpaceVariable3D*> &KappaPhi,
-                                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                                          SpaceVariable3D *LocalDt,
                                           [[maybe_unused]] double time, double dt, int time_step, 
                                           int subcycle, double dts)
 {
@@ -440,10 +498,14 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     exit_mpi();
   }
   if(Phi.size()>0 || NPhi.size()>0 || KappaPhi.size()>0 || L || Xi || subcycle>0 || dts != dt) {
-    print_error("*** Error: Problem setup is not supported by TimeIntegratorSIMPLEC.\n");
+    print_error("*** Error: Problem setup is not supported by TimeIntegratorSIMPLER.\n");
     exit_mpi();
   }
 
+  if(Vturb) {
+    print_error("*** Error: Turbulence models are not supported by TimeIntegratorSIMPLER.\n");
+    exit_mpi();
+  }
 
   GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
@@ -568,6 +630,10 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     //-----------------------------------------------------
     rel_err = UpdateStates(v, P, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar); 
 
+    //-----------------------------------------------------
+    // Step 5: Solve for Eddy Viscosity using SA Turb. Eq.
+    //-----------------------------------------------------
+    
     V.RestoreDataPointerAndInsert();
 
     if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
@@ -746,7 +812,8 @@ void
 TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
                                        vector<SpaceVariable3D*>& Phi, vector<SpaceVariable3D*> &NPhi,
                                        vector<SpaceVariable3D*> &KappaPhi,
-                                       SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *LocalDt,
+                                       SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                                       SpaceVariable3D *LocalDt,
                                        [[maybe_unused]] double time, double dt, int time_step, int subcycle,
                                        double dts)
 {
@@ -757,10 +824,15 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     exit_mpi();
   }
   if(Phi.size()>0 || NPhi.size()>0 || KappaPhi.size()>0 || L || Xi || subcycle>0 || dts != dt) {
-    print_error("*** Error: Problem setup is not supported by TimeIntegratorSIMPLE(or SIMPLEC).\n");
+    print_error("*** Error: Problem setup is not supported by TimeIntegratorPISO.\n");
     exit_mpi();
   }
 
+  if(Vturb) {
+    print_error("*** Error: Turbulence models are not supported by TimeIntegratorPISO.\n");
+    exit_mpi();
+  }
+  double*** vturb = NULL; //not supporting turbulence right now
 
   GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
@@ -789,7 +861,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the x-momentum equation
   if(global_mesh.x_glob.size()>1) {
-    inco.BuildVelocityEquationSIMPLE(0, v0, v, id, homo, vlin_rows, B, DX, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
@@ -804,7 +876,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the y-momentum equation
   if(global_mesh.y_glob.size()>1) {
-    inco.BuildVelocityEquationSIMPLE(1, v0, v, id, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
@@ -819,7 +891,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the z-momentum equation
   if(global_mesh.z_glob.size()>1) {
-    inco.BuildVelocityEquationSIMPLE(2, v0, v, id, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {

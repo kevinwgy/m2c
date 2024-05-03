@@ -986,14 +986,14 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
 //--------------------------------------------------------------------------
 //TODO: Needs to be updated to include turbulence stress
 void
-IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, Vec5D*** v, double*** id,
-                                                    double*** nu_SA, //SA eddy viscosity working term
-                                                    double*** homo, //node is in a homogeneous region?
+IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v, double*** id,
+                                                    double*** vturb0, double*** vturb,//SA eddy viscosity working term previous & current
+                                                    [[maybe_unused]] double*** homo, //node is in a homogeneous region?
                                                     vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
                                                     SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
                                                     double dt, SpaceVariable3D *LocalDt)
 {
-  assert(dir==0 || dir==1 || dir==2);
+  //assert(dir==0 || dir==1 || dir==2);
 
   double*** dtloc = NULL;
   if(LocalDt) { //local time-stepping, dealt with separately.
@@ -1010,13 +1010,13 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
   int row_counter = 0;
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
-  double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2, rho, nu;
-  double a, ap, ap0, F, D, mu, mu1, mu2, anb;
+  double rho, nu;
+  double a, ap, ap0, F, D, mu, anb, mu_t;
 
   double cb1,sigma,cb2,k,cw2,cw3,cv1,ct3,ct4,cw1; 
   double fv1,fv2,fw,ft2,g,r;
   double chi,S,Omega,W,d;
-  Vec3D plate_start{1.0,0.0,0.0}; // leading edge location of flate plate
+  Vec3D plate_start{0.5,0.0,0.0}; // leading edge location of flate plate
   ///Spalart-Allmaras constants
   cb1 = 0.1355; //production
   sigma = 2.0/3.0; cb2 = 0.622; // diffusion
@@ -1024,13 +1024,13 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
   cw1 = (cb1/(k*k)) + ((1+cb2)/sigma); //source
 
   for(int k=k0; k<kmax; k++) {
-    dz  = Dz[dir][k-k0];
-    dzk = dz_k[dir][k-k0];
-    dzf = dz_f[dir][k-k0];
+    dz  = global_mesh.GetDz(k);
+    dzk = 0.5*(global_mesh.GetDz(k-1) + dz);
+    dzf = 0.5*(dz + global_mesh.GetDz(k+1));
     for(int j=j0; j<jmax; j++) {
-      dy   = Dy[dir][j-j0];
-      dyb  = dy_b[dir][j-j0];
-      dyt  = dy_t[dir][j-j0];
+      dy   = global_mesh.GetDy(j);
+      dyb  = 0.5*(global_mesh.GetDy(j-1) + dy);
+      dyt  = 0.5*(dy + global_mesh.GetDy(j+1));
       dydz = dy*dz;
       for(int i=i0; i<imax; i++) {
         
@@ -1044,29 +1044,22 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         row.SetRow(i,j,k);
         row_counter++;
 
-        if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0)) {
-          row.PushEntry(i,j,k, 1.0); 
-          bb[k][j][i] = v[k][j][i][1+dir];
-          diag[k][j][i] = 0.0; // not really used
-          continue;
-        }
-
-        dx   = Dx[dir][i-i0];
-        dxl  = dx_l[dir][i-i0];
-        dxr  = dx_r[dir][i-i0];
+        dx   = global_mesh.GetDx(i);
+        dxl  = 0.5*(global_mesh.GetDx(i-1) + dx);
+        dxr  = 0.5*(dx + global_mesh.GetDx(i+1));
         dxdy = dx*dy;
         dxdz = dx*dz;
         
         //---------------------------------------------------
         // Approximating velocity gradients at current point
         //---------------------------------------------------
-        double u_up = (v[k][j+1][i][1] - v[k][j+1][i+1][1]) / dx; 
-        double u_btm = (v[k][j-1][i][1] - v[k][j-1][i+1][1]) / dx; 
-        double v_left = (v[k][j+1][i-1][2] - v[k][j][i-1][2]) / dy;
-        double v_right = (v[k][j+1][i+1][2] - v[k][j][i+1][2]) / dy;
+        double u_up = (v[k][j+1][i][1] + v[k][j+1][i+1][1]) / 2.0;
+        double u_btm = (v[k][j-1][i][1] + v[k][j-1][i+1][1]) / 2.0;
+        double v_left = (v[k][j+1][i-1][2] + v[k][j][i-1][2]) / 2.0;
+        double v_right = (v[k][j+1][i+1][2] + v[k][j][i+1][2]) / 2.0;
 
-        double dvdx =  (v_left-v_right) / (2*dx); //velocity gradients
-        double dudy =  (u_up-u_btm) / (2*dy);
+        double dvdx =  (v_right-v_left) / (dxl + dxr); //velocity gradients
+        double dudy =  (u_up-u_btm) / (dyb + dyt);
 
         
         //---------------------------------------------------
@@ -1074,7 +1067,7 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //---------------------------------------------------
         Vec3D coords = global_mesh.GetXYZ(i,j,k); //coords of current point
 
-        if (coords.v[1] >= plate_start.v[1]) d = coords.v[1]; // grid points that are above flat plate case
+        if (coords[0] >= plate_start[0]) d = coords[1]; // grid points that are above flat plate case
         else{ //grid points that are to the left of the flate plate
           //compute distance to leading edge point
           double dist = sqrt(pow(plate_start.v[0]-coords.v[0],2.0) + pow((plate_start.v[1]-coords.v[1]),2.0)); 
@@ -1085,16 +1078,17 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //---------------------------------------------------
         // Spalart-Allmaras Additional Eqs. 
         //---------------------------------------------------
-        chi = nu_SA[k][j][i] / nu;
+        chi = vturb0[k][j][i] / nu;
         fv1 = (pow(chi,3)) / (pow(chi,3) + pow(cv1,3));
         fv2 = 1 - (chi / 1+(chi*fv1));
         ft2 = ct3 * exp(-ct4*chi*chi);
    
-        W = dvdx - dudy; //vorticity component - 2D case only!!!
+        //W = (0.5*(dudy - dvdx)*(dudy - dvdx)) + (0.5*(dvdx - dudy)*(dvdx - dudy)) ; //vorticity component - 2D case only!!!
+        W = sqrt((dvdx-dudy)*(dvdx-dudy)); //vorticity component - 2D case only!!!
         Omega = sqrt(2*W);
 
-        S = Omega + (nu_SA[k][j][i] / (k*k*d*d)) * fv2; 
-        r = min((nu_SA[k][j][i])/(S*k*k*d*d),10.0);
+        S = Omega + (vturb0[k][j][i] / (k*k*d*d)) * fv2; 
+        r = min((vturb0[k][j][i])/(S*k*k*d*d),10.0);
         g = r + cw2*(pow(r,6.0)-r);
 
         fw = g * pow((1+pow(cw3,6.0))/(pow(g,6.0)+pow(cw3,6.0)),1.0/6.0);
@@ -1108,46 +1102,16 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //-----------
         // LEFT
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
-        if(dir==0)
-          F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
-        else {
-          if(homo[k][j][i]) { //this "cell" (i,j,k) is in a neighborhood w/ constant rho and mu
-            rhou1 = dir==1 ? v[k][j-1][i][1]*v[k][j][i][0] : v[k-1][j][i][1]*v[k][j][i][0];
-            rhou2 = v[k][j][i][1]*v[k][j][i][0];
-          } else {
-            cm = global_mesh.GetDx(i-1);
-            cp = global_mesh.GetDx(i);
-            cm_plus_cp = cm + cp;
-            rhou1 = dir==1 ? v[k][j-1][i][1]*(cp*v[k][j-1][i-1][0] + cm*v[k][j-1][i][0])/cm_plus_cp
-                           : v[k-1][j][i][1]*(cp*v[k-1][j][i-1][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
-            rhou2 = v[k][j][i][1]*(cp*v[k][j][i-1][0] + cm*v[k][j][i][0])/(cm+cp);
-          }
-          F = dir== 1 ? (dyt*rhou1 + dyb*rhou2)/(dyb+dyt) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
-        }
+        // Calculate F at the correct location (different for dir=0,1,2)
+        //if(dir==0)
+        F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
         F *= dydz;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        if(dir==0)
-          mu = Mu[id[k][j][i-1]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(i==0) {
-              mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==1 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
-            }
-            mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
-          }
-        }
-        if(mu>0.0) {
-          D  = mu*dydz/dxl;
+        //if(dir==0)
+        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
+        if(mu_t>0.0) {
+          D  = mu_t*dydz/dxl;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1158,12 +1122,12 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
           if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET ||
              iod.mesh.bc_x0 == MeshData::OVERSET)
-            bb[k][j][i] += a*v[k][j][i-1][dir+1]; //+a*v or +a*w to the RHS 
+            bb[k][j][i] += a*vturb[k][j][i-1]; //+a*vturb to the RHS 
           else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
             ap -= a;
           else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
-                                                //to have zero velocity on the wall
+            bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i-1] should be -vturb[k][j][i]
+                                             //to have zero on the wall
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_x0);
@@ -1175,46 +1139,16 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //-----------
         // RIGHT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
-        if(dir==0)
-          F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
-        else {
-          if(homo[k][j][i]) {
-            rhou1 = dir==1 ? v[k][j-1][i+1][1]*v[k][j][i][0] : v[k-1][j][i+1][1]*v[k][j][i][0];
-            rhou2 = v[k][j][i+1][1]*v[k][j][i][0];
-          } else {
-            cm = global_mesh.GetDx(i);
-            cp = global_mesh.GetDx(i+1);
-            cm_plus_cp = cm + cp;
-            rhou1 = dir==1 ? v[k][j-1][i+1][1]*(cp*v[k][j-1][i][0] + cm*v[k][j-1][i+1][0])/cm_plus_cp
-                           : v[k-1][j][i+1][1]*(cp*v[k-1][j][i][0] + cm*v[k-1][j][i+1][0])/cm_plus_cp;
-            rhou2 = v[k][j][i+1][1]*(cp*v[k][j][i][0] + cm*v[k][j][i+1][0])/(cm+cp);
-          }
-          F = dir== 1 ? (dyt*rhou1 + dyb*rhou2)/(dyb+dyt) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
-        }
+        // Calculate F at the correct location (different for dir=0,1,2)
+        //if(dir==0)
+        F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
         F *= dydz;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        if(dir==0)
-          mu = Mu[id[k][j][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(i==NX-1) {
-              mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==1 ? (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j-1][i+1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j][i+1]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j][i+1]])/cm_plus_cp;
-            }
-            mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
-          }
-        }
-        if(mu>0.0) {
-          D  = mu*dydz/dxr;
+        //if(dir==0)
+        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
+        if(mu_t>0.0) {
+          D  = mu_t*dydz/dxr;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1224,13 +1158,11 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         else { //i+1 is outside domain boundary
           if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET ||
              iod.mesh.bc_xmax == MeshData::OVERSET)
-            bb[k][j][i] += a*v[k][j][i+1][dir+1];
+            bb[k][j][i] += a*vturb[k][j][i+1];
           else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
-            if(dir != 0) //otherwise, v[k][j][i+1][1] = 0
-              ap -= a;
+            ap -= a;
           } else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
-            if(dir != 0) //otherwise, v[k][j][i+1][1] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
+            bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i+1] should be -vturb[k][j][i]
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_xmax);
@@ -1242,46 +1174,16 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //-----------
         // BOTTOM 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
-        if(dir==1)
-          F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
-        else {
-          if(homo[k][j][i]) {
-            rhou1 = dir==0 ? v[k][j][i-1][2]*v[k][j][i][0] : v[k-1][j][i][2]*v[k][j][i][0];
-            rhou2 = v[k][j][i][2]*v[k][j][i][0];
-          } else {
-            cm = global_mesh.GetDy(j-1);
-            cp = global_mesh.GetDy(j);
-            cm_plus_cp = cm + cp;
-            rhou1 = dir==0 ? v[k][j][i-1][2]*(cp*v[k][j-1][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
-                           : v[k-1][j][i][2]*(cp*v[k-1][j-1][i][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
-            rhou2 = v[k][j][i][2]*(cp*v[k][j-1][i][0] + cm*v[k][j][i][0])/(cm+cp);
-          }
-          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
-        }
+        // Calculate F at the correct location (different for dir=0,1,2)
+        //if(dir==1)
+        F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
         F *= dxdz;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        if(dir==1)
-          mu = Mu[id[k][j-1][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]]; 
-          else {
-            // cm and cp have been calculated!   
-            if(j==0) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
-            }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
-          }
-        }
-        if(mu>0.0) {
-          D  = mu*dxdz/dyb;
+        //if(dir==1)
+        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
+        if(mu_t>0.0) {
+          D  = mu_t*dxdz/dyb;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1291,12 +1193,11 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
           if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
-            bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS 
+            bb[k][j][i] += a*vturb[k][j-1][i];
           else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
             ap -= a;
           else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
-                                                //to have zero velocity on the wall
+            bb[k][j][i] -= a*vturb[k][j][i]; 
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_y0);
@@ -1308,46 +1209,16 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //-----------
         // TOP 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
-        if(dir==1)
-          F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
-        else {
-          if(homo[k][j][i]) {
-            rhou1 = dir==0 ? v[k][j+1][i-1][2]*v[k][j][i][0] : v[k-1][j+1][i][2]*v[k][j][i][0];
-            rhou2 = v[k][j+1][i][2]*v[k][j][i][0];
-          } else {
-            cm = global_mesh.GetDy(j);
-            cp = global_mesh.GetDy(j+1);
-            cm_plus_cp = cm + cp;
-            rhou1 = dir==0 ? v[k][j+1][i-1][2]*(cp*v[k][j][i-1][0] + cm*v[k][j+1][i-1][0])/cm_plus_cp
-                           : v[k-1][j+1][i][2]*(cp*v[k-1][j][i][0] + cm*v[k-1][j+1][i][0])/cm_plus_cp;
-            rhou2 = v[k][j+1][i][2]*(cp*v[k][j][i][0] + cm*v[k][j+1][i][0])/(cm+cp);
-          }
-          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
-        }
+        // Calculate F at the correct location (different for dir=0,1,2)
+        //if(dir==1)
+        F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
         F *= dxdz;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        if(dir==1)
-          mu = Mu[id[k][j][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(j==NY-1) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j+1][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j+1][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j+1][i]])/cm_plus_cp;
-            }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
-          }
-        }
-        if(mu>0.0) {
-          D  = mu*dxdz/dyt;
+        //if(dir==1)
+        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
+        if(mu_t>0.0) {
+          D  = mu_t*dxdz/dyt;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1357,13 +1228,11 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         else { //j+1 is outside domain boundary
           if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET ||
              iod.mesh.bc_ymax == MeshData::OVERSET)
-            bb[k][j][i] += a*v[k][j+1][i][dir+1];
+            bb[k][j][i] += a*vturb[k][j+1][i];
           else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
-            if(dir != 1) //otherwise, v[k][j+1][i][2] = 0
-              ap -= a;
+            ap -= a;
           } else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
-            if(dir != 1) //otherwise, v[k][j+1][i][2] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
+            bb[k][j][i] -= a*vturb[k][j][i];
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_ymax);
@@ -1375,46 +1244,16 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //-----------
         // BACK
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
-        if(dir==2)
-          F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
-        else {
-          if(homo[k][j][i]) {
-            rhou1 = dir==0 ? v[k][j][i-1][3]*v[k][j][i][0] : v[k][j-1][i][3]*v[k][j][i][0];
-            rhou2 = v[k][j][i][3]*v[k][j][i][0];
-          } else {
-            cm = global_mesh.GetDz(k-1);
-            cp = global_mesh.GetDz(k);
-            cm_plus_cp = cm + cp;
-            rhou1 = dir==0 ? v[k][j][i-1][3]*(cp*v[k-1][j][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
-                           : v[k][j-1][i][3]*(cp*v[k-1][j-1][i][0] + cm*v[k][j-1][i][0])/cm_plus_cp;
-            rhou2 = v[k][j][i][3]*(cp*v[k-1][j][i][0] + cm*v[k][j][i][0])/(cm+cp);
-          }
-          F = dir==0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dyt*rhou1 + dyb*rhou2)/(dyb+dyt);
-        }
+        // Calculate F at the correct location (different for dir=0,1,2)
+        //if(dir==2)
+        F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
         F *= dxdy;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        if(dir==2)
-          mu = Mu[id[k-1][j][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(k==0) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
-            }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
-          }
-        }
-        if(mu>0.0) {
-          D  = mu*dxdy/dzk;
+        //if(dir==2)
+        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
+        if(mu_t>0.0) {
+          D  = mu_t*dxdy/dzk;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1424,12 +1263,11 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         else { //k-1 is outside domain boundary (if it gets here, dir must be x or y (0 or 1))
           if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET ||
              iod.mesh.bc_z0 == MeshData::OVERSET)
-            bb[k][j][i] += a*v[k-1][j][i][dir+1]; //+a*u or +a*v to the RHS 
+            bb[k][j][i] += a*vturb[k-1][j][i]; 
           else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
             ap -= a;
           else if(iod.mesh.bc_z0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
-                                                //to have zero velocity on the wall
+            bb[k][j][i] -= a*vturb[k][j][i];
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_z0);
@@ -1443,46 +1281,16 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         //-----------
         // FRONT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
-        if(dir==2)
-          F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
-        else {
-          if(homo[k][j][i]) {
-            rhou1 = dir==0 ? v[k+1][j][i-1][3]*v[k][j][i][0] : v[k+1][j-1][i][3]*v[k][j][i][0];
-            rhou2 = v[k+1][j][i][3]*v[k][j][i][0];
-          } else {
-            cm = global_mesh.GetDz(k);
-            cp = global_mesh.GetDz(k+1);
-            cm_plus_cp = cm + cp;
-            rhou1 = dir==0 ? v[k+1][j][i-1][3]*(cp*v[k][j][i-1][0] + cm*v[k+1][j][i-1][0])/cm_plus_cp
-                           : v[k+1][j-1][i][3]*(cp*v[k][j-1][i][0] + cm*v[k+1][j-1][i][0])/cm_plus_cp;
-            rhou2 = v[k+1][j][i][3]*(cp*v[k][j][i][0] + cm*v[k+1][j][i][0])/(cm+cp);
-            F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dyt*rhou1 + dyb*rhou2)/(dyb+dyt);
-          }
-        }
+        // Calculate F at the correct location (different for dir=0,1,2)
+        //if(dir==2)
+        F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
         F *= dxdy;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        if(dir==2)
-          mu = Mu[id[k][j][i]];
-        else {
-          if(homo[k][j][i]) 
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(k==NZ-1) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k+1][j][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k+1][j-1][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k+1][j][i]])/cm_plus_cp;
-            }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
-          }
-        }
-        if(mu>0.0) {
-          D  = mu*dxdy/dzf;
+        //if(dir==2)
+        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy)
+        if(mu_t>0.0) {
+          D  = mu_t*dxdy/dzf;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1492,13 +1300,11 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         else { //k+1 is outside domain boundary
           if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET ||
              iod.mesh.bc_zmax == MeshData::OVERSET)
-            bb[k][j][i] += a*v[k+1][j][i][dir+1];
+            bb[k][j][i] += a*vturb[k+1][j][i];
           else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
-            if(dir != 2) //otherwise, v[k+1][j][i][3] = 0
-              ap -= a;
+            ap -= a;
           } else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
-            if(dir != 2) //otherwise, v[k+1][j][i][3] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
+            bb[k][j][i] -= a*vturb[k][j][i];
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_zmax);
@@ -1512,78 +1318,41 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
         //------------------------------------------------------
         anb = SIMPLEC ? ap : 0.0; //needed later
-        ap0 = dir==0 ? (dxr*v0[k][j][i-1][0] + dxl*v0[k][j][i][0])/(dxl+dxr) :
+        /*ap0 = dir==0 ? (dxr*v0[k][j][i-1][0] + dxl*v0[k][j][i][0])/(dxl+dxr) : -- ONLY FOR STAGGERED GRID(NO NEED FOR THIS)
               dir==1 ? (dyt*v0[k][j-1][i][0] + dyb*v0[k][j][i][0])/(dyb+dyt) :
                        (dzf*v0[k-1][j][i][0] + dzk*v0[k][j][i][0])/(dzk+dzf);
+        */
+        ap0 = v0[k][j][i][0]; //density
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
-        /*if (dir == 0) { //X-momentum equation case
-          double xmom_d2udx2,xmom_d2udy2,xmom_d2vdxdy;
+        //------------------------------------------------------
+        // Addition of Source Terms
+        // RHS of Spalart-Allmaras Model
+        //------------------------------------------------------
+        bb[k][j][i] += ap0*vturb0[k][j][i]; 
 
-          //------------------------------------------------------
-          // Calculating 2nd derivative velocity derivatives of the staggered grid
-          //------------------------------------------------------
-          
-          //X-Momentum gradients
-          xmom_d2udx2 = (v[k][j][i+1][1]-(2*v[k][j][i-1][1]) + v[k][j][i-1][1]) / (dx*dx); 
-          xmom_d2udy2 = (v[k][j+1][i][1]-(2*v[k][j][i][1]) + v[k][j-1][i][1]) / (dy*dy); 
-  
-          double v_btm_right = v[k][j][i][2];
-          double v_btm_left = v[k][j][i-1][2];
-          double v_top_right = v[k][j+1][i][2];
-          double v_top_left = v[k][j+1][i-1][2];
+        //production term
+        bb[k][j][i] += cb1*(1.0-ft2)*S*vturb[k][j][i];
 
-          xmom_d2vdxdy = (v_btm_left+v_top_right-v_btm_right-v_top_left) / (4.0*pow(dx/2.0,2)); //cross derivative 
-        
-          //------------------------------------------------------
-          // Solving for Fluctuating Reynolds stresses Source term (Sc) -- using Boussinesq Approx
-          //------------------------------------------------------
-          double Sc = -2.0*v[k][j][i][0]*nu_t*0.5*((2.0*xmom_d2udx2)+xmom_d2udy2+xmom_d2vdxdy); 
+        //destruction term
+        bb[k][j][i] += -((cw1*fw)-(cb1/(k*k))*fv2)*pow(vturb[k][j][i]/d,2);
 
-          bb[k][j][i] += Sc*dx*dy*dz; //updates bb
-
-        }
-        if (dir == 1) { //Y-Momentum equation case
-          double ymom_d2vdx2,ymom_d2udxdy,ymom_d2vdy2;
-
-          //------------------------------------------------------
-          // Calculating 2nd derivative velocity derivatives of the staggered grid
-          //------------------------------------------------------
-
-          //Y-Momentum gradients 
-          ymom_d2vdx2 = (v[k][j][i+1][2]-(2*v[k][j][i-1][2]) + v[k][j][i-1][2]) / (dx*dx); 
-          ymom_d2vdy2 = (v[k][j+1][i][1]-(2*v[k][j][i][1]) + v[k][j-1][i][1]) / (dy*dy); 
-  
-          double u_btm_right = v[k][j-1][i-1][1];
-          double u_btm_left = v[k][j-1][i][1];
-          double u_top_right = v[k][j-1][i][1];
-          double u_top_left = v[k][j][i][1];
-
-          ymom_d2udxdy = (u_btm_left+u_top_right-u_btm_right-u_top_left) / (4.0*pow(dy/2.0,2)); //cross derivative 
-        
-          //------------------------------------------------------
-          // Solving for Fluctuating Reynolds stresses (Boussinesq Approx.) 
-          //------------------------------------------------------
-          double Sc = -2.0*v[k][j][i][0]*nu_t*0.5*(ymom_d2vdx2+ymom_d2udxdy+(2.0*ymom_d2vdy2)); 
-
-          bb[k][j][i] += Sc*dx*dy*dz; //updates bb
-        }
-*/
-
-        bb[k][j][i] += ap0*v0[k][j][i][dir+1]; 
+        //nonlinear diffusion term
+        double dnudx = (vturb0[k][j][i+1]-vturb0[k][j][i-1]) / (dx*dx); //derivative in x 
+        double dnudy = (vturb0[k][j+1][i]-vturb0[k][j-1][i]) / (dy*dy); //derivative in y
+        double dnudz = (vturb0[k+1][j][i]-vturb0[k-1][j][i]) / (dz*dz); //derivative in z 
+        bb[k][j][i] += (1.0/sigma)*cb2*(pow(dnudx,2)+(pow(dnudy,2))+(pow(dnudz,2)));
 
 
-        //ADD SOMETHING HERE!
-        // for bb
-
-        bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
+       /* bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
                        dir==1 ? (v[k][j-1][i][4] - v[k][j][i][4])*dxdz :
                                 (v[k-1][j][i][4] - v[k][j][i][4])*dxdy;
+       */
 
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
         assert(Efactor>0.0);
-        bb[k][j][i] += ap*v0[k][j][i][dir+1]/Efactor;
+        bb[k][j][i] += ap*vturb0[k][j][i]/Efactor;
 
         ap *= 1.0 + 1.0/Efactor; 
         row.PushEntry(i,j,k, ap);
@@ -1591,7 +1360,7 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
         // Store diagonal for use in pressure correction equation
         assert(ap-anb!=0.0);
         diag[k][j][i] = 1.0/(ap-anb);
-        diag[k][j][i] *= dir==0 ? dydz : dir==1 ? dxdz : dxdy;
+        //diag[k][j][i] *= dir==0 ? dydz : dir==1 ? dxdz : dxdy;
 
       }
     }
@@ -1608,6 +1377,7 @@ IncompressibleOperator::BuildSA_TURBULENCE_EquationSIMPLE(int dir, Vec5D*** v0, 
 //TODO: Needs to be updated to include turbulence stress
 void
 IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*** v, double*** id,
+                                                    double*** vturb, //turbulent working term
                                                     double*** homo, //node is in a homogeneous region?
                                                     vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
                                                     SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
@@ -1632,8 +1402,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
-  double nu_t; //additional quantities: nu_t = eddy viscosity && S = result from Bousinessq (tau_ij)
-  nu_t = 0.0; //arbitrary constant for now
+  double nu_t,chi,fv1; //parameters used to evaluate the turbulent eddy viscosity
+  double cv1 = 7.1; //constant coefficient in S-A model
 
   for(int k=k0; k<kmax; k++) {
     dz  = Dz[dir][k-k0];
@@ -1676,7 +1446,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         //-----------
         // LEFT
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==0)
           F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
         else {
@@ -1743,7 +1513,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         //-----------
         // RIGHT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==0)
           F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
         else {
@@ -1810,7 +1580,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         //-----------
         // BOTTOM 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==1)
           F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
         else {
@@ -1876,7 +1646,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         //-----------
         // TOP 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==1)
           F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
         else {
@@ -1943,7 +1713,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         //-----------
         // BACK
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==2)
           F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
         else {
@@ -2011,7 +1781,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         //-----------
         // FRONT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==2)
           F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
         else {
@@ -2086,6 +1856,13 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
+        //------------------------------------------------------
+        // Evaluating the Turbulent EDDY Viscosity
+        //------------------------------------------------------
+        chi = vturb[k][j][i] / (mu/v[k][j][i][0]);
+        fv1 = (pow(chi,3)) / (pow(chi,3) + pow(cv1,3));
+        nu_t = vturb[k][j][i]*fv1; //kinematic EDDY viscosity
+          
         if (dir == 0) { //X-momentum equation case
           double xmom_d2udx2,xmom_d2udy2,xmom_d2vdxdy;
 
@@ -2107,7 +1884,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           //------------------------------------------------------
           // Solving for Fluctuating Reynolds stresses Source term (Sc) -- using Boussinesq Approx
           //------------------------------------------------------
-          double Sc = -2.0*v[k][j][i][0]*nu_t*0.5*((2.0*xmom_d2udx2)+xmom_d2udy2+xmom_d2vdxdy); 
+          double Sc = 2.0*v[k][j][i][0]*nu_t*0.5*((2.0*xmom_d2udx2)+xmom_d2udy2+xmom_d2vdxdy); 
 
           bb[k][j][i] += Sc*dx*dy*dz; //updates bb
 
@@ -2133,7 +1910,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           //------------------------------------------------------
           // Solving for Fluctuating Reynolds stresses (Boussinesq Approx.) 
           //------------------------------------------------------
-          double Sc = -2.0*v[k][j][i][0]*nu_t*0.5*(ymom_d2vdx2+ymom_d2udxdy+(2.0*ymom_d2vdy2)); 
+          double Sc = 2.0*v[k][j][i][0]*nu_t*0.5*(ymom_d2vdx2+ymom_d2udxdy+(2.0*ymom_d2vdy2)); 
 
           bb[k][j][i] += Sc*dx*dy*dz; //updates bb
         }
@@ -2412,7 +2189,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         //-----------
         // LEFT
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==0)
           F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
         else {
@@ -2480,7 +2257,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         //-----------
         // RIGHT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==0)
           F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
         else {
@@ -2550,7 +2327,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         //-----------
         // BOTTOM 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==1)
           F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
         else {
@@ -2619,7 +2396,76 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         //-----------
         // TOP 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
+        if(dir==1)
+          F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
+        else {
+          if(homo[k][j][i]) {
+            rhou1 = dir==0 ? v[k][j][i-1][2]*v[k][j][i][0] : v[k-1][j][i][2]*v[k][j][i][0];
+            rhou2 = v[k][j][i][2]*v[k][j][i][0];
+          } else {
+            cm = global_mesh.GetDy(j-1);
+            cp = global_mesh.GetDy(j);
+            cm_plus_cp = cm + cp;
+            rhou1 = dir==0 ? v[k][j][i-1][2]*(cp*v[k][j-1][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
+                           : v[k-1][j][i][2]*(cp*v[k-1][j-1][i][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
+            rhou2 = v[k][j][i][2]*(cp*v[k][j-1][i][0] + cm*v[k][j][i][0])/(cm+cp);
+          }
+          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
+        }
+        F *= dxdz;
+        // Calculate D and the "a" coefficient
+        a = std::max(F, 0.0);
+        if(dir==1)
+          mu = Mu[id[k][j-1][i]];
+        else {
+          if(homo[k][j][i])
+            mu = Mu[id[k][j][i]]; 
+          else {
+            // cm and cp have been calculated!   
+            if(j==0) {
+              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+              mu2 = Mu[id[k][j][i]];
+            } else {
+              mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
+                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+              mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+            }
+            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          }
+        }
+        if(mu>0.0) {
+          D  = mu*dxdz/dyb;
+          a += D*PowerLaw(F/D);
+        }
+        ap += a;
+        vhat[k][j][i] += a*v[k][j-1][i][dir+1];
+        vhat_denom += a;
+
+        // Add entry (or add to bb or ap, if j-1 is outside boundary)
+        if(j-1>=0)
+          row.PushEntry(i,j-1,k, -a);  //on the left hand side
+        else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
+          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
+             iod.mesh.bc_y0 == MeshData::OVERSET)
+            bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS
+          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
+            ap -= a;
+          else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
+            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          else {
+            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+                    (int)iod.mesh.bc_y0);
+            exit(-1);
+          }
+        }             
+
+
+        //-----------
+        // TOP 
+        //-----------
+        // Calculate F at the correct location (different for 
         if(dir==1)
           F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
         else {
@@ -2689,7 +2535,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         //-----------
         // BACK
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==2)
           F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
         else {
@@ -2758,7 +2604,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         //-----------
         // FRONT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==2)
           F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
         else {
@@ -3096,7 +2942,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D**
         //-----------
         // LEFT
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==0)
           F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
         else {
@@ -3145,7 +2991,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D**
         //-----------
         // RIGHT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==0)
           F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
         else {
@@ -3194,7 +3040,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D**
         //-----------
         // BOTTOM 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==1)
           F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
         else {
@@ -3243,7 +3089,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D**
         //-----------
         // TOP 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==1)
           F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
         else {
@@ -3292,7 +3138,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D**
         //-----------
         // BACK
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==2)
           F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
         else {
@@ -3341,7 +3187,7 @@ IncompressibleOperator::CalculateVelocityTildePISO(int dir, Vec5D*** v0, Vec5D**
         //-----------
         // FRONT 
         //-----------
-        // Calculate F at the correct location (different for dir=1,2,3)
+        // Calculate F at the correct location (different for dir=0,1,2)
         if(dir==2)
           F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
         else {
