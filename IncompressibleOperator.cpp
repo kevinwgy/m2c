@@ -1864,63 +1864,70 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         nu_t = vturb[k][j][i]*fv1; //kinematic EDDY viscosity
           
         if (dir == 0) { //X-momentum equation case
-          double xmom_d2udx2,xmom_d2udy2,xmom_d2vdxdy;
+          double dudx,dvdx;
+          double dnudx, dnudy;
 
           //------------------------------------------------------
-          // Calculating 2nd derivative velocity derivatives of the staggered grid
+          // Calculating velocity and nu_t gradients
           //------------------------------------------------------
           
-          //X-Momentum gradients
-          xmom_d2udx2 = (v[k][j][i+1][1]-(2*v[k][j][i-1][1]) + v[k][j][i-1][1]) / (dx*dx); 
-          xmom_d2udy2 = (v[k][j+1][i][1]-(2*v[k][j][i][1]) + v[k][j-1][i][1]) / (dy*dy); 
-  
-          double v_btm_right = v[k][j][i][2];
-          double v_btm_left = v[k][j][i-1][2];
-          double v_top_right = v[k][j+1][i][2];
-          double v_top_left = v[k][j+1][i-1][2];
+          //Velocity gradients
+          double v_left = (v[k][j+1][i-1][2] + v[k][j][i-1][2]) / 2.0;
+          double v_right = (v[k][j+1][i+1][2] + v[k][j][i+1][2]) / 2.0;
 
-          xmom_d2vdxdy = (v_btm_left+v_top_right-v_btm_right-v_top_left) / (4.0*pow(dx/2.0,2)); //cross derivative 
+          dvdx = (v_right-v_left) / (dxl+_dxr);
+          dudx = (v[k][j][i+1][1] + v[k][j][i][1]) / (dx); 
+
+          //Nu_t gradients
+          double nu_top = (vturb[k][j+1][i] + vturb[k][j+1][i-1]) / 2.0;
+          double nu_btm = (vturb[k][j-1][i] + vturb[k][j-1][i-1]) / 2.0; 
+
+          dnudy = (nu_top - nu_btm) / ((2.0*dyt)+(2.0*dyb));
+          dnudx = (vturb[k][j][i] - vturb[k][j][i-1]) / (2.0*dxl);
+  
         
           //------------------------------------------------------
           // Solving for Fluctuating Reynolds stresses Source term (Sc) -- using Boussinesq Approx
           //------------------------------------------------------
-          double Sc = 2.0*v[k][j][i][0]*nu_t*0.5*((2.0*xmom_d2udx2)+xmom_d2udy2+xmom_d2vdxdy); 
+          double Sc = (dudx*dnudx) + (dudy*dnudy);
 
-          bb[k][j][i] += Sc*dx*dy*dz; //updates bb
+          bb[k][j][i] += v[k][j][i][0]*Sc*dx*dy*dz; //updates bb
 
         }
         if (dir == 1) { //Y-Momentum equation case
-          double ymom_d2vdx2,ymom_d2udxdy,ymom_d2vdy2;
 
           //------------------------------------------------------
-          // Calculating 2nd derivative velocity derivatives of the staggered grid
+          // Calculating velocity and nu_t gradients
           //------------------------------------------------------
+          double dudy,dvdy;
+          double dnudx, dnudy;
 
-          //Y-Momentum gradients 
-          ymom_d2vdx2 = (v[k][j][i+1][2]-(2*v[k][j][i-1][2]) + v[k][j][i-1][2]) / (dx*dx); 
-          ymom_d2vdy2 = (v[k][j+1][i][1]-(2*v[k][j][i][1]) + v[k][j-1][i][1]) / (dy*dy); 
-  
-          double u_btm_right = v[k][j-1][i-1][1];
-          double u_btm_left = v[k][j-1][i][1];
-          double u_top_right = v[k][j-1][i][1];
-          double u_top_left = v[k][j][i][1];
+          //Velocity gradients
+          double u_up = (v[k][j+1][i][1] + v[k][j+1][i+1][1]) / 2.0;
+          double u_btm = (v[k][j-1][i][1] + v[k][j-1][i+1][1]) / 2.0;
 
-          ymom_d2udxdy = (u_btm_left+u_top_right-u_btm_right-u_top_left) / (4.0*pow(dy/2.0,2)); //cross derivative 
+          dudy = (u_up - u_btm) / ((2.0*dyt) + (2.0*dyb));
+          dvdy = (v[k][j+1][i][2] - v[k][j][i][2]) / (2.0*dyt) 
+
+          //Nu_t gradients
+          double nu_left = (vturb[k][j][i-1] + vturb[k][j-1][i-1]) / 2.0;
+          double nu_right = (vturb[k][j][i+1] + vturb[k][j-1][i+1]) / 2.0; 
+
+          dnudx = (nu_right - nu_left) / ((2.0*dxl)+(2.0*dxr));
+          dnudy = (vturb[k][j][i] - vturb[k][j-1][i]) / (2.0*dyb);
         
           //------------------------------------------------------
           // Solving for Fluctuating Reynolds stresses (Boussinesq Approx.) 
           //------------------------------------------------------
-          double Sc = 2.0*v[k][j][i][0]*nu_t*0.5*(ymom_d2vdx2+ymom_d2udxdy+(2.0*ymom_d2vdy2)); 
+          double Sc = (dudy*dnudx) + (dvdy*dnudy);
 
-          bb[k][j][i] += Sc*dx*dy*dz; //updates bb
+          bb[k][j][i] += v[k][j][i][0]*Sc*dx*dy*dz; //updates bb
         }
 
 
         bb[k][j][i] += ap0*v0[k][j][i][dir+1]; 
 
 
-        //ADD SOMETHING HERE!
-        // for bb
 
         bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
                        dir==1 ? (v[k][j-1][i][4] - v[k][j][i][4])*dxdz :
