@@ -1374,7 +1374,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
 }
 
 //--------------------------------------------------------------------------
-//TODO: Needs to be updated to include turbulence stress
+
 void
 IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*** v, double*** id,
                                                     double*** vturb, //turbulent working term
@@ -1465,16 +1465,23 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         F *= dydz;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        if(dir==0)
+        if(dir==0) {
           mu = Mu[id[k][j][i-1]];
-        else {
+          if(vturb)
+            mu += GetDynamicEddyViscosity(rho[k][j][i-1], mu, vturb[k][j][i-1]);
+        } else {
           if(homo[k][j][i])
             mu = Mu[id[k][j][i]];
+            if(vturb)
+              mu += GetDynamicEddyViscosity(rho[k][j][i], mu, vturb[k][j][i]);
           else {
             // cm and cp have been calculated!   
             if(i==0) {
               mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
               mu2 = Mu[id[k][j][i]];
+              if(vturb) {
+                mu1 += GetDynamicEddyViscosity(rho[k][j][i], mu, vturb[k][j][i]); I AM HERE!!!
+              }
             } else {
               mu1 = dir==1 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp
                            : (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
@@ -3367,12 +3374,42 @@ IncompressibleOperator::CalculateMomentumChanges(Vec5D*** v0, SpaceVariable3D &V
 
 //----------------------------------------------------------------------------
 
+void
+IncompressibleOperator::InitializeTurbulenceVariables(SpaceVariable3D &Vturb)
+{
+  assert(iod.rans.model == RANSTurbulenceModelData::SPALART_ALLMARAS &&
+         iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE); //this is all we can do right now
 
+  Vturb.SetConstantValue(0.0, true); //set Vturb = 0 (including ghost layer)
+
+}
 
 //--------------------------------------------------------------------------
 
+void
+IncompressibleOperator::ApplyBoundaryConditionsTurbulenceVariables(SpaceVariable3D &Vturb)
+{
+//TODO
 
+}
 
+//--------------------------------------------------------------------------
+
+double
+IncompressibleOperator::GetDynamicEddyViscosity(double rho, double mu, double nu_tilde)
+{
+  // Spalart-Allmaras for the moment
+
+  double cv1_3 = 357.911; //=7.1*7.1*7.1
+
+  assert(rho>0 && mu>0);
+  double nu   = mu/rho;
+  double chi  = nu_tilde / nu;
+  double chi3 = chi*chi*chi;
+  double fv1  = chi3/(chi3 + cv1_3);
+
+  return rho*nu_tilde*fv1;
+}
 
 //--------------------------------------------------------------------------
 

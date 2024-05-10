@@ -275,6 +275,8 @@ int main(int argc, char* argv[])
   if(incompressible) {
     assert(interp);
     inco = new IncompressibleOperator(comm, dms, iod, vf, spo, *interp);
+    if(Vturb)
+      inco->InitializeTurbulenceVariables(*Vturb);
   }
 
   //! Allocate memory for V and ID 

@@ -74,14 +74,6 @@ public:
                                    double Efactor, double dt,
                                    SpaceVariable3D *LocalDt = NULL); 
 
-  void BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v, double*** id,
-                                   double*** vturb0, double*** vturb,//added SA eddy viscosity working term
-                                   [[maybe_unused]] double*** homo, //wheter each node is in a homogeneous region
-                                   std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, SpaceVariable3D &Ddiag,
-                                   bool SIMPLEC, //!< for SIMPLEC, generates a different Ddiag; otherwise the same
-                                   double Efactor, double dt,
-                                   SpaceVariable3D *LocalDt = NULL); 
-
   void BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, SpaceVariable3D &VXstar,
                                    SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                    SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
@@ -107,6 +99,23 @@ public:
  
   void CalculateMomentumChanges(Vec5D*** v0, SpaceVariable3D &V, double*** id, SpaceVariable3D &R3);
 
+
+
+
+  //! For turbulent flows (RANS for now)
+  void InitializeTurbulenceVariables(SpaceVariable3D &Vturb);
+
+  void ApplyBoundaryConditionsTurbulenceVariables(SpaceVariable3D &Vturb);
+
+  void BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v, double*** id,
+                                   double*** vturb0, double*** vturb,//added SA eddy viscosity working term
+                                   [[maybe_unused]] double*** homo, //wheter each node is in a homogeneous region
+                                   std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, SpaceVariable3D &Ddiag,
+                                   bool SIMPLEC, //!< for SIMPLEC, generates a different Ddiag; otherwise the same
+                                   double Efactor, double dt,
+                                   SpaceVariable3D *LocalDt = NULL); 
+
+
 private:
 
   void CheckInputs(IoData &iod); //!< Check input file. Quit if error is found.
@@ -119,6 +128,10 @@ private:
   //! Function "A" -- Eq.(5.64) in Patankar's book
   inline double PowerLaw(double pc) {double pp=1.0-0.1*fabs(pc); return pp>0.0 ? pow(pp,5) : 0.0;}
   //inline double PowerLaw([[maybe_unused]] double pc) {return 1.0;} //degenerates to upwinding (useful for debugging)
+
+
+  //! For turbulent flows (RANS for now) TODO: These functions should be moved to dedicated classes later
+  double GetDynamicEddyViscosity(double rho, double mu, double nu_tilde); //Spalart-Allmaras
 };
 
 #endif

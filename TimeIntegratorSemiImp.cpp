@@ -177,7 +177,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the x-momentum equation
     if(global_mesh.x_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor,
+                                       dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -197,7 +198,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the y-momentum equation
     if(global_mesh.y_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor,
+                                       dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -214,7 +216,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the z-momentum equation
     if(global_mesh.z_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor,
+                                       dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
@@ -285,7 +288,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         print_error("*** Error: Found unknown turbulence closure model.\n");
         exit_mpi();
       }
-      inco.BuildSATurbulenceEquationSIMPLE(v0, v, id, vturb0, vturb, homo, vturb_lin_rows, B, DX, type==SIMPLEC, Efactor, dt, LocalDt);
+      inco.BuildSATurbulenceEquationSIMPLE(v0, v, id, vturb0, vturb, homo, vturb_lin_rows, B, DX,
+                                           type==SIMPLEC, Efactor, dt, LocalDt);
       Vturb->RestoreDataPointerToLocalVector();
       vturb_lin_solver.SetLinearOperator(vturb_lin_rows);
       lin_success = vturb_lin_solver.Solve(B, *Vturb, NULL, &nLinIts, &lin_rnorm);
