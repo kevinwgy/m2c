@@ -1402,7 +1402,6 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
-  double nu_t, chi,fv1; //parameters used to evaluate the turbulent eddy viscosity
   double cv1 = 7.1; //constant coefficient in S-A model
 
   for(int k=k0; k<kmax; k++) {
@@ -1860,9 +1859,6 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         // Evaluating the Turbulent EDDY Viscosity
         //------------------------------------------------------
           
-        chi = vturb[k][j][i] / (mu/v[k][j][i][0]);
-        fv1 = (pow(chi,3)) / (pow(chi,3) + pow(cv1,3));
-        nu_t = vturb[k][j][i]*fv1; //current location
 
         if (dir == 0) { //X-momentum equation case
           double dudx,dvdx;
@@ -1944,7 +1940,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           double u_btm = (v[k][j-1][i][1] + v[k][j-1][i-1][1]) / 2.0;
 
           dudy = (u_up - u_btm) / dy;
-          dvdy = (v[k][j+1][i][2] - v[k][j][i][2]) / (dytdyb);
+          dvdy = (v[k][j+1][i][2] - v[k][j][i][2]) / (dyt+dyb);
 
           //Nu_t gradients -- CORRECT DISTANCES
 
@@ -1957,7 +1953,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           fv1_btm = (pow(chi_btm,3)) / (pow(chi_btm,3) + pow(cv1,3));
           nu_t_btm = vturb[k][j-1][i+1]*fv1_btm; 
 
-          right_nu_t = (nu_t_top + nu_btm) / 2.0; //interpolated eddy viscosity at right location
+          right_nu_t = (nu_t_top + nu_t_btm) / 2.0; //interpolated eddy viscosity at right location
 
           //Calculating Interpolated Eddy Viscosity at left  -- uses [k][j][i-1] & [k][j-1][i-1]
           chi_top = vturb[k][j][i-1] / (mu/v[k][j][i][0]);
@@ -1972,11 +1968,11 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
 
 
           chi_top = vturb[k][j][i] / (mu/v[k][j][i][0]);
-          fv1_top = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
+          fv1_top = (pow(chi_top,3)) / (pow(chi_top,3) + pow(cv1,3));
           top_nu_t = vturb[k][j][i]*fv1_top;
   
           chi_btm = vturb[k][j-1][i] / (mu/v[k][j][i][0]);
-          fv1_btm = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
+          fv1_btm = (pow(chi_btm,3)) / (pow(chi_btm,3) + pow(cv1,3));
           btm_nu_t = vturb[k][j-1][i]*fv1_btm;
 
           dnudx = (right_nu_t - left_nu_t) / (dxl+dxr);
