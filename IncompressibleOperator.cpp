@@ -1402,7 +1402,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
-  double nu_t,chi,fv1; //parameters used to evaluate the turbulent eddy viscosity
+  double nu_t, chi,fv1; //parameters used to evaluate the turbulent eddy viscosity
   double cv1 = 7.1; //constant coefficient in S-A model
 
   for(int k=k0; k<kmax; k++) {
@@ -1859,37 +1859,71 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         //------------------------------------------------------
         // Evaluating the Turbulent EDDY Viscosity
         //------------------------------------------------------
+          
         chi = vturb[k][j][i] / (mu/v[k][j][i][0]);
         fv1 = (pow(chi,3)) / (pow(chi,3) + pow(cv1,3));
-        nu_t = vturb[k][j][i]*fv1; //kinematic EDDY viscosity
-          
+        nu_t = vturb[k][j][i]*fv1; //current location
+
         if (dir == 0) { //X-momentum equation case
           double dudx,dvdx;
           double dnudx, dnudy;
+          double left_nu_t,right_nu_t,top_nu_t,btm_nu_t; //nu_t values used for evaluating gradients
+          double chi_right,chi_left,fv1_right,fv1_left; //additional variablr used to calc. nu_t
+          double nu_t_right,nu_t_left;
 
           //------------------------------------------------------
           // Calculating velocity and nu_t gradients
           //------------------------------------------------------
-          
+
           //Velocity gradients
           double v_left = (v[k][j+1][i-1][2] + v[k][j][i-1][2]) / 2.0;
-          double v_right = (v[k][j+1][i+1][2] + v[k][j][i+1][2]) / 2.0;
+          double v_right = (v[k][j+1][i][2] + v[k][j][i][2]) / 2.0;
 
-          dvdx = (v_right-v_left) / (dxl+_dxr);
-          dudx = (v[k][j][i+1][1] + v[k][j][i][1]) / (dx); 
+          dvdx = (v_right-v_left) / dx;
+          dudx = (v[k][j][i+1][1] - v[k][j][i][1]) / (dxr+dxl);
 
-          //Nu_t gradients
-          double nu_top = (vturb[k][j+1][i] + vturb[k][j+1][i-1]) / 2.0;
-          double nu_btm = (vturb[k][j-1][i] + vturb[k][j-1][i-1]) / 2.0; 
+          //Nu_t gradients -- CORRECT DISTANCES
 
-          dnudy = (nu_top - nu_btm) / ((2.0*dyt)+(2.0*dyb));
-          dnudx = (vturb[k][j][i] - vturb[k][j][i-1]) / (2.0*dxl);
+          //Calculating Interpolated Eddy Viscosity at top -- uses [k][j+1][i] & [k][j+1][i-1]
+          chi_right = vturb[k][j+1][i] / (mu/v[k][j][i][0]);
+          fv1_right = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
+          nu_t_right = vturb[k][j+1][i]*fv1_right; 
+
+          chi_left = vturb[k][j+1][i-1] / (mu/v[k][j][i][0]);
+          fv1_left = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
+          nu_t_left = vturb[k][j+1][i-1]*fv1_left; 
+
+          top_nu_t = (nu_t_right + nu_t_left) / 2.0; //interpolated eddy viscosity at top location
+
+          //Calculating Interpolated Eddy Viscosity at bottom  -- uses [k][j-1][i] & [k][j-1][i-1]
+          chi_right = vturb[k][j-1][i] / (mu/v[k][j][i][0]);
+          fv1_right = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
+          nu_t_right = vturb[k][j-1][i]*fv1_right; 
+
+          chi_left = vturb[k][j-1][i-1] / (mu/v[k][j][i][0]);
+          fv1_left = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
+          nu_t_left = vturb[k][j-1][i-1]*fv1_left; 
+
+          btm_nu_t = (nu_t_right + nu_t_left) / 2.0; //interpolated eddy viscosity at bottom location
+
+
+
+          chi_left = vturb[k][j][i-1] / (mu/v[k][j][i][0]);
+          fv1_left = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
+          left_nu_t = vturb[k][j][i-1]*fv1_left;
+  
+          chi_right = vturb[k][j][i] / (mu/v[k][j][i][0]);
+          fv1_right = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
+          right_nu_t = vturb[k][j][i]*fv1_right;
+
+          dnudy = (top_nu_t - btm_nu_t) / (dyt+dyb);
+          dnudx = (right_nu_t - left_nu_t) / dx;
   
         
           //------------------------------------------------------
           // Solving for Fluctuating Reynolds stresses Source term (Sc) -- using Boussinesq Approx
           //------------------------------------------------------
-          double Sc = (dudx*dnudx) + (dudy*dnudy);
+          double Sc = (dudx*dnudx) + (dvdx*dnudy);
 
           bb[k][j][i] += v[k][j][i][0]*Sc*dx*dy*dz; //updates bb
 
@@ -1901,20 +1935,53 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           //------------------------------------------------------
           double dudy,dvdy;
           double dnudx, dnudy;
+          double left_nu_t,right_nu_t,top_nu_t,btm_nu_t; //nu_t values used for evaluating gradients
+          double chi_top,chi_btm,fv1_top,fv1_btm; //additional variables used to calc. nu_t
+          double nu_t_top,nu_t_btm;
 
           //Velocity gradients
-          double u_up = (v[k][j+1][i][1] + v[k][j+1][i+1][1]) / 2.0;
-          double u_btm = (v[k][j-1][i][1] + v[k][j-1][i+1][1]) / 2.0;
+          double u_up = (v[k][j][i][1] + v[k][j][i-1][1]) / 2.0;
+          double u_btm = (v[k][j-1][i][1] + v[k][j-1][i-1][1]) / 2.0;
 
-          dudy = (u_up - u_btm) / ((2.0*dyt) + (2.0*dyb));
-          dvdy = (v[k][j+1][i][2] - v[k][j][i][2]) / (2.0*dyt) 
+          dudy = (u_up - u_btm) / dy;
+          dvdy = (v[k][j+1][i][2] - v[k][j][i][2]) / (dytdyb);
 
-          //Nu_t gradients
-          double nu_left = (vturb[k][j][i-1] + vturb[k][j-1][i-1]) / 2.0;
-          double nu_right = (vturb[k][j][i+1] + vturb[k][j-1][i+1]) / 2.0; 
+          //Nu_t gradients -- CORRECT DISTANCES
 
-          dnudx = (nu_right - nu_left) / ((2.0*dxl)+(2.0*dxr));
-          dnudy = (vturb[k][j][i] - vturb[k][j-1][i]) / (2.0*dyb);
+          //Calculating Interpolated Eddy Viscosity at right -- uses [k][j][i+1] & [k][j-1][i+1]
+          chi_top = vturb[k][j][i+1] / (mu/v[k][j][i][0]);
+          fv1_top = (pow(chi_top,3)) / (pow(chi_top,3) + pow(cv1,3));
+          nu_t_top = vturb[k][j][i+1]*fv1_top; 
+
+          chi_btm = vturb[k][j-1][i+1] / (mu/v[k][j][i][0]);
+          fv1_btm = (pow(chi_btm,3)) / (pow(chi_btm,3) + pow(cv1,3));
+          nu_t_btm = vturb[k][j-1][i+1]*fv1_btm; 
+
+          right_nu_t = (nu_t_top + nu_btm) / 2.0; //interpolated eddy viscosity at right location
+
+          //Calculating Interpolated Eddy Viscosity at left  -- uses [k][j][i-1] & [k][j-1][i-1]
+          chi_top = vturb[k][j][i-1] / (mu/v[k][j][i][0]);
+          fv1_top = (pow(chi_top,3)) / (pow(chi_top,3) + pow(cv1,3));
+          nu_t_top = vturb[k][j][i-1]*fv1_top; 
+
+          chi_btm = vturb[k][j-1][i-1] / (mu/v[k][j][i][0]);
+          fv1_btm = (pow(chi_btm,3)) / (pow(chi_btm,3) + pow(cv1,3));
+          nu_t_btm = vturb[k][j-1][i-1]*fv1_btm; 
+
+          left_nu_t = (nu_t_top + nu_t_btm) / 2.0; //interpolated eddy viscosity at left location
+
+
+          chi_top = vturb[k][j][i] / (mu/v[k][j][i][0]);
+          fv1_top = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
+          top_nu_t = vturb[k][j][i]*fv1_top;
+  
+          chi_btm = vturb[k][j-1][i] / (mu/v[k][j][i][0]);
+          fv1_btm = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
+          btm_nu_t = vturb[k][j-1][i]*fv1_btm;
+
+          dnudx = (right_nu_t - left_nu_t) / (dxl+dxr);
+          dnudy = (top_nu_t - btm_nu_t) / dy;
+
         
           //------------------------------------------------------
           // Solving for Fluctuating Reynolds stresses (Boussinesq Approx.) 
