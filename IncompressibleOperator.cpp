@@ -1402,6 +1402,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
+  double nut, nut1, nut2; //turbulent eddy viscosity (kinematic)
+  double rho, rho1, rho2;
   double cv1 = 7.1; //constant coefficient in S-A model
 
   for(int k=k0; k<kmax; k++) {
@@ -1468,26 +1470,36 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(dir==0) {
           mu = Mu[id[k][j][i-1]];
           if(vturb)
-            mu += GetDynamicEddyViscosity(rho[k][j][i-1], mu, vturb[k][j][i-1]);
+            mu += GetDynamicEddyViscosity(v[k][j][i-1][0], mu, vturb[k][j][i-1]);
         } else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-            if(vturb)
-              mu += GetDynamicEddyViscosity(rho[k][j][i], mu, vturb[k][j][i]);
-          else {
-            // cm and cp have been calculated!   
-            if(i==0) {
-              mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-              if(vturb) {
-                mu1 += GetDynamicEddyViscosity(rho[k][j][i], mu, vturb[k][j][i]); I AM HERE!!!
-              }
-            } else {
-              mu1 = dir==1 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+          // cm and cp have been calculated!   
+          if(i==0) {
+            mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+            if(vturb) {
+              rho1 = dir==1 ? v[k][j-1][i][0] : v[k-1][j][i][0];
+              rho2 = v[k][j][i][0];
+              nut1 = dir==1 ? vturb[k][j-1][i] : vturb[k-1][j][i];
+              nut2 = vturb[k][j][i];
             }
-            mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          } else {
+            mu1 = dir==1 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+            if(vturb) {
+              rho1 = dir==1 ? (cp*v[k][j-1][i-1][0] + cm*v[k][j-1][i][0])/cm_plus_cp :
+                              (cp*v[k-1][j][i-1][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
+              rho2 = (cp*v[k][j][i-1][0] + cm*v[k][j][i][0])/cm_plus_cp;
+              nut1 = dir==1 ? (cp*vturb[k][j-1][i-1] + cm*vturb[k][j-1][i])/cm_plus_cp :
+                              (cp*vturb[k-1][j][i-1] + cm*vturb[k-1][j][i])/cm_plus_cp;
+              nut2 = (cp*vturb[k][j][i-1] + cm*vturb[k][j][i])/cm_plus_cp;
+            }
+          }
+          mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          if(vturb) {
+            rho = dir==1 ? (dyt*rho1 + dyb*rho2)/(dyb+dyt) : (dzf*rho1 + dzk*rho2)/(dzk+dzf);
+            nut = dir==1 ? (dyt*nut1 + dyb*nut2)/(dyb+dyt) : (dzf*nut1 + dzk*nut2)/(dzk+dzf);
+            mu += GetDynamicEddyViscosity(rho, mu, nut);
           }
         }
         if(mu>0.0) {
@@ -1539,22 +1551,39 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         F *= dydz;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        if(dir==0)
+        if(dir==0) {
           mu = Mu[id[k][j][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(i==NX-1) {
-              mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==1 ? (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j-1][i+1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j][i+1]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j][i+1]])/cm_plus_cp;
+          if(vturb)
+            mu += GetDynamicEddyViscosity(v[k][j][i][0], mu, vturb[k][j][i]);
+        } else {
+          // cm and cp have been calculated!   
+          if(i==NX-1) {
+            mu1 = dir==1 ? Mu[id[k][j-1][i]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+            if(vturb) {
+              rho1 = dir==1 ? v[k][j-1][i][0] : v[k-1][j][i][0];
+              rho2 = v[k][j][i][0];
+              nut1 = dir==1 ? vturb[k][j-1][i] : vturb[k-1][j][i];
+              nut2 = vturb[k][j][i];
             }
-            mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          } else {
+            mu1 = dir==1 ? (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j-1][i+1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j][i+1]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j][i+1]])/cm_plus_cp;
+            if(vturb) {
+              rho1 = dir==1 ? (cp*v[k][j-1][i][0] + cm*v[k][j-1][i+1][0])/cm_plus_cp :
+                              (cp*v[k-1][j][i][0] + cm*v[k-1][j][i+1][0])/cm_plus_cp;
+              rho2 = (cp*v[k][j][i][0] + cm*v[k][j][i+1][0])/cm_plus_cp;
+              nut1 = dir==1 ? (cp*vturb[k][j-1][i] + cm*vturb[k][j-1][i+1])/cm_plus_cp :
+                              (cp*vturb[k-1][j][i] + cm*vturb[k-1][j][i+1])/cm_plus_cp;
+              nut2 = (cp*vturb[k][j][i] + cm*vturb[k][j][i+1])/cm_plus_cp;
+            }
+          }
+          mu = dir==1 ? (dyt*mu1 + dyb*mu2)/(dyb+dyt) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          if(vturb) {
+            rho = dir==1 ? (dyt*rho1 + dyb*rho2)/(dyb+dyt) : (dzf*rho1 + dzk*rho2)/(dzk+dzf);
+            nut = dir==1 ? (dyt*nut1 + dyb*nut2)/(dyb+dyt) : (dzf*nut1 + dzk*nut2)/(dzk+dzf);
+            mu += GetDynamicEddyViscosity(rho, mu, nut);
           }
         }
         if(mu>0.0) {
@@ -1606,22 +1635,39 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         F *= dxdz;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        if(dir==1)
+        if(dir==1) {
           mu = Mu[id[k][j-1][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]]; 
-          else {
-            // cm and cp have been calculated!   
-            if(j==0) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+          if(vturb)
+            mu += GetDynamicEddyViscosity(v[k][j-1][i][0], mu, vturb[k][j-1][i]);
+        } else {
+          // cm and cp have been calculated!   
+          if(j==0) {
+            mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+            if(vturb) {
+              rho1 = dir==0 ? v[k][j][i-1][0] : v[k-1][j][i][0];
+              rho2 = v[k][j][i][0];
+              nut1 = dir==0 ? vturb[k][j][i-1] : vturb[k-1][j][i];
+              nut2 = vturb[k][j][i];
             }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+            if(vturb) {
+              rho1 = dir==0 ? (cp*v[k][j-1][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp :
+                              (cp*v[k-1][j-1][i][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
+              rho2 = (cp*v[k][j-1][i][0] + cm*v[k][j][i][0])/cm_plus_cp;
+              nut1 = dir==0 ? (cp*vturb[k][j-1][i-1] + cm*vturb[k][j][i-1])/cm_plus_cp :
+                              (cp*vturb[k-1][j-1][i] + cm*vturb[k-1][j][i])/cm_plus_cp;
+              nut2 = (cp*vturb[k][j-1][i] + cm*vturb[k][j][i])/cm_plus_cp;
+            }
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          if(vturb) {
+            rho = dir==0 ? (dxr*rho1 + dxl*rho2)/(dxl+dxr) : (dzf*rho1 + dzk*rho2)/(dzk+dzf);
+            nut = dir==0 ? (dxr*nut1 + dxl*nut2)/(dxl+dxr) : (dzf*nut1 + dzk*nut2)/(dzk+dzf);
+            mu += GetDynamicEddyViscosity(rho, mu, nut);
           }
         }
         if(mu>0.0) {
@@ -1672,22 +1718,39 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         F *= dxdz;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        if(dir==1)
+        if(dir==1) {
           mu = Mu[id[k][j][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(j==NY-1) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j+1][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j+1][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j+1][i]])/cm_plus_cp;
+          if(vturb)
+            mu += GetDynamicEddyViscosity(v[k][j][i][0], mu, vturb[k][j][i]);
+        } else {
+          // cm and cp have been calculated!   
+          if(j==NY-1) {
+            mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
+            mu2 = Mu[id[k][j][i]];
+            if(vturb) {
+              rho1 = dir==0 ? v[k][j][i-1][0] : v[k-1][j][i][0];
+              rho2 = v[k][j][i][0];
+              nut1 = dir==0 ? vturb[k][j][i-1] : vturb[k-1][j][i];
+              nut2 = vturb[k][j][i];
             }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k][j+1][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k-1][j+1][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k][j+1][i]])/cm_plus_cp;
+            if(vturb) {
+              rho1 = dir==0 ? (cp*v[k][j][i-1][0] + cm*v[k][j+1][i-1][0])/cm_plus_cp :
+                              (cp*v[k-1][j][i][0] + cm*v[k-1][j+1][i][0])/cm_plus_cp;
+              rho2 = (cp*v[k][j][i][0] + cm*v[k][j+1][i][0])/cm_plus_cp;
+              nut1 = dir==0 ? (cp*vturb[k][j][i-1] + cm*vturb[k][j+1][i-1])/cm_plus_cp :
+                              (cp*vturb[k-1][j][i] + cm*vturb[k-1][j+1][i])/cm_plus_cp;
+              nut2 = (cp*vturb[k][j][i] + cm*vturb[k][j+1][i])/cm_plus_cp;
+            }
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
+          if(vturb) {
+            rho = dir==0 ? (dxr*rho1 + dxl*rho2)/(dxl+dxr) : (dzf*rho1 + dzk*rho2)/(dzk+dzf);
+            nut = dir==0 ? (dxr*nut1 + dxl*nut2)/(dxl+dxr) : (dzf*nut1 + dzk*nut2)/(dzk+dzf);
+            mu += GetDynamicEddyViscosity(rho, mu, nut);
           }
         }
         if(mu>0.0) {
@@ -1739,22 +1802,39 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         F *= dxdy;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        if(dir==2)
+        if(dir==2) {
           mu = Mu[id[k-1][j][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(k==0) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+          if(vturb)
+            mu += GetDynamicEddyViscosity(v[k-1][j][i][0], mu, vturb[k-1][j][i]);
+        } else {
+          // cm and cp have been calculated!   
+          if(k==0) {
+            mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
+            mu2 = Mu[id[k][j][i]];
+            if(vturb) {
+              rho1 = dir==0 ? v[k][j][i-1][0] : v[k][j-1][i][0];
+              rho2 = v[k][j][i][0];
+              nut1 = dir==0 ? vturb[k][j][i-1] : vturb[k][j-1][i];
+              nut2 = vturb[k][j][i];
             }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k-1][j][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k][j-1][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k-1][j][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
+            if(vturb) {
+              rho1 = dir==0 ? (cp*v[k-1][j][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp :
+                              (cp*v[k-1][j-1][i][0] + cm*v[k][j-1][i][0])/cm_plus_cp;
+              rho2 = (cp*v[k-1][j][i][0] + cm*v[k][j][i][0])/cm_plus_cp;
+              nut1 = dir==0 ? (cp*vturb[k-1][j][i-1] + cm*vturb[k][j][i-1])/cm_plus_cp :
+                              (cp*vturb[k-1][j-1][i] + cm*vturb[k][j-1][i])/cm_plus_cp;
+              nut2 = (cp*vturb[k-1][j][i] + cm*vturb[k][j][i])/cm_plus_cp;
+            }
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
+          if(vturb) {
+            rho = dir==0 ? (dxr*rho1 + dxl*rho2)/(dxl+dxr) : (dyt*rho1 + dyb*rho2)/(dyb+dyt);
+            nut = dir==0 ? (dxr*nut1 + dxl*nut2)/(dxl+dxr) : (dyt*nut1 + dyb*nut2)/(dyb+dyt);
+            mu += GetDynamicEddyViscosity(rho, mu, nut);
           }
         }
         if(mu>0.0) {
@@ -1807,22 +1887,39 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         F *= dxdy;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        if(dir==2)
+        if(dir==2) {
           mu = Mu[id[k][j][i]];
-        else {
-          if(homo[k][j][i]) 
-            mu = Mu[id[k][j][i]];
-          else {
-            // cm and cp have been calculated!   
-            if(k==NZ-1) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k+1][j][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k+1][j-1][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k+1][j][i]])/cm_plus_cp;
+          if(vturb)
+            mu += GetDynamicEddyViscosity(v[k][j][i][0], mu, vturb[k][j][i]);
+        } else {
+          // cm and cp have been calculated!   
+          if(k==NZ-1) {
+            mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k][j-1][i]];
+            mu2 = Mu[id[k][j][i]];
+            if(vturb) {
+              rho1 = dir==0 ? v[k][j][i-1][0] : v[k][j-1][i][0];
+              rho2 = v[k][j][i][0];
+              nut1 = dir==0 ? vturb[k][j][i-1] : vturb[k][j-1][i];
+              nut2 = vturb[k][j][i];
             }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
+          } else {
+            mu1 = dir==0 ? (cp*Mu[id[k][j][i-1]] + cm*Mu[id[k+1][j][i-1]])/cm_plus_cp
+                         : (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k+1][j-1][i]])/cm_plus_cp;
+            mu2 = (cp*Mu[id[k][j][i]] + cm*Mu[id[k+1][j][i]])/cm_plus_cp;
+            if(vturb) {
+              rho1 = dir==0 ? (cp*v[k][j][i-1][0] + cm*v[k+1][j][i-1][0])/cm_plus_cp :
+                              (cp*v[k][j-1][i][0] + cm*v[k+1][j-1][i][0])/cm_plus_cp;
+              rho2 = (cp*v[k][j][i][0] + cm*v[k+1][j][i][0])/cm_plus_cp;
+              nut1 = dir==0 ? (cp*vturb[k][j][i-1] + cm*vturb[k+1][j][i-1])/cm_plus_cp :
+                              (cp*vturb[k][j-1][i] + cm*vturb[k+1][j-1][i])/cm_plus_cp;
+              nut2 = (cp*vturb[k][j][i] + cm*vturb[k+1][j][i])/cm_plus_cp;
+            }
+          }
+          mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dyt*mu1 + dyb*mu2)/(dyb+dyt);
+          if(vturb) {
+            rho = dir==0 ? (dxr*rho1 + dxl*rho2)/(dxl+dxr) : (dyt*rho1 + dyb*rho2)/(dyt+dyb);
+            nut = dir==0 ? (dxr*nut1 + dxl*nut2)/(dxl+dxr) : (dyt*nut1 + dyb*nut2)/(dyt+dyb);
+            mu += GetDynamicEddyViscosity(rho, mu, nut);
           }
         }
         if(mu>0.0) {
@@ -1851,6 +1948,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         }
    
    
+//I AM HERE
         //------------------------------------------------------
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
