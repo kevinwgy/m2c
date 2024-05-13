@@ -204,9 +204,9 @@ IncompressibleOperator::CheckInputs(IoData &iod)
   if(iod.bc.inlet.density != default_density)       bc_error++;
   if(iod.bc.inlet.pressure != 0.0)                  bc_error++;
   if(iod.bc.inlet.internal_energy_per_mass != 0.0)  bc_error++;
-  if(iod.bc.outlet.density != default_density)      bc_error++;
-  if(iod.bc.outlet.pressure != 0.0)                 bc_error++;
-  if(iod.bc.outlet.internal_energy_per_mass != 0.0) bc_error++;
+  if(iod.bc.inlet2.density != default_density)      bc_error++;
+  if(iod.bc.inlet2.pressure != 0.0)                 bc_error++;
+  if(iod.bc.inlet2.internal_energy_per_mass != 0.0) bc_error++;
 
   for(auto&& obj : iod.bc.multiBoundaryConditions.diskMap.dataMap)  {
     if(obj.second->state.density != default_density)       bc_error++;
@@ -316,10 +316,10 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       v0[1] = iod.bc.inlet.velocity_y;
       v0[2] = iod.bc.inlet.velocity_z;
     }
-    else if(it->bcType == MeshData::OUTLET) {
-      v0[0] = iod.bc.outlet.velocity_x;
-      v0[1] = iod.bc.outlet.velocity_y;
-      v0[2] = iod.bc.outlet.velocity_z;
+    else if(it->bcType == MeshData::INLET2) {
+      v0[0] = iod.bc.inlet2.velocity_x;
+      v0[1] = iod.bc.inlet2.velocity_y;
+      v0[2] = iod.bc.inlet2.velocity_z;
     }
 
 
@@ -327,10 +327,15 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
     // Treating the six sides separately might seem clumsy. But in some cases imposing a boundary
     // condition requires populating two entries. 
     if(it->side == GhostPoint::LEFT) {
-      if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+      if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2) {
         v[k][j][im_i][1] = v0[0];
         v[k][j][i][2]    = v0[1];
         v[k][j][i][3]    = v0[2];
+      }
+      else if(it->bcType == MeshData::OUTLET) {
+        v[k][j][i][1]    = v[k][j][im_i][1];
+        v[k][j][i][2]    = v[k][j][im_i][2];
+        v[k][j][i][3]    = v[k][j][im_i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][im_i][1] = 0.0;
@@ -350,12 +355,17 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
     }
     else if(it->side == GhostPoint::RIGHT) {
-      if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+      if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2) {
         v[k][j][i][1]    = v0[0];
         v[k][j][i][2]    = v0[1];
         v[k][j][i][3]    = v0[2];
       }
-      else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
+      else if(it->bcType == MeshData::OUTLET) {
+        v[k][j][i][1]    = v[k][j][im_i][1];
+        v[k][j][i][2]    = v[k][j][im_i][2];
+        v[k][j][i][3]    = v[k][j][im_i][3];
+      }
+       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = 0.0;
         v[k][j][i][2]    = v[k][j][im_i][2];
         v[k][j][i][3]    = v[k][j][im_i][3];
@@ -373,10 +383,15 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
     }
     else if(it->side == GhostPoint::BOTTOM) {
-      if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+      if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2) {
         v[k][j][i][1]    = v0[0];
         v[k][im_j][i][2] = v0[1];
         v[k][j][i][3]    = v0[2];
+      }
+      else if(it->bcType == MeshData::OUTLET) {
+        v[k][j][i][1]    = v[k][im_j][i][1];
+        v[k][j][i][2]    = v[k][im_j][i][2];
+        v[k][j][i][3]    = v[k][im_j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = v[k][im_j][i][1];
@@ -396,10 +411,15 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
     }
     else if(it->side == GhostPoint::TOP) {
-      if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+      if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2) {
         v[k][j][i][1]    = v0[0];
         v[k][j][i][2]    = v0[1];
         v[k][j][i][3]    = v0[2];
+      }
+      else if(it->bcType == MeshData::OUTLET) {
+        v[k][j][i][1]    = v[k][im_j][i][1];
+        v[k][j][i][2]    = v[k][im_j][i][2];
+        v[k][j][i][3]    = v[k][im_j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = v[k][im_j][i][1];
@@ -419,10 +439,15 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
     }
     else if(it->side == GhostPoint::BACK) {
-      if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+      if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2) {
         v[k][j][i][1]    = v0[0];
         v[k][i][i][2]    = v0[1];
         v[im_k][j][i][3] = v0[2];
+      }
+      else if(it->bcType == MeshData::OUTLET) {
+        v[k][j][i][1]    = v[im_k][j][i][1];
+        v[k][j][i][2]    = v[im_k][j][i][2];
+        v[k][j][i][3]    = v[im_k][j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = v[im_k][j][i][1];
@@ -442,10 +467,15 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
     }
     else if(it->side == GhostPoint::FRONT) {
-      if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET) {
+      if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2) {
         v[k][j][i][1]    = v0[0];
         v[k][j][i][2]    = v0[1];
         v[k][j][i][3]    = v0[2];
+      }
+      else if(it->bcType == MeshData::OUTLET) {
+        v[k][j][i][1]    = v[im_k][j][i][1];
+        v[k][j][i][2]    = v[im_k][j][i][2];
+        v[k][j][i][3]    = v[im_k][j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = v[im_k][j][i][1];
@@ -497,7 +527,7 @@ IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
   if(ii0==-1) { 
-    if (iod.mesh.bc_x0 == MeshData::INLET    || iod.mesh.bc_x0 == MeshData::OUTLET ||
+    if (iod.mesh.bc_x0 == MeshData::INLET    || iod.mesh.bc_x0 == MeshData::INLET2 ||
         iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -547,7 +577,7 @@ IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(iimax==NX+1) { 
-    if (iod.mesh.bc_xmax == MeshData::INLET    || iod.mesh.bc_xmax == MeshData::OUTLET ||
+    if (iod.mesh.bc_xmax == MeshData::INLET    || iod.mesh.bc_xmax == MeshData::INLET2 ||
         iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -599,7 +629,7 @@ IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(jj0==-1) { 
-    if (iod.mesh.bc_y0 == MeshData::INLET    || iod.mesh.bc_y0 == MeshData::OUTLET ||
+    if (iod.mesh.bc_y0 == MeshData::INLET    || iod.mesh.bc_y0 == MeshData::INLET2 ||
         iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -649,7 +679,7 @@ IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(jjmax==NY+1) { 
-    if (iod.mesh.bc_ymax == MeshData::INLET    || iod.mesh.bc_ymax == MeshData::OUTLET ||
+    if (iod.mesh.bc_ymax == MeshData::INLET    || iod.mesh.bc_ymax == MeshData::INLET2 ||
         iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -701,7 +731,7 @@ IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(kk0==-1) { 
-    if (iod.mesh.bc_z0 == MeshData::INLET    || iod.mesh.bc_z0 == MeshData::OUTLET ||
+    if (iod.mesh.bc_z0 == MeshData::INLET    || iod.mesh.bc_z0 == MeshData::INLET2 ||
         iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -752,7 +782,7 @@ IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(kkmax==NZ+1) { 
-    if (iod.mesh.bc_zmax == MeshData::INLET    || iod.mesh.bc_zmax == MeshData::OUTLET ||
+    if (iod.mesh.bc_zmax == MeshData::INLET    || iod.mesh.bc_zmax == MeshData::INLET2 ||
         iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -1120,7 +1150,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         if(i-1>=0)
           row.PushEntry(i-1,j,k, -a);  //on the left hand side
         else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
-          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::INLET2 ||
              iod.mesh.bc_x0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j][i-1]; //+a*vturb to the RHS 
           else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
@@ -1156,7 +1186,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         if(i+1<NX)
           row.PushEntry(i+1,j,k, -a);  //on the left hand side
         else { //i+1 is outside domain boundary
-          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET ||
+          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::INLET2 ||
              iod.mesh.bc_xmax == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j][i+1];
           else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
@@ -1191,7 +1221,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
         else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
-          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j-1][i];
           else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
@@ -1226,7 +1256,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         if(j+1<NY)
           row.PushEntry(i,j+1,k, -a);  //on the left hand side
         else { //j+1 is outside domain boundary
-          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET ||
+          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::INLET2 ||
              iod.mesh.bc_ymax == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j+1][i];
           else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
@@ -1261,7 +1291,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         if(k-1>=0)
           row.PushEntry(i,j,k-1, -a);  //on the left hand side
         else { //k-1 is outside domain boundary (if it gets here, dir must be x or y (0 or 1))
-          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::INLET2 ||
              iod.mesh.bc_z0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k-1][j][i]; 
           else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
@@ -1298,7 +1328,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         if(k+1<NZ)
           row.PushEntry(i,j,k+1, -a);  //on the left hand side
         else { //k+1 is outside domain boundary
-          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET ||
+          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::INLET2 ||
              iod.mesh.bc_zmax == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k+1][j][i];
           else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
@@ -1512,7 +1542,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(i-1>=0)
           row.PushEntry(i-1,j,k, -a);  //on the left hand side
         else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
-          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::INLET2||
              iod.mesh.bc_x0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j][i-1][dir+1]; //+a*v or +a*w to the RHS 
           else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
@@ -1595,7 +1625,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(i+1<NX)
           row.PushEntry(i+1,j,k, -a);  //on the left hand side
         else { //i+1 is outside domain boundary
-          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET ||
+          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::INLET2 ||
              iod.mesh.bc_xmax == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j][i+1][dir+1];
           else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
@@ -1679,7 +1709,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
         else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
-          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS 
           else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
@@ -1762,7 +1792,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(j+1<NY)
           row.PushEntry(i,j+1,k, -a);  //on the left hand side
         else { //j+1 is outside domain boundary
-          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET ||
+          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::INLET2 ||
              iod.mesh.bc_ymax == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j+1][i][dir+1];
           else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
@@ -1846,7 +1876,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(k-1>=0)
           row.PushEntry(i,j,k-1, -a);  //on the left hand side
         else { //k-1 is outside domain boundary (if it gets here, dir must be x or y (0 or 1))
-          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::INLET2 ||
              iod.mesh.bc_z0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k-1][j][i][dir+1]; //+a*u or +a*v to the RHS 
           else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
@@ -1931,7 +1961,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(k+1<NZ)
           row.PushEntry(i,j,k+1, -a);  //on the left hand side
         else { //k+1 is outside domain boundary
-          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET ||
+          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::INLET2 ||
              iod.mesh.bc_zmax == MeshData::OVERSET)
             bb[k][j][i] += a*v[k+1][j][i][dir+1];
           else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
@@ -1948,7 +1978,6 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         }
    
    
-//I AM HERE
         //------------------------------------------------------
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
@@ -2414,7 +2443,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         if(i-1>=0)
           row.PushEntry(i-1,j,k, -a);  //on the left hand side
         else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
-          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::INLET2 ||
              iod.mesh.bc_x0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j][i-1][dir+1]; //+a*v or +a*w to the RHS
           else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
@@ -2482,7 +2511,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         if(i+1<NX)
           row.PushEntry(i+1,j,k, -a);  //on the left hand side
         else { //i+1 is outside domain boundary
-          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::OUTLET ||
+          if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::INLET2 ||
              iod.mesh.bc_xmax == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j][i+1][dir+1];
           else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
@@ -2552,7 +2581,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
         else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
-          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS
           else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
@@ -2621,7 +2650,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
         else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
-          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS
           else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
@@ -2690,7 +2719,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         if(j+1<NY)
           row.PushEntry(i,j+1,k, -a);  //on the left hand side
         else { //j+1 is outside domain boundary
-          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::OUTLET ||
+          if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::INLET2 ||
              iod.mesh.bc_ymax == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j+1][i][dir+1];
           else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
@@ -2760,7 +2789,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         if(k-1>=0)
           row.PushEntry(i,j,k-1, -a);  //on the left hand side
         else { //k-1 is outside domain boundary (if it gets here, dir must be x or y (0 or 1))
-          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::OUTLET ||
+          if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::INLET2 ||
              iod.mesh.bc_z0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k-1][j][i][dir+1]; //+a*u or +a*v to the RHS
           else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
@@ -2829,7 +2858,7 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
         if(k+1<NZ)
           row.PushEntry(i,j,k+1, -a);  //on the left hand side
         else { //k+1 is outside domain boundary
-          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::OUTLET ||
+          if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::INLET2 ||
              iod.mesh.bc_zmax == MeshData::OVERSET)
             bb[k][j][i] += a*v[k+1][j][i][dir+1];
           else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
@@ -3501,8 +3530,7 @@ IncompressibleOperator::GetDynamicEddyViscosity(double rho, double mu, double nu
   double cv1_3 = 357.911; //=7.1*7.1*7.1
 
   assert(rho>0 && mu>0);
-  double nu   = mu/rho;
-  double chi  = nu_tilde / nu;
+  double chi  = rho*nu_tilde/mu;
   double chi3 = chi*chi*chi;
   double fv1  = chi3/(chi3 + cv1_3);
 

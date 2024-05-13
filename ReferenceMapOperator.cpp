@@ -79,7 +79,7 @@ ReferenceMapOperator::TagExternalGhostNodes()
     if(it->bcType == MeshData::SYMMETRY) {
       ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 0;
     }
-    else if(it->bcType == MeshData::INLET || it->bcType == MeshData::OUTLET ||
+    else if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2 || it->bcType == MeshData::OUTLET ||
             it->bcType == MeshData::OVERSET) {
       ghost_nodes_outer_tag[int(it-ghost_nodes_outer.begin())] = 2;      
     }

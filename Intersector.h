@@ -132,7 +132,7 @@ class Intersector {
   std::vector<int> ColorReachesBoundary; /**< stores whether each negative colored regions (i.e. enclosrures)  touches \n
                                              the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
                                              the size of this vector is "nRegions" calculated in FloodFillColors.*/
-  bool hasInlet, hasOutlet;
+  bool hasInlet, hasInlet2, hasOutlet;
   int nRegions;
                       
   //! Closest point on triangle (for near-field nodes inside subdomain, including internal ghosts nodes)
@@ -178,7 +178,8 @@ public:
   bool Intersects(Vec3D &X0, Vec3D &X1);
 
   //! Interface tracking functions
-  double TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers);
+  double TrackSurfaceFullCourse(bool &hasInlet_, bool &hasInlet2_, bool &hasOutlet_, bool &hasOcc_,
+                                int &nRegions_, int phi_layers);
 
   double RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
 
@@ -230,8 +231,9 @@ public:
   void GetElementsInScope1(std::vector<int> &elems_in_scope);
 
   //! Get colors
-  void GetColors(bool *hasInlet_ = NULL, bool *hasOutlet_ = NULL, int *nRegions_ = NULL) {
+  void GetColors(bool *hasInlet_ = NULL, bool *hasInlet2_ = NULL, bool *hasOutlet_ = NULL, int *nRegions_ = NULL) {
     if(hasInlet_)   *hasInlet_ = hasInlet;
+    if(hasInlet2_) *hasInlet2_ = hasInlet2;
     if(hasOutlet_) *hasOutlet_ = hasOutlet; 
     if(nRegions_)   *nRegions_ = nRegions;
   }

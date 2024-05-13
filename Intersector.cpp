@@ -133,6 +133,7 @@ Intersector::GetPointerToResults()
   ebds->Color_ptr               = &Color;
   ebds->ColorReachesBoundary_ptr= &ColorReachesBoundary;
   ebds->hasInlet                = hasInlet;
+  ebds->hasInlet2               = hasInlet2;
   ebds->hasOutlet               = hasOutlet;
   ebds->nRegions                = nRegions;
   ebds->ClosestPointIndex_ptr   = &ClosestPointIndex;
@@ -159,7 +160,8 @@ Intersector::GetElementsInScope1(std::vector<int> &elems_in_scope)
 //-------------------------------------------------------------------------
 
 double
-Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &hasOcc_, int &nRegions_, int phi_layers)
+Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasInlet2_, bool &hasOutlet_,
+                                    bool &hasOcc_, int &nRegions_, int phi_layers)
 {
   assert(phi_layers>=1);
 
@@ -179,6 +181,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasOutlet_, bool &has
   double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
 
   hasInlet_  = hasInlet;
+  hasInlet2_ = hasInlet2;
   hasOutlet_ = hasOutlet;
   hasOcc_    = hasOcc;
   nRegions_  = nRegions;
@@ -851,13 +854,14 @@ Intersector::FloodFillColors()
 
   // ----------------------------------------------------------------
   // Now we need to convert the color map to what we want: 0~occluded, 1, 2,...: regions connected to Dirichlet
-  // boundaries (inlet/outlet/farfield). 1=inlet, 2=outlet. -1,-2,...: inside enclosures
+  // boundaries (inlet/inlet2/farfield). 1=inlet, 2=inlet2/farfield, 3=outlet. -1,-2,...: inside enclosures
   // ----------------------------------------------------------------
   double*** color = Color.GetDataPointer();
 
-  // First, we need to find the current colors for inlet, outlet
+  // First, we need to find the current colors for inlet, inlet2, outlet
   std::set<int> inlet_color; 
-  std::set<int> outlet_color;  //In most cases, both sets should only contain 0 or 1 member. Otherwise, it means 
+  std::set<int> outlet_color; 
+  std::set<int> inlet2_color;  //In most cases, all 3 sets should only contain 0 or 1 member. Otherwise, it means 
                                //one type of boundary (e.g., inlet) is separated by the embedded surface into multiple
                                //disconnected regions. In this case, we have to merge the colors into one.
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
@@ -866,12 +870,16 @@ Intersector::FloodFillColors()
     if(it->bcType == MeshData::INLET || it->bcType == MeshData::OVERSET) {
       Int3& ijk(it->image_ijk);
       inlet_color.insert(color[ijk[2]][ijk[1]][ijk[0]]);
+    } else if(it->bcType == MeshData::INLET2) {
+      Int3& ijk(it->image_ijk);
+      inlet2_color.insert(color[ijk[2]][ijk[1]][ijk[0]]);
     } else if(it->bcType == MeshData::OUTLET) {
       Int3& ijk(it->image_ijk);
       outlet_color.insert(color[ijk[2]][ijk[1]][ijk[0]]);
     }
   }
 
+  // Deals with inlet 
   int max_inlet_color(-1);
   for(auto it = inlet_color.begin(); it != inlet_color.end(); it++)
     max_inlet_color = std::max(max_inlet_color, *it);
@@ -891,6 +899,26 @@ Intersector::FloodFillColors()
   if(in_colors.size()>0 && in_colors[0] == 1 && verbose>1)
     print_warning("Warning: Found occluded node(s) near an inlet or farfield boundary.");
 
+
+  // Deals with inlet2
+  int max_inlet2_color(-1);
+  for(auto it = inlet2_color.begin(); it != inlet2_color.end(); it++) 
+    max_inlet2_color = std::max(max_inlet2_color, *it);
+  MPI_Allreduce(MPI_IN_PLACE, &max_inlet2_color, 1, MPI_INT, MPI_MAX, comm);
+
+  vector<int> in2_colors;
+  if(max_inlet2_color!=-1) {
+    in2_colors.assign(max_inlet2_color+1, -1);
+    for(auto it = inlet2_color.begin(); it != inlet2_color.end(); it++)
+      in2_colors[*it] = 1;
+    MPI_Allreduce(MPI_IN_PLACE, in2_colors.data(), in2_colors.size(), MPI_INT, MPI_MAX, comm);
+  }
+ 
+  if(in2_colors.size()>0 && in2_colors[0] == 1 && verbose>1)
+    print_warning("Warning: Found occluded node(s) near an inlet2 or farfield boundary.");
+
+
+  // Deals with outlet 
   int max_outlet_color(-1);
   for(auto it = outlet_color.begin(); it != outlet_color.end(); it++) 
     max_outlet_color = std::max(max_outlet_color, *it);
@@ -905,22 +933,45 @@ Intersector::FloodFillColors()
   }
  
   if(out_colors.size()>0 && out_colors[0] == 1 && verbose>1)
-    print_warning("Warning: Found occluded node(s) near an outlet or farfield boundary.");
+    print_warning("Warning: Found occluded node(s) near an outlet boundary.");
+
+
+
+
 
   // Convert colors 
   std::map<int,int> old2new;
   for(int i=0; i<(int)in_colors.size(); i++)
     if(in_colors[i] == 1)
-     old2new[i] = 1; //inlet_color;
-  for(int i=0; i<(int)out_colors.size(); i++)
-    if(out_colors[i] == 1) {
-     if(old2new.find(i) != old2new.end() && verbose>=1) {
-       print_warning("Warning: Embedded surface (%d elems) cannot separate Inlet/Farfield0 and Outlet/Farfield1.\n"
-                     "         Treating both as Inlet/Farfield0.\n", surface.elems.size());
-       old2new[i] = 1; //inlet_color
-     } else
-       old2new[i] = 2; //outlet_color;
+      old2new[i] = 1; //inlet_color;
+  for(int i=0; i<(int)in2_colors.size(); i++) {
+    if(in2_colors[i] == 1) {
+      if(old2new.find(i) != old2new.end() && verbose>=1) {
+        print_warning("Warning: Embedded surface (%d elems) cannot separate Inlet/Farfield and Inlet2/Farfield2.\n"
+                      "         Treating both as Inlet/Farfield.\n", surface.elems.size());
+        old2new[i] = 1; //inlet_color
+      } else
+        old2new[i] = 2; //inlet2_color;
     }
+  }
+  for(int i=0; i<(int)out_colors.size(); i++) {
+    if(out_colors[i] == 1) {
+      if(old2new.find(i) != old2new.end() && verbose>=1) {
+        if(in_colors[i] == 1) {
+          print_warning("Warning: Embedded surface (%d elems) cannot separate Inlet/Farfield and Outlet.\n"
+                        "         Treating both as Inlet/Farfield.\n", surface.elems.size());
+          old2new[i] = 1; //inlet_color
+        } else {
+          print_warning("Warning: Embedded surface (%d elems) cannot separate Inlet2/Farfield2 and Outlet.\n"
+                        "         Treating both as Inlet2/Farfield2.\n", surface.elems.size());
+          old2new[i] = 2; //inlet2_color
+        }
+      } else
+        old2new[i] = 3; //outlet_color;
+    }
+  }
+
+
 
   // give negative colors to enclusures (i.e. regions not connected to farfield)
   int tmp_counter = 0;
@@ -949,12 +1000,14 @@ Intersector::FloodFillColors()
 
   bool hasOcc = total_occluded>0; //i.e. one zero color (for occluded)
 
-  hasInlet = hasOutlet = false;
+  hasInlet = hasInlet2 = hasOutlet = false;
   nRegions = 0;
   for(auto it = old2new.begin(); it != old2new.end(); it++)
     if(it->second==1)
       hasInlet = true;
     else if(it->second==2)
+      hasInlet2 = true;
+    else if(it->second==3)
       hasOutlet = true;
     else if(it->second<0)
       nRegions++;
@@ -1324,7 +1377,8 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
 {
 
   // Step 0. Check if the domain (not just this subdomain) has the input color
-  if((this_color==1 && !hasInlet) || (this_color==2 && !hasOutlet) || this_color>2 || this_color==0 ||
+  if((this_color==1 && !hasInlet) || (this_color==2 && !hasInlet2) || 
+     (this_color==3 && !hasOutlet)|| this_color>3 || this_color==0 ||
      this_color<-nRegions) {
     print_error("*** Error: (FindColorBoundary) Unable to find the boundary of an invalid color %d.\n",
                 this_color);

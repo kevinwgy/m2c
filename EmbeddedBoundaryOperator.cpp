@@ -1043,24 +1043,26 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
     surf.CalculateNormalsAndAreas();
 
   vector<bool> hasInlet(intersector.size(), false);
+  vector<bool> hasInlet2(intersector.size(), false);
   vector<bool> hasOutlet(intersector.size(), false);
   vector<bool> hasOccluded(intersector.size(), false);
   vector<int> numRegions(intersector.size(), 0);
   for(int i = 0; i < (int)intersector.size(); i++) {
-    bool a, b, c;
+    bool a1, a2, b, c;
     int d;
-    double max_dist0 = intersector[i]->TrackSurfaceFullCourse(a, b, c, d, phi_layers);
+    double max_dist0 = intersector[i]->TrackSurfaceFullCourse(a1, a2, b, c, d, phi_layers);
     if(max_dist0>max_dist)
       max_dist = max_dist0;
 
-    hasInlet[i] = a;
+    hasInlet[i] = a1;
+    hasInlet2[i] = a2;
     hasOutlet[i] = b;
     hasOccluded[i] = c;
     numRegions[i] = d;
 
 /*
     // debug only
-    print("o Surface %d: Inlet %d, Outlet %d, Occluded %d, numRegions %d.\n", i, a, b, c, d);
+    print("o Surface %d: Inlet %d, Inlet2 %d, Outlet %d, Occluded %d, numRegions %d.\n", i, a1, a2, b, c, d);
     unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
     string filename = "Phi_" + std::to_string(i) + ".vtr";
     EBDS->Phi_ptr->StoreMeshCoordinates(*coordinates_ptr);

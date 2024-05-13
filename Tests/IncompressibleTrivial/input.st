@@ -11,7 +11,7 @@ under Mesh {
   Zmax = 0.5;
 
   BoundaryConditionX0   = Inlet;
-  BoundaryConditionXmax = Outlet;
+  BoundaryConditionXmax = Inlet2;
   BoundaryConditionY0   = Symmetry;
   BoundaryConditionYmax = Symmetry;
   BoundaryConditionZ0   = Symmetry;
@@ -68,7 +68,7 @@ under BoundaryConditions {
     VelocityY = 0.0;
     VelocityZ = 0.0;
   }
-  under Outlet {
+  under Inlet2 {
     VelocityX = -1.0;
     VelocityY = 0.0;
     VelocityZ = 0.0;

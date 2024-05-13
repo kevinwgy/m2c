@@ -709,12 +709,12 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       v[k][j][i][3] = iod.bc.inlet.velocity_z;
       v[k][j][i][4] = iod.bc.inlet.pressure;
     }
-    else if(it->bcType == (int)MeshData::OUTLET) {
-      v[k][j][i][0] = iod.bc.outlet.density;
-      v[k][j][i][1] = iod.bc.outlet.velocity_x;
-      v[k][j][i][2] = iod.bc.outlet.velocity_y;
-      v[k][j][i][3] = iod.bc.outlet.velocity_z;
-      v[k][j][i][4] = iod.bc.outlet.pressure;
+    else if(it->bcType == (int)MeshData::INLET2) {
+      v[k][j][i][0] = iod.bc.inlet2.density;
+      v[k][j][i][1] = iod.bc.inlet2.velocity_x;
+      v[k][j][i][2] = iod.bc.inlet2.velocity_y;
+      v[k][j][i][3] = iod.bc.inlet2.velocity_z;
+      v[k][j][i][4] = iod.bc.inlet2.pressure;
     }
     else if(it->bcType == MeshData::SLIPWALL ||
             it->bcType == MeshData::SYMMETRY) {
@@ -750,7 +750,12 @@ void SpaceOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       v[k][j][i][3] = -1.0*v[im_k][im_j][im_i][3];
       v[k][j][i][4] =      v[im_k][im_j][im_i][4];
     } 
-    else if(it->bcType == MeshData::OVERSET) {
+    else if(it->bcType == MeshData::OUTLET) {
+      int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+      for(int p=0; p<5; p++)
+        v[k][j][i][p] = v[im_k][im_j][im_i][p];
+    } 
+     else if(it->bcType == MeshData::OVERSET) {
 
       // nothing to be done here. ghost nodes will be populated below
       
@@ -810,7 +815,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
   if(ii0==-1) { 
-    if (iod.mesh.bc_x0 == MeshData::INLET    || iod.mesh.bc_x0 == MeshData::OUTLET ||
+    if (iod.mesh.bc_x0 == MeshData::INLET    || iod.mesh.bc_x0 == MeshData::INLET2 ||
         iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -864,7 +869,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(iimax==NX+1) { 
-    if (iod.mesh.bc_xmax == MeshData::INLET    || iod.mesh.bc_xmax == MeshData::OUTLET ||
+    if (iod.mesh.bc_xmax == MeshData::INLET    || iod.mesh.bc_xmax == MeshData::INLET2 ||
         iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -920,7 +925,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(jj0==-1) { 
-    if (iod.mesh.bc_y0 == MeshData::INLET    || iod.mesh.bc_y0 == MeshData::OUTLET ||
+    if (iod.mesh.bc_y0 == MeshData::INLET    || iod.mesh.bc_y0 == MeshData::INLET2 ||
         iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -974,7 +979,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(jjmax==NY+1) { 
-    if (iod.mesh.bc_ymax == MeshData::INLET    || iod.mesh.bc_ymax == MeshData::OUTLET ||
+    if (iod.mesh.bc_ymax == MeshData::INLET    || iod.mesh.bc_ymax == MeshData::INLET2 ||
         iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -1030,7 +1035,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 
   
   if(kk0==-1) { 
-    if (iod.mesh.bc_z0 == MeshData::INLET    || iod.mesh.bc_z0 == MeshData::OUTLET ||
+    if (iod.mesh.bc_z0 == MeshData::INLET    || iod.mesh.bc_z0 == MeshData::INLET2 ||
         iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;
@@ -1085,7 +1090,7 @@ SpaceOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
   }
 
   if(kkmax==NZ+1) { 
-    if (iod.mesh.bc_zmax == MeshData::INLET    || iod.mesh.bc_zmax == MeshData::OUTLET ||
+    if (iod.mesh.bc_zmax == MeshData::INLET    || iod.mesh.bc_zmax == MeshData::INLET2 ||
         iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::STICKWALL) {
 
       vector<DiskData* > mydisks;

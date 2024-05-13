@@ -280,8 +280,8 @@ struct MeshData {
   ObjectMap<MeshResolution1DPointData>  ypoints_map;
   ObjectMap<MeshResolution1DPointData>  zpoints_map;
 
-  enum BcType {NONE = 0, INLET = 1, OUTLET = 2, SLIPWALL = 3, STICKWALL = 4, SYMMETRY = 5, 
-               OVERSET = 6, SIZE = 7};
+  enum BcType {NONE = 0, INLET = 1, INLET2 = 2, SLIPWALL = 3, STICKWALL = 4, SYMMETRY = 5, 
+               OVERSET = 6, OUTLET = 7, SIZE = 8};
   BcType bc_x0, bc_xmax, bc_y0, bc_ymax, bc_z0, bc_zmax;
 
   MeshData();
@@ -1037,7 +1037,7 @@ struct MultiBoundaryConditionsData {
 struct BcsData {
 
   StateVariable inlet;
-  StateVariable outlet;
+  StateVariable inlet2;
   BcsWallData wall;
 
   MultiBoundaryConditionsData multiBoundaryConditions;

@@ -823,7 +823,7 @@ RETRY:
     switch (gp->bcType) {
 
       case MeshData::INLET :
-      case MeshData::OUTLET :
+      case MeshData::INLET2 :
         //constant reconstruction (Dirichlet b.c.)
       
         if     (i<0)   copyarray(&v[k][j][i*nDOF], &vr[k][j][i*nDOF], nDOF);
@@ -847,6 +847,17 @@ RETRY:
 
         break;
 
+      case MeshData::OUTLET :
+        //constant or linear reconstruction, matching the image
+      
+        if     (i<0)   copyarray(&vl[kk][jj][ii*nDOF], &vr[k][j][i*nDOF], nDOF);
+        else if(i>=NX) copyarray(&vr[kk][jj][ii*nDOF], &vl[k][j][i*nDOF], nDOF);
+        else if(j<0)   copyarray(&vb[kk][jj][ii*nDOF], &vt[k][j][i*nDOF], nDOF);
+        else if(j>=NY) copyarray(&vt[kk][jj][ii*nDOF], &vb[k][j][i*nDOF], nDOF);
+        else if(k<0)   copyarray(&vk[kk][jj][ii*nDOF], &vf[k][j][i*nDOF], nDOF);
+        else if(k>=NZ) copyarray(&vf[kk][jj][ii*nDOF], &vk[k][j][i*nDOF], nDOF);
+
+        break;
 
       case MeshData::SYMMETRY :
       case MeshData::SLIPWALL :
@@ -1054,7 +1065,7 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
     switch (gp->bcType) {
 
       case MeshData::INLET :
-      case MeshData::OUTLET :
+      case MeshData::INLET2 :
         //constant reconstruction (Dirichlet b.c.)
       
         if(dir==0) {
@@ -1090,6 +1101,26 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
         if(slope) setValue(&slope[k][j][i*nDOF], 0.0, nDOF);
         break;
 
+      case MeshData::OUTLET :
+
+        //relying on nDOF = 1!!
+        if(dir==0) {
+          if     (i<0)   up[k][j][i] = um[kk][jj][ii];
+          else if(i>=NX) um[k][j][i] = up[kk][jj][ii]; 
+          slope[k][j][i] = slope[kk][jj][ii];
+        }
+        if(dir==1) {
+          if     (j<0)   up[k][j][i] = um[kk][jj][ii];
+          else if(j>=NY) um[k][j][i] = up[kk][jj][ii]; 
+          slope[k][j][i] = slope[kk][jj][ii];
+        }
+        if(dir==2) {
+          if     (k<0)   up[k][j][i] = um[kk][jj][ii];
+          else if(k>=NZ) um[k][j][i] = up[kk][jj][ii]; 
+          slope[k][j][i] = slope[kk][jj][ii];
+        }
+
+        break;
 
       case MeshData::SYMMETRY :
       case MeshData::SLIPWALL :
@@ -1098,18 +1129,18 @@ void Reconstructor::ReconstructIn1D(int dir/*0~x,1~y,2~z*/, SpaceVariable3D &U,
 
         //relying on nDOF = 1!!
         if(dir==0) {
-          if     (i<0)   um[k][j][i] = -up[kk][jj][ii];
-          else if(i>=NX) up[k][j][i] = -um[kk][jj][ii]; 
+          if     (i<0)   up[k][j][i] = -um[kk][jj][ii];
+          else if(i>=NX) um[k][j][i] = -up[kk][jj][ii]; 
           slope[k][j][i] = -slope[kk][jj][ii];
         }
         if(dir==1) {
-          if     (j<0)   um[k][j][i] = -up[kk][jj][ii];
-          else if(j>=NY) up[k][j][i] = -um[kk][jj][ii]; 
+          if     (j<0)   up[k][j][i] = -um[kk][jj][ii];
+          else if(j>=NY) um[k][j][i] = -up[kk][jj][ii]; 
           slope[k][j][i] = -slope[kk][jj][ii];
         }
         if(dir==2) {
-          if     (k<0)   um[k][j][i] = -up[kk][jj][ii];
-          else if(k>=NZ) up[k][j][i] = -um[kk][jj][ii]; 
+          if     (k<0)   up[k][j][i] = -um[kk][jj][ii];
+          else if(k>=NZ) um[k][j][i] = -up[kk][jj][ii]; 
           slope[k][j][i] = -slope[kk][jj][ii];
         }
 

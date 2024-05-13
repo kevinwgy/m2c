@@ -17,7 +17,7 @@ under Mesh {
   BoundaryConditionY0   = Symmetry;
   BoundaryConditionYmax = Symmetry;
   BoundaryConditionZ0   = Inlet;
-  BoundaryConditionZmax = Outlet;
+  BoundaryConditionZmax = Inlet2;
 }
 
 under Equations {
@@ -75,7 +75,7 @@ under BoundaryConditions {
     VelocityZ = 0.0;
     Pressure = 1.0e11;
   }
-  under Outlet {
+  under Inlet2 {
     MaterialID = 1;
     Density = 1000.0; 
     VelocityX = 0.0;

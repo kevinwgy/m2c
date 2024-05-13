@@ -524,73 +524,66 @@ void MeshData::setup(const char *name, ClassAssigner *father)
   ypoints_map.setup("ControlPointY", ca);
   zpoints_map.setup("ControlPointZ", ca);
 
-  // Inside the code: Farfield0 = Farfield = Inlet, Farfield1 = Outlet
   new ClassToken<MeshData>(ca, "BoundaryConditionX0", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_x0), 12,
                                "None", 0, 
-                               "Inlet", 1, "Outlet", 2, //option 1
-                               "Farfield0", 1, "Farfield1", 2, //option 2,
-                               "Farfield", 1,//option 3
+                               "Inlet", 1, "Inlet2", 2, //option 1
+                               "Farfield", 1, "Farfield2", 2, //option 2,
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
                                "NoSlipWall", 4, "Symmetry", 5,
-                               "Overset", 6);
+                               "Overset", 6, "Outlet", 7);
   new ClassToken<MeshData>(ca, "BoundaryConditionXmax", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_xmax), 12,
                                "None", 0, 
-                               "Inlet", 1, "Outlet", 2, //option 1
-                               "Farfield0", 1, "Farfield1", 2, //option 2,
-                               "Farfield", 1,//option 3
+                               "Inlet", 1, "Inlet2", 2, //option 1
+                               "Farfield", 1, "Farfield2", 2, //option 2,
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
                                "NoSlipWall", 4, "Symmetry", 5,
-                               "Overset", 6);
+                               "Overset", 6, "Outlet", 7);
   new ClassToken<MeshData>(ca, "BoundaryConditionY0", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_y0), 12,
                                "None", 0, 
-                               "Inlet", 1, "Outlet", 2, //option 1
-                               "Farfield0", 1, "Farfield1", 2, //option 2,
-                               "Farfield", 1,//option 3
+                               "Inlet", 1, "Inlet2", 2, //option 1
+                               "Farfield", 1, "Farfield2", 2, //option 2,
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
                                "NoSlipWall", 4, "Symmetry", 5,
-                               "Overset", 6);
+                               "Overset", 6, "Outlet", 7);
   new ClassToken<MeshData>(ca, "BoundaryConditionYmax", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_ymax), 12,
                                "None", 0, 
-                               "Inlet", 1, "Outlet", 2, //option 1
-                               "Farfield0", 1, "Farfield1", 2, //option 2,
-                               "Farfield", 1,//option 3
+                               "Inlet", 1, "Inlet2", 2, //option 1
+                               "Farfield", 1, "Farfield2", 2, //option 2,
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
                                "NoSlipWall", 4, "Symmetry", 5,
-                               "Overset", 6);
+                               "Overset", 6, "Outlet", 7);
   new ClassToken<MeshData>(ca, "BoundaryConditionZ0", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_z0), 12,
                                "None", 0, 
-                               "Inlet", 1, "Outlet", 2, //option 1
-                               "Farfield0", 1, "Farfield1", 2, //option 2,
-                               "Farfield", 1,//option 3
+                               "Inlet", 1, "Inlet2", 2, //option 1
+                               "Farfield", 1, "Farfield2", 2, //option 2,
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
                                "NoSlipWall", 4, "Symmetry", 5,
-                               "Overset", 6);
+                               "Overset", 6, "Outlet", 7);
   new ClassToken<MeshData>(ca, "BoundaryConditionZmax", this,
                                reinterpret_cast<int MeshData::*>(&MeshData::bc_zmax), 12,
                                "None", 0, 
-                               "Inlet", 1, "Outlet", 2, //option 1
-                               "Farfield0", 1, "Farfield1", 2, //option 2,
-                               "Farfield", 1,//option 3
+                               "Inlet", 1, "Inlet2", 2, //option 1
+                               "Farfield", 1, "Farfield2", 2, //option 2,
                                "Wall", 3, //slip wall
                                "SlipWall", 3, //slip wall,
                                "StickWall", 4, //no-slip wall
                                "NoSlipWall", 4, "Symmetry", 5,
-                               "Overset", 6);
+                               "Overset", 6, "Outlet", 7);
  } 
 
 //------------------------------------------------------------------------------
@@ -1931,11 +1924,9 @@ void BcsData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   inlet.setup("Inlet", ca);
-  //Inside the code, Farfield0 = Farfield = Inlet, Farfield1 = Outlet
-  inlet.setup("Farfield0", ca);
   inlet.setup("Farfield", ca);
-  outlet.setup("Outlet", ca);
-  outlet.setup("Farfield1", ca);
+  inlet2.setup("Inlet2", ca);
+  inlet2.setup("Farfield2", ca);
   wall.setup("Wall", ca);
 
   multiBoundaryConditions.setup("GeometricEntities2D");
