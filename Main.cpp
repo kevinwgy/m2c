@@ -379,7 +379,7 @@ int main(int argc, char* argv[])
   mpo.UpdateMaterialIDAtGhostNodes(ID); //ghost nodes (outside domain) get the ID of their image nodes
 
   if(incompressible) {
-    inco->FinalizeInitialCondition(V, ID); //Shift vel to cell faces, set rho=rho0 and p=0
+    inco->FinalizeInitialCondition(V, ID); //Shift vel to cell faces, set rho=rho0, p=0 (must be followed by ApplyBC)
     inco->ApplyBoundaryConditions(V);
   }
 

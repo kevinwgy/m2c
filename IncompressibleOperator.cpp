@@ -361,7 +361,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
         v[k][j][i][3]    = v0[2];
       }
       else if(it->bcType == MeshData::OUTLET) {
-        v[k][j][im_i][1] = v[k][j][im_i-1][1];
+        v[k][j][i][1]    = v[k][j][im_i][1];
         v[k][j][i][2]    = v[k][j][im_i][2];
         v[k][j][i][3]    = v[k][j][im_i][3];
       }
@@ -418,7 +418,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
       else if(it->bcType == MeshData::OUTLET) {
         v[k][j][i][1]    = v[k][im_j][i][1];
-        v[k][im_j][i][2] = v[k][im_j-1][i][2];
+        v[k][j][i][2]    = v[k][im_j][i][2];
         v[k][j][i][3]    = v[k][im_j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
@@ -475,7 +475,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       else if(it->bcType == MeshData::OUTLET) {
         v[k][j][i][1]    = v[im_k][j][i][1];
         v[k][j][i][2]    = v[im_k][j][i][2];
-        v[im_k][j][i][3] = v[im_k-1][j][i][3];
+        v[k][j][i][3]    = v[im_k][j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = v[im_k][j][i][1];
@@ -1415,6 +1415,12 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
 {
   assert(dir==0 || dir==1 || dir==2);
 
+  //local utility function for evaluating dynamic turbulence eddy viscosity (mu_T)
+  auto GetMut = [&] (int i, int j, int k) {
+    return GetDynamicEddyViscosity(v[k][j][i][0], Mu[id[k][j][i]], vturb[k][j][i]);
+  };
+
+
   double*** dtloc = NULL;
   if(LocalDt) { //local time-stepping, dealt with separately.
     assert(iod.ts.timestep<=0.0); //shouldn't have constant time-step size.
@@ -1434,7 +1440,6 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
   double nut, nut1, nut2; //turbulent eddy viscosity (kinematic)
   double rho, rho1, rho2;
-  double cv1 = 7.1; //constant coefficient in S-A model
 
   for(int k=k0; k<kmax; k++) {
     dz  = Dz[dir][k-k0];
@@ -1998,140 +2003,95 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
+        bb[k][j][i] += ap0*v0[k][j][i][dir+1]; 
+
 
         //------------------------------------------------------
         // Evaluating the source term due to turbulent eddy viscosity
         //------------------------------------------------------
+        if(vturb) {
+          double Sc_turb = 0.0;
+          if (dir == 0) { //X-momentum equation case (i>=1)
 
-        if (dir == 0) { //X-momentum equation case (i>=1)
-          double dudx, dvdx, dwdx;
-          double dnudx, dnudy, dnudz;
-          double left_nu_t, right_nu_t, top_nu_t, btm_nu_t; //nu_t values used for evaluating gradients
-          double chi_right, chi_left, fv1_right, fv1_left; //additional variablr used to calc. nu_t
-          double nu_t_right, nu_t_left;
+            //Velocity gradients
+            double dudx = -dxr/(dxl*(dxl+dxr))*v[k][j][i-1][1] + (dxr-dxl)/(dxl*dxr)*v[k][j][i][1]
+                        +  dxl/(dxr*(dxl+dxr))*v[k][j][i+1][1]; //2nd-order accuracy, see Kevin's notes
+            double v_left  = (v[k][j+1][i-1][2] + v[k][j][i-1][2])/2.0;
+            double v_right = (v[k][j+1][i][2]   + v[k][j][i][2])/2.0;
+            double dvdx    = (v_right - v_left)/dx;
+            double w_left  = (v[k+1][j][i-1][3] + v[k][j][i-1][3])/2.0;
+            double w_right = (v[k+1][j][i][3]   + v[k][j][i][3])/2.0;
+            double dwdx    = (w_right - w_left)/dx;
 
-          //------------------------------------------------------
-          // Calculating velocity and nu_t gradients
-          //------------------------------------------------------
+            //mu_t gradients
+            double dmutdx = (GetMut(i,j,k) - GetMut(i-1,j,k))/dx;
+            double mut[3];
+            for(int p=-1; p<2; p++)
+              mut[p+1] = (dxr*GetMut(i-1,j+p,k) + dxl*GetMut(i,j+p,k))/(dxl+dxr);
+            double dmutdy = -dyt/(dyb*(dyt+dyb))*mut[0] + (dyt-dyb)/(dyt*dyb)*mut[1] + dyb/(dyt*(dyt+dyb))*mut[2];
+            for(int p=-1; p<2; p++)
+              mut[p+1] = (dxr*GetMut(i-1,j,k+p) + dxl*GetMut(i,j,k+p))/(dxl+dxr);
+            double dmutdz = -dzf/(dzk*(dzf+dzk))*mut[0] + (dzf-dzk)/(dzf*dzk)*mut[1] + dzk/(dzf*(dzf+dzk))*mut[2];
 
-          //Velocity gradients
-          dudx = (v[k][j][i+1][1] - v[k][j][i-1][1]) / (dxr+dxl); //I AM HERE!
-          double v_left = (v[k][j+1][i-1][2] + v[k][j][i-1][2]) / 2.0;
-          double v_right = (v[k][j+1][i][2] + v[k][j][i][2]) / 2.0;
-          dvdx = (v_right - v_left) / dx;
+            Sc_turb = dudx*dmutdx + dvdx*dmutdy + dwdx*dmutdz;
 
-          //Nu_t gradients -- CORRECT DISTANCES
+          }
+          else if (dir == 1) { //Y-Momentum equation case (j>=1)
 
-          //Calculating Interpolated Eddy Viscosity at top -- uses [k][j+1][i] & [k][j+1][i-1]
-          chi_right = vturb[k][j+1][i] / (mu/v[k][j][i][0]);
-          fv1_right = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
-          nu_t_right = vturb[k][j+1][i]*fv1_right; 
+            //Velocity gradients
+            double u_btm = (v[k][j-1][i+1][1] + v[k][j-1][i][1])/2.0;
+            double u_top = (v[k][j][i+1][1]   + v[k][j][i][1])/2.0;
+            double dudy  = (u_top - u_btm)/dy;
+            double dvdy  = -dyt/(dyb*(dyt+dyb))*v[k][j-1][i][2] + (dyt-dyb)/(dyt*dyb)*v[k][j][i][2]
+                         +  dyb/(dyt*(dyt+dyb))*v[k][j+1][i][2]; //2nd-order accuracy, see Kevin's notes
+            double w_btm = (v[k+1][j-1][i][3] + v[k][j-1][i][3])/2.0;
+            double w_top = (v[k+1][j][i][3]   + v[k][j][i][3])/2.0;
+            double dwdy  = (w_top - w_btm)/dy;
 
-          chi_left = vturb[k][j+1][i-1] / (mu/v[k][j][i][0]);
-          fv1_left = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
-          nu_t_left = vturb[k][j+1][i-1]*fv1_left; 
+            //mu_t gradients
+            double mut[3];
+            for(int p=-1; p<2; p++)
+              mut[p+1] = (dyt*GetMut(i+p,j-1,k) + dyb*GetMut(i+p,j,k))/(dyt+dyb);
+            double dmutdx = -dxr/(dxl*(dxl+dxr))*mut[0] + (dxr-dxl)/(dxl*dxr)*mut[1] + dxl/(dxr*(dxl+dxr))*mut[2];
+            double dmutdy = (GetMut(i,j,k) - GetMut(i,j-1,k))/dy;
+            for(int p=-1; p<2; p++)
+              mut[p+1] = (dyt*GetMut(i,j-1,k+p) + dyb*GetMut(i,j,k+p))/(dyt+dyb);
+            double dmutdz = -dzf/(dzk*(dzf+dzk))*mut[0] + (dzf-dzk)/(dzf*dzk)*mut[1] + dzk/(dzf*(dzf+dzk))*mut[2];
 
-          top_nu_t = (nu_t_right + nu_t_left) / 2.0; //interpolated eddy viscosity at top location
+            Sc_turb = dudy*dmutdx + dvdy*dmutdy + dwdy*dmutdz;
 
-          //Calculating Interpolated Eddy Viscosity at bottom  -- uses [k][j-1][i] & [k][j-1][i-1]
-          chi_right = vturb[k][j-1][i] / (mu/v[k][j][i][0]);
-          fv1_right = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
-          nu_t_right = vturb[k][j-1][i]*fv1_right; 
+          }
+          else if (dir == 2) {//Z-Momentum equation case (k>=1)
 
-          chi_left = vturb[k][j-1][i-1] / (mu/v[k][j][i][0]);
-          fv1_left = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
-          nu_t_left = vturb[k][j-1][i-1]*fv1_left; 
+            //Velocity gradients
+            double u_bk = (v[k-1][j][i+1][1] + v[k-1][j][i][1])/2.0;
+            double u_ft = (v[k][j][i+1][1]   + v[k][j][i][1])/2.0;
+            double dudz = (u_ft - u_bk)/dz;
+            double v_bk = (v[k-1][j+1][i][2] + v[k-1][j][i][2])/2.0;
+            double v_ft = (v[k][j+1][i][2] + v[k][j][i][2])/2.0;
+            double dvdz = (v_ft - v_bk)/dz;
+            double dwdz = -dzf/(dzk*(dzf+dzk))*v[k-1][j][i][3] + (dzf-dzk)/(dzf*dzk)*v[k][j][i][3]
+                        +  dzk/(dzf*(dzf+dzk))*v[k+1][j][i][3];
 
-          btm_nu_t = (nu_t_right + nu_t_left) / 2.0; //interpolated eddy viscosity at bottom location
+            //mu_t gradients
+            double mut[3];
+            for(int p=-1; p<2; p++)
+              mut[p+1] = (dzf*GetMut(i+p,j,k-1) + dzk*GetMut(i+p,j,k))/(dzf+dzk);
+            double dmutdx = -dxr/(dxl*(dxl+dxr))*mut[0] + (dxr-dxl)/(dxl*dxr)*mut[1] + dxl/(dxr*(dxl+dxr))*mut[2];
+            for(int p=-1; p<2; p++)
+              mut[p+1] = (dzf*GetMut(i,j+p,k-1) + dzk*GetMut(i,j+p,k))/(dzf+dzk);
+            double dmutdy = -dyt/(dyb*(dyt+dyb))*mut[0] + (dyt-dyb)/(dyt*dyb)*mut[1] + dyb/(dyt*(dyt+dyb))*mut[2];
+            double dmutdz = (GetMut(i,j,k) - GetMut(i,j,k-1))/dz;
+   
+            Sc_turb = dudz*dmutdx + dvdz*dmutdy + dwdz*dmutdz;
 
+          }
 
-
-          chi_left = vturb[k][j][i-1] / (mu/v[k][j][i][0]);
-          fv1_left = (pow(chi_left,3)) / (pow(chi_left,3) + pow(cv1,3));
-          left_nu_t = vturb[k][j][i-1]*fv1_left;
-  
-          chi_right = vturb[k][j][i] / (mu/v[k][j][i][0]);
-          fv1_right = (pow(chi_right,3)) / (pow(chi_right,3) + pow(cv1,3));
-          right_nu_t = vturb[k][j][i]*fv1_right;
-
-          dnudy = (top_nu_t - btm_nu_t) / (dyt+dyb);
-          dnudx = (right_nu_t - left_nu_t) / dx;
-  
-        
-          //------------------------------------------------------
-          // Solving for Fluctuating Reynolds stresses Source term (Sc) -- using Boussinesq Approx
-          //------------------------------------------------------
-          double Sc = (dudx*dnudx) + (dvdx*dnudy);
-
-          bb[k][j][i] += v[k][j][i][0]*Sc*dx*dy*dz; //updates bb
-
+          bb[k][j][i] += v[k][j][i][0]*Sc_turb*dx*dy*dz; //updates bb
         }
-        if (dir == 1) { //Y-Momentum equation case
-
-          //------------------------------------------------------
-          // Calculating velocity and nu_t gradients
-          //------------------------------------------------------
-          double dudy,dvdy;
-          double dnudx, dnudy;
-          double left_nu_t,right_nu_t,top_nu_t,btm_nu_t; //nu_t values used for evaluating gradients
-          double chi_top,chi_btm,fv1_top,fv1_btm; //additional variables used to calc. nu_t
-          double nu_t_top,nu_t_btm;
-
-          //Velocity gradients
-          double u_up = (v[k][j][i][1] + v[k][j][i-1][1]) / 2.0;
-          double u_btm = (v[k][j-1][i][1] + v[k][j-1][i-1][1]) / 2.0;
-
-          dudy = (u_up - u_btm) / dy;
-          dvdy = (v[k][j+1][i][2] - v[k][j][i][2]) / (dyt+dyb);
-
-          //Nu_t gradients -- CORRECT DISTANCES
-
-          //Calculating Interpolated Eddy Viscosity at right -- uses [k][j][i+1] & [k][j-1][i+1]
-          chi_top = vturb[k][j][i+1] / (mu/v[k][j][i][0]);
-          fv1_top = (pow(chi_top,3)) / (pow(chi_top,3) + pow(cv1,3));
-          nu_t_top = vturb[k][j][i+1]*fv1_top; 
-
-          chi_btm = vturb[k][j-1][i+1] / (mu/v[k][j][i][0]);
-          fv1_btm = (pow(chi_btm,3)) / (pow(chi_btm,3) + pow(cv1,3));
-          nu_t_btm = vturb[k][j-1][i+1]*fv1_btm; 
-
-          right_nu_t = (nu_t_top + nu_t_btm) / 2.0; //interpolated eddy viscosity at right location
-
-          //Calculating Interpolated Eddy Viscosity at left  -- uses [k][j][i-1] & [k][j-1][i-1]
-          chi_top = vturb[k][j][i-1] / (mu/v[k][j][i][0]);
-          fv1_top = (pow(chi_top,3)) / (pow(chi_top,3) + pow(cv1,3));
-          nu_t_top = vturb[k][j][i-1]*fv1_top; 
-
-          chi_btm = vturb[k][j-1][i-1] / (mu/v[k][j][i][0]);
-          fv1_btm = (pow(chi_btm,3)) / (pow(chi_btm,3) + pow(cv1,3));
-          nu_t_btm = vturb[k][j-1][i-1]*fv1_btm; 
-
-          left_nu_t = (nu_t_top + nu_t_btm) / 2.0; //interpolated eddy viscosity at left location
-
-
-          chi_top = vturb[k][j][i] / (mu/v[k][j][i][0]);
-          fv1_top = (pow(chi_top,3)) / (pow(chi_top,3) + pow(cv1,3));
-          top_nu_t = vturb[k][j][i]*fv1_top;
-  
-          chi_btm = vturb[k][j-1][i] / (mu/v[k][j][i][0]);
-          fv1_btm = (pow(chi_btm,3)) / (pow(chi_btm,3) + pow(cv1,3));
-          btm_nu_t = vturb[k][j-1][i]*fv1_btm;
-
-          dnudx = (right_nu_t - left_nu_t) / (dxl+dxr);
-          dnudy = (top_nu_t - btm_nu_t) / dy;
-
-        
-          //------------------------------------------------------
-          // Solving for Fluctuating Reynolds stresses (Boussinesq Approx.) 
-          //------------------------------------------------------
-          double Sc = (dudy*dnudx) + (dvdy*dnudy);
-
-          bb[k][j][i] += v[k][j][i][0]*Sc*dx*dy*dz; //updates bb
-        }
-
-
-        bb[k][j][i] += ap0*v0[k][j][i][dir+1]; 
-
+        //------------------------------------------------------
+        // END of evaluating the source term due to turbulent eddy viscosity
+        //------------------------------------------------------
 
 
         bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
@@ -2153,6 +2113,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
       }
     }
   }
+
 
   B.RestoreDataPointerAndInsert();
   Ddiag.RestoreDataPointerAndInsert();
@@ -3524,8 +3485,39 @@ IncompressibleOperator::InitializeTurbulenceVariables(SpaceVariable3D &Vturb)
 void
 IncompressibleOperator::ApplyBoundaryConditionsTurbulenceVariables(SpaceVariable3D &Vturb)
 {
-//TODO
+  double*** vturb = Vturb.GetDataPointer();
 
+  vector<GhostPoint>* ghost_nodes_outer(spo.GetPointerToOuterGhostNodes());
+
+  for(auto it = ghost_nodes_outer->begin(); it != ghost_nodes_outer->end(); it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; //corner (edge or vertex) nodes are not populated
+
+    // preparation
+    int i(it->ijk[0]), j(it->ijk[1]), k(it->ijk[2]);
+    int im_i(it->image_ijk[0]), im_j(it->image_ijk[1]), im_k(it->image_ijk[2]);
+
+    switch (it->bcType) {
+      case MeshData::INLET :
+      case MeshData::INLET2 :
+        vturb[k][j][i] = 0.0;
+        break;
+      case MeshData::OUTLET :
+      case MeshData::SLIPWALL :
+      case MeshData::STICKWALL :
+      case MeshData::SYMMETRY :
+        vturb[k][j][i] = vturb[im_k][im_j][im_i]; //TODO: CHECK!!
+        break;
+      case MeshData::OVERSET :
+        break; // nothing to be done here.
+      default:
+        fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
+        exit(-1);
+    }
+  }
+
+  Vturb.RestoreDataPointerAndInsert();
 }
 
 //--------------------------------------------------------------------------

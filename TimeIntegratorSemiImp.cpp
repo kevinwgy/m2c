@@ -262,6 +262,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
 
     V.RestoreDataPointerAndInsert();
+    inco.ApplyBoundaryConditions(V);
 
     if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
       converged = true;
@@ -301,6 +302,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         if(verbose>=1)
           print("    * Solver of the turbulence closure equation converged in %d iterations.\n", nLinIts);
       }
+
+      inco.ApplyBoundaryConditionsTurbulenceVariables(*Vturb);
     }
 
  
@@ -634,11 +637,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     //-----------------------------------------------------
     rel_err = UpdateStates(v, P, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar); 
 
-    //-----------------------------------------------------
-    // Step 5: Solve for Eddy Viscosity using SA Turb. Eq.
-    //-----------------------------------------------------
-    
     V.RestoreDataPointerAndInsert();
+    inco.ApplyBoundaryConditions(V);
+
 
     if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
       converged = true;
@@ -971,12 +972,14 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
 
+    //NOTE: inco.ApplyBoundaryConditions not called. I think it is needed only for turbulent flows
   }
 
 END_CORRECTORS:
 
   UpdateStatesFinal(v, Pstar, VXstar, VYstar, VZstar); // update v
   V.RestoreDataPointerAndInsert();
+  inco.ApplyBoundaryConditions(V); 
 
   if(converged)
     print("  o Converged after %d iterations. Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
