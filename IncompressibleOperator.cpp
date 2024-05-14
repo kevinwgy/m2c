@@ -333,7 +333,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
         v[k][j][i][3]    = v0[2];
       }
       else if(it->bcType == MeshData::OUTLET) {
-        v[k][j][i][1]    = v[k][j][im_i][1];
+        v[k][j][im_i][1] = v[k][j][im_i+1][1];
         v[k][j][i][2]    = v[k][j][im_i][2];
         v[k][j][i][3]    = v[k][j][im_i][3];
       }
@@ -361,7 +361,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
         v[k][j][i][3]    = v0[2];
       }
       else if(it->bcType == MeshData::OUTLET) {
-        v[k][j][i][1]    = v[k][j][im_i][1];
+        v[k][j][im_i][1] = v[k][j][im_i-1][1];
         v[k][j][i][2]    = v[k][j][im_i][2];
         v[k][j][i][3]    = v[k][j][im_i][3];
       }
@@ -390,7 +390,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
       else if(it->bcType == MeshData::OUTLET) {
         v[k][j][i][1]    = v[k][im_j][i][1];
-        v[k][j][i][2]    = v[k][im_j][i][2];
+        v[k][im_j][i][2] = v[k][im_j+1][i][2];
         v[k][j][i][3]    = v[k][im_j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
@@ -418,7 +418,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       }
       else if(it->bcType == MeshData::OUTLET) {
         v[k][j][i][1]    = v[k][im_j][i][1];
-        v[k][j][i][2]    = v[k][im_j][i][2];
+        v[k][im_j][i][2] = v[k][im_j-1][i][2];
         v[k][j][i][3]    = v[k][im_j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
@@ -447,7 +447,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       else if(it->bcType == MeshData::OUTLET) {
         v[k][j][i][1]    = v[im_k][j][i][1];
         v[k][j][i][2]    = v[im_k][j][i][2];
-        v[k][j][i][3]    = v[im_k][j][i][3];
+        v[im_k][j][i][3] = v[im_k+1][j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = v[im_k][j][i][1];
@@ -475,7 +475,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
       else if(it->bcType == MeshData::OUTLET) {
         v[k][j][i][1]    = v[im_k][j][i][1];
         v[k][j][i][2]    = v[im_k][j][i][2];
-        v[k][j][i][3]    = v[im_k][j][i][3];
+        v[im_k][j][i][3] = v[im_k-1][j][i][3];
       }
       else if(it->bcType == MeshData::SLIPWALL || it->bcType == MeshData::SYMMETRY) {
         v[k][j][i][1]    = v[im_k][j][i][1];
@@ -1542,10 +1542,11 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(i-1>=0)
           row.PushEntry(i-1,j,k, -a);  //on the left hand side
         else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
-          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::INLET2||
+          if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::INLET2 ||
              iod.mesh.bc_x0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j][i-1][dir+1]; //+a*v or +a*w to the RHS 
-          else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY ||
+                  iod.mesh.bc_x0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
             bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
@@ -1631,7 +1632,9 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
             if(dir != 0) //otherwise, v[k][j][i+1][1] = 0
               ap -= a;
-          } else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
+          } else if(iod.mesh.bc_xmax == MeshData::OUTLET)
+            ap -= a;
+          else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
             if(dir != 0) //otherwise, v[k][j][i+1][1] should be 0 as it is on the wall
               bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
           } else {
@@ -1712,7 +1715,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS 
-          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY ||
+                  iod.mesh.bc_y0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
             bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
@@ -1798,7 +1802,9 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
             if(dir != 1) //otherwise, v[k][j+1][i][2] = 0
               ap -= a;
-          } else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
+          } else if(iod.mesh.bc_ymax == MeshData::OUTLET)
+              ap -= a;
+          else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
             if(dir != 1) //otherwise, v[k][j+1][i][2] should be 0 as it is on the wall
               bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
           } else {
@@ -1879,7 +1885,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::INLET2 ||
              iod.mesh.bc_z0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k-1][j][i][dir+1]; //+a*u or +a*v to the RHS 
-          else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY ||
+                  iod.mesh.bc_z0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_z0 == MeshData::STICKWALL)
             bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
@@ -1967,7 +1974,9 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
           else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
             if(dir != 2) //otherwise, v[k+1][j][i][3] = 0
               ap -= a;
-          } else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
+          } else if(iod.mesh.bc_zmax == MeshData::OUTLET)
+            ap -= a;
+          else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
             if(dir != 2) //otherwise, v[k+1][j][i][3] should be 0 as it is on the wall
               bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
           } else {
@@ -1989,28 +1998,27 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
 
-        //------------------------------------------------------
-        // Evaluating the Turbulent EDDY Viscosity
-        //------------------------------------------------------
-          
 
-        if (dir == 0) { //X-momentum equation case
-          double dudx,dvdx;
-          double dnudx, dnudy;
-          double left_nu_t,right_nu_t,top_nu_t,btm_nu_t; //nu_t values used for evaluating gradients
-          double chi_right,chi_left,fv1_right,fv1_left; //additional variablr used to calc. nu_t
-          double nu_t_right,nu_t_left;
+        //------------------------------------------------------
+        // Evaluating the source term due to turbulent eddy viscosity
+        //------------------------------------------------------
+
+        if (dir == 0) { //X-momentum equation case (i>=1)
+          double dudx, dvdx, dwdx;
+          double dnudx, dnudy, dnudz;
+          double left_nu_t, right_nu_t, top_nu_t, btm_nu_t; //nu_t values used for evaluating gradients
+          double chi_right, chi_left, fv1_right, fv1_left; //additional variablr used to calc. nu_t
+          double nu_t_right, nu_t_left;
 
           //------------------------------------------------------
           // Calculating velocity and nu_t gradients
           //------------------------------------------------------
 
           //Velocity gradients
+          dudx = (v[k][j][i+1][1] - v[k][j][i-1][1]) / (dxr+dxl); //I AM HERE!
           double v_left = (v[k][j+1][i-1][2] + v[k][j][i-1][2]) / 2.0;
           double v_right = (v[k][j+1][i][2] + v[k][j][i][2]) / 2.0;
-
-          dvdx = (v_right-v_left) / dx;
-          dudx = (v[k][j][i+1][1] - v[k][j][i][1]) / (dxr+dxl);
+          dvdx = (v_right - v_left) / dx;
 
           //Nu_t gradients -- CORRECT DISTANCES
 
