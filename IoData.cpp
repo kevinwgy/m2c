@@ -2841,7 +2841,7 @@ void RANSTurbulenceModelData::setup(const char *name, ClassAssigner *father)
   ClassAssigner *ca = new ClassAssigner(name, 3, father);
 
   new ClassToken<RANSTurbulenceModelData>(ca, "Model", this,
-                reinterpret_cast<int RANSTurbulenceModelData::*>(&RANSTurbulenceModelData::example), 2,
+                reinterpret_cast<int RANSTurbulenceModelData::*>(&RANSTurbulenceModelData::model), 2,
                 "None", 0, "SpalartAllmaras", 1);
   new ClassToken<RANSTurbulenceModelData>(ca, "ExampleProblem", this,
                 reinterpret_cast<int RANSTurbulenceModelData::*>(&RANSTurbulenceModelData::example), 3,

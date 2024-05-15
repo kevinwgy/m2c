@@ -132,6 +132,8 @@ private:
 
   //! For turbulent flows (RANS for now) TODO: These functions should be moved to dedicated classes later
   double GetDynamicEddyViscosity(double rho, double mu, double nu_tilde); //Spalart-Allmaras
+  double GetDistanceToWall(Vec3D x);
+
 };
 
 #endif

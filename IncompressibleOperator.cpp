@@ -1014,16 +1014,20 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
 }
 
 //--------------------------------------------------------------------------
-//TODO: Needs to be updated to include turbulence stress
+
 void
-IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v, double*** id,
-                                                    double*** vturb0, double*** vturb,//SA eddy viscosity working term previous & current
-                                                    [[maybe_unused]] double*** homo, //node is in a homogeneous region?
-                                                    vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
-                                                    SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
-                                                    double dt, SpaceVariable3D *LocalDt)
+IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v, double*** id, double*** vturb0,
+                                                        double*** vturb,//SA eddy viscosity working var prev & current
+                                                        [[maybe_unused]] double*** homo, //node in homogeneous region?
+                                                        vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
+                                                        SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
+                                                        double dt, SpaceVariable3D *LocalDt)
 {
-  //assert(dir==0 || dir==1 || dir==2);
+  if(iod.rans.model   != RANSTurbulenceModelData::SPALART_ALLMARAS ||
+     iod.rans.example != RANSTurbulenceModelData::FLAT_PLATE) {
+    print_error("*** Error: Detected unsupported turbulence model or example problem.\n");
+    exit_mpi();
+  }
 
   double*** dtloc = NULL;
   if(LocalDt) { //local time-stepping, dealt with separately.
@@ -1042,16 +1046,18 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double rho, nu;
   double a, ap, ap0, F, D, mu, anb, mu_t;
+  double dudy, dudz, dvdx, dvdz, dwdx, dwdy;
 
-  double cb1,sigma,cb2,k,cw2,cw3,cv1,ct3,ct4,cw1; 
-  double fv1,fv2,fw,ft2,g,r;
-  double chi,S,Omega,W,d;
-  Vec3D plate_start{0.5,0.0,0.0}; // leading edge location of flate plate
+
   ///Spalart-Allmaras constants
-  cb1 = 0.1355; //production
-  sigma = 2.0/3.0; cb2 = 0.622; // diffusion
-  cw2 = 0.3; cw3 = 2.0; cv1 = 7.1; ct3 = 1.2; ct4 = 0.5; k = 0.41; //source
-  cw1 = (cb1/(k*k)) + ((1+cb2)/sigma); //source
+  double cb1 = 0.1355; //production
+  double sigma = 2.0/3.0, cb2 = 0.622; // diffusion
+  double cw2 = 0.3, cw3 = 2.0, cv1 = 7.1, ct3 = 1.2, ct4 = 0.5, kappa = 0.41; //source
+  double cw3_pow6 = pow(cw3, 6);
+  double cw1 = (cb1/(kappa*kappa)) + ((1.0+cb2)/sigma); //source
+  double fv1,fv2,fw,ft2,g,r,S;
+  double chi,Omega,d2w,k2d2;
+  Vec3D vort;
 
   for(int k=k0; k<kmax; k++) {
     dz  = global_mesh.GetDz(k);
@@ -1064,7 +1070,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
       dydz = dy*dz;
       for(int i=i0; i<imax; i++) {
         
-        mu = Mu[id[k][j][i-1]]; //dynamic viscosity
+        mu = Mu[id[k][j][i]]; //dynamic viscosity
         rho = v[k][j][i][0]; //density
         nu = mu/rho; //kinematic viscosity
 
@@ -1081,47 +1087,54 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         dxdz = dx*dz;
         
         //---------------------------------------------------
-        // Approximating velocity gradients at current point
+        // Calculate vorticity 
         //---------------------------------------------------
-        double u_up = (v[k][j+1][i][1] + v[k][j+1][i+1][1]) / 2.0;
-        double u_btm = (v[k][j-1][i][1] + v[k][j-1][i+1][1]) / 2.0;
-        double v_left = (v[k][j+1][i-1][2] + v[k][j][i-1][2]) / 2.0;
-        double v_right = (v[k][j+1][i+1][2] + v[k][j][i+1][2]) / 2.0;
+        double vtmp[3];
+        for(int p=-1; p<2; p++)
+          vtmp[p+1] = (v[k][j+p][i][1] + v[k][j+p][i+1][1]) / 2.0;
+        dudy = -dyt/(dyb*(dyt+dyb))*vtmp[0] + (dyt-dyb)/(dyt*dyb)*vtmp[1] + dyb/(dyt*(dyt+dyb))*vtmp[2];
+        for(int p=-1; p<2; p++)
+          vtmp[p+1] = (v[k+p][j][i][1] + v[k+p][j][i+1][1]) / 2.0;
+        dudz = -dzf/(dzk*(dzf+dzk))*vtmp[0] + (dzf-dzk)/(dzf*dzk)*vtmp[1] + dzk/(dzf*(dzf+dzk))*vtmp[2];
+        for(int p=-1; p<2; p++)
+          vtmp[p+1] = (v[k][j][i+p][2] + v[k][j+1][i+p][2]) / 2.0;
+        dvdx = -dxr/(dxl*(dxl+dxr))*vtmp[0] + (dxr-dxl)/(dxl*dxr)*vtmp[1] + dxl/(dxr*(dxl+dxr))*vtmp[2];
+        for(int p=-1; p<2; p++)
+          vtmp[p+1] = (v[k+p][j][i][2] + v[k+p][j+1][i][2]) / 2.0;
+        dvdz = -dzf/(dzk*(dzf+dzk))*vtmp[0] + (dzf-dzk)/(dzf*dzk)*vtmp[1] + dzk/(dzf*(dzf+dzk))*vtmp[2];
+        for(int p=-1; p<2; p++)
+          vtmp[p+1] = (v[k][j][i+p][3] + v[k+1][j][i+p][3]) / 2.0;
+        dwdx = -dxr/(dxl*(dxl+dxr))*vtmp[0] + (dxr-dxl)/(dxl*dxr)*vtmp[1] + dxl/(dxr*(dxl+dxr))*vtmp[2];
+        for(int p=-1; p<2; p++)
+          vtmp[p+1] = (v[k][j+p][i][3] + v[k+1][j+p][i][3]) / 2.0;
+        dwdy = -dyt/(dyb*(dyt+dyb))*vtmp[0] + (dyt-dyb)/(dyt*dyb)*vtmp[1] + dyb/(dyt*(dyt+dyb))*vtmp[2];
 
-        double dvdx =  (v_right-v_left) / (dxl + dxr); //velocity gradients
-        double dudy =  (u_up-u_btm) / (dyb + dyt);
+        vort[0] = dwdy-dvdz;
+        vort[1] = dudz-dwdx;
+        vort[2] = dvdx-dudy;
+        Omega = vort.norm();
 
         
         //---------------------------------------------------
-        // Calculating d (distance to nearest wall)
+        // Calculating d2w (distance to nearest wall)
         //---------------------------------------------------
-        Vec3D coords = global_mesh.GetXYZ(i,j,k); //coords of current point
-
-        if (coords[0] >= plate_start[0]) d = coords[1]; // grid points that are above flat plate case
-        else{ //grid points that are to the left of the flate plate
-          //compute distance to leading edge point
-          double dist = sqrt(pow(plate_start.v[0]-coords.v[0],2.0) + pow((plate_start.v[1]-coords.v[1]),2.0)); 
-          d = dist;
-        }
-        
+        d2w = GetDistanceToWall(global_mesh.GetXYZ(i,j,k));
 
         //---------------------------------------------------
         // Spalart-Allmaras Additional Eqs. 
         //---------------------------------------------------
-        chi = vturb0[k][j][i] / nu;
-        fv1 = (pow(chi,3)) / (pow(chi,3) + pow(cv1,3));
-        fv2 = 1 - (chi / 1+(chi*fv1));
-        ft2 = ct3 * exp(-ct4*chi*chi);
+        chi = vturb[k][j][i]/nu;
+        fv1 = pow(chi,3)/(pow(chi,3) + pow(cv1,3));
+        fv2 = 1.0 - chi/(1.0 + chi*fv1);
+        ft2 = ct3*exp(-ct4*chi*chi);
    
-        //W = (0.5*(dudy - dvdx)*(dudy - dvdx)) + (0.5*(dvdx - dudy)*(dvdx - dudy)) ; //vorticity component - 2D case only!!!
-        W = sqrt((dvdx-dudy)*(dvdx-dudy)); //vorticity component - 2D case only!!!
-        Omega = sqrt(2*W);
-
-        S = Omega + (vturb0[k][j][i] / (k*k*d*d)) * fv2; 
-        r = min((vturb0[k][j][i])/(S*k*k*d*d),10.0);
+        k2d2 = kappa*kappa*d2w*d2w;
+        S = Omega + fv2*vturb[k][j][i]/k2d2;
+        r = std::min(vturb[k][j][i]/(S*k2d2), 10.0);
         g = r + cw2*(pow(r,6.0)-r);
 
-        fw = g * pow((1+pow(cw3,6.0))/(pow(g,6.0)+pow(cw3,6.0)),1.0/6.0);
+        fw = g * pow((1+cw3_pow6)/(pow(g,6.0)+cw3_pow6), 1.0/6.0);
+
         //---------------------------------------------------
         // Reference: Patankar's book, Eqs. (5.61) - (5.64)
         //---------------------------------------------------
@@ -1129,6 +1142,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         ap = 0.0; //diagonal
         bb[k][j][i] = 0.0; //rhs
 
+//I AM HERE
         //-----------
         // LEFT
         //-----------
@@ -1366,7 +1380,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         bb[k][j][i] += cb1*(1.0-ft2)*S*vturb[k][j][i];
 
         //destruction term
-        bb[k][j][i] += -((cw1*fw)-(cb1/(k*k))*fv2)*pow(vturb[k][j][i]/d,2);
+        bb[k][j][i] += -((cw1*fw)-(cb1/(kappa*kappa))*fv2)*pow(vturb[k][j][i]/d2w,2);
 
         //nonlinear diffusion term
         double dnudx = (vturb0[k][j][i+1]-vturb0[k][j][i-1]) / (dx*dx); //derivative in x 
@@ -3536,6 +3550,49 @@ IncompressibleOperator::GetDynamicEddyViscosity(double rho, double mu, double nu
 
   return rho*nu_tilde*fv1;
 }
+
+//--------------------------------------------------------------------------
+
+double
+IncompressibleOperator::GetDistanceToWall(Vec3D x)
+{
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
+
+  if(iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE) {
+    double h = x[1] - global_mesh.GetYmin();
+    assert(h>=0.0);
+    double d = x[0] - iod.rans.example_param_1;
+    if(d>=0.0)
+      return h;
+    else
+      return sqrt(h*h + d*d);
+  }
+
+  double dist = DBL_MAX;
+  if(iod.mesh.bc_x0 == MeshData::STICKWALL)
+    dist = std::min(dist, x[0] - global_mesh.GetXmin());
+  if(iod.mesh.bc_xmax == MeshData::STICKWALL)
+    dist = std::min(dist, global_mesh.GetXmax() - x[0]);
+  if(iod.mesh.bc_y0 == MeshData::STICKWALL)
+    dist = std::min(dist, x[1] - global_mesh.GetYmin());
+  if(iod.mesh.bc_ymax == MeshData::STICKWALL)
+    dist = std::min(dist, global_mesh.GetYmax() - x[1]);
+  if(iod.mesh.bc_z0 == MeshData::STICKWALL)
+    dist = std::min(dist, x[2] - global_mesh.GetZmin());
+  if(iod.mesh.bc_zmax == MeshData::STICKWALL)
+    dist = std::min(dist, global_mesh.GetZmax() - x[2]);
+
+  if(dist == DBL_MAX) {
+    fprintf(stdout,"\033[0;31m*** Error: Unable to find a stick wall --- needed in turbulence model.\033[0m\n");
+    exit(-1);
+  }
+
+  assert(dist>=0.0);
+  return dist;
+}    
+
+//--------------------------------------------------------------------------
+
 
 //--------------------------------------------------------------------------
 
