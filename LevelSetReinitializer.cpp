@@ -155,14 +155,17 @@ RETRY_FullDomain:
   // apply failsafe
   if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
-                  "Tol = %e.\n", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(dphi_max<0.02) //ok...
+                  "Tol = %e.", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
+    if(dphi_max<0.02) {//ok...
+      print_warning("\n");
       return;
+    }
     if(cfl < 0.02) {//failed...
-      print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
+      print_error("\n*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
                   residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       exit_mpi();
     } else {
+      print_warning(" Retrying.\n");
       cfl /= 1.5;
       Phi.AXPlusBY(0.0, 1.0, Phibk,true);
       goto RETRY_FullDomain;
@@ -276,10 +279,12 @@ RETRY_NarrowBand:
   if(iter==maxIts) {
     print_warning("  o Warning: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, "
                   "Tol = %e.", residual, dphi_max, iod_ls.reinit.convergence_tolerance);
-    if(dphi_max<0.02) //ok...
+    if(dphi_max<0.02) {//ok...
+      print_warning("\n");
       return; 
+    }
     if(cfl < 0.02) {//failed...
-      print_error("*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
+      print_error("\n*** Error: L-S Reinitialization failed to converge. Residual = %e, Rel.Error = %e, Tol = %e.\n", 
                   residual, dphi_max, iod_ls.reinit.convergence_tolerance);
       exit_mpi();
     } else {

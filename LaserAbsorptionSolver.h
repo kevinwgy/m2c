@@ -171,7 +171,7 @@ public:
 
   //! Compute raser radiance L 
   void ComputeLaserRadiance(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &L, 
-                            const double t); 
+                            const double t, int time_step); 
 
   //! Compute eta*L and add to the 5th entry of R. (Not multiplying cell volume)
   void AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID, 

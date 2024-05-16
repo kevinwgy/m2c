@@ -551,7 +551,7 @@ int main(int argc, char* argv[])
   // actually used. It represents the smallest dt in all the cells.
 
   if(laser) //initialize L (otherwise the initial output will only have 0s)
-    laser->ComputeLaserRadiance(V, ID, *L, t);
+    laser->ComputeLaserRadiance(V, ID, *L, t, time_step);
 
   //! Compute force on embedded surfaces (if any) using initial state
   if(embed) {

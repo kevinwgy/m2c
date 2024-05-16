@@ -434,6 +434,10 @@ LaserAbsorptionSolver::CheckForInputErrors()
     print_error("*** Error: 'focusing_angle_degrees' in Laser Absorption must be between -90 and 90.\n");
     error ++;
   }
+  if(laser.solver_skipping_steps<0) {
+    print_error("*** Error: Laser solver skipping steps cannot be negative (%d).\n", laser.solver_skipping_steps);
+    error ++;
+  }
   if(error>0)
     exit_mpi();
 }
@@ -1974,11 +1978,18 @@ static bool L_is_already_set_to_zero0 = false; //to save a bit of cost
 //--------------------------------------------------------------------------
 void
 LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D &ID_, SpaceVariable3D &L_,
-                                            const double t)
+                                            const double t, int time_step)
 {
 
+  if(time_step % (iod.laser.solver_skipping_steps + 1) != 0) {
+    if(verbose >= OutputData::HIGH)
+      print("  o Skipping the laser radiation solver.\n");
+    return;
+  }
+
   // ------------------------------------------------------------------------------------------------------------------
-  // Check is source power is zero at this time (possible if a time-history is specified). If yes, set L = 0 and return.
+  // Check is source power is zero at this time (possible if a time-history is specified).
+  // If yes, set L = 0 and return.
   if(!source_power_timehistory.empty()) {
     power_current = GetSourcePower(t);
     if(power_current < 1.0e-18/*eps*/) {
@@ -1993,6 +2004,10 @@ LaserAbsorptionSolver::ComputeLaserRadiance(SpaceVariable3D &V_, SpaceVariable3D
     L_is_already_set_to_zero0 = false;
   }
   // ------------------------------------------------------------------------------------------------------------------
+
+
+  // ------------------------------------------------------------------------------------------------------------------
+
 
 
   PopulateLaserMesh(V_, ID_, L_); //get Temperature, ID, and L on the laser mesh (may or may not be the same as the N-S mesh)

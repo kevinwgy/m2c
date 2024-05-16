@@ -1168,6 +1168,7 @@ struct LaserData {
   double convergence_tol;
   double max_iter;
   double relax_coeff;
+  int solver_skipping_steps; //!< Solve laser equations not every time step. (Laser solution can be expensive!)
 
   LaserData();
   ~LaserData() {}

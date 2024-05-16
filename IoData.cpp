@@ -2639,6 +2639,8 @@ LaserData::LaserData() {
   max_iter = 400;
   relax_coeff = 1.0;
 
+  solver_skipping_steps = 0;
+
 }
 
 //------------------------------------------------------------------------------
@@ -2646,7 +2648,7 @@ LaserData::LaserData() {
 
 void LaserData::setup(const char *name, ClassAssigner *father) {
 
-  ClassAssigner *ca = new ClassAssigner(name, 23, father); 
+  ClassAssigner *ca = new ClassAssigner(name, 24, father); 
 
   //Physical Parameters
   new ClassDouble<LaserData>(ca, "SourceIntensity", this, &LaserData::source_intensity);
@@ -2680,6 +2682,7 @@ void LaserData::setup(const char *name, ClassAssigner *father) {
   new ClassDouble<LaserData>(ca, "MaxIts", this, &LaserData::max_iter);
   new ClassDouble<LaserData>(ca, "RelaxationCoefficient", this, &LaserData::relax_coeff);
 
+  new ClassInt<LaserData>(ca, "SkippingSteps", this, &LaserData::solver_skipping_steps);
 }
 
 //------------------------------------------------------------------------------
