@@ -1016,12 +1016,10 @@ IncompressibleOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVaria
 //--------------------------------------------------------------------------
 
 void
-IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v, double*** id, double*** vturb0,
+IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id, double*** vturb0,
                                                         double*** vturb,//SA eddy viscosity working var prev & current
-                                                        [[maybe_unused]] double*** homo, //node in homogeneous region?
                                                         vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
-                                                        SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
-                                                        double dt, SpaceVariable3D *LocalDt)
+                                                        double Efactor, double dt, SpaceVariable3D *LocalDt)
 {
   if(iod.rans.model   != RANSTurbulenceModelData::SPALART_ALLMARAS ||
      iod.rans.example != RANSTurbulenceModelData::FLAT_PLATE) {
@@ -1038,15 +1036,14 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
   GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
 
   double*** bb = B.GetDataPointer();
-  double*** diag = Ddiag.GetDataPointer();
 
   vlin_rows.clear(); //clear existing data (to be safe)
   int row_counter = 0;
 
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
-  double rho, nu;
-  double a, ap, ap0, F, D, mu, anb, mu_t;
+  double a, ap, ap0, F, D, nu, nustar;
   double dudy, dudz, dvdx, dvdz, dwdx, dwdy;
+  Vec3D dnut;
 
 
   ///Spalart-Allmaras constants
@@ -1054,8 +1051,8 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
   double sigma = 2.0/3.0, cb2 = 0.622; // diffusion
   double cw2 = 0.3, cw3 = 2.0, cv1 = 7.1, ct3 = 1.2, ct4 = 0.5, kappa = 0.41; //source
   double cw3_pow6 = pow(cw3, 6);
-  double cw1 = (cb1/(kappa*kappa)) + ((1.0+cb2)/sigma); //source
-  double fv1,fv2,fw,ft2,g,r,S;
+  double cw1 = cb1/(kappa*kappa) + (1.0+cb2)/sigma; //source
+  double fv1,fv2,fw,ft2,fn,g,r,S,Sbar;
   double chi,Omega,d2w,k2d2;
   Vec3D vort;
 
@@ -1069,10 +1066,8 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
       dyt  = 0.5*(dy + global_mesh.GetDy(j+1));
       dydz = dy*dz;
       for(int i=i0; i<imax; i++) {
-        
-        mu = Mu[id[k][j][i]]; //dynamic viscosity
-        rho = v[k][j][i][0]; //density
-        nu = mu/rho; //kinematic viscosity
+         
+        nu = Mu[id[k][j][i]]/v[k][j][i][0]; //kinematic viscosity
 
         // insert the row
         vlin_rows.push_back(RowEntries(7)); // at most 7 non-zero entries on each row
@@ -1080,6 +1075,16 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         row.SetRow(i,j,k);
         row_counter++;
 
+        //---------------------------------------------------
+        // Calculating d2w (distance to nearest wall)
+        //---------------------------------------------------
+        d2w = GetDistanceToWall(global_mesh.GetXYZ(i,j,k));
+        if(d2w==0.0) { //at the wall, nu_t = 0.0
+          row.PushEntry(i,j,k, 1.0); 
+          bb[k][j][i] = 0.0; 
+          continue;
+        }
+ 
         dx   = global_mesh.GetDx(i);
         dxl  = 0.5*(global_mesh.GetDx(i-1) + dx);
         dxr  = 0.5*(dx + global_mesh.GetDx(i+1));
@@ -1114,25 +1119,30 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         vort[2] = dvdx-dudy;
         Omega = vort.norm();
 
-        
-        //---------------------------------------------------
-        // Calculating d2w (distance to nearest wall)
-        //---------------------------------------------------
-        d2w = GetDistanceToWall(global_mesh.GetXYZ(i,j,k));
 
         //---------------------------------------------------
         // Spalart-Allmaras Additional Eqs. 
         //---------------------------------------------------
+        bool neg_nut = vturb[k][j][i]<0.0;
         chi = vturb[k][j][i]/nu;
         fv1 = pow(chi,3)/(pow(chi,3) + pow(cv1,3));
         fv2 = 1.0 - chi/(1.0 + chi*fv1);
         ft2 = ct3*exp(-ct4*chi*chi);
-   
+        fn  = neg_nut ? (16.0 + pow(chi,3))/(16.0 - pow(chi,3)) : 1.0;
         k2d2 = kappa*kappa*d2w*d2w;
-        S = Omega + fv2*vturb[k][j][i]/k2d2;
-        r = std::min(vturb[k][j][i]/(S*k2d2), 10.0);
-        g = r + cw2*(pow(r,6.0)-r);
+        Sbar = fv2*vturb[k][j][i]/k2d2; 
 
+        //---------------------------------------------
+        // Limiting S using Note 1(c) of https://turbmodels.larc.nasa.gov/spalart.html
+        if(Sbar>=-0.7*Omega) //if(true) ---> original w/o limiting
+          S = Omega + Sbar;
+        else
+          S = Omega - Omega*(0.49*Omega + 0.9*Sbar)/(0.5*Omega + Sbar);
+
+        r = S==0 ? 10.0 : std::min(vturb[k][j][i]/(S*k2d2), 10.0); 
+        //---------------------------------------------
+
+        g = r + cw2*(pow(r,6.0)-r);
         fw = g * pow((1+cw3_pow6)/(pow(g,6.0)+cw3_pow6), 1.0/6.0);
 
         //---------------------------------------------------
@@ -1142,20 +1152,17 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         ap = 0.0; //diagonal
         bb[k][j][i] = 0.0; //rhs
 
-//I AM HERE
+
         //-----------
         // LEFT
         //-----------
-        // Calculate F at the correct location (different for dir=0,1,2)
-        //if(dir==0)
-        F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
-        F *= dydz;
+        // Calculate F at the correct location 
+        F = v[k][j][i][1]*dydz;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        //if(dir==0)
-        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
-        if(mu_t>0.0) {
-          D  = mu_t*dydz/dxl;
+        nustar = (nu + fn*vturb[k][j][i]) / sigma;
+        if(nustar>0.0) {
+          D  = nustar*dydz/dxl;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1163,17 +1170,17 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         // Add entry (or add to bb or ap, if i-1 is outside boundary)
         if(i-1>=0)
           row.PushEntry(i-1,j,k, -a);  //on the left hand side
-        else { //i-1 is outside domain boundary (if it gets here, dir must be y or z (1 or 2))
+        else { //i-1 is outside domain boundary 
           if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::INLET2 ||
              iod.mesh.bc_x0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j][i-1]; //+a*vturb to the RHS 
-          else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_x0 == MeshData::SYMMETRY || iod.mesh.bc_x0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
             bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i-1] should be -vturb[k][j][i]
                                              //to have zero on the wall
           else {
-            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+            fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_x0);
             exit(-1);
           }
@@ -1183,16 +1190,13 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         //-----------
         // RIGHT 
         //-----------
-        // Calculate F at the correct location (different for dir=0,1,2)
-        //if(dir==0)
-        F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
-        F *= dydz;
+        // Calculate F at the correct location 
+        F = v[k][j][i+1][1]*dydz;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        //if(dir==0)
-        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
-        if(mu_t>0.0) {
-          D  = mu_t*dydz/dxr;
+        nustar = (nu + fn*vturb[k][j][i]) / sigma;
+        if(nustar>0.0) {
+          D  = nustar*dydz/dxr;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1203,12 +1207,12 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
           if(iod.mesh.bc_xmax == MeshData::INLET || iod.mesh.bc_xmax == MeshData::INLET2 ||
              iod.mesh.bc_xmax == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j][i+1];
-          else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
+          else if(iod.mesh.bc_xmax == MeshData::SYMMETRY || iod.mesh.bc_xmax == MeshData::OUTLET) {
             ap -= a;
           } else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
             bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i+1] should be -vturb[k][j][i]
           } else {
-            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+            fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_xmax);
             exit(-1);
           }
@@ -1218,32 +1222,29 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         //-----------
         // BOTTOM 
         //-----------
-        // Calculate F at the correct location (different for dir=0,1,2)
-        //if(dir==1)
-        F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
-        F *= dxdz;
+        // Calculate F at the correct location
+        F = v[k][j][i][2]*dxdz;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        //if(dir==1)
-        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
-        if(mu_t>0.0) {
-          D  = mu_t*dxdz/dyb;
+        nustar = (nu + fn*vturb[k][j][i]) / sigma;
+        if(nustar>0.0) {
+          D  = nustar*dxdz/dyb;
           a += D*PowerLaw(F/D);
         }
         ap += a;
         // Add entry (or add to bb or ap, if j-1 is outside boundary)
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
-        else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
+        else { //j-1 is outside domain boundary 
           if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j-1][i];
-          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_y0 == MeshData::SYMMETRY || iod.mesh.bc_y0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
             bb[k][j][i] -= a*vturb[k][j][i]; 
           else {
-            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+            fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_y0);
             exit(-1);
           }
@@ -1253,16 +1254,13 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         //-----------
         // TOP 
         //-----------
-        // Calculate F at the correct location (different for dir=0,1,2)
-        //if(dir==1)
-        F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
-        F *= dxdz;
+        // Calculate F at the correct location 
+        F = v[k][j+1][i][2]*dxdz;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        //if(dir==1)
-        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
-        if(mu_t>0.0) {
-          D  = mu_t*dxdz/dyt;
+        nustar = (nu + fn*vturb[k][j][i]) / sigma;
+        if(nustar>0.0) {
+          D  = nustar*dxdz/dyt;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1273,12 +1271,12 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
           if(iod.mesh.bc_ymax == MeshData::INLET || iod.mesh.bc_ymax == MeshData::INLET2 ||
              iod.mesh.bc_ymax == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j+1][i];
-          else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
+          else if(iod.mesh.bc_ymax == MeshData::SYMMETRY || iod.mesh.bc_ymax == MeshData::OUTLET) {
             ap -= a;
           } else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
             bb[k][j][i] -= a*vturb[k][j][i];
           } else {
-            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+            fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_ymax);
             exit(-1);
           }
@@ -1288,53 +1286,45 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         //-----------
         // BACK
         //-----------
-        // Calculate F at the correct location (different for dir=0,1,2)
-        //if(dir==2)
-        F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
-        F *= dxdy;
+        // Calculate F at the correct location
+        F = v[k][j][i][3]*dxdy;
         // Calculate D and the "a" coefficient
         a = std::max(F, 0.0);
-        //if(dir==2)
-        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy / sigma)
-        if(mu_t>0.0) {
-          D  = mu_t*dxdy/dzk;
+        nustar = (nu + fn*vturb[k][j][i]) / sigma;
+        if(nustar>0.0) {
+          D  = nustar*dxdy/dzk;
           a += D*PowerLaw(F/D);
         }
         ap += a;
         // Add entry (or add to bb or ap, if k-1 is outside boundary)
         if(k-1>=0)
           row.PushEntry(i,j,k-1, -a);  //on the left hand side
-        else { //k-1 is outside domain boundary (if it gets here, dir must be x or y (0 or 1))
+        else { //k-1 is outside domain boundary 
           if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::INLET2 ||
              iod.mesh.bc_z0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k-1][j][i]; 
-          else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_z0 == MeshData::SYMMETRY || iod.mesh.bc_z0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_z0 == MeshData::STICKWALL)
             bb[k][j][i] -= a*vturb[k][j][i];
           else {
-            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+            fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_z0);
             exit(-1);
           }
         }
-
-
               
 
         //-----------
         // FRONT 
         //-----------
-        // Calculate F at the correct location (different for dir=0,1,2)
-        //if(dir==2)
-        F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
-        F *= dxdy;
+        // Calculate F at the correct location
+        F = v[k+1][j][i][3]*dxdy;
         // Calculate D and the "a" coefficient
         a = std::max(-F, 0.0);
-        //if(dir==2)
-        mu_t = (mu + (vturb[k][j][i]*rho)) / sigma; //"total" viscosity (molec. + eddy)
-        if(mu_t>0.0) {
-          D  = mu_t*dxdy/dzf;
+        nustar = (nu + fn*vturb[k][j][i]) / sigma;
+        if(nustar>0.0) {
+          D  = nustar*dxdy/dzf;
           a += D*PowerLaw(F/D);
         }
         ap += a;
@@ -1345,12 +1335,12 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
           if(iod.mesh.bc_zmax == MeshData::INLET || iod.mesh.bc_zmax == MeshData::INLET2 ||
              iod.mesh.bc_zmax == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k+1][j][i];
-          else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
+          else if(iod.mesh.bc_zmax == MeshData::SYMMETRY || iod.mesh.bc_zmax == MeshData::OUTLET) {
             ap -= a;
           } else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
             bb[k][j][i] -= a*vturb[k][j][i];
           } else {
-            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
+            fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_zmax);
             exit(-1);
           }
@@ -1361,38 +1351,32 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
         //------------------------------------------------------
-        anb = SIMPLEC ? ap : 0.0; //needed later
-        /*ap0 = dir==0 ? (dxr*v0[k][j][i-1][0] + dxl*v0[k][j][i][0])/(dxl+dxr) : -- ONLY FOR STAGGERED GRID(NO NEED FOR THIS)
-              dir==1 ? (dyt*v0[k][j-1][i][0] + dyb*v0[k][j][i][0])/(dyb+dyt) :
-                       (dzf*v0[k-1][j][i][0] + dzk*v0[k][j][i][0])/(dzk+dzf);
-        */
-        ap0 = v0[k][j][i][0]; //density
-        ap0 *= LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
+        ap0 = LocalDt ? dxdy*dz/dtloc[k][j][i] : dxdy*dz/dt;
         ap += ap0; //!< -Sp*dx*dy*dz, for source terms
+
+        bb[k][j][i] += ap0*vturb0[k][j][i]; 
+
 
         //------------------------------------------------------
         // Addition of Source Terms
         // RHS of Spalart-Allmaras Model
         //------------------------------------------------------
-        bb[k][j][i] += ap0*vturb0[k][j][i]; 
-
+        double Sc = 0.0; 
         //production term
-        bb[k][j][i] += cb1*(1.0-ft2)*S*vturb[k][j][i];
-
+        Sc += neg_nut ? cb1*(1-ct3)*Omega*vturb[k][j][i] : cb1*(1.0-ft2)*S*vturb[k][j][i];
         //destruction term
-        bb[k][j][i] += -((cw1*fw)-(cb1/(kappa*kappa))*fv2)*pow(vturb[k][j][i]/d2w,2);
-
+        Sc += neg_nut ? cw1*pow(vturb[k][j][i]/d2w,2) : -(cw1*fw - cb1/(kappa*kappa)*ft2)*pow(vturb[k][j][i]/d2w,2);
         //nonlinear diffusion term
-        double dnudx = (vturb0[k][j][i+1]-vturb0[k][j][i-1]) / (dx*dx); //derivative in x 
-        double dnudy = (vturb0[k][j+1][i]-vturb0[k][j-1][i]) / (dy*dy); //derivative in y
-        double dnudz = (vturb0[k+1][j][i]-vturb0[k-1][j][i]) / (dz*dz); //derivative in z 
-        bb[k][j][i] += (1.0/sigma)*cb2*(pow(dnudx,2)+(pow(dnudy,2))+(pow(dnudz,2)));
+        dnut[0] = -dxr/(dxl*(dxl+dxr))*vturb[k][j][i-1] + (dxr-dxl)/(dxl*dxr)*vturb[k][j][i]
+                +  dxl/(dxr*(dxl+dxr))*vturb[k][j][i+1]; //2nd-order accuracy, see Kevin's notes
+        dnut[1] = -dyt/(dyb*(dyt+dyb))*vturb[k][j-1][i] + (dyt-dyb)/(dyt*dyb)*vturb[k][j][i]
+                +  dyb/(dyt*(dyt+dyb))*vturb[k][j+1][i];
+        dnut[2] = -dzf/(dzk*(dzf+dzk))*vturb[k-1][j][i] + (dzf-dzk)/(dzf*dzk)*vturb[k][j][i]
+                +  dzk/(dzf*(dzf+dzk))*vturb[k+1][j][i];
+        Sc += cb2/sigma*(dnut*dnut);
 
-
-       /* bb[k][j][i] += dir==0 ? (v[k][j][i-1][4] - v[k][j][i][4])*dydz :
-                       dir==1 ? (v[k][j-1][i][4] - v[k][j][i][4])*dxdz :
-                                (v[k-1][j][i][4] - v[k][j][i][4])*dxdy;
-       */
+        bb[k][j][i] += Sc*dxdy*dz; //multiply source term by cell volume;
+ 
 
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
         assert(Efactor>0.0);
@@ -1401,17 +1385,11 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v0, Vec5D*** v,
         ap *= 1.0 + 1.0/Efactor; 
         row.PushEntry(i,j,k, ap);
 
-        // Store diagonal for use in pressure correction equation
-        assert(ap-anb!=0.0);
-        diag[k][j][i] = 1.0/(ap-anb);
-        //diag[k][j][i] *= dir==0 ? dydz : dir==1 ? dxdz : dxdy;
-
       }
     }
   }
 
   B.RestoreDataPointerAndInsert();
-  Ddiag.RestoreDataPointerAndInsert();
 
   if(LocalDt)
     LocalDt->RestoreDataPointerToLocalVector();
@@ -3503,6 +3481,9 @@ IncompressibleOperator::ApplyBoundaryConditionsTurbulenceVariables(SpaceVariable
 
   vector<GhostPoint>* ghost_nodes_outer(spo.GetPointerToOuterGhostNodes());
 
+  double nu_tilde_far = iod.rans.nu_tilde_farfield;
+  assert(nu_tilde_far>=0.0);
+
   for(auto it = ghost_nodes_outer->begin(); it != ghost_nodes_outer->end(); it++) {
 
     if(it->type_projection != GhostPoint::FACE)
@@ -3515,13 +3496,14 @@ IncompressibleOperator::ApplyBoundaryConditionsTurbulenceVariables(SpaceVariable
     switch (it->bcType) {
       case MeshData::INLET :
       case MeshData::INLET2 :
-        vturb[k][j][i] = 0.0;
+        vturb[k][j][i] = nu_tilde_far;
         break;
       case MeshData::OUTLET :
-      case MeshData::SLIPWALL :
-      case MeshData::STICKWALL :
       case MeshData::SYMMETRY :
-        vturb[k][j][i] = vturb[im_k][im_j][im_i]; //TODO: CHECK!!
+        vturb[k][j][i] = vturb[im_k][im_j][im_i];
+        break;
+      case MeshData::STICKWALL :
+        vturb[k][j][i] = -vturb[im_k][im_j][im_i];
         break;
       case MeshData::OVERSET :
         break; // nothing to be done here.
@@ -3540,6 +3522,8 @@ double
 IncompressibleOperator::GetDynamicEddyViscosity(double rho, double mu, double nu_tilde)
 {
   // Spalart-Allmaras for the moment
+  if(nu_tilde<0)
+    return 0.0; //if set nut to 0.0
 
   double cv1_3 = 357.911; //=7.1*7.1*7.1
 

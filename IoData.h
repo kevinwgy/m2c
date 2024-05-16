@@ -1449,6 +1449,7 @@ struct RANSTurbulenceModelData {
   enum ExampleProblem {GENERAL = 0, FLAT_PLATE = 1, LID_CAVITY = 2} example;
 
   double example_param_1; 
+  double nu_tilde_farfield; //!< farfield value for the Spalart-Allmaras working variable
 
   RANSTurbulenceModelData();
   ~RANSTurbulenceModelData() {}

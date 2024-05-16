@@ -2832,13 +2832,14 @@ RANSTurbulenceModelData::RANSTurbulenceModelData()
   model = NONE; //by default, no RANS turbulence model 
   example = GENERAL;
   example_param_1 = 0.0;
+  nu_tilde_farfield = 0.0;
 }
 
 //------------------------------------------------------------------------------
 
 void RANSTurbulenceModelData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 3, father);
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
 
   new ClassToken<RANSTurbulenceModelData>(ca, "Model", this,
                 reinterpret_cast<int RANSTurbulenceModelData::*>(&RANSTurbulenceModelData::model), 2,
@@ -2848,6 +2849,9 @@ void RANSTurbulenceModelData::setup(const char *name, ClassAssigner *father)
                 "General", 0, "FlatPlate", 1, "LidDrivenCavity", 2);
   new ClassDouble<RANSTurbulenceModelData>(ca, "ExampleParameterReal1", this,
                  &RANSTurbulenceModelData::example_param_1);
+  new ClassDouble<RANSTurbulenceModelData>(ca, "NuTildeAtFarfield", this,
+                 &RANSTurbulenceModelData::nu_tilde_farfield);
+
 }
 
 //------------------------------------------------------------------------------
