@@ -68,8 +68,8 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
     R3_ptr = new SpaceVariable3D(comm_, &(dms_.ghosted1_3dof));
 
   if(iod.rans.model == RANSTurbulenceModelData::SPALART_ALLMARAS) {
-    if(iod.semi_impl.type != SemiImplicitTsData::SIMPLE &&
-       iod.semi_impl.type != SemiImplicitTsData::SIMPLEC) {
+    if(iod.ts.semi_impl.type != SemiImplicitTsData::SIMPLE &&
+       iod.ts.semi_impl.type != SemiImplicitTsData::SIMPLEC) {
       print_error("*** Error: Currently, only SIMPLE and SIMPLEC support RANS Spalart-Allmaras.\n");
       exit_mpi();
     }

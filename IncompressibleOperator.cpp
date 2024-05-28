@@ -1628,7 +1628,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
                         +  dxl/(dxr*(dxl+dxr))*v[k][j][i+1][1]; //2nd-order accuracy, see Kevin's notes
             double v_left  = (v[k][j+1][i-1][2] + v[k][j][i-1][2])/2.0;
             double v_right = (v[k][j+1][i][2]   + v[k][j][i][2])/2.0;
-            double dvdx    = (v_right - v_left)/dx;
+            double dvdx    = (v_right - v_left)/dx; //TODO: only 1st order for non-unif grids (also dwdx, dir=1,2)
             double w_left  = (v[k+1][j][i-1][3] + v[k][j][i-1][3])/2.0;
             double w_right = (v[k+1][j][i][3]   + v[k][j][i][3])/2.0;
             double dwdx    = (w_right - w_left)/dx;
