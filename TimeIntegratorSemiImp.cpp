@@ -297,7 +297,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         print_error("*** Error: Found unknown turbulence closure model.\n");
         exit_mpi();
       }
+      v = (Vec5D***)V.GetDataPointer();
       inco.BuildSATurbulenceEquationSIMPLE(v, id, vturb0, vturb, vturb_lin_rows, B, Efactor, dt, LocalDt);
+      V.RestoreDataPointerToLocalVector();
       Vturb->RestoreDataPointerToLocalVector();
       vturb_lin_solver.SetLinearOperator(vturb_lin_rows);
       lin_success = vturb_lin_solver.Solve(B, *Vturb, NULL, &nLinIts, &lin_rnorm);
