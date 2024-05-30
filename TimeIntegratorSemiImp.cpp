@@ -279,8 +279,6 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       break; 
     }
 
-    print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
-
 /*
     if(iter==0) {
       print("Fine...\n");
@@ -316,7 +314,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       inco.ApplyBoundaryConditionsTurbulenceVariables(*Vturb);
     }
 
- 
+    print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
 
   }
 

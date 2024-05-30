@@ -3283,7 +3283,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
           }
         }
 
-    
+
         //-----------
         // BOTTOM 
         //-----------
@@ -3411,7 +3411,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
           }
         }
    
-   
+  
         //------------------------------------------------------
         // Calculate and add the diagonal entry and the RHS (b)
         // Ref: Eqs. (5.62) and (6.8) in Patankar's book
