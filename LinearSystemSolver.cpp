@@ -232,9 +232,10 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
   }
 
 
+  int nIts = 0;
+  KSPGetIterationNumber(ksp, &nIts);
   if(numIts) //user requested output of number of iterations
-    KSPGetIterationNumber(ksp, numIts);
-
+    *numIts = nIts;
 
   // log
   if(rnorm || !log_filename.empty() || write_log_to_screen) {//need residual norm history
@@ -250,14 +251,15 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
     if(write_log_to_screen) {
       if(success) {
         if(equation_name.empty())
-          print("  o Linear solver converged.\n");
+          print("  o Linear solver converged (It. %d).\n", nIts);
         else
-          print("  o Linear solver for %s converged.\n", equation_name.c_str());
+          print("  o Linear solver for %s converged (It. %d).\n", equation_name.c_str(), nIts);
       } else {
         if(equation_name.empty())
-          print_warning("  o Linear solver failed to converged.\n");
+          print_warning("  o Linear solver failed to converged (It. %d).\n", nIts);
         else
-          print_warning("  o Linear solver for %s failed to converged.\n", equation_name.c_str());
+          print_warning("  o Linear solver for %s failed to converged (It. %d).\n",
+                        equation_name.c_str(), nIts);
       }
       for(int i=0; i<nEntries; i++)
         print("    > It. %d: residual = %e.\n", i+1, rnorm_history[i]);
@@ -270,12 +272,12 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
         exit_mpi();
       }
       if(success) 
-        print(file, "o Linear solver converged.\n");
+        print(file, "  o Linear solver converged (It. %d).\n", nIts);
       else
-        print(file, "o Linear solver failed to converged.\n");
+        print(file, "  o Linear solver failed to converged (It. %d).\n", nIts);
 
       for(int i=0; i<nEntries; i++)
-        print(file, "  > It. %d: residual = %e.\n", i+1, rnorm_history[i]);
+        print(file, "    > It. %d: residual = %e.\n", i+1, rnorm_history[i]);
 
       fclose(file);
       MPI_Barrier(comm);

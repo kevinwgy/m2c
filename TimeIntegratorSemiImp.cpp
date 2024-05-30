@@ -189,8 +189,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the x-momentum equation failed to converge.\n");
-        for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        if(verbose>=2)
+          for(int i=0; i<(int)lin_rnorm.size(); i++)
+            print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
           print("    * Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
@@ -210,8 +211,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the y-momentum equation failed to converge.\n");
-        for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        if(verbose>=2)
+          for(int i=0; i<(int)lin_rnorm.size(); i++)
+            print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
           print("    * Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
@@ -228,8 +230,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the z-momentum equation failed to converge.\n");
-        for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        if(verbose>=2)
+          for(int i=0; i<(int)lin_rnorm.size(); i++)
+            print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
           print("    * Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
@@ -248,8 +251,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(verbose>=2)
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
         print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
@@ -301,8 +305,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       lin_success = vturb_lin_solver.Solve(B, *Vturb, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the turbulence closure equation failed to converge.\n");
-        for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        if(verbose>=2)
+          for(int i=0; i<(int)lin_rnorm.size(); i++)
+            print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
           print("    * Solver of the turbulence closure equation converged in %d iterations.\n", nLinIts);
@@ -561,8 +566,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     lin_success = plin_solver.Solve(B, P, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the pressure equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(verbose>=2)
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
         print("    * Solver of the pressure equation converged in %d iterations.\n", nLinIts);
@@ -581,8 +587,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       lin_success = vlin_solver.Solve(Bu, VXstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the x-momentum equation failed to converge.\n");
-        for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        if(verbose>=2)
+          for(int i=0; i<(int)lin_rnorm.size(); i++)
+            print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
           print("    * Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
@@ -596,8 +603,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       lin_success = vlin_solver.Solve(Bv, VYstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the y-momentum equation failed to converge.\n");
-        for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        if(verbose>=2)
+          for(int i=0; i<(int)lin_rnorm.size(); i++)
+            print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
           print("    * Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
@@ -611,8 +619,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       lin_success = vlin_solver.Solve(Bw, VZstar, NULL, &nLinIts, &lin_rnorm);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the z-momentum equation failed to converge.\n");
-        for(int i=0; i<(int)lin_rnorm.size(); i++)
-          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+        if(verbose>=2)
+          for(int i=0; i<(int)lin_rnorm.size(); i++)
+            print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
       } else {
         if(verbose>=1)
           print("    * Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
@@ -629,8 +638,9 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(verbose>=2)
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
         print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
@@ -876,8 +886,9 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the x-momentum equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(verbose>=2)
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
         print("    * Solver of the x-momentum equation converged in %d iterations.\n", nLinIts);
@@ -891,8 +902,9 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the y-momentum equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(verbose>=2)
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("        > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
         print("    * Solver of the y-momentum equation converged in %d iterations.\n", nLinIts);
@@ -906,8 +918,9 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the z-momentum equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(verbose>=2)
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
         print("    * Solver of the z-momentum equation converged in %d iterations.\n", nLinIts);
@@ -925,8 +938,9 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
   if(!lin_success) {
     print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
-    for(int i=0; i<(int)lin_rnorm.size(); i++)
-      print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+    if(verbose>=2)
+      for(int i=0; i<(int)lin_rnorm.size(); i++)
+        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
   } else {
     if(verbose>=1)
       print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
@@ -960,8 +974,9 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
-      for(int i=0; i<(int)lin_rnorm.size(); i++)
-        print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
+      if(verbose>=2)
+        for(int i=0; i<(int)lin_rnorm.size(); i++)
+          print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
     } else {
       if(verbose>=1)
         print("    * Solver of the pressure correction equation converged in %d iterations.\n", nLinIts);
