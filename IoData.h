@@ -331,11 +331,10 @@ struct NobleAbelStiffenedGasModelData {
   double pressureConstant; //!< p_c
   double volumeConstant; //!< b
   double energyConstant; //!< q
-  double entropyConstant; //!< q'
 
   //! parameters related to temperature
   double cv; //!< specific heat at constant volume
-  double integrationConstant; //!< bigC
+  double bigC; //!< new bigC (dim: [volume]/[mass])
 
   NobleAbelStiffenedGasModelData();
   ~NobleAbelStiffenedGasModelData() {}
