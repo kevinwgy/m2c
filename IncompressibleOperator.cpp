@@ -1096,13 +1096,13 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(dir==0)
           F = v[k][j][i-1][0]*0.5*(v[k][j][i-1][1] + v[k][j][i][1]);
         else {
+          cm = global_mesh.GetDx(i-1);
+          cp = global_mesh.GetDx(i);
+          cm_plus_cp = cm + cp;
           if(homo[k][j][i]) { //this "cell" (i,j,k) is in a neighborhood w/ constant rho and mu
             rhou1 = dir==1 ? v[k][j-1][i][1]*v[k][j][i][0] : v[k-1][j][i][1]*v[k][j][i][0];
             rhou2 = v[k][j][i][1]*v[k][j][i][0];
           } else {
-            cm = global_mesh.GetDx(i-1);
-            cp = global_mesh.GetDx(i);
-            cm_plus_cp = cm + cp;
             rhou1 = dir==1 ? v[k][j-1][i][1]*(cp*v[k][j-1][i-1][0] + cm*v[k][j-1][i][0])/cm_plus_cp
                            : v[k-1][j][i][1]*(cp*v[k-1][j][i-1][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
             rhou2 = v[k][j][i][1]*(cp*v[k][j][i-1][0] + cm*v[k][j][i][0])/(cm+cp);
@@ -1181,13 +1181,13 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(dir==0)
           F = v[k][j][i][0]*0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
         else {
+          cm = global_mesh.GetDx(i);
+          cp = global_mesh.GetDx(i+1);
+          cm_plus_cp = cm + cp;
           if(homo[k][j][i]) {
             rhou1 = dir==1 ? v[k][j-1][i+1][1]*v[k][j][i][0] : v[k-1][j][i+1][1]*v[k][j][i][0];
             rhou2 = v[k][j][i+1][1]*v[k][j][i][0];
           } else {
-            cm = global_mesh.GetDx(i);
-            cp = global_mesh.GetDx(i+1);
-            cm_plus_cp = cm + cp;
             rhou1 = dir==1 ? v[k][j-1][i+1][1]*(cp*v[k][j-1][i][0] + cm*v[k][j-1][i+1][0])/cm_plus_cp
                            : v[k-1][j][i+1][1]*(cp*v[k-1][j][i][0] + cm*v[k-1][j][i+1][0])/cm_plus_cp;
             rhou2 = v[k][j][i+1][1]*(cp*v[k][j][i][0] + cm*v[k][j][i+1][0])/(cm+cp);
@@ -1267,13 +1267,13 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(dir==1)
           F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
         else {
+          cm = global_mesh.GetDy(j-1);
+          cp = global_mesh.GetDy(j);
+          cm_plus_cp = cm + cp;
           if(homo[k][j][i]) {
             rhou1 = dir==0 ? v[k][j][i-1][2]*v[k][j][i][0] : v[k-1][j][i][2]*v[k][j][i][0];
             rhou2 = v[k][j][i][2]*v[k][j][i][0];
           } else {
-            cm = global_mesh.GetDy(j-1);
-            cp = global_mesh.GetDy(j);
-            cm_plus_cp = cm + cp;
             rhou1 = dir==0 ? v[k][j][i-1][2]*(cp*v[k][j-1][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
                            : v[k-1][j][i][2]*(cp*v[k-1][j-1][i][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
             rhou2 = v[k][j][i][2]*(cp*v[k][j-1][i][0] + cm*v[k][j][i][0])/(cm+cp);
@@ -1351,13 +1351,13 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(dir==1)
           F = v[k][j][i][0]*0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
         else {
+          cm = global_mesh.GetDy(j);
+          cp = global_mesh.GetDy(j+1);
+          cm_plus_cp = cm + cp;
           if(homo[k][j][i]) {
             rhou1 = dir==0 ? v[k][j+1][i-1][2]*v[k][j][i][0] : v[k-1][j+1][i][2]*v[k][j][i][0];
             rhou2 = v[k][j+1][i][2]*v[k][j][i][0];
           } else {
-            cm = global_mesh.GetDy(j);
-            cp = global_mesh.GetDy(j+1);
-            cm_plus_cp = cm + cp;
             rhou1 = dir==0 ? v[k][j+1][i-1][2]*(cp*v[k][j][i-1][0] + cm*v[k][j+1][i-1][0])/cm_plus_cp
                            : v[k-1][j+1][i][2]*(cp*v[k-1][j][i][0] + cm*v[k-1][j+1][i][0])/cm_plus_cp;
             rhou2 = v[k][j+1][i][2]*(cp*v[k][j][i][0] + cm*v[k][j+1][i][0])/(cm+cp);
@@ -1437,13 +1437,13 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(dir==2)
           F = v[k-1][j][i][0]*0.5*(v[k-1][j][i][3] + v[k][j][i][3]);
         else {
+          cm = global_mesh.GetDz(k-1);
+          cp = global_mesh.GetDz(k);
+          cm_plus_cp = cm + cp;
           if(homo[k][j][i]) {
             rhou1 = dir==0 ? v[k][j][i-1][3]*v[k][j][i][0] : v[k][j-1][i][3]*v[k][j][i][0];
             rhou2 = v[k][j][i][3]*v[k][j][i][0];
           } else {
-            cm = global_mesh.GetDz(k-1);
-            cp = global_mesh.GetDz(k);
-            cm_plus_cp = cm + cp;
             rhou1 = dir==0 ? v[k][j][i-1][3]*(cp*v[k-1][j][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
                            : v[k][j-1][i][3]*(cp*v[k-1][j-1][i][0] + cm*v[k][j-1][i][0])/cm_plus_cp;
             rhou2 = v[k][j][i][3]*(cp*v[k-1][j][i][0] + cm*v[k][j][i][0])/(cm+cp);
@@ -1523,13 +1523,13 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(dir==2)
           F = v[k][j][i][0]*0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
         else {
+          cm = global_mesh.GetDz(k);
+          cp = global_mesh.GetDz(k+1);
+          cm_plus_cp = cm + cp;
           if(homo[k][j][i]) {
             rhou1 = dir==0 ? v[k+1][j][i-1][3]*v[k][j][i][0] : v[k+1][j-1][i][3]*v[k][j][i][0];
             rhou2 = v[k+1][j][i][3]*v[k][j][i][0];
           } else {
-            cm = global_mesh.GetDz(k);
-            cp = global_mesh.GetDz(k+1);
-            cm_plus_cp = cm + cp;
             rhou1 = dir==0 ? v[k+1][j][i-1][3]*(cp*v[k][j][i-1][0] + cm*v[k+1][j][i-1][0])/cm_plus_cp
                            : v[k+1][j-1][i][3]*(cp*v[k][j-1][i][0] + cm*v[k+1][j-1][i][0])/cm_plus_cp;
             rhou2 = v[k+1][j][i][3]*(cp*v[k][j][i][0] + cm*v[k+1][j][i][0])/(cm+cp);
