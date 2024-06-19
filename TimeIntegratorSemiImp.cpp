@@ -46,6 +46,8 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
   }
   alphaP = iod.ts.semi_impl.alphaP;
 
+
+  fix_pressure_at_one_corner = iod.ts.semi_impl.fix_pressure_at_one_corner == SemiImplicitTsData::YES;
   ijk_zero_p = FindCornerFixedPressure();
 
 
@@ -245,12 +247,15 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
-    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
+    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B,
+                                     fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
+      //plin_solver.WriteToMatlabFile("Mat.m", "Mat");
+      //B.WriteToMatlabFile("B.m", "B");
       if(verbose>=2)
         for(int i=0; i<(int)lin_rnorm.size(); i++)
           print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
@@ -561,7 +566,8 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       inco.CalculateCoefficientsSIMPLER(1, v0, v, id, homo, vlin_rows, Bv, VYstar, DY, Efactor, dt, LocalDt); //"Vhat"
     if(global_mesh.z_glob.size()>1)
       inco.CalculateCoefficientsSIMPLER(2, v0, v, id, homo, wlin_rows, Bw, VZstar, DZ, Efactor, dt, LocalDt); //"What"
-    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
+    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, 
+                                     fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
     lin_success = plin_solver.Solve(B, P, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
@@ -632,7 +638,8 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
     //-----------------------------------------------------
     // Step 3: Solve the p' equation
     //-----------------------------------------------------
-    inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXstar, VYstar, VZstar, B, &ijk_zero_p);
+    inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXstar, VYstar, VZstar, B,
+                                          fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.UsePreviousPreconditioner(true); //The matrix A is still the same
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
@@ -932,7 +939,8 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //-----------------------------------------------------
   // Step 2: Solve the p' equation (First Corrector Step)
   //-----------------------------------------------------
-  inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, &ijk_zero_p);
+  inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B,
+                                   fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
   plin_solver.SetLinearOperator(plin_rows);
   Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
   lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
@@ -968,7 +976,8 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     inco.CalculateVelocityTildePISO(1, v0, v, id, homo, VYprime, VYtildep, Efactor, dt, LocalDt);
     inco.CalculateVelocityTildePISO(2, v0, v, id, homo, VZprime, VZtildep, Efactor, dt, LocalDt);
 
-    inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXtildep, VYtildep, VZtildep, B, &ijk_zero_p);
+    inco.BuildPressureEquationRHS_SIMPLER(v, homo, VXtildep, VYtildep, VZtildep, B,
+                                          fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.UsePreviousPreconditioner(true); //The matrix A is still the same
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);

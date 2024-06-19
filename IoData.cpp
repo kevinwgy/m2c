@@ -1753,6 +1753,8 @@ SemiImplicitTsData::SemiImplicitTsData()
 
   // for PISO, convergence_tolerance is not used
   convergence_tolerance = 1.0e-4;
+
+  fix_pressure_at_one_corner = NO;
 }
 
 //------------------------------------------------------------------------------
@@ -1760,7 +1762,7 @@ SemiImplicitTsData::SemiImplicitTsData()
 void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 8, father);
+  ClassAssigner *ca = new ClassAssigner(name, 9, father);
 
   new ClassToken<SemiImplicitTsData>
     (ca, "Type", this,
@@ -1774,6 +1776,10 @@ void SemiImplicitTsData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<SemiImplicitTsData>(ca, "ConvergenceTolerance", this,
                                       &SemiImplicitTsData::convergence_tolerance);
 
+  new ClassToken<SemiImplicitTsData>(ca, "FixPressureAtOneCorner", this,
+     reinterpret_cast<int SemiImplicitTsData::*>(&SemiImplicitTsData::fix_pressure_at_one_corner),
+     2, "No", 0, "Yes", 1);
+ 
   velocity_linear_solver.setup("LinearSolverForVelocity", ca);
 
   pressure_linear_solver.setup("LinearSolverForPressure", ca);

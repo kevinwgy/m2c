@@ -43,6 +43,9 @@ protected:
   double Efactor;
   double alphaP;
 
+  //! The pressure system is rank-deficient. Can be fixed by fixing pressure to 0 at a point
+  bool fix_pressure_at_one_corner;
+
   //! A corner where pressure is fixed to 0
   Int3 ijk_zero_p; //!< set to [NZ-1][NY-1][NX-1]
 

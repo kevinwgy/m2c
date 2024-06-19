@@ -944,6 +944,8 @@ struct SemiImplicitTsData {
   LinearSolverData pressure_linear_solver;
   LinearSolverData turbulence_linear_solver;
   
+  enum YesNo {NO = 0, YES = 1} fix_pressure_at_one_corner; //!< fix p at a corner
+
   SemiImplicitTsData();
   ~SemiImplicitTsData() {}
 
