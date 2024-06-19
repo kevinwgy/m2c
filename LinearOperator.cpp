@@ -4,7 +4,9 @@
  ************************************************************************/
 
 #include<LinearOperator.h>
+#include<petscksp.h> //for computing singular values & condition number
 #include<cassert>
+#include<cfloat>
 
 //-----------------------------------------------------
 
@@ -99,6 +101,49 @@ LinearOperator::ApplyLinearOperatorAndAdd(SpaceVariable3D &x, SpaceVariable3D &b
 
 //-----------------------------------------------------
 
+void
+LinearOperator::CalculateExtremeSingularValues(double &lambda_max, double &lambda_min)
+{
+  KSP ksp_tmp; //create a temporary Krylov-subspace based solver
+  KSPCreate(comm, &ksp_tmp);
+  KSPSetComputeSingularValues(ksp_tmp, PETSC_TRUE);
+  PC pc;
+  KSPGetPC(ksp_tmp, &pc);
+  PCSetType(pc, PCNONE);
+  KSPGMRESSetRestart(ksp_tmp, 1000000); //disable restart
+  KSPSetOperators(ksp_tmp, A, A);
+  KSPSetTolerances(ksp_tmp, 1.0e-8, 1.0e-8, PETSC_DEFAULT, 3000);
+  KSPSetUp(ksp_tmp);
+
+  //singular values are estimated while solving a linear system...
+  Vec x,b;
+  DMCreateGlobalVector(dm, &x);
+  DMCreateGlobalVector(dm, &b);
+  VecSet(x, 1.0);
+  VecSet(b, 2.0);
+  KSPSolve(ksp_tmp, b, x);
+
+  KSPComputeExtremeSingularValues(ksp_tmp, &lambda_max, &lambda_min); //min can be quite inaccurate
+
+  //cleanup
+  VecDestroy(&x);
+  VecDestroy(&b);
+  KSPDestroy(&ksp_tmp);
+}
+
+//-----------------------------------------------------
+
+double
+LinearOperator::EstimateConditionNumber()
+{
+  double lambda_max(1.0), lambda_min(1.0);
+  CalculateExtremeSingularValues(lambda_max, lambda_min);
+  if(lambda_min == 0.0)
+    return DBL_MAX;
+  return lambda_max/lambda_min;
+}
+
+//-----------------------------------------------------
 
 double
 LinearOperator::CalculateMatrixOneNorm()
@@ -106,6 +151,16 @@ LinearOperator::CalculateMatrixOneNorm()
   double norm(0.0);
   MatNorm(A, NORM_1, &norm);
   return norm;
+}
+
+//-----------------------------------------------------
+
+double
+LinearOperator::CalculateMatrixTwoNorm()
+{
+  double lambda_max(0.0), lambda_min(0.0);
+  CalculateExtremeSingularValues(lambda_max, lambda_min);
+  return lambda_max; //matrix 2-norm is just max singular value
 }
 
 //-----------------------------------------------------

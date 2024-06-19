@@ -43,7 +43,8 @@ public:
   void UsePreviousPreconditioner(bool reuse_or_not = true);
 
   bool Solve(SpaceVariable3D &b, SpaceVariable3D &x, //!< x: both input (initial guess) & output (solution)
-             LinearSolverConvergenceReason *reason = NULL, int *numIts = NULL, std::vector<double> *rnorm = NULL) ;
+             LinearSolverConvergenceReason *reason = NULL, int *numIts = NULL,
+             std::vector<double> *rnorm = NULL);
 
   void GetTolerances(double *rtol, double *abstol, double *dtol, int *maxits); //!< set NULL to params not needed
 

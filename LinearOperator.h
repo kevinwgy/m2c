@@ -87,8 +87,12 @@ public:
                                  SpaceVariable3D &y); //!< calculates y = Ax + b (x =/= y!)
 
   double CalculateMatrixOneNorm();
+  double CalculateMatrixTwoNorm(); //!< max singular value
   double CalculateMatrixInfNorm();
   double CalculateMatrixFrobeniusNorm();
+
+  void CalculateExtremeSingularValues(double &lambda_max, double &lambda_min);
+  double EstimateConditionNumber(); //!<lambda_min is often quite inaccurate!
 
   bool IsSymmetric(double tol = 0.0); //!< Calls MatIsSymmetric in PETSc
 
