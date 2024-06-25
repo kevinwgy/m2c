@@ -288,14 +288,14 @@ IncompressibleOperator::FinalizeInitialCondition(SpaceVariable3D &V, SpaceVariab
   V3.RestoreDataPointerToLocalVector(); //no need to exchange data
   ID.RestoreDataPointerToLocalVector();
 
-
+/*
   //debug
   v = (Vec5D***) V.GetDataPointer();
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jj0+3; j++)
       for(int i=ii0; i<iimax; i++)
         fprintf(stdout,"v[%d][%d][%d] = %e %e %e %e %e.\n", k,j,i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
-  
+*/  
 }
 
 //--------------------------------------------------------------------------
