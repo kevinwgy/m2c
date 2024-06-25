@@ -287,6 +287,15 @@ IncompressibleOperator::FinalizeInitialCondition(SpaceVariable3D &V, SpaceVariab
   V.RestoreDataPointerAndInsert();
   V3.RestoreDataPointerToLocalVector(); //no need to exchange data
   ID.RestoreDataPointerToLocalVector();
+
+
+  //debug
+  v = (Vec5D***) V.GetDataPointer();
+  for(int k=kk0; k<kkmax; k++)
+    for(int j=jj0; j<jj0+3; j++)
+      for(int i=ii0; i<iimax; i++)
+        fprintf(stdout,"v[%d][%d][%d] = %e %e %e %e %e.\n", k,j,i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][2], v[k][j][i][3], v[k][j][i][4]);
+  
 }
 
 //--------------------------------------------------------------------------
@@ -299,6 +308,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 
   Vec5D*** v = (Vec5D***) V.GetDataPointer();
 
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
   vector<GhostPoint>* ghost_nodes_outer(spo.GetPointerToOuterGhostNodes());
 
   for(auto it = ghost_nodes_outer->begin(); it != ghost_nodes_outer->end(); it++) {
@@ -409,6 +419,18 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
         fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n", (int)it->bcType);
         exit(-1);
       }
+
+      // special treatment for flat plate
+      if(iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE) {
+        double x = global_mesh.GetX(i);
+        if(x>=iod.rans.example_param_1) {
+          if(x-0.5*global_mesh.GetDx(i) >= iod.rans.example_param_1) //check x-velo grid point
+            v[k][j][i][1] = -v[k][im_j][i][1];
+          v[k][im_j][i][2] = 0.0;
+          v[k][j][i][3]    = -v[k][im_j][i][3]; 
+        }
+      }
+
     }
     else if(it->side == GhostPoint::TOP) {
       if(it->bcType == MeshData::INLET || it->bcType == MeshData::INLET2) {
@@ -497,6 +519,8 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 
   }
 
+
+
 /*
   // update overset ghosts (if any)
   for(auto&& g : ghost_overset)
@@ -504,6 +528,9 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 */
 
   ApplyBoundaryConditionsGeometricEntities(v);
+
+
+
 
   V.RestoreDataPointerAndInsert();
 
@@ -1164,7 +1191,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
                   iod.mesh.bc_x0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
+            ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
                                                 //to have zero velocity on the wall
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
@@ -1251,7 +1278,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
             ap -= a;
           else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
             if(dir != 0) //otherwise, v[k][j][i+1][1] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
+              ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_xmax);
@@ -1327,14 +1354,21 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
         else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
-          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
+          // special treatment for flat plate
+          if(iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE &&
+             ((dir == 0 && global_mesh.GetX(i) - 0.5*global_mesh.GetDx(i) >= iod.rans.example_param_1) ||
+              (dir == 2 && global_mesh.GetX(i) >= iod.rans.example_param_1))) { //stick wall
+            ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
+                                                //to have zero velocity on the wall
+          }
+          else if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS 
           else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY ||
                   iod.mesh.bc_y0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
+            ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
                                                 //to have zero velocity on the wall
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
@@ -1421,7 +1455,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
               ap -= a;
           else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
             if(dir != 1) //otherwise, v[k][j+1][i][2] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
+              ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_ymax);
@@ -1504,7 +1538,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
                   iod.mesh.bc_z0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_z0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
+            ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
                                                 //to have zero velocity on the wall
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
@@ -1593,7 +1627,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
             ap -= a;
           else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
             if(dir != 2) //otherwise, v[k+1][j][i][3] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
+              ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_zmax);
@@ -2023,10 +2057,11 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
           if(iod.mesh.bc_x0 == MeshData::INLET || iod.mesh.bc_x0 == MeshData::INLET2 ||
              iod.mesh.bc_x0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j][i-1][dir+1]; //+a*v or +a*w to the RHS
-          else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_x0 == MeshData::SLIPWALL || iod.mesh.bc_x0 == MeshData::SYMMETRY ||
+                  iod.mesh.bc_x0 == MeshData::OUTLET)
             ap -= a; // vhat_denom remains the same
           else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
+            ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i-1][dir+1] should be -v[k][j][i][dir+1]
                                                 //to have zero velocity on the wall
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
@@ -2094,9 +2129,11 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
           else if(iod.mesh.bc_xmax == MeshData::SLIPWALL || iod.mesh.bc_xmax == MeshData::SYMMETRY) {
             if(dir != 0) //otherwise, v[k][j][i+1][1] = 0
               ap -= a;
+          } else if(iod.mesh.bc_xmax == MeshData::OUTLET) {
+            ap -= a;
           } else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
             if(dir != 0) //otherwise, v[k][j][i+1][1] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
+              ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j][i+1][dir+1] should be -v[k][j][i][dir+1]
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_xmax);
@@ -2161,79 +2198,11 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
           if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS
-          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY ||
+                  iod.mesh.bc_y0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
-                                                //to have zero velocity on the wall
-          else {
-            fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
-                    (int)iod.mesh.bc_y0);
-            exit(-1);
-          }
-        }             
-
-
-        //-----------
-        // TOP 
-        //-----------
-        // Calculate F at the correct location (different for dir=0,1,2)
-        if(dir==1)
-          F = v[k][j-1][i][0]*0.5*(v[k][j-1][i][2] + v[k][j][i][2]);
-        else {
-          if(homo[k][j][i]) {
-            rhou1 = dir==0 ? v[k][j][i-1][2]*v[k][j][i][0] : v[k-1][j][i][2]*v[k][j][i][0];
-            rhou2 = v[k][j][i][2]*v[k][j][i][0];
-          } else {
-            cm = global_mesh.GetDy(j-1);
-            cp = global_mesh.GetDy(j);
-            cm_plus_cp = cm + cp;
-            rhou1 = dir==0 ? v[k][j][i-1][2]*(cp*v[k][j-1][i-1][0] + cm*v[k][j][i-1][0])/cm_plus_cp
-                           : v[k-1][j][i][2]*(cp*v[k-1][j-1][i][0] + cm*v[k-1][j][i][0])/cm_plus_cp;
-            rhou2 = v[k][j][i][2]*(cp*v[k][j-1][i][0] + cm*v[k][j][i][0])/(cm+cp);
-          }
-          F = dir== 0 ? (dxr*rhou1 + dxl*rhou2)/(dxl+dxr) : (dzf*rhou1 + dzk*rhou2)/(dzk+dzf);
-        }
-        F *= dxdz;
-        // Calculate D and the "a" coefficient
-        a = std::max(F, 0.0);
-        if(dir==1)
-          mu = Mu[id[k][j-1][i]];
-        else {
-          if(homo[k][j][i])
-            mu = Mu[id[k][j][i]]; 
-          else {
-            // cm and cp have been calculated!   
-            if(j==0) {
-              mu1 = dir==0 ? Mu[id[k][j][i-1]] : Mu[id[k-1][j][i]];
-              mu2 = Mu[id[k][j][i]];
-            } else {
-              mu1 = dir==0 ? (cp*Mu[id[k][j-1][i-1]] + cm*Mu[id[k][j][i-1]])/cm_plus_cp
-                           : (cp*Mu[id[k-1][j-1][i]] + cm*Mu[id[k-1][j][i]])/cm_plus_cp;
-              mu2 = (cp*Mu[id[k][j-1][i]] + cm*Mu[id[k][j][i]])/cm_plus_cp;
-            }
-            mu = dir==0 ? (dxr*mu1 + dxl*mu2)/(dxl+dxr) : (dzf*mu1 + dzk*mu2)/(dzk+dzf);
-          }
-        }
-        if(mu>0.0) {
-          D  = mu*dxdz/dyb;
-          a += D*PowerLaw(F/D);
-        }
-        ap += a;
-        vhat[k][j][i] += a*v[k][j-1][i][dir+1];
-        vhat_denom += a;
-
-        // Add entry (or add to bb or ap, if j-1 is outside boundary)
-        if(j-1>=0)
-          row.PushEntry(i,j-1,k, -a);  //on the left hand side
-        else { //j-1 is outside domain boundary (if it gets here, dir must be x or z (0 or 2))
-          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
-             iod.mesh.bc_y0 == MeshData::OVERSET)
-            bb[k][j][i] += a*v[k][j-1][i][dir+1]; //+a*u or +a*w to the RHS
-          else if(iod.mesh.bc_y0 == MeshData::SLIPWALL || iod.mesh.bc_y0 == MeshData::SYMMETRY)
-            ap -= a;
-          else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
+            ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j-1][i][dir+1] should be -v[k][j][i][dir+1]
                                                 //to have zero velocity on the wall
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
@@ -2302,9 +2271,11 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
           else if(iod.mesh.bc_ymax == MeshData::SLIPWALL || iod.mesh.bc_ymax == MeshData::SYMMETRY) {
             if(dir != 1) //otherwise, v[k][j+1][i][2] = 0
               ap -= a;
+          } else if(iod.mesh.bc_ymax == MeshData::OUTLET) {
+              ap -= a;
           } else if(iod.mesh.bc_ymax == MeshData::STICKWALL) {
             if(dir != 1) //otherwise, v[k][j+1][i][2] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
+              ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k][j+1][i][dir+1] should be -v[k][j][i][dir+1]
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_ymax);
@@ -2369,10 +2340,11 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
           if(iod.mesh.bc_z0 == MeshData::INLET || iod.mesh.bc_z0 == MeshData::INLET2 ||
              iod.mesh.bc_z0 == MeshData::OVERSET)
             bb[k][j][i] += a*v[k-1][j][i][dir+1]; //+a*u or +a*v to the RHS
-          else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY)
+          else if(iod.mesh.bc_z0 == MeshData::SLIPWALL || iod.mesh.bc_z0 == MeshData::SYMMETRY ||
+                  iod.mesh.bc_z0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_z0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
+            ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k-1][j][i][dir+1] should be -v[k][j][i][dir+1]
                                                 //to have zero velocity on the wall
           else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
@@ -2441,9 +2413,11 @@ IncompressibleOperator::CalculateCoefficientsSIMPLER(int dir, Vec5D*** v0, Vec5D
           else if(iod.mesh.bc_zmax == MeshData::SLIPWALL || iod.mesh.bc_zmax == MeshData::SYMMETRY) {
             if(dir != 2) //otherwise, v[k+1][j][i][3] = 0
               ap -= a;
+          } else if(iod.mesh.bc_zmax == MeshData::OUTLET) {
+            ap -= a;
           } else if(iod.mesh.bc_zmax == MeshData::STICKWALL) {
             if(dir != 2) //otherwise, v[k+1][j][i][3] should be 0 as it is on the wall
-              bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
+              ap += a; //bb[k][j][i] -= a*v[k][j][i][dir+1]; //v[k+1][j][i][dir+1] should be -v[k][j][i][dir+1]
           } else {
             fprintf(stdout,"*** Error: Detected unknown boundary condition type (%d).\n",
                     (int)iod.mesh.bc_zmax);
@@ -3238,7 +3212,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
           else if(iod.mesh.bc_x0 == MeshData::SYMMETRY || iod.mesh.bc_x0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_x0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i-1] should be -vturb[k][j][i]
+            ap += a; //bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i-1] should be -vturb[k][j][i]
                                              //to have zero on the wall
           else {
             fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
@@ -3271,7 +3245,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
           else if(iod.mesh.bc_xmax == MeshData::SYMMETRY || iod.mesh.bc_xmax == MeshData::OUTLET) {
             ap -= a;
           } else if(iod.mesh.bc_xmax == MeshData::STICKWALL) {
-            bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i+1] should be -vturb[k][j][i]
+            ap += a; //bb[k][j][i] -= a*vturb[k][j][i]; //vturb[k][j][i+1] should be -vturb[k][j][i]
           } else {
             fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_xmax);
@@ -3297,13 +3271,17 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
         else { //j-1 is outside domain boundary 
-          if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
+          if(iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE &&
+             global_mesh.GetX(i) >= iod.rans.example_param_1) { //stick wall
+            ap += a; 
+          }        
+          else if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
              iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j-1][i];
           else if(iod.mesh.bc_y0 == MeshData::SYMMETRY || iod.mesh.bc_y0 == MeshData::OUTLET)
             ap -= a;
           else if(iod.mesh.bc_y0 == MeshData::STICKWALL)
-            bb[k][j][i] -= a*vturb[k][j][i]; 
+            ap += a; //bb[k][j][i] -= a*vturb[k][j][i]; 
           else {
             fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n",
                     (int)iod.mesh.bc_y0);
