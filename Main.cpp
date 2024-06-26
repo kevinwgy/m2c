@@ -44,7 +44,7 @@ using std::to_string;
 
 int verbose;
 double domain_diagonal;
-clock_t start_time;
+double start_time; //start time in seconds
 MPI_Comm m2c_comm;
 
 int INACTIVE_MATERIAL_ID;
@@ -54,10 +54,10 @@ int INACTIVE_MATERIAL_ID;
  ************************************/
 int main(int argc, char* argv[])
 {
-  start_time = clock(); //for timing purpose only
-
+  
   //! Initialize MPI 
   MPI_Init(NULL,NULL); //called together with all concurrent programs -> MPI_COMM_WORLD
+  start_time = walltime(); //for timing purpose only (calls MPI_Wtime)
 
   //! Print header (global proc #0, assumed to be a M2C proc)
   m2c_comm = MPI_COMM_WORLD; //temporary, just for the next few lines of code
@@ -688,15 +688,15 @@ int main(int argc, char* argv[])
  
       if(steady_state)  {
         print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
-              time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+              time_step, t, dt, cfl, walltime()-start_time);
       }
       else { //unsteady
         if(dts<=dt)
           print("Step %d: t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
-                time_step, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+                time_step, t, dt, cfl, walltime()-start_time);
         else
           print("Step %d(%d): t = %e, dt = %e, cfl = %.4e. Computation time: %.4e s.\n", 
-                time_step, subcycle+1, t, dt, cfl, ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+                time_step, subcycle+1, t, dt, cfl, walltime()-start_time);
       }
 
       //----------------------------------------------------
@@ -780,7 +780,7 @@ int main(int argc, char* argv[])
   print("\033[0;32m==========================================\033[0m\n");
   print("\033[0;32m   NORMAL TERMINATION (t = %e)  \033[0m\n", t); 
   print("\033[0;32m==========================================\033[0m\n");
-  print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+  print("Total Computation Time: %f sec.\n", walltime()-start_time);
   print("\n");
 
 

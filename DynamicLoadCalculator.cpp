@@ -12,7 +12,7 @@ using std::string;
 using std::vector;
 using std::shared_ptr;
 
-extern clock_t start_time; //time computation started (in Main.cpp)
+extern double start_time; //time computation started (in Main.cpp)
 
 //-----------------------------------------------------------------
 
@@ -63,7 +63,7 @@ DynamicLoadCalculator::Run()
   print("\033[0;32m==========================================\033[0m\n");
   print("\033[0;32m            NORMAL TERMINATION            \033[0m\n");
   print("\033[0;32m==========================================\033[0m\n");
-  print("Total Computation Time: %f sec.\n", ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+  print("Total Computation Time: %f sec.\n", walltime() - start_time);
   print("\n");
 }
 
@@ -115,8 +115,7 @@ DynamicLoadCalculator::RunForAeroS()
     // Move forward by one time-step
     //---------------------------------
     t += dt;
-    print("Step %d: t = %e, dt = %e. Computation time: %.4e s.\n", time_step, t, dt,
-              ((double)(clock()-start_time))/CLOCKS_PER_SEC);
+    print("Step %d: t = %e, dt = %e. Computation time: %.4e s.\n", time_step, t, dt, walltime()-start_time);
  
     ComputeForces(surface, force, t); 
 

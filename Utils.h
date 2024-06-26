@@ -41,6 +41,8 @@ void print(FILE* fd, const char format[],...);
 void print(MPI_Comm& comm, FILE* fd, const char format[],...);
 //--------------------------------------------------
 void mpi_barrier();
+double walltime(); //returns wall-clock time on that process (not the same as CPU-time given by "clock()"!)
+//--------------------------------------------------
 //--------------------------------------------------
 //! Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const string getCurrentDateTime();

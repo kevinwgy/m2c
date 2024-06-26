@@ -544,9 +544,9 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
   // do we need to print at this time?
   if(!force_write) {
     if(use_clocktime) {
-      double current_time = (double)clock();
+      double current_time = walltime();
       MPI_Allreduce(MPI_IN_PLACE, &current_time, 1, MPI_DOUBLE, MPI_MAX, comm); 
-      if((current_time-last_snapshot_clocktime)/CLOCKS_PER_SEC < iod_terminal.frequency_clocktime)
+      if(current_time-last_snapshot_clocktime < iod_terminal.frequency_clocktime)
         return;
     } else {
       if(!isTimeToWrite(time, dt, time_step, iod_terminal.frequency_dt, iod_terminal.frequency, 
@@ -844,7 +844,7 @@ TerminalVisualization::PrintSolutionSnapshot(double time, double dt, int time_st
 
   iFrame++;
   last_snapshot_time = time;
-  last_snapshot_clocktime = (double)clock();
+  last_snapshot_clocktime = walltime();
   MPI_Allreduce(MPI_IN_PLACE, &last_snapshot_clocktime, 1, MPI_DOUBLE, MPI_MAX, comm); 
 
 }
