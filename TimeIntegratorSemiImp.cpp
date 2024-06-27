@@ -340,7 +340,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
     if(rel_err/rel_err_prev>10.0) {
-      print_("  x Warning: Detected drastic increase of error (%eX). Repeating...\n", rel_err/rel_err_prev);
+      print_warning("  x Warning: Detected drastic increase of error (%eX). Repeating.\n",
+                    rel_err/rel_err_prev);
       repetition = true;
       V.AXPlusBY(0.0, 1.0, Tmp5, true); 
       if(Vturb)
