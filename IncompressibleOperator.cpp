@@ -1827,7 +1827,8 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         if(i>0) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dx*v[k][j][i-1][0] + dxl*v[k][j][i][0])/(dxl+dx);
           a = rho*diagx[k][j][i]/dx;
-          row.PushEntry(i-1,j,k, -a);  //on the left hand side
+          if(!ijk_zero_p || *ijk_zero_p != Int3(i-1,j,k))
+            row.PushEntry(i-1,j,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] += rho*ustar[k][j][i]/dx;
         } else {
@@ -1842,7 +1843,8 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         if(i<NX-1) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dxr*v[k][j][i][0] + dx*v[k][j][i+1][0])/(dx+dxr);
           a = rho*diagx[k][j][i+1]/dx;
-          row.PushEntry(i+1,j,k, -a);  //on the left hand side
+          if(!ijk_zero_p || *ijk_zero_p != Int3(i+1,j,k))
+            row.PushEntry(i+1,j,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] -= rho*ustar[k][j][i+1]/dx;
         } else {
@@ -1857,7 +1859,8 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         if(j>0) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dy*v[k][j-1][i][0] + dyb*v[k][j][i][0])/(dyb+dy);
           a = rho*diagy[k][j][i]/dy;
-          row.PushEntry(i,j-1,k, -a);  //on the left hand side
+          if(!ijk_zero_p || *ijk_zero_p != Int3(i,j-1,k))
+            row.PushEntry(i,j-1,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] += rho*vstar[k][j][i]/dy;
         } else {
@@ -1872,7 +1875,8 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         if(j<NY-1) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dyt*v[k][j][i][0] + dy*v[k][j+1][i][0])/(dy+dyt);
           a = rho*diagy[k][j+1][i]/dy;
-          row.PushEntry(i,j+1,k, -a);  //on the left hand side
+          if(!ijk_zero_p || *ijk_zero_p != Int3(i,j+1,k))
+            row.PushEntry(i,j+1,k, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] -= rho*vstar[k][j+1][i]/dy;
         } else {
@@ -1887,7 +1891,8 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         if(k>0) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dz*v[k-1][j][i][0] + dzk*v[k][j][i][0])/(dzk+dz);
           a = rho*diagz[k][j][i]/dz;
-          row.PushEntry(i,j,k-1, -a);  //on the left hand side
+          if(!ijk_zero_p || *ijk_zero_p != Int3(i,j,k-1))
+            row.PushEntry(i,j,k-1, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] += rho*wstar[k][j][i]/dz;
         } else {
@@ -1902,7 +1907,8 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         if(k<NZ-1) {
           rho = homo[k][j][i] ? v[k][j][i][0] : (dzf*v[k][j][i][0] + dz*v[k+1][j][i][0])/(dz+dzf);
           a = rho*diagz[k+1][j][i]/dz;
-          row.PushEntry(i,j,k+1, -a);  //on the left hand side
+          if(!ijk_zero_p || *ijk_zero_p != Int3(i,j,k+1))
+            row.PushEntry(i,j,k+1, -a);  //on the left hand side
           ap += a;
           bb[k][j][i] -= rho*wstar[k+1][j][i]/dz;
         } else {

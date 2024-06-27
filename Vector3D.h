@@ -40,6 +40,8 @@ struct Int3 {
     else if(v[2] != v2.v[2])   return false;
     else                       return true;
   }
+
+  bool operator!=(const Int3& v2) const {return !(*this==v2);}
 };
 
 //------------------------------------------------------------------------------

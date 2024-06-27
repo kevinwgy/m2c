@@ -21,6 +21,7 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                       Pprime(comm_, &(dms_.ghosted1_1dof)), B(comm_, &(dms_.ghosted1_1dof)),
                       DX(comm_, &(dms_.ghosted1_1dof)), DY(comm_, &(dms_.ghosted1_1dof)),
                       DZ(comm_, &(dms_.ghosted1_1dof)), V0(comm_, &(dms_.ghosted1_5dof)),
+                      Tmp1(comm_, &(dms_.ghosted1_1dof)), Tmp5(comm_, &(dms_.ghosted1_5dof)),
                       vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver,
                       "velocity"),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver,
@@ -106,6 +107,8 @@ TimeIntegratorSIMPLE::Destroy()
   DY.Destroy();
   DZ.Destroy();
   V0.Destroy();
+  Tmp1.Destroy();
+  Tmp5.Destroy();
 
   vlin_solver.Destroy();
   plin_solver.Destroy();
@@ -152,7 +155,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   vector<double> lin_rnorm; 
   bool lin_success, converged(false);
   int nLinIts(0);
-  double rel_err(10000.0);
+  double rel_err_prev(100000), rel_err(10000.0);
 
   if(type == SIMPLEC)
     print("  o Running the iterative SIMPLEC procedure (E = %e).\n", Efactor);
@@ -172,7 +175,14 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   }
 
 
+  bool repetition = false;
+
   for(iter = 0; iter < maxIter; iter++) {
+
+    // Backup
+    Tmp5.AXPlusBY(0.0, 1.0, V, true); //Tmp = V (include ghost nodes)
+    if(Vturb)
+      Tmp1.AXPlusBY(0.0, 1.0, *Vturb, true); //Tmp = vturb (include ghost nodes)
 
     Vec5D***      v = (Vec5D***)V.GetDataPointer();
     double*** vturb = Vturb ? Vturb->GetDataPointer() : NULL;
@@ -185,7 +195,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the x-momentum equation
     if(global_mesh.x_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor,
+      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, /*vturb*/NULL, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor,
                                        dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm);
@@ -207,7 +217,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the y-momentum equation
     if(global_mesh.y_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor,
+      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, /*vturb*/NULL, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor,
                                        dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm);
@@ -226,7 +236,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the z-momentum equation
     if(global_mesh.z_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor,
+      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, /*vturb*/NULL, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor,
                                        dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm);
@@ -248,14 +258,20 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B,
-                                     fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
+                                     (fix_pressure_at_one_corner && !repetition) ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge.\n");
-      //plin_solver.WriteToMatlabFile("Mat.m", "Mat");
-      //B.WriteToMatlabFile("B.m", "B");
+/*
+      plin_solver.WriteToMatlabFile("Mat.m", "A");
+      B.WriteToMatlabFile("B.m", "b");
+      Pprime.WriteToMatlabFile("P.m","x");
+      double sigma_min, sigma_max;
+      plin_solver.CalculateExtremeSingularValues(sigma_max, sigma_min);
+      print("sigma_max = %e, sigma_min = %e.\n", sigma_max, sigma_min);
+*/
       if(verbose>=2)
         for(int i=0; i<(int)lin_rnorm.size(); i++)
           print_warning("      > It. %d: residual = %e.\n", i+1, lin_rnorm[i]);
@@ -273,6 +289,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
     // Step 3: Update p, u, v, w, and compute relative error in velocity
     //-----------------------------------------------------
+    rel_err_prev = rel_err;
     rel_err = UpdateStates(v, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, alphaP); 
 
 
@@ -322,6 +339,19 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     }
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
+    if(rel_err/rel_err_prev>10.0) {
+      print_("  x Warning: Detected drastic increase of error (%eX). Repeating...\n", rel_err/rel_err_prev);
+      repetition = true;
+      V.AXPlusBY(0.0, 1.0, Tmp5, true); 
+      if(Vturb)
+        Vturb->AXPlusBY(0.0, 1.0, Tmp1, true); //Tmp = vturb (include ghost nodes)
+/*
+      Tmp5.WriteToVTRFile("Vold.vtr","Vold");
+      V.WriteToVTRFile("V.vtr","V");
+      exit_mpi();
+*/
+    } else
+      repetition = false;
 
   }
 

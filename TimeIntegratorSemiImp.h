@@ -39,6 +39,9 @@ protected:
 
   SpaceVariable3D *R3_ptr; //!< momentum changes (dof = 3), for steady state only
 
+  SpaceVariable3D Tmp1; //!< for temporary use (dof = 1)
+  SpaceVariable3D Tmp5; //!< for temporary use (dof = 5)
+
   //! Relaxation coefficients
   double Efactor;
   double alphaP;
