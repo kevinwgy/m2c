@@ -11,7 +11,8 @@
 
 LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverData &lin_input,
                                        const char *equation_name_)
-                  : LinearOperator(comm_, dm_), log_filename(lin_input.logfile)
+                  : LinearOperator(comm_, dm_), log_filename(lin_input.logfile),
+                    Xtmp(comm_, &dm_), Rtmp(comm_, &dm_)
 {
 
   KSPCreate(comm, &ksp);
@@ -67,7 +68,7 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
 
   KSPSetFromOptions(ksp); //overrides any options specified above
 
-  rnorm_history.resize(1000); //1000 entries should be more than enough
+  rnorm_history.resize(5000); //5000 entries should be more than enough
   KSPSetResidualHistory(ksp, rnorm_history.data(), rnorm_history.size(), PETSC_TRUE); //reset for each Solve
 
   // Set up log file
@@ -101,6 +102,8 @@ LinearSystemSolver::~LinearSystemSolver()
 void
 LinearSystemSolver::Destroy()
 {
+  Xtmp.Destroy();
+  Rtmp.Destroy();
   KSPDestroy(&ksp);
   LinearOperator::Destroy();
 }
@@ -181,7 +184,8 @@ LinearSystemSolver::UsePreviousPreconditioner(bool reuse_or_not)
 
 bool
 LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
-                          LinearSolverConvergenceReason *reason, int *numIts, std::vector<double> *rnorm)
+                          LinearSolverConvergenceReason *reason, int *numIts, std::vector<double> *rnorm,
+                          std::vector<int> *rnorm_its)
 {
   // --------------------------------------------------
   // Sanity checks
@@ -200,8 +204,14 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
   assert(i0_==ii0 && j0_==jj0 && k0_==kk0 && imax_==iimax && jmax_==jjmax && kmax_==kkmax);
   x.GetGhostedCornerIndices(&i0_, &j0_, &k0_, &imax_, &jmax_, &kmax_);
   assert(i0_==ii0 && j0_==jj0 && k0_==kk0 && imax_==iimax && jmax_==jjmax && kmax_==kkmax);
+
+  if(rnorm_its)
+    assert(rnorm); //if the user requested rnorm_its, they should also request rnorm
+
   // ---------------------------------------------------
   
+  // Store initial guess (*may* be used later)
+  Xtmp.AXPlusBY(0.0, 1.0, x); //Xtmp = x
 
   // ---------------------------------------------------
   // Solve!
@@ -242,10 +252,34 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
     int nEntries(0);
     KSPGetResidualHistory(ksp, NULL, &nEntries);
 
+    vector<int> indices;
+
+
+    if(nEntries==0) {
+      //some solvers in PETSc do not provide the residual time-history. calculate initial & final residuals
+      nEntries = 2;
+      indices.push_back(0);
+      ComputeResidual(b, Xtmp, Rtmp);
+      rnorm_history[0] = Xtmp.CalculateVectorTwoNorm();
+      indices.push_back(nIts-1);
+      ComputeResidual(b, x, Rtmp);
+      rnorm_history[0] = x.CalculateVectorTwoNorm();
+    } else {
+      for(int i=0; i<nEntries; i++)
+        indices.push_back(i);   
+    }
+
+
     if(rnorm) {
       rnorm->resize(nEntries, 0);
       for(int i=0; i<nEntries; i++) //copy data instead of passing rnorm_history (safer)
         (*rnorm)[i] = rnorm_history[i];
+
+      if(rnorm_its) {
+        rnorm_its->resize(nEntries,0);     
+        for(int i=0; i<nEntries; i++) //copy data instead of passing rnorm_history (safer)
+          (*rnorm_its)[i] = indices[i];
+      }
     }
 
     if(write_log_to_screen) {
@@ -262,7 +296,7 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
                         equation_name.c_str(), nIts);
       }
       for(int i=0; i<nEntries; i++)
-        print("    > It. %d: residual = %e.\n", i+1, rnorm_history[i]);
+        print("    > It. %d: residual = %e.\n", indices[i]+1, rnorm_history[i]);
     }
 
     if(!log_filename.empty()) {
@@ -277,7 +311,7 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
         print(file, "  o Linear solver failed to converged (It. %d).\n", nIts);
 
       for(int i=0; i<nEntries; i++)
-        print(file, "    > It. %d: residual = %e.\n", i+1, rnorm_history[i]);
+        print(file, "    > It. %d: residual = %e.\n", indices[i]+1, rnorm_history[i]);
 
       fclose(file);
       MPI_Barrier(comm);

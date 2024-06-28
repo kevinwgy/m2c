@@ -23,11 +23,14 @@ enum LinearSolverConvergenceReason
 class LinearSystemSolver : public LinearOperator {
 
   KSP ksp;
+
   std::vector<double> rnorm_history; //!< stores the history of residual norm for the "Solve"
 
   bool write_log_to_screen;
   string log_filename;
   string equation_name; //!< optional (used in log file only)
+
+  SpaceVariable3D Xtmp, Rtmp; //!< for temporary use
 
 public:
 
@@ -44,7 +47,7 @@ public:
 
   bool Solve(SpaceVariable3D &b, SpaceVariable3D &x, //!< x: both input (initial guess) & output (solution)
              LinearSolverConvergenceReason *reason = NULL, int *numIts = NULL,
-             std::vector<double> *rnorm = NULL);
+             std::vector<double> *rnorm = NULL, std::vector<int> *rnorm_its = NULL);
 
   void GetTolerances(double *rtol, double *abstol, double *dtol, int *maxits); //!< set NULL to params not needed
 
