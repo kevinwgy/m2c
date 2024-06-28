@@ -3499,6 +3499,25 @@ IncompressibleOperator::ApplyBoundaryConditionsTurbulenceVariables(SpaceVariable
 //--------------------------------------------------------------------------
 
 double
+IncompressibleOperator::GetKinematicEddyViscosity(double rho, double mu, double nu_tilde)
+{
+  // Spalart-Allmaras for the moment
+  if(nu_tilde<0)
+    return 0.0; //if set nut to 0.0
+
+  double cv1_3 = 357.911; //=7.1*7.1*7.1
+
+  assert(rho>0 && mu>0);
+  double chi  = rho*nu_tilde/mu;
+  double chi3 = chi*chi*chi;
+  double fv1  = chi3/(chi3 + cv1_3);
+
+  return nu_tilde*fv1;
+}
+
+//--------------------------------------------------------------------------
+
+double
 IncompressibleOperator::GetDynamicEddyViscosity(double rho, double mu, double nu_tilde)
 {
   // Spalart-Allmaras for the moment
@@ -3554,6 +3573,29 @@ IncompressibleOperator::GetDistanceToWall(Vec3D x)
   assert(dist>=0.0);
   return dist;
 }    
+
+//--------------------------------------------------------------------------
+
+void
+IncompressibleOperator::ComputeKinematicEddyViscosity(SpaceVariable3D &Vturb, SpaceVariable3D &V,
+                                                      SpaceVariable3D &ID, SpaceVariable3D &NuT)
+{
+  double*** vturb = Vturb.GetDataPointer();
+  Vec5D***  v     = (Vec5D***) V.GetDataPointer();
+  double*** id     = ID.GetDataPointer();
+  double*** nut    = NuT.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++)
+        nut[k][j][i] = GetKinematicEddyViscosity(v[k][j][i][0], Mu[id[k][j][i]], vturb[k][j][i]);
+
+  Vturb.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerToLocalVector();
+  ID.RestoreDataPointerToLocalVector();
+
+  NuT.RestoreDataPointerAndInsert();
+}
 
 //--------------------------------------------------------------------------
 

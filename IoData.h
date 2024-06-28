@@ -1496,6 +1496,10 @@ struct OutputData {
     return mean_charge==ON || heavy_particles_density==ON || electron_density==ON || molar_fractions0==ON ||
            molar_fractions1==ON || molar_fractions2==ON || molar_fractions3==ON || molar_fractions4==ON;}
 
+  //! turbulence-related outputs
+  Options kinematic_eddy_viscosity; //!< nu_T 
+
+
   int frequency;
   double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
 

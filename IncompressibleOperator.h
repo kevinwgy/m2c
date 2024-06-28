@@ -112,6 +112,9 @@ public:
                                        std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, 
                                        double Efactor, double dt, SpaceVariable3D *LocalDt = NULL); 
 
+  void ComputeKinematicEddyViscosity(SpaceVariable3D &Vturb, SpaceVariable3D &V, SpaceVariable3D &ID,
+                                     SpaceVariable3D &NuT); //compute kin.eddy.vis ==> NuT
+
 
 private:
 
@@ -128,6 +131,7 @@ private:
 
 
   //! For turbulent flows (RANS for now) TODO: These functions should be moved to dedicated classes later
+  double GetKinematicEddyViscosity(double rho, double mu, double nu_tilde); //Spalart-Allmaras
   double GetDynamicEddyViscosity(double rho, double mu, double nu_tilde); //Spalart-Allmaras
   double GetDistanceToWall(Vec3D x);
 

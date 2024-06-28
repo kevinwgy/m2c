@@ -462,7 +462,8 @@ int main(int argc, char* argv[])
 */
 
   //! Initialize output
-  Output out(comm, dms, iod, global_mesh, spo.GetPointerToOuterGhostNodes(), vf, laser, spo.GetMeshCoordinates(), spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), ion, heo); 
+  Output out(comm, dms, iod, global_mesh, spo.GetPointerToOuterGhostNodes(), vf, laser, spo.GetMeshCoordinates(),
+             spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), ion, heo, inco); 
   out.InitializeOutput(spo.GetMeshCoordinates());
 
 
@@ -563,7 +564,7 @@ int main(int argc, char* argv[])
   }
 
   //! write initial condition to file
-  out.OutputSolutions(t, dt, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, true/*force_write*/);
+  out.OutputSolutions(t, dt, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, Vturb, true/*force_write*/);
 
   if(concurrent.Coupled()) {
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
@@ -761,7 +762,7 @@ int main(int argc, char* argv[])
 
     
 
-    out.OutputSolutions(t, dts0, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, false/*force_write*/);
+    out.OutputSolutions(t, dts0, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, Vturb, false/*force_write*/);
 
   }
 
@@ -774,7 +775,7 @@ int main(int argc, char* argv[])
   if(embed)
     embed->OutputResults(t, dt, time_step, true/*force_write*/);
 
-  out.OutputSolutions(t, dts, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, true/*force_write*/);
+  out.OutputSolutions(t, dts, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, Vturb, true/*force_write*/);
 
   print("\n");
   print("\033[0;32m==========================================\033[0m\n");

@@ -10,9 +10,11 @@
 
 //--------------------------------------------------------------------------
 
-Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_, std::vector<GhostPoint>* ghost_nodes_outer_,
-               vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, 
-               SpaceVariable3D &cell_volume, IonizationOperator* ion_, HyperelasticityOperator* heo_) : 
+Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
+               std::vector<GhostPoint>* ghost_nodes_outer_, vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_,
+               SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, 
+               SpaceVariable3D &cell_volume, IonizationOperator* ion_, HyperelasticityOperator* heo_,
+               IncompressibleOperator* inco_) : 
     comm(comm_), 
     iod(iod_), global_mesh(global_mesh_), ghost_nodes_outer(*ghost_nodes_outer_), vf(vf_), laser(laser_),
     scalar(comm_, &(dms.ghosted1_1dof)),
@@ -21,7 +23,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     probe_output(comm_, iod_.output, vf_, ion_, heo_),
     energy_output(comm_,iod_, iod_.output, iod_.mesh, iod_.eqs, laser_, vf_, coordinates, delta_xyz, cell_volume),
     matvol_output(comm_, iod_, cell_volume),
-    ion(ion_), heo(heo_),
+    ion(ion_), heo(heo_), inco(inco_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
 {
   iFrame = 0;
@@ -131,7 +133,8 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
                         SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, 
                         std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/,
                         std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
-                        SpaceVariable3D *L, SpaceVariable3D *Xi, bool force_write)
+                        SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
+                        bool force_write)
 {
 
   SpaceVariable3D *Vout = &V;
@@ -143,7 +146,7 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
   //write solution snapshot
   if(isTimeToWrite(time, dt, time_step, iod.output.frequency_dt, iod.output.frequency, 
      last_snapshot_time, force_write))
-    WriteSolutionSnapshot(time, time_step, *Vout, ID, Phi, NPhi, KappaPhi, L, Xi);
+    WriteSolutionSnapshot(time, time_step, *Vout, ID, Phi, NPhi, KappaPhi, L, Xi, Vturb);
 
   //write solutions at probes
   probe_output.WriteSolutionAtProbes(time, dt, time_step, *Vout, ID, Phi, L, Xi, force_write);
@@ -174,7 +177,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
                               SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
                               std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/ ,
                               std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
-                              SpaceVariable3D *L, SpaceVariable3D *Xi)
+                              SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb)
 {
   //! Post-processing
   if(iod.output.ionization_output_requested())
@@ -465,6 +468,21 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
   }
 
   // ---------------------------------------
+
+  // ---------------------------------------
+  // outputs related to turbulence
+  if(iod.output.kinematic_eddy_viscosity==OutputData::ON) {
+    if(Vturb == NULL || inco == NULL) {
+      print_error("*** Error: Cannot output kinematic eddy viscosity. Solver is not activated.\n");
+      exit_mpi();
+    }
+    inco->ComputeKinematicEddyViscosity(*Vturb, V, ID, scalar);
+    PetscObjectSetName((PetscObject)(scalar.GetRefToGlobalVec()), "KinematicEddyViscosity");
+    VecView(scalar.GetRefToGlobalVec(), viewer);
+    numSol++;
+  }
+  // ---------------------------------------
+
 
   MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
 

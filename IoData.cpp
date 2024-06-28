@@ -2926,6 +2926,9 @@ OutputData::OutputData()
   for(int i=0; i<MAXSPECIES; i++)
     molar_fractions[i] = OFF;
 
+
+  kinematic_eddy_viscosity = OFF;
+
   mesh_filename = "";
 
   mesh_partition = "";
@@ -2937,7 +2940,7 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 27+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 28+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -3026,6 +3029,12 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   new ClassToken<OutputData>(ca, "MolarFractionsElement4", this,
                              reinterpret_cast<int OutputData::*>(&OutputData::molar_fractions4), 2,
                              "Off", 0, "On", 1);
+
+
+  new ClassToken<OutputData>(ca, "KinematicEddyViscosity", this,
+                             reinterpret_cast<int OutputData::*>(&OutputData::kinematic_eddy_viscosity), 2,
+                             "Off", 0, "On", 1);
+
 
   new ClassStr<OutputData>(ca, "MeshInformation", this, &OutputData::mesh_filename);
 

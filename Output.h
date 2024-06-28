@@ -12,6 +12,7 @@
 #include <MaterialVolumeOutput.h>
 #include <TerminalVisualization.h>
 #include <HyperelasticityOperator.h>
+#include <IncompressibleOperator.h>
 #include <stdio.h>
 
 /** Class Output is responsible  for writing solutions to files. It uses PETSc functionalities
@@ -39,6 +40,9 @@ class Output
   //! Hyperelasticity solver (Used here optionally, as a post-processor)
   HyperelasticityOperator *heo;
   
+  //! Incompressible operator 
+  IncompressibleOperator *inco;
+
   //! These variables will temporarily hold solutions before they are printed to file
   SpaceVariable3D scalar;   
   SpaceVariable3D vector3;
@@ -62,9 +66,11 @@ class Output
 
 public:
 
-  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_, std::vector<GhostPoint>* ghost_nodes_outer_,
-         vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_, SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
-         IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL);
+  Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
+         std::vector<GhostPoint>* ghost_nodes_outer_, vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_,
+         SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
+         IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL,
+         IncompressibleOperator* inco_ = NULL);
 
   ~Output();
 
@@ -76,6 +82,7 @@ public:
                        std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,       
                        SpaceVariable3D *L/*laser radiance*/, 
                        SpaceVariable3D *Xi/*ref map for hyperelasticity*/,
+                       SpaceVariable3D *Vturb/*turbulence working variable(s)*/,
                        bool force_write);
 
   void FinalizeOutput();
@@ -88,7 +95,7 @@ private:
                              std::vector<SpaceVariable3D*> &NPhi/*unit normal of levelset*/,
                              std::vector<SpaceVariable3D*> &KappaPhi/*curvature information of levelset*/,
                              SpaceVariable3D *L,
-                             SpaceVariable3D *Xi); //!< write solution to file
+                             SpaceVariable3D *Xi, SpaceVariable3D *Vturb); //!< write solution to file
 
   void OutputMeshPartition();
 
