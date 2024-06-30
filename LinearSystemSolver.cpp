@@ -260,10 +260,10 @@ LinearSystemSolver::Solve(SpaceVariable3D &b, SpaceVariable3D &x,
       nEntries = 2;
       indices.push_back(0);
       ComputeResidual(b, Xtmp, Rtmp);
-      rnorm_history[0] = Xtmp.CalculateVectorTwoNorm();
+      rnorm_history[0] = Rtmp.CalculateVectorTwoNorm();
       indices.push_back(nIts-1);
       ComputeResidual(b, x, Rtmp);
-      rnorm_history[0] = x.CalculateVectorTwoNorm();
+      rnorm_history[1] = Rtmp.CalculateVectorTwoNorm();
     } else {
       for(int i=0; i<nEntries; i++)
         indices.push_back(i);   
