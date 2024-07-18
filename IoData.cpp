@@ -3743,7 +3743,7 @@ void SpecialToolsData::setup(const char *name, ClassAssigner *father)
 LinearSolverData::LinearSolverData()
 {
   // solver options
-  ksp = IMPROVED_STAB_BI_CG;
+  ksp = STAB_BI_CG;
   pc  = BLOCK_JACOBI;
 
   // tolerances
