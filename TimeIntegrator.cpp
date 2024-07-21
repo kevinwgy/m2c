@@ -746,6 +746,10 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
     // Reinitialize level set (also apply boundary conditions)
     if(resolved_conflicts>0) { //must reinitialize
+      if(verbose>=1) {
+        print("- Resolved %d conflicts between level sets and embedded boundaries. "
+              "Reinitialize level sets...\n", resolved_conflicts);
+      }
       for(int i=0; i<(int)Phi.size(); i++) 
         lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0/*no-special-maxIts*/, true/*"must_do"*/);
     } else {

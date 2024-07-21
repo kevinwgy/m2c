@@ -313,7 +313,6 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
       if(verbose>=1)
         print_warning("Warning: Found %d orphan nodes swept by interfaces tracked by level sets. Set ID = 0.\n",
                       total_remaining);
-      //exit(-1);
       break;
     }
 
