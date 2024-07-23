@@ -275,9 +275,9 @@ IncompressibleOperator::FinalizeInitialCondition(SpaceVariable3D &V, SpaceVariab
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
         v[k][j][i][0] = vf[id[k][j][i]]->GetDensity(0.0,0.0); //get rho0
-        v[k][j][i][1] = cx0[i]*v3[k][j][i-1][0] + cx1[i]*v3[k][j][i][0];
-        v[k][j][i][2] = cy0[j]*v3[k][j-1][i][1] + cy1[j]*v3[k][j][i][1];
-        v[k][j][i][3] = cz0[k]*v3[k-1][j][i][2] + cz1[k]*v3[k][j][i][2];
+        v[k][j][i][1] = cx0[i-i0]*v3[k][j][i-1][0] + cx1[i-i0]*v3[k][j][i][0];
+        v[k][j][i][2] = cy0[j-j0]*v3[k][j-1][i][1] + cy1[j-j0]*v3[k][j][i][1];
+        v[k][j][i][3] = cz0[k-k0]*v3[k-1][j][i][2] + cz1[k-k0]*v3[k][j][i][2];
         v[k][j][i][4] = 0.0; //initialize p = 0
       }
 
