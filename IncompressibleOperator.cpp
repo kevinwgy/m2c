@@ -3450,6 +3450,7 @@ IncompressibleOperator::InitializeTurbulenceVariables(SpaceVariable3D &Vturb)
 
   Vturb.SetConstantValue(0.0, true); //set Vturb = 0 (including ghost layer)
 
+  ApplyBoundaryConditionsTurbulenceVariables(Vturb);
 }
 
 //--------------------------------------------------------------------------

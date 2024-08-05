@@ -301,23 +301,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     rel_err_prev = rel_err;
     rel_err = UpdateStates(v, Pprime, DX, DY, DZ, VXstar, VYstar, VZstar, alphaP); 
 
-
     V.RestoreDataPointerAndInsert();
     inco.ApplyBoundaryConditions(V);
-
-    if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
-      converged = true;
-      break; 
-    }
-
-/*
-    if(iter==0) {
-      print("Fine...\n");
-      V.StoreMeshCoordinates(spo.GetMeshCoordinates());
-      V.WriteToVTRFile("V.vtr","V");
-      exit_mpi();
-    }
-*/
 
 
     //-----------------------------------------------------
@@ -348,6 +333,14 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
       inco.ApplyBoundaryConditionsTurbulenceVariables(*Vturb);
     }
+
+
+    //TODO: For the moment, only check convergence of the N-S equations, not turbulence closure.
+    if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
+      converged = true;
+      break; 
+    }
+
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
     if(rel_err/rel_err_prev>10.0) {
