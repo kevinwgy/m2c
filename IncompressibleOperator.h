@@ -131,9 +131,11 @@ private:
 
 
   //! For turbulent flows (RANS for now) TODO: These functions should be moved to dedicated classes later
-  double GetKinematicEddyViscosity(double rho, double mu, double nu_tilde); //Spalart-Allmaras
-  double GetDynamicEddyViscosity(double rho, double mu, double nu_tilde); //Spalart-Allmaras
+  double GetKinematicEddyViscosity(double rho, double mu, double nu_tilde); //!< Spalart-Allmaras
+  double GetDynamicEddyViscosity(double rho, double mu, double nu_tilde); //!< Spalart-Allmaras
   double GetDistanceToWall(Vec3D x);
+  double ApplyVelocityBoundaryConditionLocal(int dir, GhostPoint::Side side, double vim,
+                                             bool flat_plate_wall = false); //!< for computing vorticity
 
 };
 

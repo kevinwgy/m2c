@@ -3097,6 +3097,13 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
   double chi,Omega,d2w,k2d2;
   Vec3D vort;
 
+/*
+  for(int j=jj0; j<jjmax; j++) {
+    fprintf(stdout,"v[%d][%d][%d] = %e %e %e %e %e\n", 0, j, 31, v[0][j][31][0], v[0][j][31][1], v[0][j][31][2], v[0][j][31][3], v[0][j][31][4]);
+    fprintf(stdout,"v[%d][%d][%d] = %e %e %e %e %e\n", 0, j, 32, v[0][j][32][0], v[0][j][32][1], v[0][j][32][2], v[0][j][32][3], v[0][j][32][4]);
+  }
+*/
+
   for(int k=k0; k<kmax; k++) {
     dz  = global_mesh.GetDz(k);
     dzk = 0.5*(global_mesh.GetDz(k-1) + dz);
@@ -3132,34 +3139,83 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         dxdy = dx*dy;
         dxdz = dx*dz;
         
+        bool flat_plate_wall = (iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE) &&
+                               (global_mesh.GetX(i) >= iod.rans.example_param_1); //stick wall
+
         //---------------------------------------------------
         // Calculate vorticity 
+        // Note: Must avoid accessing edge/corner ghosts outside physical domain
         //---------------------------------------------------
         double vtmp[3];
         for(int p=-1; p<2; p++)
           vtmp[p+1] = (v[k][j+p][i][1] + v[k][j+p][i+1][1]) / 2.0;
+        if(i+1>=global_mesh.NX) { //may need correction
+          if(j-1<0) //edge
+            vtmp[0] = ApplyVelocityBoundaryConditionLocal(0, GhostPoint::BOTTOM, vtmp[1], flat_plate_wall); //0~x-velo
+          if(j+1>=global_mesh.NY) //edge
+            vtmp[2] = ApplyVelocityBoundaryConditionLocal(0, GhostPoint::TOP, vtmp[1]);
+        }
         dudy = -dyt/(dyb*(dyt+dyb))*vtmp[0] + (dyt-dyb)/(dyt*dyb)*vtmp[1] + dyb/(dyt*(dyt+dyb))*vtmp[2];
+//        if(i==imax-1)
+//          fprintf(stdout,"vtmp[%d][%d][%d] = %e %e %e, dudy = %e.\n", k,j,i, vtmp[0], vtmp[1], vtmp[2], dudy);
+
         for(int p=-1; p<2; p++)
           vtmp[p+1] = (v[k+p][j][i][1] + v[k+p][j][i+1][1]) / 2.0;
+
+        if(i+1>=global_mesh.NX) { //may need correction
+          if(k-1<0) //edge
+            vtmp[0] = ApplyVelocityBoundaryConditionLocal(0, GhostPoint::BACK, vtmp[1]);
+          if(k+1>=global_mesh.NZ) //edge
+            vtmp[2] = ApplyVelocityBoundaryConditionLocal(0, GhostPoint::FRONT, vtmp[1]);
+        }
         dudz = -dzf/(dzk*(dzf+dzk))*vtmp[0] + (dzf-dzk)/(dzf*dzk)*vtmp[1] + dzk/(dzf*(dzf+dzk))*vtmp[2];
+
         for(int p=-1; p<2; p++)
           vtmp[p+1] = (v[k][j][i+p][2] + v[k][j+1][i+p][2]) / 2.0;
+        if(j+1>=global_mesh.NY) { //may need correction
+          if(i-1<0) //edge
+            vtmp[0] = ApplyVelocityBoundaryConditionLocal(1, GhostPoint::LEFT, vtmp[1]); //1~y-velo
+          if(i+1>=global_mesh.NX) //edge
+            vtmp[2] = ApplyVelocityBoundaryConditionLocal(1, GhostPoint::RIGHT, vtmp[1]);
+        }
         dvdx = -dxr/(dxl*(dxl+dxr))*vtmp[0] + (dxr-dxl)/(dxl*dxr)*vtmp[1] + dxl/(dxr*(dxl+dxr))*vtmp[2];
+
         for(int p=-1; p<2; p++)
           vtmp[p+1] = (v[k+p][j][i][2] + v[k+p][j+1][i][2]) / 2.0;
+        if(j+1>=global_mesh.NY) { //may need correction
+          if(k-1<0) //edge
+            vtmp[0] = ApplyVelocityBoundaryConditionLocal(1, GhostPoint::BACK, vtmp[1]); //1~y-velo
+          if(k+1>=global_mesh.NZ) //edge
+            vtmp[2] = ApplyVelocityBoundaryConditionLocal(1, GhostPoint::FRONT, vtmp[1]);
+        }
         dvdz = -dzf/(dzk*(dzf+dzk))*vtmp[0] + (dzf-dzk)/(dzf*dzk)*vtmp[1] + dzk/(dzf*(dzf+dzk))*vtmp[2];
+
         for(int p=-1; p<2; p++)
           vtmp[p+1] = (v[k][j][i+p][3] + v[k+1][j][i+p][3]) / 2.0;
+        if(k+1>=global_mesh.NZ) { //may need correction
+          if(i-1<0) //edge
+            vtmp[0] = ApplyVelocityBoundaryConditionLocal(2, GhostPoint::LEFT, vtmp[1]); //2~z-velo
+          if(i+1>=global_mesh.NX) //edge
+            vtmp[2] = ApplyVelocityBoundaryConditionLocal(2, GhostPoint::RIGHT, vtmp[1]);
+        }
         dwdx = -dxr/(dxl*(dxl+dxr))*vtmp[0] + (dxr-dxl)/(dxl*dxr)*vtmp[1] + dxl/(dxr*(dxl+dxr))*vtmp[2];
+
         for(int p=-1; p<2; p++)
           vtmp[p+1] = (v[k][j+p][i][3] + v[k+1][j+p][i][3]) / 2.0;
+        if(k+1>=global_mesh.NZ) { //may need correction
+          if(j-1<0) //edge
+            vtmp[0] = ApplyVelocityBoundaryConditionLocal(2, GhostPoint::BOTTOM, vtmp[1], flat_plate_wall); //2~z-velo
+          if(j+1>=global_mesh.NY) //edge
+            vtmp[2] = ApplyVelocityBoundaryConditionLocal(2, GhostPoint::TOP, vtmp[1]);
+        }
         dwdy = -dyt/(dyb*(dyt+dyb))*vtmp[0] + (dyt-dyb)/(dyt*dyb)*vtmp[1] + dyb/(dyt*(dyt+dyb))*vtmp[2];
 
         vort[0] = dwdy-dvdz;
         vort[1] = dudz-dwdx;
         vort[2] = dvdx-dudy;
         Omega = vort.norm();
-
+        if(i==imax-1 || i==imax-3)
+          fprintf(stdout,"vort[%d][%d][%d] = %e %e %e, norm = %e | dvdx = %e, dudy = %e.\n", k,j,i, vort[0], vort[1], vort[2], Omega, dvdx, dudy);
 
         //---------------------------------------------------
         // Spalart-Allmaras Additional Eqs. 
@@ -3277,12 +3333,10 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         if(j-1>=0)
           row.PushEntry(i,j-1,k, -a);  //on the left hand side
         else { //j-1 is outside domain boundary 
-          if(iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE &&
-             global_mesh.GetX(i) >= iod.rans.example_param_1) { //stick wall
+          if(flat_plate_wall) //stick wall
             ap += a; 
-          }        
           else if(iod.mesh.bc_y0 == MeshData::INLET || iod.mesh.bc_y0 == MeshData::INLET2 ||
-             iod.mesh.bc_y0 == MeshData::OVERSET)
+                  iod.mesh.bc_y0 == MeshData::OVERSET)
             bb[k][j][i] += a*vturb[k][j-1][i];
           else if(iod.mesh.bc_y0 == MeshData::SYMMETRY || iod.mesh.bc_y0 == MeshData::OUTLET)
             ap -= a;
@@ -3409,8 +3463,14 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         double Sc = 0.0; 
         //production term
         Sc += neg_nut ? cb1*(1-ct3)*Omega*vturb[k][j][i] : cb1*(1.0-ft2)*S*vturb[k][j][i];
+        if(i==imax-1 || i==imax-3)
+          fprintf(stdout,"Sc[%d][%d][%d] = %e (production), neg_nut = %d.\n", k,j,i, Sc, (int)neg_nut);
+
         //destruction term
         Sc += neg_nut ? cw1*pow(vturb[k][j][i]/d2w,2) : -(cw1*fw - cb1/(kappa*kappa)*ft2)*pow(vturb[k][j][i]/d2w,2);
+        if(i==imax-1 || i==imax-3)
+          fprintf(stdout,"Sc[%d][%d][%d] = %e (production + destruction)\n", k,j,i, Sc);
+
         //nonlinear diffusion term
         dnut[0] = -dxr/(dxl*(dxl+dxr))*vturb[k][j][i-1] + (dxr-dxl)/(dxl*dxr)*vturb[k][j][i]
                 +  dxl/(dxr*(dxl+dxr))*vturb[k][j][i+1]; //2nd-order accuracy, see Kevin's notes
@@ -3419,8 +3479,12 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         dnut[2] = -dzf/(dzk*(dzf+dzk))*vturb[k-1][j][i] + (dzf-dzk)/(dzf*dzk)*vturb[k][j][i]
                 +  dzk/(dzf*(dzf+dzk))*vturb[k+1][j][i];
         Sc += cb2/sigma*(dnut*dnut);
+        if(i==imax-1 || i==imax-3)
+          fprintf(stdout,"Sc[%d][%d][%d] = %e (production + destruction + diffusion)\n", k,j,i, Sc);
 
         bb[k][j][i] += Sc*dxdy*dz; //multiply source term by cell volume;
+        if(i==imax-1 || i==imax-3)
+          fprintf(stdout,"Sc[%d][%d][%d] = %e vol*(production + destruction + diffusion)\n", k,j,i, Sc*dxdy*dz);
  
 
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
@@ -3600,6 +3664,79 @@ IncompressibleOperator::ComputeKinematicEddyViscosity(SpaceVariable3D &Vturb, Sp
 
 //--------------------------------------------------------------------------
 
+double
+IncompressibleOperator::ApplyVelocityBoundaryConditionLocal(int dir, GhostPoint::Side side, double vim,
+                                                            bool flat_plate_wall)
+{
+  // This function calculates velocity at ghost cell CENTER; and "vim" is the velocity at the image cell CENTER,
+  // regardless of dir = 0,1,2.
+
+  if(flat_plate_wall) //stick wall
+    return -vim;
+
+  double vghost(DBL_MAX);
+  int wall_dir(0);
+  MeshData::BcType type(MeshData::NONE);
+  switch (side) {
+    case GhostPoint::LEFT :
+      type = iod.mesh.bc_x0;
+      wall_dir = 0;
+      break;
+    case GhostPoint::RIGHT :
+      type = iod.mesh.bc_xmax;
+      wall_dir = 0;
+      break;
+    case GhostPoint::BOTTOM :
+      type = iod.mesh.bc_y0;
+      wall_dir = 1;
+      break;
+    case GhostPoint::TOP :
+      type = iod.mesh.bc_ymax;
+      wall_dir = 1;
+      break;
+    case GhostPoint::BACK :
+      type = iod.mesh.bc_z0;
+      wall_dir = 2;
+      break;
+    case GhostPoint::FRONT :
+      type = iod.mesh.bc_zmax;
+      wall_dir = 2;
+      break;
+    default :
+      fprintf(stdout,"*** Error: Detected unsupported boundary code.\n");
+      exit(-1);
+  }
+
+  switch (type) {
+    case MeshData::INLET :
+        vghost = dir==0 ? iod.bc.inlet.velocity_x : (dir==1 ? iod.bc.inlet.velocity_y : iod.bc.inlet.velocity_z);
+        break;
+      case MeshData::INLET2 :
+        vghost = dir==0 ? iod.bc.inlet2.velocity_x : (dir==1 ? iod.bc.inlet2.velocity_y : iod.bc.inlet2.velocity_z);
+        break;
+      case MeshData::OUTLET :
+        vghost = vim;
+        break;
+      case MeshData::SLIPWALL :
+      case MeshData::SYMMETRY :
+        if(dir==wall_dir) vghost = -vim; 
+        else              vghost =  vim;
+        break;
+      case MeshData::STICKWALL :
+        vghost = -vim;
+        break;
+      case MeshData::OVERSET :
+        //nothing to be done here. TODO
+        break;
+      default :
+        fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n", (int)iod.mesh.bc_x0); 
+        exit(-1);
+  }
+
+  return vghost;
+}
+
+//--------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------
 
