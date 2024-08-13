@@ -3093,16 +3093,10 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
   double cw2 = 0.3, cw3 = 2.0, cv1 = 7.1, ct3 = 1.2, ct4 = 0.5, kappa = 0.41; //source
   double cw3_pow6 = pow(cw3, 6);
   double cw1 = cb1/(kappa*kappa) + (1.0+cb2)/sigma; //source
+  cw1 /= 5.0; //TODO: THIS IS A HACK
   double fv1,fv2,fw,ft2,fn,g,r,S,Sbar;
   double chi,Omega,d2w,k2d2;
   Vec3D vort;
-
-/*
-  for(int j=jj0; j<jjmax; j++) {
-    fprintf(stdout,"v[%d][%d][%d] = %e %e %e %e %e\n", 0, j, 31, v[0][j][31][0], v[0][j][31][1], v[0][j][31][2], v[0][j][31][3], v[0][j][31][4]);
-    fprintf(stdout,"v[%d][%d][%d] = %e %e %e %e %e\n", 0, j, 32, v[0][j][32][0], v[0][j][32][1], v[0][j][32][2], v[0][j][32][3], v[0][j][32][4]);
-  }
-*/
 
   for(int k=k0; k<kmax; k++) {
     dz  = global_mesh.GetDz(k);
@@ -3156,8 +3150,6 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
             vtmp[2] = ApplyVelocityBoundaryConditionLocal(0, GhostPoint::TOP, vtmp[1]);
         }
         dudy = -dyt/(dyb*(dyt+dyb))*vtmp[0] + (dyt-dyb)/(dyt*dyb)*vtmp[1] + dyb/(dyt*(dyt+dyb))*vtmp[2];
-//        if(i==imax-1)
-//          fprintf(stdout,"vtmp[%d][%d][%d] = %e %e %e, dudy = %e.\n", k,j,i, vtmp[0], vtmp[1], vtmp[2], dudy);
 
         for(int p=-1; p<2; p++)
           vtmp[p+1] = (v[k+p][j][i][1] + v[k+p][j][i+1][1]) / 2.0;
@@ -3214,8 +3206,6 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         vort[1] = dudz-dwdx;
         vort[2] = dvdx-dudy;
         Omega = vort.norm();
-        if(i==imax-1 || i==imax-3)
-          fprintf(stdout,"vort[%d][%d][%d] = %e %e %e, norm = %e | dvdx = %e, dudy = %e.\n", k,j,i, vort[0], vort[1], vort[2], Omega, dvdx, dudy);
 
         //---------------------------------------------------
         // Spalart-Allmaras Additional Eqs. 
@@ -3463,14 +3453,8 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         double Sc = 0.0; 
         //production term
         Sc += neg_nut ? cb1*(1-ct3)*Omega*vturb[k][j][i] : cb1*(1.0-ft2)*S*vturb[k][j][i];
-        if(i==imax-1 || i==imax-3)
-          fprintf(stdout,"Sc[%d][%d][%d] = %e (production), neg_nut = %d.\n", k,j,i, Sc, (int)neg_nut);
-
         //destruction term
         Sc += neg_nut ? cw1*pow(vturb[k][j][i]/d2w,2) : -(cw1*fw - cb1/(kappa*kappa)*ft2)*pow(vturb[k][j][i]/d2w,2);
-        if(i==imax-1 || i==imax-3)
-          fprintf(stdout,"Sc[%d][%d][%d] = %e (production + destruction)\n", k,j,i, Sc);
-
         //nonlinear diffusion term
         dnut[0] = -dxr/(dxl*(dxl+dxr))*vturb[k][j][i-1] + (dxr-dxl)/(dxl*dxr)*vturb[k][j][i]
                 +  dxl/(dxr*(dxl+dxr))*vturb[k][j][i+1]; //2nd-order accuracy, see Kevin's notes
@@ -3479,13 +3463,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         dnut[2] = -dzf/(dzk*(dzf+dzk))*vturb[k-1][j][i] + (dzf-dzk)/(dzf*dzk)*vturb[k][j][i]
                 +  dzk/(dzf*(dzf+dzk))*vturb[k+1][j][i];
         Sc += cb2/sigma*(dnut*dnut);
-        if(i==imax-1 || i==imax-3)
-          fprintf(stdout,"Sc[%d][%d][%d] = %e (production + destruction + diffusion)\n", k,j,i, Sc);
-
         bb[k][j][i] += Sc*dxdy*dz; //multiply source term by cell volume;
-        if(i==imax-1 || i==imax-3)
-          fprintf(stdout,"Sc[%d][%d][%d] = %e vol*(production + destruction + diffusion)\n", k,j,i, Sc*dxdy*dz);
- 
 
         // Apply relaxation (Ref: Eq.(6) of Van Doormaal and Rathby, 1984)
         assert(Efactor>0.0);

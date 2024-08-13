@@ -332,19 +332,20 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       }
 
       inco.ApplyBoundaryConditionsTurbulenceVariables(*Vturb);
-      if(lin_rnorm.back()>1.0e20)
-        exit_mpi();
+//      if(lin_rnorm.back()>1.0e20)
+//        exit_mpi();
     }
 
-
+/*
     Vturb->StoreMeshCoordinates(spo.GetMeshCoordinates());
     string filename = "Vturb_" + std::to_string(time_step) + "_" + std::to_string(iter) + ".vtr";
     Vturb->WriteToVTRFile(filename.c_str(), "Vturb");
     string filename2 = "V_" + std::to_string(time_step) + "_" + std::to_string(iter) + ".vtr";
     V.WriteToVTRFile(filename2.c_str(), "V");
+*/
 
     //TODO: For the moment, only check convergence of the N-S equations, not turbulence closure.
-    if(iter>30 && rel_err<iod.ts.semi_impl.convergence_tolerance) {
+    if(iter>10 && rel_err<iod.ts.semi_impl.convergence_tolerance) {
       converged = true;
       break; 
     }
