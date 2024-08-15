@@ -67,6 +67,7 @@ public:
 
   void WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V,
            SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D* L /* laser radiance*/,
+           SpaceVariable3D *Nu_T /* Calculated Eddy Viscosity */,
            bool force_write);
 
 public:

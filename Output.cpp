@@ -155,8 +155,25 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
   energy_output.WriteSolutionOfIntegrationEnergy(time, dt, time_step, V, ID, L, force_write);
 
   //write solutions along lines
+
+  // ---------------------------------------
+  // outputs related to turbulence -- computing eddy viscosity
+  //SpaceVariable3D NuT = *Vturb; SpaceVariable3D *Nu_T = &NuT;
+  //fprintf(stdout,"\n After instantiaiting NuT\n");
+  [[maybe_unused]] SpaceVariable3D *scalar_ptr = &scalar;
+  if(iod.output.kinematic_eddy_viscosity==OutputData::ON) {
+    if(Vturb == NULL || inco == NULL) {
+      print_error("*** Error: Cannot output kinematic eddy viscosity. Solver is not activated.\n");
+      exit_mpi();
+    }
+    inco->ComputeKinematicEddyViscosity(*Vturb, V, ID, scalar);
+  }
+ else scalar_ptr = NULL;
+ //fprintf(stdout,"\nAfter compute of 1st eddy visc.\n");
+  // ---------------------------------------
+
   for(int i=0; i<(int)line_outputs.size(); i++)
-    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, *Vout, ID, Phi, L, force_write);
+    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, *Vout, ID, Phi, L,scalar_ptr, force_write);
 
   //write solutions on planes
   for(auto&& plane : plane_outputs)

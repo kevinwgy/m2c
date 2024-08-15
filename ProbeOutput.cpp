@@ -464,7 +464,7 @@ ProbeOutput::SetupInterpolation(SpaceVariable3D &coordinates)
 
 void 
 ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                                        std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, bool force_write)
+                                        std::vector<SpaceVariable3D*> &Phi, SpaceVariable3D *L, SpaceVariable3D *Nu_T, bool force_write)
 {
   if(numNodes <= 0)
     return;
@@ -505,6 +505,9 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
   if(L) 
     print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Temperature  |  Material ID  "
                 "|  Laser Radiance  |  LevelSet(s)");
+  if(Nu_T) 
+    print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Temperature  |  Material ID  "
+                "|  Eddy Viscosity  |  LevelSet(s)");
   else
     print(file, "## Coordinate  |  Density  |  Velocity (Vx,Vy,Vz)  |  Pressure  |  Temperature  |  Material ID  "
                 "|  LevelSet(s)");
@@ -519,6 +522,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
   double***  v  = (double***) V.GetDataPointer();
   double*** id  = (double***)ID.GetDataPointer();
   double***  l  = L? L->GetDataPointer() : NULL;
+  double***  nu_t  = Nu_T? Nu_T->GetDataPointer() : NULL;
   std::vector<double***> phi;
   for(int i=0; i<(int)Phi.size(); i++)
     phi.push_back((double***)Phi[i]->GetDataPointer());
@@ -538,6 +542,11 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
     if(l) {
       double laser_rad = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], l, 1, 0);
       print(file, "%16.8e  ", laser_rad);
+    }
+
+    if(nu_t) {
+      double eddy_visc  = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], nu_t, 1, 0);
+      print(file, "%16.8e  ", eddy_visc);
     }
     for(int i=0; i<(int)Phi.size(); i++) {
       double sol = InterpolateSolutionAtProbe(ijk[iNode], ijk_valid[iNode], trilinear_coords[iNode], phi[i], 1, 0);
@@ -559,6 +568,7 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
   V.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
   if(L) L->RestoreDataPointerToLocalVector();
+  if(Nu_T) Nu_T->RestoreDataPointerToLocalVector();
   for(int i=0; i<(int)Phi.size(); i++)
     Phi[i]->RestoreDataPointerToLocalVector();
 
