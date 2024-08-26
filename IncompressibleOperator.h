@@ -110,7 +110,7 @@ public:
   void BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id,
                                        double*** vturb0, double*** vturb,//added SA eddy viscosity working term
                                        std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, 
-                                       double Efactor, double destruct_reduction,
+                                       double Efactor, double cw1_reduction,
                                        double dt, SpaceVariable3D *LocalDt = NULL); 
 
   void ComputeKinematicEddyViscosity(SpaceVariable3D &Vturb, SpaceVariable3D &V, SpaceVariable3D &ID,
