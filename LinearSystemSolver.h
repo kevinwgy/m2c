@@ -51,13 +51,15 @@ public:
 
   void GetTolerances(double *rtol, double *abstol, double *dtol, int *maxits); //!< set NULL to params not needed
 
+  void SetTolerances(double relative_error, double absolute_error, double divergence_tol, int max_iterations);
+
   void GetSolverType(string *ksp_type, string *pc_type = NULL); //!< if only one is needed, use NULL for the other
 
   void ComputeResidual(SpaceVariable3D &b, SpaceVariable3D &x, SpaceVariable3D &res); //!< res = b-Ax
 
 private:
 
-  void SetTolerances(LinearSolverData &lin_input);
+  void SetTolerancesInput(LinearSolverData &lin_input);
 
 };
 

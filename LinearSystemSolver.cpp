@@ -18,7 +18,7 @@ LinearSystemSolver::LinearSystemSolver(MPI_Comm &comm_, DM &dm_, LinearSolverDat
   KSPCreate(comm, &ksp);
   KSPSetInitialGuessNonzero(ksp, PETSC_TRUE); //!< initial guess is passed to KSPSolve
 
-  SetTolerances(lin_input);
+  SetTolerancesInput(lin_input);
 
   if(lin_input.ksp == LinearSolverData::PETSC_KSP_DEFAULT) {
     /* nothing to do */
@@ -111,13 +111,23 @@ LinearSystemSolver::Destroy()
 //-----------------------------------------------------
 
 void
-LinearSystemSolver::SetTolerances(LinearSolverData &lin_input) 
+LinearSystemSolver::SetTolerancesInput(LinearSolverData &lin_input) 
 {
   double relative_error = lin_input.rtol;
   double absolute_error = lin_input.abstol;
   double divergence_tol = lin_input.dtol;
   int    max_iterations = lin_input.maxits;
 
+  SetTolerances(relative_error, absolute_error, divergence_tol, max_iterations);
+}
+
+
+//-----------------------------------------------------
+
+void
+LinearSystemSolver::SetTolerances(double relative_error, double absolute_error,  double divergence_tol,
+                                  int    max_iterations)
+{
   KSPSetTolerances(ksp,
                    relative_error>0 ? relative_error : PETSC_DEFAULT,
                    absolute_error>0 ? absolute_error : PETSC_DEFAULT,

@@ -177,6 +177,9 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
 
   bool repetition = false;
+  double plin_rtol, plin_abstol, plin_div;
+  int plin_maxIts;
+  plin_solver.GetTolerances(&plin_rtol, &plin_abstol, &plin_div, &plin_maxIts);
 
   for(iter = 0; iter < maxIter; iter++) {
 
@@ -196,9 +199,12 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the x-momentum equation
     if(global_mesh.x_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, /*vturb*/NULL, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor,
+      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor,
                                        dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
+
+      //print("X-Momentum condition number is: %f\n",vlin_solver.EstimateConditionNumber()); //prints out the condition number
+
       lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the x-momentum equation failed to converge."
@@ -213,16 +219,15 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       }
     }
 
-    //vlin_solver.WriteToMatlabFile("VXMatrix.m", "VXMat");
-    //B.WriteToMatlabFile("VXB.m", "VXB");
-    //VXstar.WriteToVTRFile("VXstar.vtr","VXstar");
-
 
     // Solve the y-momentum equation
     if(global_mesh.y_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, /*vturb*/NULL, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor,
+      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor,
                                        dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
+
+      //print("Y-Momentum condition number is: %f\n",vlin_solver.EstimateConditionNumber()); //prints out the condition number
+
       lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the y-momentum equation failed to converge."
@@ -237,11 +242,10 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       }
     }
 
-    //VYstar.WriteToVTRFile("VYstar.vtr","VYstar");
 
     // Solve the z-momentum equation
     if(global_mesh.z_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, /*vturb*/NULL, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor,
+      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor,
                                        dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
@@ -258,16 +262,19 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       }
     }
 
-    //VZstar.WriteToVTRFile("VZstar.vtr","VZstar");
 
 
     //-----------------------------------------------------
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B,
-                                     (fix_pressure_at_one_corner && !repetition) ? &ijk_zero_p : NULL);
+                                     (fix_pressure_at_one_corner /*&& !repetition*/) ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
+
+    //print("Pressure condition number is: %f\n",plin_solver.EstimateConditionNumber()); //prints out the condition number
+
     Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
+
     lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
     if(!lin_success) {
       print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge."
@@ -314,10 +321,20 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         exit_mpi();
       }
       v = (Vec5D***)V.GetDataPointer();
-      inco.BuildSATurbulenceEquationSIMPLE(v, id, vturb0, vturb, vturb_lin_rows, B, Efactor, dt, LocalDt);
+      double cw1_reduction = 1.0;
+      if(time_step<500) {
+        cw1_reduction = 10.0; 
+      } else if(time_step<2500) {
+        cw1_reduction = 10.0 - 9.0/2000.0*(time_step - 500.0);
+      }
+
+      inco.BuildSATurbulenceEquationSIMPLE(v, id, vturb0, vturb, vturb_lin_rows, B, Efactor, cw1_reduction, dt, LocalDt);
       V.RestoreDataPointerToLocalVector();
-      Vturb->RestoreDataPointerToLocalVector();
+      Vturb->RestoreDataPointerAndInsert();
       vturb_lin_solver.SetLinearOperator(vturb_lin_rows);
+
+      //print("SA condition number is: %f\n",vturb_lin_solver.EstimateConditionNumber()); //prints out the condition number
+
       lin_success = vturb_lin_solver.Solve(B, *Vturb, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
       if(!lin_success) {
         print_warning("    x Warning: Linear solver for the turbulence closure equation failed to converge."
@@ -332,36 +349,35 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       }
 
       inco.ApplyBoundaryConditionsTurbulenceVariables(*Vturb);
-//      if(lin_rnorm.back()>1.0e20)
-//        exit_mpi();
     }
 
-/*
-    Vturb->StoreMeshCoordinates(spo.GetMeshCoordinates());
-    string filename = "Vturb_" + std::to_string(time_step) + "_" + std::to_string(iter) + ".vtr";
-    Vturb->WriteToVTRFile(filename.c_str(), "Vturb");
-    string filename2 = "V_" + std::to_string(time_step) + "_" + std::to_string(iter) + ".vtr";
-    V.WriteToVTRFile(filename2.c_str(), "V");
-*/
-
-    //TODO: For the moment, only check convergence of the N-S equations, not turbulence closure.
-    if(iter>10 && rel_err<iod.ts.semi_impl.convergence_tolerance) {
-      converged = true;
-      break; 
-    }
 
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
-    if(rel_err/rel_err_prev>10.0) {
+    if(rel_err/rel_err_prev>3.0) { 
       print_warning("  x Warning: Detected drastic increase of error (%eX). Repeating.\n",
                     rel_err/rel_err_prev);
       repetition = true;
+      iter--;
+
+      plin_solver.SetTolerances(1.0e-3, plin_abstol, plin_div, 400);
+
       V.AXPlusBY(0.0, 1.0, Tmp5, true); 
       if(Vturb)
         Vturb->AXPlusBY(0.0, 1.0, Tmp1, true); //Tmp = vturb (include ghost nodes)
-    } else
-      repetition = false;
+    } else {
+      if(repetition == true) {
+        plin_solver.SetTolerances(plin_rtol, plin_abstol, plin_div, plin_maxIts);
+        repetition = false;
+      }
+    }
 
+
+    //TODO: For the moment, only check convergence of the N-S equations, not turbulence closure.
+    if(iter>5 && rel_err<iod.ts.semi_impl.convergence_tolerance) {
+      converged = true;
+      break; 
+    }
   }
 
   if(converged)
@@ -411,10 +427,10 @@ TimeIntegratorSIMPLE::ExtractVariableComponents(Vec5D*** v, SpaceVariable3D *VX_
         if(pp) pp[k][j][i] = v[k][j][i][4];
       }
 
-  if(VX_ptr) VX_ptr->RestoreDataPointerToLocalVector(); //no need to exchange, as we have covered ghost layers
-  if(VY_ptr) VY_ptr->RestoreDataPointerToLocalVector();
-  if(VZ_ptr) VZ_ptr->RestoreDataPointerToLocalVector();
-  if(P_ptr)   P_ptr->RestoreDataPointerToLocalVector();
+  if(VX_ptr) VX_ptr->RestoreDataPointerAndInsert();
+  if(VY_ptr) VY_ptr->RestoreDataPointerAndInsert();
+  if(VZ_ptr) VZ_ptr->RestoreDataPointerAndInsert();
+  if(P_ptr)   P_ptr->RestoreDataPointerAndInsert();
 }
 
 //----------------------------------------------------------------------------

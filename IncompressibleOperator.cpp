@@ -426,7 +426,7 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
         if(x>=iod.rans.example_param_1) {
           if(x-0.5*global_mesh.GetDx(i) >= iod.rans.example_param_1) //check x-velo grid point
             v[k][j][i][1] = -v[k][im_j][i][1];
-          v[k][im_j][i][2] = 0.0;
+          v[k][im_j][i][2] = 0.0; //y-velocity is stored on the bottom facet of the cell
           v[k][j][i][3]    = -v[k][im_j][i][3]; 
         }
       }
@@ -3060,7 +3060,8 @@ void
 IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id, double*** vturb0,
                                                         double*** vturb,//SA eddy viscosity working var prev & current
                                                         vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
-                                                        double Efactor, double dt, SpaceVariable3D *LocalDt)
+                                                        double Efactor, double cw1_reduction,
+                                                        double dt, SpaceVariable3D *LocalDt)
 {
   if(iod.rans.model   != RANSTurbulenceModelData::SPALART_ALLMARAS ||
      iod.rans.example != RANSTurbulenceModelData::FLAT_PLATE) {
@@ -3091,9 +3092,9 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
   double cb1 = 0.1355; //production
   double sigma = 2.0/3.0, cb2 = 0.622; // diffusion
   double cw2 = 0.3, cw3 = 2.0, cv1 = 7.1, ct3 = 1.2, ct4 = 0.5, kappa = 0.41; //source
-  double cw3_pow6 = pow(cw3, 6);
+  double cw3_pow6 = pow(cw3, 6.0);
   double cw1 = cb1/(kappa*kappa) + (1.0+cb2)/sigma; //source
-  cw1 /= 5.0; //TODO: THIS IS A HACK
+  cw1 /= cw1_reduction; //TODO: THIS IS A HACK
   double fv1,fv2,fw,ft2,fn,g,r,S,Sbar;
   double chi,Omega,d2w,k2d2;
   Vec3D vort;
@@ -3116,6 +3117,17 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         RowEntries &row(vlin_rows[row_counter]);
         row.SetRow(i,j,k);
         row_counter++;
+
+/*
+        // TEMPORARY FIX: Setting pts left of the wall to freestream value
+        Vec3D coords = global_mesh.GetXYZ(i,j,k);
+        if (coords[0] < 0.0){
+          //fprintf(stdout,"\nClosest pt to leading edge is getting fixed");
+          row.PushEntry(i,j,k, 1.0); 
+          bb[k][j][i] = 8.0e-7; 
+          continue;
+        }
+*/
 
         //---------------------------------------------------
         // Calculating d2w (distance to nearest wall)
@@ -3454,7 +3466,8 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
         //production term
         Sc += neg_nut ? cb1*(1-ct3)*Omega*vturb[k][j][i] : cb1*(1.0-ft2)*S*vturb[k][j][i];
         //destruction term
-        Sc += neg_nut ? cw1*pow(vturb[k][j][i]/d2w,2) : -(cw1*fw - cb1/(kappa*kappa)*ft2)*pow(vturb[k][j][i]/d2w,2);
+        Sc += neg_nut ? cw1*pow(vturb[k][j][i]/d2w,2) : -(cw1*fw - cb1/(kappa*kappa)*ft2)*pow(vturb[k][j][i]/d2w,2); //TODO: THIS IS A HACK
+
         //nonlinear diffusion term
         dnut[0] = -dxr/(dxl*(dxl+dxr))*vturb[k][j][i-1] + (dxr-dxl)/(dxl*dxr)*vturb[k][j][i]
                 +  dxl/(dxr*(dxl+dxr))*vturb[k][j][i+1]; //2nd-order accuracy, see Kevin's notes
@@ -3475,6 +3488,7 @@ IncompressibleOperator::BuildSATurbulenceEquationSIMPLE(Vec5D*** v, double*** id
       }
     }
   }
+  
 
   B.RestoreDataPointerAndInsert();
 
@@ -3490,7 +3504,8 @@ IncompressibleOperator::InitializeTurbulenceVariables(SpaceVariable3D &Vturb)
   assert(iod.rans.model == RANSTurbulenceModelData::SPALART_ALLMARAS &&
          iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE); //this is all we can do right now
 
-  Vturb.SetConstantValue(0.0, true); //set Vturb = 0 (including ghost layer)
+  //Vturb.SetConstantValue(0.0, true); //set Vturb = 0 (including ghost layer)
+  Vturb.SetConstantValue(iod.rans.nu_tilde_farfield, true); //set Vturb = 0 (including ghost layer)
 
   ApplyBoundaryConditionsTurbulenceVariables(Vturb);
 }

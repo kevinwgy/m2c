@@ -533,10 +533,7 @@ void SpaceVariable3D::SetConstantValue(double a, bool workOnGhost)
         for(int p=0; p<dof; p++)
           v[k][j][i*dof+p] = a;
 
-  if(!workOnGhost)
-    RestoreDataPointerAndInsert();
-  else
-    RestoreDataPointerToLocalVector(); //no need to communicate because the ghost region has been set to a const
+  RestoreDataPointerAndInsert();
 }
 
 //---------------------------------------------------------
