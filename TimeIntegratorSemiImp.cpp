@@ -283,7 +283,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
     inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B,
-                                     (fix_pressure_at_one_corner /*&& !repetition*/) ? &ijk_zero_p : NULL);
+                                     fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
 
     //print("Pressure condition number is: %f\n",plin_solver.EstimateConditionNumber()); //prints out the condition number
@@ -376,9 +376,12 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       print_warning("  x Warning: Detected drastic increase of error (%eX). Repeating.\n",
                     rel_err/rel_err_prev);
       repetition = true;
+      rel_err = rel_err_prev;
       iter--;
 
-      plin_solver.SetTolerances(1.0e-3, plin_abstol, plin_div, 400);
+      double current_rtol;
+      plin_solver.GetTolerances(&current_rtol, NULL, NULL, NULL);
+      plin_solver.SetTolerances(10.0*current_rtol, plin_abstol, plin_div, plin_maxIts);
 
       V.AXPlusBY(0.0, 1.0, Tmp5, true); 
       if(Vturb)
@@ -392,7 +395,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
 
     //TODO: For the moment, only check convergence of the N-S equations, not turbulence closure.
-    if(iter>5 && rel_err<iod.ts.semi_impl.convergence_tolerance) {
+    if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
       converged = true;
       break; 
     }
