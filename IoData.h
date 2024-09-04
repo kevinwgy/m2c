@@ -1453,6 +1453,10 @@ struct RANSTurbulenceModelData {
   double example_param_1; 
   double nu_tilde_farfield; //!< farfield value for the Spalart-Allmaras working variable
 
+  double sa_cw1_reduction_factor; //!< starting reduction factor
+  double sa_cw1_reduction_t1; //!< time reduction factor starts to decrease (linearly)
+  double sa_cw1_reduction_t2; //!< time reduction factor becomes 1
+
   RANSTurbulenceModelData();
   ~RANSTurbulenceModelData() {}
 

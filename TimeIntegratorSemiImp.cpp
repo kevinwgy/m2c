@@ -47,6 +47,21 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
   }
   alphaP = iod.ts.semi_impl.alphaP;
 
+  if(iod.rans.sa_cw1_reduction_factor != 1.0) {
+    if(iod.rans.model != RANSTurbulenceModelData::SPALART_ALLMARAS) {
+      print_error("*** Error: CW1ReductionFactor is used with Spalart-Allmaras only.\n");
+      exit_mpi();
+    }
+    if(iod.rans.sa_cw1_reduction_factor <= 0.0) {
+      print_error("*** Error: CW1ReductionFactor must be positive.\n");
+      exit_mpi();
+    }
+    if(iod.rans.sa_cw1_reduction_t1<0 || iod.rans.sa_cw1_reduction_t2<iod.rans.sa_cw1_reduction_t1) {
+      print_error("*** Error: Detected error in CW1ReductionTime1 and/or CW1ReductionTime2.\n");
+      exit_mpi();
+    }
+  }
+
 
   fix_pressure_at_one_corner = iod.ts.semi_impl.fix_pressure_at_one_corner == SemiImplicitTsData::YES;
   ijk_zero_p = FindCornerFixedPressure();
@@ -131,7 +146,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
                                          vector<SpaceVariable3D*> &KappaPhi,
                                          SpaceVariable3D *L, SpaceVariable3D *Xi, SpaceVariable3D *Vturb,
                                          SpaceVariable3D *LocalDt,
-                                         [[maybe_unused]] double time, double dt, 
+                                         double time, double dt, 
                                          int time_step, int subcycle, double dts)
 {
 
@@ -321,11 +336,14 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         exit_mpi();
       }
       v = (Vec5D***)V.GetDataPointer();
-      double cw1_reduction = 1.0;
-      if(time_step<500) {
-        cw1_reduction = 10.0; 
-      } else if(time_step<2500) {
-        cw1_reduction = 10.0 - 9.0/2000.0*(time_step - 500.0);
+      double cw1_reduction = 1.0; //Ramping function imposed here to reduce cw1 
+      if(time<iod.rans.sa_cw1_reduction_t1) {
+        cw1_reduction = iod.rans.sa_cw1_reduction_factor;
+      } else if(time<iod.rans.sa_cw1_reduction_t2) {
+        double t1 = iod.rans.sa_cw1_reduction_t1;
+        double t2 = iod.rans.sa_cw1_reduction_t2;
+        double factor = iod.rans.sa_cw1_reduction_factor;
+        cw1_reduction = factor - (factor - 1.0)/(t2 - t1)*(time-t1);
       }
 
       inco.BuildSATurbulenceEquationSIMPLE(v, id, vturb0, vturb, vturb_lin_rows, B, Efactor, cw1_reduction, dt, LocalDt);

@@ -2839,13 +2839,17 @@ RANSTurbulenceModelData::RANSTurbulenceModelData()
   example = GENERAL;
   example_param_1 = 0.0;
   nu_tilde_farfield = 0.0;
+
+  sa_cw1_reduction_factor = 1.0;
+  sa_cw1_reduction_t1 = 0.0;
+  sa_cw1_reduction_t2 = 0.0;
 }
 
 //------------------------------------------------------------------------------
 
 void RANSTurbulenceModelData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 7, father);
 
   new ClassToken<RANSTurbulenceModelData>(ca, "Model", this,
                 reinterpret_cast<int RANSTurbulenceModelData::*>(&RANSTurbulenceModelData::model), 2,
@@ -2858,6 +2862,12 @@ void RANSTurbulenceModelData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<RANSTurbulenceModelData>(ca, "NuTildeAtFarfield", this,
                  &RANSTurbulenceModelData::nu_tilde_farfield);
 
+  new ClassDouble<RANSTurbulenceModelData>(ca, "CW1ReductionFactor", this,
+                 &RANSTurbulenceModelData::sa_cw1_reduction_factor);
+  new ClassDouble<RANSTurbulenceModelData>(ca, "CW1ReductionTime1", this,
+                 &RANSTurbulenceModelData::sa_cw1_reduction_t1);
+  new ClassDouble<RANSTurbulenceModelData>(ca, "CW1ReductionTime2", this,
+                 &RANSTurbulenceModelData::sa_cw1_reduction_t2);
 }
 
 //------------------------------------------------------------------------------
