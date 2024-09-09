@@ -1714,13 +1714,13 @@ DONE:
     //reinit must have been created (not NULL)
     print("  o Updated Phi (material id: %d) at %d nodes based on embedded boundary. "
           "Going to reinitialize phi.\n", materialid, ebds_counter);
-    lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //first 3 inputs are not used ("must do"!)
+    lso.Reinitialize(0.0, 1.0, 0.0, Phi, 2000, true/*must do*/); //first 3 inputs are not used ("must do"!)
   }
   else if(active_arbitrary_enclosure && lso.HasReinitializer()) {
     //if reinit is NULL, should have reinitialized phi (full-domain) in InitializePhiWithinEnclosure
     print("  o Updated Phi (material id: %d) based on surface mesh(es). "
           "Going to reinitialize phi.\n", materialid);
-    lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/); //first 3 inputs are not used ("must do"!)
+    lso.Reinitialize(0.0, 1.0, 0.0, Phi, 2000, true/*must do*/); //first 3 inputs are not used ("must do"!)
   }
 
 
@@ -1837,7 +1837,7 @@ SpaceInitializer::InitializePhiWithinEnclosure(UserSpecifiedEnclosureData &enclo
   // the end of the function "SetInitialCondition"
   if(tmp_reinit) {
     lso.ApplyBoundaryConditions(Phi); //need this before reinitialization!
-    tmp_reinit->ReinitializeFullDomain(Phi, 600); //one-time use
+    tmp_reinit->ReinitializeFullDomain(Phi, 2000); //one-time use
     tmp_reinit->Destroy(); 
     delete tmp_reinit;
   }
@@ -1933,7 +1933,7 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
     lso.ConstructNarrowBandInReinitializer(Phi);
 
   print("  o Set Phi (material id: %d) near subdomain boundary. Going to reinitialize it.\n", materialid);
-  lso.Reinitialize(0.0, 1.0, 0.0, Phi, 600, true/*must do*/);
+  lso.Reinitialize(0.0, 1.0, 0.0, Phi, 2000, true/*must do*/);
 
 
   // Initialize NPhi and KappaPhi if needed
