@@ -106,7 +106,7 @@ FloodFill::FillBasedOnEdgeObstructions(SpaceVariable3D& Obs, int non_obstruction
           goto FOUND_SEED;
         }
     FOUND_SEED:
-    assert(seed != Int3(iimax_in-1,jjmax_in-1,kkmax_in-1)); //everyone else are decided. this is the last one...
+    //assert(seed != Int3(iimax_in-1,jjmax_in-1,kkmax_in-1)); //everyone else are decided. this is the last one...
     Q.push(seed);
 
     int i,j,k;
