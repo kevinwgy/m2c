@@ -145,6 +145,17 @@ LinearSystemSolver::GetTolerances(double *rtol, double *abstol, double *dtol, in
 
 //-----------------------------------------------------
 
+
+//-----------------------------------------------------
+
+void
+LinearSystemSolver::ConvergedDefaultSetUMIRNorm()
+{
+  KSPConvergedDefaultSetUMIRNorm(ksp);
+}
+
+//-----------------------------------------------------
+
 void
 LinearSystemSolver::GetSolverType(string *ksp_type, string *pc_type)
 {

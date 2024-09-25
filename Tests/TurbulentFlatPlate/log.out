@@ -1,0 +1,299 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: 86570d7+ | Branch: main | Tag: 
+Computation started at: 2024-09-25.13:40:38 EDT
+Using 8 processor cores (including concurrent programs).
+Command: /projects/wang_aoe_lab/ErickRivas/m2c_Wang/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+
+- Mesh Statistics:
+  X-Direction: [-5.000000e-01, 2.000000e+00], 401 nodes/cells, dx_min = 1.001673e-03, dx_max = 5.008365e-02.
+  Y-Direction: [0.000000e+00, 1.000000e+00], 96 nodes/cells, dy_min = 2.042797e-04, dy_max = 8.008679e-02.
+  Z-Direction: [-5.000000e-03, 5.000000e-03], 1 nodes/cells, dz_min = 1.000000e-02, dz_max = 1.000000e-02.
+  Total number of nodes/cells: 38496.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 2610
+  o Number of ghost nodes outside computational domain: 85254
+
+
+- Initializing the state variables (V) and material id. (ID).
+
+- [Line Plot] (9.700000e-01, 0.000000e+00, 0.000000e+00) --> (9.700000e-01, 5.000000e-01, 0.000000e+00), 10000 points.
+- Setting up a semi-implicit time integrator.
+  o Linear solver for velocity: bcgsl, Preconditioner: bjacobi.
+  o Linear solver for pressure: bcgsl, Preconditioner: bjacobi.
+  o Linear solver for turbulence closure equations: fgmres, Preconditioner: bjacobi.
+- Performing a steady-state analysis. Tolerance (rel. residual): 2.000000e-07.
+
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+Step 1: t = 0.000000e+00, dt = 1.001673e-03, cfl = 1.0000e+00. Computation time: 4.6809e-01 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 1.786563e-01 -> 2.887551e-17.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 0.000000e+00 -> 0.000000e+00.
+    * Solver of the pressure correction equation converged in 676 iterations. Residual: 2.666379e-03 -> 2.313868e-10.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 2.064099e-10 -> 4.166613e-16.
+  o It. 1: Relative error in velocity (2-norm): 3.806090e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 1.082264e-01 -> 3.679120e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 7.835111e-04 -> 6.535436e-16.
+    * Solver of the pressure correction equation converged in 526 iterations. Residual: 1.626546e-03 -> 9.004120e-11.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 6.350181e-11 -> 7.025124e-17.
+  o It. 2: Relative error in velocity (2-norm): 2.110688e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 4.068020e-02 -> 2.081543e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 5.523691e-04 -> 3.788445e-16.
+    * Solver of the pressure correction equation converged in 552 iterations. Residual: 1.160549e-03 -> 8.197305e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 2.016223e-11 -> 3.870585e-14.
+  o It. 3: Relative error in velocity (2-norm): 9.646307e-07.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 1.294221e-02 -> 7.100938e-16.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 2.723935e-04 -> 1.477876e-16.
+    * Solver of the pressure correction equation converged in 690 iterations. Residual: 6.408971e-04 -> 6.365138e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 6.319183e-12 -> 1.100145e-14.
+  o It. 4: Relative error in velocity (2-norm): 6.107356e-07.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 3.976091e-03 -> 2.128031e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 1.339030e-04 -> 3.395380e-15.
+    * Solver of the pressure correction equation converged in 814 iterations. Residual: 3.465755e-04 -> 3.217114e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 1.969248e-12 -> 3.124424e-15.
+  o It. 5: Relative error in velocity (2-norm): 4.485572e-07.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 1.211063e-03 -> 5.800526e-16.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 7.056409e-05 -> 6.192463e-16.
+    * Solver of the pressure correction equation converged in 650 iterations. Residual: 2.343505e-04 -> 2.205770e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 6.123324e-13 -> 8.865841e-16.
+  o It. 6: Relative error in velocity (2-norm): 3.398474e-07.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 3.697592e-04 -> 7.239216e-16.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 3.949016e-05 -> 1.598899e-15.
+    * Solver of the pressure correction equation converged in 846 iterations. Residual: 1.898879e-04 -> 9.960835e-12.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 1.901889e-13 -> 2.514430e-16.
+  o It. 7: Relative error in velocity (2-norm): 2.626525e-07.
+  o Converged after 7 iterations. Relative error in velocity (2-norm): 2.626525e-07.
+- Calculated residual normalization factors: 2.562745e-02 1.482504e-03 1.000000e+00.
+- Initial residual: 3.280538e-05 (Func. L1 norm), 2.000762e-03 (L2), 1.000000e+00 (inf).
+  => Residual: 1.0000e+00 (func 1 norm) |  1.0000e+00 (2 norm)  |  1.0000e+00 (max).
+Step 2: t = 1.001673e-03, dt = 1.001227e-03, cfl = 1.0000e+00. Computation time: 1.4601e+00 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 3.339984e-01 -> 3.177306e-13.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 5.496267e-03 -> 1.149533e-14.
+    * Solver of the pressure correction equation converged in 714 iterations. Residual: 3.857316e-03 -> 3.503853e-10.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 2.669025e-10 -> 3.064578e-16.
+  o It. 1: Relative error in velocity (2-norm): 3.587040e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 2.034373e-01 -> 2.781223e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 2.472788e-05 -> 3.350413e-16.
+    * Solver of the pressure correction equation converged in 572 iterations. Residual: 2.277281e-03 -> 1.792840e-10.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 6.993060e-11 -> 4.613900e-16.
+  o It. 2: Relative error in velocity (2-norm): 3.838255e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 5.454410e-02 -> 5.310833e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 4.746782e-04 -> 3.633840e-16.
+    * Solver of the pressure correction equation converged in 630 iterations. Residual: 2.145116e-03 -> 2.090137e-10.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 1.468305e-11 -> 3.398411e-14.
+  o It. 3: Relative error in velocity (2-norm): 1.800438e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 1.182114e-02 -> 1.247926e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 2.393288e-04 -> 1.425426e-16.
+    * Solver of the pressure correction equation converged in 1046 iterations. Residual: 9.835420e-04 -> 9.505671e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 2.889035e-12 -> 7.348007e-15.
+  o It. 4: Relative error in velocity (2-norm): 1.219222e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 2.471865e-03 -> 2.178907e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 9.694329e-05 -> 5.101267e-15.
+    * Solver of the pressure correction equation converged in 702 iterations. Residual: 5.396318e-04 -> 5.080171e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 5.591141e-13 -> 1.587326e-15.
+  o It. 5: Relative error in velocity (2-norm): 8.737382e-07.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 5.166563e-04 -> 1.043880e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 3.999016e-05 -> 1.412607e-15.
+    * Solver of the pressure correction equation converged in 766 iterations. Residual: 4.340848e-04 -> 2.437564e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 1.074366e-13 -> 3.411018e-16.
+  o It. 6: Relative error in velocity (2-norm): 6.533030e-07.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 1.102145e-04 -> 1.535773e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 1.944433e-05 -> 3.224709e-15.
+    * Solver of the pressure correction equation converged in 596 iterations. Residual: 3.791232e-04 -> 2.132300e-11.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 2.031893e-14 -> 2.031893e-14.
+  o It. 7: Relative error in velocity (2-norm): 5.074026e-07.
+  o Converged after 7 iterations. Relative error in velocity (2-norm): 5.074026e-07.
+  => Residual: 1.6551e+00 (func 1 norm) |  1.7697e+00 (2 norm)  |  1.7734e+00 (max).
+Step 3: t = 2.002900e-03, dt = 1.000618e-03, cfl = 1.0000e+00. Computation time: 2.4988e+00 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 5.735636e-01 -> 4.473655e-13.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 9.338007e-03 -> 2.243818e-14.
+    * Solver of the pressure correction equation converged in 722 iterations. Residual: 6.804931e-03 -> 5.347714e-10.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 3.019644e-10 -> 8.360436e-16.
+  o It. 1: Relative error in velocity (2-norm): 6.864059e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 2.242717e-01 -> 6.179201e-14.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 5.683274e-05 -> 1.754085e-14.
+    * Solver of the pressure correction equation converged in 546 iterations. Residual: 4.268008e-03 -> 2.916541e-10.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 3.333051e-11 -> 2.011381e-16.
+  o It. 2: Relative error in velocity (2-norm): 4.475109e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 2.862781e-02 -> 1.508976e-14.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 5.456816e-04 -> 1.929598e-15.
+    * Solver of the pressure correction equation converged in 774 iterations. Residual: 2.829106e-03 -> 2.090201e-10.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 1.883544e-12 -> 1.029980e-14.
+  o It. 3: Relative error in velocity (2-norm): 2.668680e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 2.596248e-03 -> 2.265162e-15.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 2.572932e-04 -> 9.859532e-17.
+    * Solver of the pressure correction equation converged in 578 iterations. Residual: 1.034965e-03 -> 9.665451e-11.
+    * Solver of the turbulence closure equation converged in 1 iterations. Residual: 1.016687e-13 -> 1.023541e-15.
+  o It. 4: Relative error in velocity (2-norm): 1.642441e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 2.836913e-04 -> 9.441794e-16.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 1.065543e-04 -> 8.712491e-16.
+    * Solver of the pressure correction equation converged in 630 iterations. Residual: 7.100728e-04 -> 5.461388e-11.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 6.143275e-15 -> 6.143275e-15.
+  o It. 5: Relative error in velocity (2-norm): 1.143773e-06.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 5.126121e-05 -> 4.308959e-16.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 4.520660e-05 -> 4.763097e-16.
+    * Solver of the pressure correction equation converged in 688 iterations. Residual: 6.190517e-04 -> 3.475209e-11.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 6.947496e-15 -> 6.947496e-15.
+  o It. 6: Relative error in velocity (2-norm): 8.650932e-07.
+    * Solver of the x-momentum equation converged in 2 iterations. Residual: 2.359127e-05 -> 5.254165e-17.
+    * Solver of the y-momentum equation converged in 2 iterations. Residual: 2.050060e-05 -> 1.479191e-16.
+    * Solver of the pressure correction equation converged in 668 iterations. Residual: 5.383008e-04 -> 5.279358e-11.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 7.746346e-15 -> 7.746346e-15.
+  o It. 7: Relative error in velocity (2-norm): 6.836549e-07.
+  o Converged after 7 iterations. Relative error in velocity (2-norm): 6.836549e-07.
+  => Residual: 2.1415e+00 (func 1 norm) |  2.3623e+00 (2 norm)  |  2.3520e+00 (max).
+
+
+
+...
+
+
+
+Step 4250: t = 4.247444e+00, dt = 1.000015e-03, cfl = 1.0000e+00. Computation time: 3.9287e+03 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.597875e-08 -> 1.597875e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.773130e-09 -> 1.773130e-09.
+    * Solver of the pressure correction equation converged in 632 iterations. Residual: 5.802441e-08 -> 5.310688e-15.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 7.558516e-12 -> 9.257550e-15.
+  o It. 1: Relative error in velocity (2-norm): 6.512223e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.597878e-08 -> 1.597878e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.773030e-09 -> 1.773030e-09.
+    * Solver of the pressure correction equation converged in 604 iterations. Residual: 4.944827e-08 -> 3.562728e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.827584e-14 -> 1.827584e-14.
+  o It. 2: Relative error in velocity (2-norm): 5.508631e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.597878e-08 -> 1.597878e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.772945e-09 -> 1.772945e-09.
+    * Solver of the pressure correction equation converged in 580 iterations. Residual: 4.214025e-08 -> 4.005512e-15.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.827597e-14 -> 1.827597e-14.
+  o It. 3: Relative error in velocity (2-norm): 4.672922e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.597879e-08 -> 1.597879e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.772874e-09 -> 1.772874e-09.
+    * Solver of the pressure correction equation converged in 544 iterations. Residual: 3.591740e-08 -> 3.098942e-15.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.827608e-14 -> 1.827608e-14.
+  o It. 4: Relative error in velocity (2-norm): 3.971964e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.597879e-08 -> 1.597879e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.772814e-09 -> 1.772814e-09.
+    * Solver of the pressure correction equation converged in 766 iterations. Residual: 3.061962e-08 -> 2.583932e-15.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.827616e-14 -> 1.827616e-14.
+  o It. 5: Relative error in velocity (2-norm): 3.380914e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.597879e-08 -> 1.597879e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.772763e-09 -> 1.772763e-09.
+    * Solver of the pressure correction equation converged in 566 iterations. Residual: 2.610887e-08 -> 1.683151e-15.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.827623e-14 -> 1.827623e-14.
+  o It. 6: Relative error in velocity (2-norm): 2.880768e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.597880e-08 -> 1.597880e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.772720e-09 -> 1.772720e-09.
+    * Solver of the pressure correction equation converged in 578 iterations. Residual: 2.226742e-08 -> 2.135954e-15.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.827628e-14 -> 1.827628e-14.
+  o It. 7: Relative error in velocity (2-norm): 2.456456e-11.
+  o Converged after 7 iterations. Relative error in velocity (2-norm): 2.456456e-11.
+  => Residual: 5.3845e-05 (func 1 norm) |  1.1609e-05 (2 norm)  |  7.8103e-07 (max).
+- Wrote solution at 4.248444e+00 to solution_0850.vtr.
+Step 4251: t = 4.248444e+00, dt = 1.000015e-03, cfl = 1.0000e+00. Computation time: 3.9296e+03 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.596390e-08 -> 1.596390e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.958092e-09 -> 1.958092e-09.
+    * Solver of the pressure correction equation converged in 626 iterations. Residual: 1.899515e-08 -> 7.065903e-16.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 7.532924e-12 -> 9.240013e-15.
+  o It. 1: Relative error in velocity (2-norm): 2.095711e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.596395e-08 -> 1.596395e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.958059e-09 -> 1.958059e-09.
+    * Solver of the pressure correction equation converged in 592 iterations. Residual: 1.620676e-08 -> 1.182368e-15.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.821701e-14 -> 1.821701e-14.
+  o It. 2: Relative error in velocity (2-norm): 1.788644e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.596395e-08 -> 1.596395e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.958030e-09 -> 1.958030e-09.
+    * Solver of the pressure correction equation converged in 604 iterations. Residual: 1.383005e-08 -> 7.027392e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.821705e-14 -> 1.821705e-14.
+  o It. 3: Relative error in velocity (2-norm): 1.527086e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.596395e-08 -> 1.596395e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.958006e-09 -> 1.958006e-09.
+    * Solver of the pressure correction equation converged in 584 iterations. Residual: 1.180389e-08 -> 9.241053e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.821707e-14 -> 1.821707e-14.
+  o It. 4: Relative error in velocity (2-norm): 1.303968e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.596396e-08 -> 1.596396e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.957985e-09 -> 1.957985e-09.
+    * Solver of the pressure correction equation converged in 602 iterations. Residual: 1.007590e-08 -> 7.135482e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.821709e-14 -> 1.821709e-14.
+  o It. 5: Relative error in velocity (2-norm): 1.113709e-11.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.596396e-08 -> 1.596396e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.957967e-09 -> 1.957967e-09.
+    * Solver of the pressure correction equation converged in 790 iterations. Residual: 8.602064e-09 -> 2.801985e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.821711e-14 -> 1.821711e-14.
+  o It. 6: Relative error in velocity (2-norm): 9.512604e-12.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.596396e-08 -> 1.596396e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 1.957952e-09 -> 1.957952e-09.
+    * Solver of the pressure correction equation converged in 536 iterations. Residual: 7.344580e-09 -> 4.394710e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.821713e-14 -> 1.821713e-14.
+  o It. 7: Relative error in velocity (2-norm): 8.125664e-12.
+  o Converged after 7 iterations. Relative error in velocity (2-norm): 8.125664e-12.
+  => Residual: 1.7671e-05 (func 1 norm) |  3.7814e-06 (2 norm)  |  2.4724e-07 (max).
+Step 4252: t = 4.249444e+00, dt = 1.000015e-03, cfl = 1.0000e+00. Computation time: 3.9305e+03 s.
+  o Running the iterative SIMPLEC procedure (E = 5.000000e+00).
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.595696e-08 -> 1.595696e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 2.021025e-09 -> 2.021025e-09.
+    * Solver of the pressure correction equation converged in 722 iterations. Residual: 6.271473e-09 -> 2.291916e-16.
+    * Solver of the turbulence closure equation converged in 2 iterations. Residual: 7.507403e-12 -> 9.222481e-15.
+  o It. 1: Relative error in velocity (2-norm): 6.941879e-12.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.595701e-08 -> 1.595701e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 2.021015e-09 -> 2.021015e-09.
+    * Solver of the pressure correction equation converged in 494 iterations. Residual: 5.355700e-09 -> 4.422799e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.815853e-14 -> 1.815853e-14.
+  o It. 2: Relative error in velocity (2-norm): 5.930819e-12.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.595701e-08 -> 1.595701e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 2.021005e-09 -> 2.021005e-09.
+    * Solver of the pressure correction equation converged in 624 iterations. Residual: 4.574031e-09 -> 2.424037e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.815854e-14 -> 1.815854e-14.
+  o It. 3: Relative error in velocity (2-norm): 5.066957e-12.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.595701e-08 -> 1.595701e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 2.020997e-09 -> 2.020997e-09.
+    * Solver of the pressure correction equation converged in 556 iterations. Residual: 3.906676e-09 -> 3.899384e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.815855e-14 -> 1.815855e-14.
+  o It. 4: Relative error in velocity (2-norm): 4.328869e-12.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.595701e-08 -> 1.595701e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 2.020990e-09 -> 2.020990e-09.
+    * Solver of the pressure correction equation converged in 670 iterations. Residual: 3.336821e-09 -> 2.705673e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.815855e-14 -> 1.815855e-14.
+  o It. 5: Relative error in velocity (2-norm): 3.699088e-12.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.595701e-08 -> 1.595701e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 2.020984e-09 -> 2.020984e-09.
+    * Solver of the pressure correction equation converged in 594 iterations. Residual: 2.850365e-09 -> 2.361950e-16.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.815856e-14 -> 1.815856e-14.
+  o It. 6: Relative error in velocity (2-norm): 3.160235e-12.
+    * Solver of the x-momentum equation converged in 0 iterations. Residual: 1.595701e-08 -> 1.595701e-08.
+    * Solver of the y-momentum equation converged in 0 iterations. Residual: 2.020979e-09 -> 2.020979e-09.
+    * Solver of the pressure correction equation converged in 588 iterations. Residual: 2.434831e-09 -> 8.795170e-17.
+    * Solver of the turbulence closure equation converged in 0 iterations. Residual: 1.815856e-14 -> 1.815856e-14.
+  o It. 7: Relative error in velocity (2-norm): 2.700544e-12.
+  o Converged after 7 iterations. Relative error in velocity (2-norm): 2.700544e-12.
+  => Residual: 5.8631e-06 (func 1 norm) |  1.2539e-06 (2 norm)  |  8.1335e-08 (max).
+- Wrote solution at 4.250444e+00 to solution_0851.vtr.
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 4.250444e+00)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 3931.680156 sec.
+
