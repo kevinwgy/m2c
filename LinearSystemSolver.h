@@ -49,6 +49,8 @@ public:
              LinearSolverConvergenceReason *reason = NULL, int *numIts = NULL,
              std::vector<double> *rnorm = NULL, std::vector<int> *rnorm_its = NULL);
 
+  void ConvergedDefaultSetUMIRNorm(); //!< modifies the initial residual norm
+
   void GetTolerances(double *rtol, double *abstol, double *dtol, int *maxits); //!< set NULL to params not needed
 
   void SetTolerances(double relative_error, double absolute_error, double divergence_tol, int max_iterations);

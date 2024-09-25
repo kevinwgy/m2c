@@ -22,6 +22,7 @@ TimeIntegratorSIMPLE::TimeIntegratorSIMPLE(MPI_Comm &comm_, IoData& iod_, DataMa
                       DX(comm_, &(dms_.ghosted1_1dof)), DY(comm_, &(dms_.ghosted1_1dof)),
                       DZ(comm_, &(dms_.ghosted1_1dof)), V0(comm_, &(dms_.ghosted1_5dof)),
                       Tmp1(comm_, &(dms_.ghosted1_1dof)), Tmp5(comm_, &(dms_.ghosted1_5dof)),
+                      TmpTmp(comm_, &(dms_.ghosted1_1dof)),
                       vlin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.velocity_linear_solver,
                       "velocity"),
                       plin_solver(comm_, dms_.ghosted1_1dof, iod.ts.semi_impl.pressure_linear_solver,
@@ -124,6 +125,7 @@ TimeIntegratorSIMPLE::Destroy()
   V0.Destroy();
   Tmp1.Destroy();
   Tmp5.Destroy();
+  TmpTmp.Destroy();
 
   vlin_solver.Destroy();
   plin_solver.Destroy();
@@ -190,11 +192,13 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     vturb0 = Vturb0_ptr->GetDataPointer();
   }
 
+  //plin_solver.ConvergedDefaultSetUMIRNorm(); //modifies the initial residual norm by doing min[norm(resid. of b-A(xguess),norm(B-b)]
 
   bool repetition = false;
   double plin_rtol, plin_abstol, plin_div;
   int plin_maxIts;
   plin_solver.GetTolerances(&plin_rtol, &plin_abstol, &plin_div, &plin_maxIts);
+  //enum LinearSolverConvergenceReason plin_convergence_reason;
 
   for(iter = 0; iter < maxIter; iter++) {
 
@@ -288,12 +292,21 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     //print("Pressure condition number is: %f\n",plin_solver.EstimateConditionNumber()); //prints out the condition number
 
-    Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
+    if(!repetition) {
+      TmpTmp.AXPlusBY(0.0, 1.0, Pprime, true);
+      Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)
+    } else {
+      Pprime.AXPlusBY(0.0, 1.0, TmpTmp, true); //!< Use previous solution as initial guess
+    }
 
-    lin_success = plin_solver.Solve(B, Pprime, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
-    if(!lin_success) {
+    bool plin_success = plin_solver.Solve(B, Pprime, NULL/*&plin_convergence_reason*/, &nLinIts, &lin_rnorm, &lin_rnorm_its);
+
+    //print("PPrime solver convergence reason is: %d\n",plin_convergence_reason);
+
+    if(!plin_success) {
       print_warning("    x Warning: Linear solver for the pressure correction equation failed to converge."
                     " Residual: %e -> %e.\n", lin_rnorm.front(), lin_rnorm.back());
+
 /*
       plin_solver.WriteToMatlabFile("Mat.m", "A");
       B.WriteToMatlabFile("B.m", "b");
@@ -302,6 +315,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
       plin_solver.CalculateExtremeSingularValues(sigma_max, sigma_min);
       print("sigma_max = %e, sigma_min = %e.\n", sigma_max, sigma_min);
 */
+
       if(verbose>=2)
         for(int i=0; i<(int)lin_rnorm.size(); i++)
           print_warning("      > It. %d: residual = %e.\n", lin_rnorm_its[i]+1, lin_rnorm[i]);
@@ -373,19 +387,29 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     print("  o It. %d: Relative error in velocity (2-norm): %e.\n", iter+1, rel_err);
     if(rel_err/rel_err_prev>3.0) { 
-      print_warning("  x Warning: Detected drastic increase of error (%eX). Repeating.\n",
+      print_warning("  x Warning: Detected drastic increase of error (%eX).",
                     rel_err/rel_err_prev);
-      repetition = true;
-      rel_err = rel_err_prev;
-      iter--;
 
       double current_rtol;
       plin_solver.GetTolerances(&current_rtol, NULL, NULL, NULL);
-      plin_solver.SetTolerances(10.0*current_rtol, plin_abstol, plin_div, plin_maxIts);
+      if(!plin_success && current_rtol<0.1) {
+        print_warning(" Repeating.\n");
+        repetition = true;
+        rel_err = rel_err_prev;
+        iter--;
 
-      V.AXPlusBY(0.0, 1.0, Tmp5, true); 
-      if(Vturb)
-        Vturb->AXPlusBY(0.0, 1.0, Tmp1, true); //Tmp = vturb (include ghost nodes)
+        plin_solver.SetTolerances(10.0*current_rtol, plin_abstol, plin_div, plin_maxIts);
+
+        V.AXPlusBY(0.0, 1.0, Tmp5, true); 
+        if(Vturb)
+          Vturb->AXPlusBY(0.0, 1.0, Tmp1, true); //Tmp = vturb (include ghost nodes)
+      } else {
+        print_warning("\n");
+        if(repetition == true) {
+          plin_solver.SetTolerances(plin_rtol, plin_abstol, plin_div, plin_maxIts);
+          repetition = false;
+        } 
+      }
     } else {
       if(repetition == true) {
         plin_solver.SetTolerances(plin_rtol, plin_abstol, plin_div, plin_maxIts);
@@ -395,7 +419,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
 
     //TODO: For the moment, only check convergence of the N-S equations, not turbulence closure.
-    if(rel_err<iod.ts.semi_impl.convergence_tolerance) {
+    if(iter>5 && rel_err<iod.ts.semi_impl.convergence_tolerance) { //HACK: enforcing the minimum iterations criteria again
       converged = true;
       break; 
     }
@@ -531,6 +555,7 @@ TimeIntegratorSIMPLE::UpdateStates(Vec5D*** v, SpaceVariable3D &Pprime, SpaceVar
   }
 
   return sqrt(uerr/unorm);
+  //return sqrt(uerr); //HACK: Rel_error redefined!!! 
 
 }
 
