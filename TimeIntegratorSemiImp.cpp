@@ -165,6 +165,10 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
   GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
 
+  // Get embedded boundary data
+  std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS
+      = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
+
   double*** id = ID.GetDataPointer();
   double*** homo = Homo.GetDataPointer();
 
@@ -218,8 +222,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the x-momentum equation
     if(global_mesh.x_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, type==SIMPLEC, Efactor,
-                                       dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, EBDS.get(),
+                                       type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
 
       //print("X-Momentum condition number is: %f\n",vlin_solver.EstimateConditionNumber()); //prints out the condition number
@@ -241,8 +245,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the y-momentum equation
     if(global_mesh.y_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, type==SIMPLEC, Efactor,
-                                       dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, EBDS.get(),
+                                       type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
 
       //print("Y-Momentum condition number is: %f\n",vlin_solver.EstimateConditionNumber()); //prints out the condition number
@@ -264,8 +268,8 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
 
     // Solve the z-momentum equation
     if(global_mesh.z_glob.size()>1) {
-      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, type==SIMPLEC, Efactor,
-                                       dt, LocalDt);
+      inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, EBDS.get(),
+                                       type==SIMPLEC, Efactor, dt, LocalDt);
       vlin_solver.SetLinearOperator(vlin_rows);
       lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
       if(!lin_success) {
@@ -286,7 +290,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
-    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B,
+    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, EBDS.get(),
                                      fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
 
@@ -360,6 +364,10 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
         cw1_reduction = factor - (factor - 1.0)/(t2 - t1)*(time-t1);
       }
 
+      if(embed) {
+        print_error("*** Error: Currently, the SA Turbulence model does not support embedded boundaries.\n");
+        exit_mpi();
+      }
       inco.BuildSATurbulenceEquationSIMPLE(v, id, vturb0, vturb, vturb_lin_rows, B, Efactor, cw1_reduction, dt, LocalDt);
       V.RestoreDataPointerToLocalVector();
       Vturb->RestoreDataPointerAndInsert();
@@ -584,6 +592,11 @@ TimeIntegratorSIMPLER::TimeIntegratorSIMPLER(MPI_Comm &comm_, IoData& iod_, Data
 {
   type = SIMPLER;
   alphaP = 0.0; //not used
+
+  if(embed) {
+    print_error("*** Error: Currently, SIMPLER does not support embedded boundaries. (Try SIMPLEC or SIMPLE.)\n");
+    exit_mpi();
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -668,7 +681,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       inco.CalculateCoefficientsSIMPLER(1, v0, v, id, homo, vlin_rows, Bv, VYstar, DY, Efactor, dt, LocalDt); //"Vhat"
     if(global_mesh.z_glob.size()>1)
       inco.CalculateCoefficientsSIMPLER(2, v0, v, id, homo, wlin_rows, Bw, VZstar, DZ, Efactor, dt, LocalDt); //"What"
-    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, 
+    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, NULL/*EBDS.get()*/,
                                      fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
     lin_success = plin_solver.Solve(B, P, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
@@ -923,6 +936,11 @@ TimeIntegratorPISO::TimeIntegratorPISO(MPI_Comm &comm_, IoData& iod_, DataManage
   type = PISO;
   Efactor = 1.0e8; // essentially, no relaxation
   alphaP  = 1.0; //no relaxation
+
+  if(embed) {
+    print_error("*** Error: Currently, PISO does not support embedded boundaries. (Try SIMPLEC or SIMPLE.)\n");
+    exit_mpi();
+  }
 }
 //----------------------------------------------------------------------------
 
@@ -1001,7 +1019,8 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the x-momentum equation
   if(global_mesh.x_glob.size()>1) {
-    inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(0, v0, v, id, vturb, homo, vlin_rows, B, DX, NULL/*EBDS.get()*/,
+                                     false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VXstar, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
     if(!lin_success) {
@@ -1019,7 +1038,8 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the y-momentum equation
   if(global_mesh.y_glob.size()>1) {
-    inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(1, v0, v, id, vturb, homo, vlin_rows, B, DY, NULL/*EBDS.get()*/,
+                                     false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VYstar, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
     if(!lin_success) {
@@ -1037,7 +1057,8 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   // Solve the z-momentum equation
   if(global_mesh.z_glob.size()>1) {
-    inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, false, Efactor, dt, LocalDt);
+    inco.BuildVelocityEquationSIMPLE(2, v0, v, id, vturb, homo, vlin_rows, B, DZ, NULL/*EBDS.get()*/,
+                                     false, Efactor, dt, LocalDt);
     vlin_solver.SetLinearOperator(vlin_rows);
     lin_success = vlin_solver.Solve(B, VZstar, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
     if(!lin_success) {
@@ -1058,7 +1079,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //-----------------------------------------------------
   // Step 2: Solve the p' equation (First Corrector Step)
   //-----------------------------------------------------
-  inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B,
+  inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, NULL/*EBDS.get()*/,
                                    fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
   plin_solver.SetLinearOperator(plin_rows);
   Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)

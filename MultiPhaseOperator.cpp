@@ -714,12 +714,6 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
           continue;
         }
 
-/*
-        bool gotyou = false;
-        if(i==9 && j==45 && k==0)
-          gotyou = true;
-*/
-
         // Preparation: Collect useful neighbors and intersection info
         FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,
                                           *(*EBDS)[surf]->occluded_ptr,

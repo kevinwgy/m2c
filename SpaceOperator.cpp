@@ -12,7 +12,6 @@
 #include <DistancePointToSpheroid.h>
 #include <DistancePointToParallelepiped.h>
 #include <EmbeddedBoundaryDataSet.h>
-#include <EmbeddedBoundaryOperator.h>
 #include <algorithm> //std::upper_bound
 #include <cfloat> //DBL_MAX
 #include <KDTree.h>

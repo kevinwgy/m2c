@@ -7,6 +7,7 @@
 #include<LinearOperator.h>
 #include<GeoTools.h>
 using std::vector;
+using std::unique_ptr;
 
 using namespace GeoTools;
 
@@ -1047,10 +1048,14 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
                                                     double*** vturb, //turbulent working term
                                                     double*** homo, //node is in a homogeneous region?
                                                     vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
-                                                    SpaceVariable3D &Ddiag, bool SIMPLEC, double Efactor,
+                                                    SpaceVariable3D &Ddiag,
+                                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                                    bool SIMPLEC, double Efactor,
                                                     double dt, SpaceVariable3D *LocalDt)
 {
   assert(dir==0 || dir==1 || dir==2);
+
+  assert(!EBDS); //I AM HERE
 
   //local utility function for evaluating dynamic turbulence eddy viscosity (mu_T)
   auto GetMut = [&] (int i, int j, int k) {
@@ -1773,8 +1778,10 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
                                                     SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                                     SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
                                                     vector<RowEntries> &plin_rows, SpaceVariable3D &B,
+                                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                                     Int3 *ijk_zero_p)
 {
+  assert(!EBDS); //I AM HERE!
 
   GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
 

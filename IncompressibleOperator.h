@@ -9,7 +9,9 @@
 #include<Interpolator.h>
 #include<GhostFluidOperator.h>
 #include<SpaceOperator.h>
+#include <utility> //std::unique_ptr;
 
+class EmbeddedBoundaryDataSet;
 struct RowEntries;
 
 /***************************************************
@@ -70,6 +72,7 @@ public:
                                    double*** vturb0, //turbulent working term
                                    double*** homo, //wheter each node is in a homogeneous region
                                    std::vector<RowEntries> &vlin_rows, SpaceVariable3D &B, SpaceVariable3D &Ddiag,
+                                   std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                    bool SIMPLEC, //!< for SIMPLEC, generates a different Ddiag; otherwise the same
                                    double Efactor, double dt,
                                    SpaceVariable3D *LocalDt = NULL); 
@@ -78,6 +81,7 @@ public:
                                    SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                    SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
                                    std::vector<RowEntries> &plin_rows, SpaceVariable3D &B,
+                                   std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                    Int3 *ijk_zero_p = NULL); //!< allows p to be fixed at one node
 
   //! For specified momentum equation (dir=0,1,2), find coefficients for pressure and velocity equations
