@@ -114,8 +114,8 @@ EmbeddedBoundaryFormula::BuildMirroringFormula(Int3& ghost, Int3& image, Vec3D& 
       FinalizeMirroringFormulaElem(ghost, node_tmp, xi);
       break;
     default:
-      fprintf(stdout,"*** Error: Detected error in the construction of mirroring formulas. Ghost node: %d %d %d.\n",
-                     ghost[0], ghost[1], ghost[2]);
+      fprintf(stdout,"*** Error: Detected error in the construction of mirroring formulas. "
+                     "Ghost node: %d %d %d.\n", ghost[0], ghost[1], ghost[2]);
       break;
   }
 }

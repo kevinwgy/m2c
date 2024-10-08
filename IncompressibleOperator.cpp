@@ -1055,8 +1055,6 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
 {
   assert(dir==0 || dir==1 || dir==2);
 
-  assert(!EBDS); //I AM HERE
-
   //local utility function for evaluating dynamic turbulence eddy viscosity (mu_T)
   auto GetMut = [&] (int i, int j, int k) {
     return GetDynamicEddyViscosity(v[k][j][i][0], Mu[id[k][j][i]], vturb[k][j][i]);

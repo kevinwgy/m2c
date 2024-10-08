@@ -27,11 +27,12 @@ class EmbeddedBoundaryFormula {
 
 public:
 
-  enum Operation {MIRRORING = 0, LINEAR_EXTRAPOLATION = 1};
+  enum Operation {MIRRORING = 0, LINEAR_EXTRAPOLATION = 1, RBF_EXTRAPOLATION = 2};
 
   enum ImageScenario {NODE = 0, EDGE_SHARED = 1, EDGE_REMOTE = 2,
                       FACE_SHARED = 3, FACE_REMOTE = 4, 
-                      ELEMENT_SHARED = 5, ELEMENT_REMOTE = 6};
+                      ELEMENT_SHARED = 5, ELEMENT_REMOTE = 6,
+                      RBF = 7}; //!< RBF <---> RBF_EXTRAPOLATION (one-to-one mapping)
 
 private: 
 
