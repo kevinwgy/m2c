@@ -15,7 +15,7 @@
 namespace GeoTools {
 
 inline bool BoxesOverlapping1D(double b1min, double b1max, double b2min, double b2max) {
-  return b1max <= b2min || b2max <= b1min;
+  return !(b1max <= b2min || b2max <= b1min);
 }
 
 bool BoxesOverlapping2D(Vec2D &b1min, Vec2D &b1max, Vec2D &b2min, Vec2D &b2max) {

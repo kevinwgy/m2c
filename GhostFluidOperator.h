@@ -11,6 +11,7 @@
 #include<memory> //unique_ptr
 
 class EmbeddedBoundaryDataSet;
+class EmbeddedBoundaryFormula;
 
 /**************************************************************
 * Class GhostFluidOperator is responsible for populating ghost
@@ -36,6 +37,18 @@ class GhostFluidOperator {
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
   int NX, NY, NZ;
 
+  //! Ghost nodes --- not limited to inactive nodes
+  std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > ghostNodes1; //!< ghosts whose image is inside the subdomain
+
+  std::vector<std::vector<Int3> > ghostNodes2; //!< ghosts whose image is inside another subdomain
+  std::vector<int> ghostNodes2_sender; //!< owner (subD id.) of each node in ghostNodes2
+
+  std::vector<std::vector<std::pair<Int3, EmbeddedBoundaryFormula> > > friendsGhostNodes;
+  std::vector<int> friendsGhostNodes_receiver;
+
+  //! Values at ghost nodes 
+  std::vector<double> scalar_gn1; //!< ghostNodes1
+  std::vector<std::vector<double> > scalar_gn2; //!< ghostNodes2
 
 public:
 
