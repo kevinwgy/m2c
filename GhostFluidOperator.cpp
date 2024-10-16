@@ -54,7 +54,7 @@ GhostFluidOperator::Destroy()
 //-------------------------------------------------------------
 
 int
-GhostFluidOperator::PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V, 
+GhostFluidOperator::PopulateInactiveNodesForViscosityOperator(SpaceVariable3D &V, 
                         SpaceVariable3D &ID,
                         vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                         SpaceVariable3D &Velog)
@@ -66,7 +66,7 @@ GhostFluidOperator::PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V,
   // ----------------------------------------------------------------------------
   // Step 1: Identify ghost nodes inside the subdomain that need to be populated
   // ----------------------------------------------------------------------------
-  int number_of_ghosts = TagGhostNodes(id, 2); //2 layers; Tag and ghosts_ijk get computed 
+  int number_of_ghosts = TagInactiveNodes(id, 2); //2 layers; Tag and ghosts_ijk get computed 
 
   if(number_of_ghosts==0) {
     ID.RestoreDataPointerToLocalVector();
@@ -205,7 +205,7 @@ GhostFluidOperator::PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V,
 //-------------------------------------------------------------
 
 int
-GhostFluidOperator::TagGhostNodes(double*** id, int nLayers)
+GhostFluidOperator::TagInactiveNodes(double*** id, int nLayers)
 {
   assert(nLayers>=1);
 
@@ -346,7 +346,7 @@ GhostFluidOperator::ProjectGhostsToInterface(vector<std::unique_ptr<EmbeddedBoun
 
     Int3& tnodes((*EBDS)[mysurf]->surface_ptr->elems[cp.tid]);
 
-    // get position at projeciton point
+    // get position at projection point
     ghosts_xp[n] = cp.xi[0]*X[tnodes[0]] + cp.xi[1]*X[tnodes[1]] 
                  + cp.xi[2]*X[tnodes[2]]; 
 
@@ -388,10 +388,12 @@ GhostFluidOperator::FindImagesForGhosts(double*** id, vector<Vec3D> &ghosts_xyz,
   // Put the undertermined ghosts in a set. Clear this set gradually.
   std::set<int> undetermined;
   for(int n=0; n<(int)ghosts_ijk.size(); n++) {
-    // if dist from ghost to interface is <15% of element size, apply const extrap
-    if((images_xyz[n]-ghosts_xyz[n]).norm() < 0.3*global_mesh.GetMinDXYZ(ghosts_ijk[n])) 
-      ghosts_tag[n] = 0;
-    else if(ghosts_tag[n]<0)
+    // if dist from ghost to interface <5% of element size, apply const extrap
+    //if((images_xyz[n]-ghosts_xyz[n]).norm() < 0.1*global_mesh.GetMinDXYZ(ghosts_ijk[n])) 
+    //  ghosts_tag[n] = 0;
+    //else if(ghosts_tag[n]<0)
+    //  undetermined.insert(n);
+    if(ghosts_tag[n]<0)
       undetermined.insert(n);
   }
  
@@ -443,13 +445,13 @@ GhostFluidOperator::FindImagesForGhosts(double*** id, vector<Vec3D> &ghosts_xyz,
 
             if(!Tag.IsHere(i,j,k,true)) { //get from neighbor
               int key = outside_images[n][counter++]; 
-              if(neighbor_received[key]==INACTIVE_MATERIAL_ID &&
-                 ghosts_ijk[n] != Int3(i,j,k)) 
+              if(neighbor_received[key]==INACTIVE_MATERIAL_ID && ghosts_ijk[n] != Int3(i,j,k))
+                //WARNING: Not requiring the same mat ID (ok for variables continous across interfaces)
                 valid = false;
             }
             else {
-              if(id[k][j][i]==INACTIVE_MATERIAL_ID &&
-                 ghosts_ijk[n] != Int3(i,j,k))
+              if(id[k][j][i]==INACTIVE_MATERIAL_ID && ghosts_ijk[n] != Int3(i,j,k))
+                //WARNING: Not requiring the same mat ID (ok for variables continous across interfaces)
                 valid = false;
             }
 
@@ -470,7 +472,7 @@ update_image:
       }
       else { //image is invalid; move further
         Vec3D dir = images_xyz[n] - ghosts_xyz[n];
-        images_xyz[n] = ghosts_xyz[n] + 1.2*dir;
+        images_xyz[n] = ghosts_xyz[n] + 1.5*dir;
         bool got = global_mesh.FindElementCoveringPoint(images_xyz[n], images_ijk[n], &images_xi[n],
                                                         true); //include ghost layer outside domain
         if(!got) {//constant extrapolation

@@ -58,14 +58,14 @@ public:
 
   void Destroy();
 
-  int PopulateGhostNodesForViscosityOperator(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                             std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
-                                             SpaceVariable3D &Vgf);
+  int PopulateInactiveNodesForViscosityOperator(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                                std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                                SpaceVariable3D &Vgf);
 
 private:
 
   //! Find ghost nodes. Update Tag and ghosts_ijk.
-  int TagGhostNodes(double*** id, int nLayers); //!< returns the total number of ghosts
+  int TagInactiveNodes(double*** id, int nLayers); //!< returns the total number of ghosts
 
   //! Find projection points (not unique! just find one.). Also finds the image by mirroring
   void ProjectGhostsToInterface(std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS, 
