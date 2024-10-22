@@ -67,6 +67,9 @@ public:
 
   void ApplyBoundaryConditions(SpaceVariable3D &V); //!< Also modify non-ghost entries (due to MAC grid)
 
+  void PopulateInactiveGhosts(SpaceVariable3D &V, SpaceVariable3D &ID, vector<SpaceVariable3D*>& Phi,
+                              std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
+
   void BuildVelocityEquationSIMPLE(int dir, //!< dir: 0,1,2 for x,y,z
                                    Vec5D*** v0, Vec5D*** v, double*** id,
                                    double*** vturb0, //turbulent working term
@@ -120,6 +123,7 @@ public:
   void ComputeKinematicEddyViscosity(SpaceVariable3D &Vturb, SpaceVariable3D &V, SpaceVariable3D &ID,
                                      SpaceVariable3D &NuT); //compute kin.eddy.vis ==> NuT
 
+  friend class Output; //!< output needs to call some private function(s)
 
 private:
 
@@ -130,17 +134,25 @@ private:
 
   void ApplyBoundaryConditionsGeometricEntities(Vec5D*** v);
 
+  //! Interpolate velocity to cell centers (V: 5D, Vout: 3D) --- only populate FACE ghost nodes
+  void InterpolateVelocityToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vout);
+
+  //! Interpolate velocity to cell centers (V: 5D, Vout: 5D) --- only populate FACE ghost nodes
+  void CopyAndInterpolateVelocityToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vout);
+
   //! Function "A" -- Eq.(5.64) in Patankar's book
   inline double PowerLaw(double pc) {double pp=1.0-0.1*fabs(pc); return pp>0.0 ? pow(pp,5) : 0.0;}
   //inline double PowerLaw([[maybe_unused]] double pc) {return 1.0;} //degenerates to upwinding (useful for debugging)
 
+  //! Utility function for calculating velocity at ghost cell CENTER (image, vim, is also at cell CENTER)
+  double ApplyVelocityBoundaryConditionLocal(int dir, GhostPoint::Side side, double vim,
+                                             bool flat_plate_wall = false);
+  Vec3D ApplyVelocityBoundaryConditionLocal3D(GhostPoint::Side side, Vec3D &vim, bool flat_plate_wall = false);
 
   //! For turbulent flows (RANS for now) TODO: These functions should be moved to dedicated classes later
   double GetKinematicEddyViscosity(double rho, double mu, double nu_tilde); //!< Spalart-Allmaras
   double GetDynamicEddyViscosity(double rho, double mu, double nu_tilde); //!< Spalart-Allmaras
   double GetDistanceToWall(Vec3D x);
-  double ApplyVelocityBoundaryConditionLocal(int dir, GhostPoint::Side side, double vim,
-                                             bool flat_plate_wall = false); //!< for computing vorticity
 
 };
 

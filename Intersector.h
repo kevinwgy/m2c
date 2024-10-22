@@ -29,16 +29,7 @@
  * (6) the "color" of each node (i.e. connectivity info)
  * (7) the elements in the embedded surface that form the boundary
  *     of a "color", and their inward-facing side.
- *
- * Note 1: The above results are stored within this class.
- *
- * Note 2 (10/2024): This class is updated to find intersections
- *     on the MAC grid (i.e., staggered grid), which is used for
- *     incompressible flow computation. This update is an extension
- *     of the previous class. It does not alter any existing functions
- *     and data. Only edge-interface intersections are computed for
- *     the shifted (velocity) grids. For more details, refer to
- *     KW's notes.
+ * Note: The above results are stored within this class.
  ***************************************************************/
 
 class Intersector {
@@ -134,7 +125,6 @@ class Intersector {
                                   two vertices. XForward stores the one that is closest to the left/bottom/back vertex. \n
                                   XBackward stores the one that is closest to the right/top/front vertex. */
 
-
   //! Phi and Color communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
   int Phi_nLayer; //!< number of layers of nodes where Phi is calculated.
@@ -169,21 +159,13 @@ class Intersector {
   //! an internally used vector
   std::set<Int3> previously_occluded_but_not_now;
 
-  //-----------------------------------------------------------------------------
-  //! For MAC/staggered grid only (Note: no "occluded" for the MAC grid - velocities)
-  bool MACGrid;
-  SpaceVariable3D* XForwardMAC;  //!< Like XForward, for MAC grid (velocities) (default: -1)
-  SpaceVariable3D* XBackwardMAC; //!< like XBackward, for MAC grid (velocities) (default: -1)
-  std::vector<IntersectionPoint> intersectionsMAC; //!< like intersections (all registered in XForward/BackwardMAC)
-  //-----------------------------------------------------------------------------
-
 public:
 
   Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceData &iod_surface_,
               TriangulatedSurface &surface_,
               SpaceVariable3D &coordinates_, 
               std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,
-              GlobalMeshInfo &global_mesh_, bool MACGrid_ = false);
+              GlobalMeshInfo &global_mesh_);
 
   ~Intersector();
 
@@ -220,8 +202,6 @@ public:
                            std::vector<std::pair<Int3, std::vector<MyTriangle> > > &candidates); 
 
   void FindIntersections(); //!< find occluded nodes, intersections, and first layer nodes
-
-  void FindIntersectionsMAC(); //!< only find intersections, for MACGrid - velocities
 
   bool FloodFillColors(); /**< determine the generalized color function ("Color").\n 
                                Returns whether some nodes are occluded.\n"*/

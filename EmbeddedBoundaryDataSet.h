@@ -99,11 +99,6 @@ public:
 
   std::set<Int3> *swept_ptr;
 
-  //! For MAC grid only
-  bool MACGrid;
-  SpaceVariable3D *XForwardMAC_ptr;
-  SpaceVariable3D *XBackwardMAC_ptr;
-  std::vector<IntersectionPoint> *intersectionsMAC_ptr;
 
 public:
   EmbeddedBoundaryDataSet() : surface_ptr(nullptr), half_thickness(0.0),
@@ -113,9 +108,7 @@ public:
                               ClosestPointIndex_ptr(nullptr), closest_points_ptr(nullptr), 
                               intersections_ptr(nullptr),
                               occluded_ptr(nullptr), firstLayer_ptr(nullptr),
-                              imposed_occluded_ptr(nullptr), swept_ptr(nullptr),
-                              MACGrid(false), XForwardMAC_ptr(nullptr), XBackwardMAC_ptr(nullptr),
-                              intersectionsMAC_ptr(nullptr)
+                              imposed_occluded_ptr(nullptr), swept_ptr(nullptr)
   { }
 
   ~EmbeddedBoundaryDataSet() {}

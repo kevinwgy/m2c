@@ -540,6 +540,22 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 //--------------------------------------------------------------------------
 
 void
+IncompressibleOperator::PopulateInactiveGhosts(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                               vector<SpaceVariable3D*>& Phi,
+                                               std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
+{
+  InterpolateVelocityToCellCenters(V, V3);
+
+  assert(gfo);
+//  gfo->Populate I AM HERE
+
+
+  //PopulateInactiveCellBoundaries(V3, V, ID);
+}
+
+//--------------------------------------------------------------------------
+
+void
 IncompressibleOperator::ApplyBoundaryConditionsGeometricEntities(Vec5D*** v)
 {
 
@@ -3673,32 +3689,25 @@ IncompressibleOperator::ApplyVelocityBoundaryConditionLocal(int dir, GhostPoint:
     return -vim;
 
   double vghost(DBL_MAX);
-  int wall_dir(0);
   MeshData::BcType type(MeshData::NONE);
   switch (side) {
     case GhostPoint::LEFT :
       type = iod.mesh.bc_x0;
-      wall_dir = 0;
       break;
     case GhostPoint::RIGHT :
       type = iod.mesh.bc_xmax;
-      wall_dir = 0;
       break;
     case GhostPoint::BOTTOM :
       type = iod.mesh.bc_y0;
-      wall_dir = 1;
       break;
     case GhostPoint::TOP :
       type = iod.mesh.bc_ymax;
-      wall_dir = 1;
       break;
     case GhostPoint::BACK :
       type = iod.mesh.bc_z0;
-      wall_dir = 2;
       break;
     case GhostPoint::FRONT :
       type = iod.mesh.bc_zmax;
-      wall_dir = 2;
       break;
     default :
       fprintf(stdout,"*** Error: Detected unsupported boundary code.\n");
@@ -3717,17 +3726,21 @@ IncompressibleOperator::ApplyVelocityBoundaryConditionLocal(int dir, GhostPoint:
         break;
       case MeshData::SLIPWALL :
       case MeshData::SYMMETRY :
+      {
+        int wall_dir = (side == GhostPoint::LEFT || side == GhostPoint::RIGHT) ? 0 :
+                       ((side == GhostPoint::BOTTOM || side == GhostPoint::TOP) ? 1 : 2);
         if(dir==wall_dir) vghost = -vim; 
         else              vghost =  vim;
         break;
+      }
       case MeshData::STICKWALL :
         vghost = -vim;
         break;
       case MeshData::OVERSET :
         //nothing to be done here. TODO
         break;
-      default :
-        fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n", (int)iod.mesh.bc_x0); 
+      default : //Note: edge & corner ghosts have type == NONE (0), shouldn't try to populate these ghosts
+        fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n", (int)type); 
         exit(-1);
   }
 
@@ -3736,7 +3749,193 @@ IncompressibleOperator::ApplyVelocityBoundaryConditionLocal(int dir, GhostPoint:
 
 //--------------------------------------------------------------------------
 
+Vec3D
+IncompressibleOperator::ApplyVelocityBoundaryConditionLocal3D(GhostPoint::Side side, Vec3D &vim,
+                                                              bool flat_plate_wall)
+{
+  // This function calculates velocity at ghost cell CENTER; and "vim" is the velocity at the image cell CENTER,
+
+  if(flat_plate_wall) //stick wall
+    return -vim;
+
+  MeshData::BcType type(MeshData::NONE);
+  switch (side) {
+    case GhostPoint::LEFT :
+      type = iod.mesh.bc_x0;
+      break;
+    case GhostPoint::RIGHT :
+      type = iod.mesh.bc_xmax;
+      break;
+    case GhostPoint::BOTTOM :
+      type = iod.mesh.bc_y0;
+      break;
+    case GhostPoint::TOP :
+      type = iod.mesh.bc_ymax;
+      break;
+    case GhostPoint::BACK :
+      type = iod.mesh.bc_z0;
+      break;
+    case GhostPoint::FRONT :
+      type = iod.mesh.bc_zmax;
+      break;
+    default :
+      fprintf(stdout,"*** Error: Detected unsupported boundary code.\n");
+      exit(-1);
+  }
+
+  Vec3D vghost(DBL_MAX);
+  switch (type) {
+    case MeshData::INLET :
+        vghost[0] = iod.bc.inlet.velocity_x;
+        vghost[1] = iod.bc.inlet.velocity_y;
+        vghost[2] = iod.bc.inlet.velocity_z;
+        break;
+      case MeshData::INLET2 :
+        vghost[0] = iod.bc.inlet2.velocity_x;
+        vghost[1] = iod.bc.inlet2.velocity_y;
+        vghost[2] = iod.bc.inlet2.velocity_z;
+        break;
+      case MeshData::OUTLET :
+        vghost = vim;
+        break;
+      case MeshData::SLIPWALL :
+      case MeshData::SYMMETRY :
+        vghost = vim;
+        if(side == GhostPoint::LEFT || side == GhostPoint::RIGHT)
+          vghost[0] = -vghost[0]; //flip the normal velocity
+        else if(side == GhostPoint::BOTTOM || side == GhostPoint::TOP)
+          vghost[1] = -vghost[1]; //flip the normal velocity
+        else
+          vghost[2] = -vghost[2]; //flip the normal velocity
+        break;
+      case MeshData::STICKWALL :
+        vghost = -vim;
+        break;
+      case MeshData::OVERSET :
+        //nothing to be done here. TODO
+        break;
+      default : //Note: edge & corner ghosts have type == NONE (0), shouldn't try to populate these ghosts
+        fprintf(stdout,"*** Error: Detected unsupported boundary condition type (%d).\n", (int)type); 
+        exit(-1);
+  }
+
+  return vghost;
+}
+
 //--------------------------------------------------------------------------
+
+void
+IncompressibleOperator::InterpolateVelocityToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vout)
+{
+
+  assert(V.NumDOF() == 5 && Vout.NumDOF() == 3);
+
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
+
+  //fill domain interior first
+  Vec5D*** v  = (Vec5D***)V.GetDataPointer();
+  Vec3D*** v3 = (Vec3D***)Vout.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        v3[k][j][i][0] = 0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
+        v3[k][j][i][1] = 0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
+        v3[k][j][i][2] = 0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
+      }
+
+  //now, populate ghost nodes
+  int i,j,k, i_im, j_im, k_im;
+  vector<GhostPoint>* ghost_nodes_outer(spo.GetPointerToOuterGhostNodes());
+  for(auto it = ghost_nodes_outer->begin(); it != ghost_nodes_outer->end(); it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; // Do not populate edge and corner ghosts --- they shouldn't be used anyway
+
+    i = it->ijk[0];
+    j = it->ijk[1];
+    k = it->ijk[2];
+    i_im = it->image_ijk[0];
+    j_im = it->image_ijk[1];
+    k_im = it->image_ijk[2];
+
+    bool flat_plate_wall = (iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE) &&
+                           (global_mesh.GetX(i) >= iod.rans.example_param_1); //stick wall
+
+    v3[k][j][i] = ApplyVelocityBoundaryConditionLocal3D(it->side, v3[k_im][j_im][i_im], flat_plate_wall);
+  }
+
+  V.RestoreDataPointerToLocalVector();
+  Vout.RestoreDataPointerAndInsert();
+} 
+
+//--------------------------------------------------------------------------
+
+void
+IncompressibleOperator::CopyAndInterpolateVelocityToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vout)
+{
+  assert(V.NumDOF() == 5 && Vout.NumDOF() == 5);
+
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
+
+  //fill domain interior first
+  Vec5D*** v  = (Vec5D***)V.GetDataPointer();
+  Vec5D*** v5 = (Vec5D***)Vout.GetDataPointer();
+
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        v5[k][j][i][0] = v[k][j][i][0];
+        v5[k][j][i][1] = 0.5*(v[k][j][i][1] + v[k][j][i+1][1]);
+        v5[k][j][i][2] = 0.5*(v[k][j][i][2] + v[k][j+1][i][2]);
+        v5[k][j][i][3] = 0.5*(v[k][j][i][3] + v[k+1][j][i][3]);
+        v5[k][j][i][4] = v[k][j][i][4];
+      }
+
+
+  //now, populate ghost nodes by const extrapolation
+  vector<GhostPoint>* ghost_nodes_outer(spo.GetPointerToOuterGhostNodes());
+  int i,j,k, i_im, j_im, k_im;
+  Vec3D vel_in, vel_out;
+  for(auto it = ghost_nodes_outer->begin(); it != ghost_nodes_outer->end(); it++) {
+
+    if(it->type_projection != GhostPoint::FACE)
+      continue; // Do not populate edge and corner ghosts --- they shouldn't be used anyway
+
+    i = it->ijk[0];
+    j = it->ijk[1];
+    k = it->ijk[2];
+
+    i_im = it->image_ijk[0];
+    j_im = it->image_ijk[1];
+    k_im = it->image_ijk[2];
+    vel_in = Vec3D(v5[k_im][j_im][i_im][1], v5[k_im][j_im][i_im][2], v5[k_im][j_im][i_im][3]);
+
+    bool flat_plate_wall = (iod.rans.example == RANSTurbulenceModelData::FLAT_PLATE) &&
+                           (global_mesh.GetX(i) >= iod.rans.example_param_1); //stick wall
+
+    vel_out = ApplyVelocityBoundaryConditionLocal3D(it->side, vel_in, flat_plate_wall);
+
+    v5[k][j][i][0] = v[k_im][j_im][i_im][0]; 
+    v5[k][j][i][1] = vel_out[0];
+    v5[k][j][i][2] = vel_out[1];
+    v5[k][j][i][3] = vel_out[2];
+    v5[k][j][i][4] = v[k_im][j_im][i_im][4]; 
+  }
+
+  V.RestoreDataPointerToLocalVector();
+  Vout.RestoreDataPointerAndInsert();
+}
+
+
+//--------------------------------------------------------------------------
+
+
+
+
+//--------------------------------------------------------------------------
+
+
 
 
 

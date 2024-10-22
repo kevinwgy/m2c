@@ -139,7 +139,8 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
 
   SpaceVariable3D *Vout = &V;
   if(global_mesh.IsMeshStaggered()) { //interpolate velocity
-    CopyAndInterpolateToCellCenters(V, vector5); 
+    assert(inco);
+    inco->CopyAndInterpolateVelocityToCellCenters(V, vector5); 
     Vout = &vector5;
   }
 
@@ -635,45 +636,6 @@ Output::OutputMeshPartition()
   MPI_Barrier(comm); //this might be needed to avoid file corruption (incomplete output)
 
   scalar.SetConstantValue(0.0); //clean up the internal variable (not necessary)
-}
-
-//--------------------------------------------------------------------------
-
-void
-Output::CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vnew)
-{
-  //fill domain interior first
-  int i0, j0, k0, imax, jmax, kmax;
-  V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
-
-  Vec5D*** vold = (Vec5D***)V.GetDataPointer();
-  Vec5D*** vnew = (Vec5D***)Vnew.GetDataPointer();
-
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-        vnew[k][j][i][0] = vold[k][j][i][0];
-        vnew[k][j][i][1] = 0.5*(vold[k][j][i][1] + vold[k][j][i+1][1]);
-        vnew[k][j][i][2] = 0.5*(vold[k][j][i][2] + vold[k][j+1][i][2]);
-        vnew[k][j][i][3] = 0.5*(vold[k][j][i][3] + vold[k+1][j][i][3]);
-        vnew[k][j][i][4] = vold[k][j][i][4];
-      }
-
-
-  //now, populate ghost nodes by const extrapolation
-  int i,j,k, i_im, j_im, k_im;
-  for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
-    i = it->ijk[0]; 
-    j = it->ijk[1]; 
-    k = it->ijk[2]; 
-    i_im = it->image_ijk[0]; 
-    j_im = it->image_ijk[1]; 
-    k_im = it->image_ijk[2]; 
-    vnew[k][j][i] = vnew[k_im][j_im][i_im];
-  }
-
-  V.RestoreDataPointerToLocalVector();
-  Vnew.RestoreDataPointerAndInsert();
 }
 
 //--------------------------------------------------------------------------

@@ -211,6 +211,11 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     if(Vturb)
       Tmp1.AXPlusBY(0.0, 1.0, *Vturb, true); //Tmp = vturb (include ghost nodes)
 
+
+   if(embed)
+     inco.PopulateInactiveGhosts(V, ID, Phi, EBDS.get()); //!< V gets updated 
+
+
     Vec5D***      v = (Vec5D***)V.GetDataPointer();
     double*** vturb = Vturb ? Vturb->GetDataPointer() : NULL;
 

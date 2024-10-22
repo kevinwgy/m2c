@@ -99,9 +99,6 @@ private:
 
   void OutputMeshPartition();
 
-  //! Takes care of staggered/MAC grid. (Only fills within the physical domain)
-  void CopyAndInterpolateToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vnew);
-
 };
 
 #endif
