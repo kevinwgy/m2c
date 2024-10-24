@@ -30,6 +30,8 @@ class GhostFluidOperator {
 
   GlobalMeshInfo &global_mesh;
 
+  I AM HERE::: Add neighbour list (custom)
+
   SpaceVariable3D Tag;
   std::vector<Int3> ghosts_ijk;
 
@@ -58,9 +60,12 @@ public:
 
   void Destroy();
 
-  int PopulateInactiveNodesForViscosityOperator(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                                std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
-                                                SpaceVariable3D &Vgf);
+  int PopulateInactiveNodesForVisco(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                    std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                    SpaceVariable3D &Vgf);
+
+  int PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVariable3D &ID,
+                                   std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS);
 
 private:
 

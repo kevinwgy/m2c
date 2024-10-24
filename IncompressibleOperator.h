@@ -140,6 +140,9 @@ private:
   //! Interpolate velocity to cell centers (V: 5D, Vout: 5D) --- only populate FACE ghost nodes
   void CopyAndInterpolateVelocityToCellCenters(SpaceVariable3D &V, SpaceVariable3D &Vout);
 
+  //! Interpolate velocity from cell centers (V3) to MAC grid (V) --- only populate cells w/ id = inactive
+  void PopulateInactiveCellBoundaries(SpaceVariable3D &V3, SpaceVariable3D &ID, SpaceVariable3D &V);
+
   //! Function "A" -- Eq.(5.64) in Patankar's book
   inline double PowerLaw(double pc) {double pp=1.0-0.1*fabs(pc); return pp>0.0 ? pow(pp,5) : 0.0;}
   //inline double PowerLaw([[maybe_unused]] double pc) {return 1.0;} //degenerates to upwinding (useful for debugging)

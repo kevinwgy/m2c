@@ -21,12 +21,22 @@ NeighborCommunicator::NeighborCommunicator(MPI_Comm& comm_, GlobalMeshInfo& glob
   subD_neighbors_all = &global_mesh.GetAllNeighborsOfSub(rank);
   subD_neighbors_face_edge = &global_mesh.GetFaceEdgeNeighborsOfSub(rank);
   subD_neighbors_face = &global_mesh.GetFaceNeighborsOfSub(rank);
+
+  //subD_neighbors_custom is empty
 }
 
 //----------------------------------------------------
 
 NeighborCommunicator::~NeighborCommunicator()
 { }
+
+//----------------------------------------------------
+
+void
+BuildCustomNeighborList(int layer, double dist = 0.0)
+{
+  global_mesh.BuildCustomNeighborList(subD_neighbors_custom, layer, dist);
+}
 
 //----------------------------------------------------
 

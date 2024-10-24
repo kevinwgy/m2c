@@ -207,7 +207,7 @@ void ViscosityOperator::AddDiffusionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
   if(EBDS && EBDS->size()>0) {
     assert(gfo); 
-    int numGhostPopulated = gfo->PopulateInactiveNodesForViscosityOperator(V, ID, EBDS, *Velog);
+    int numGhostPopulated = gfo->PopulateInactiveNodesForVisco(V, ID, EBDS, *Velog);
     if(numGhostPopulated>0) {// In this case, Velog should have been filled, and it is the one to use below.
       VV = Velog; //Note: Velog is only velocity, not the 5-dim vector!
       index_in[0] = 0;

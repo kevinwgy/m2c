@@ -58,11 +58,11 @@ public:
             std::vector<std::vector<double> > &Export, std::vector<std::vector<double> > &Import);
    
   void Request(SpaceVariable3D &V, std::vector<Int3> &Request, std::vector<double> &Received,
-               int exchange_type = 0); //!< 0~all, 1~face_edge, 2~face);
+               int exchange_type = 0); //!< 0~all, 1~face_edge, 2~face
 
   void Request(double*** v, int dof,
                std::vector<Int3> &Request, std::vector<double> &Received,
-               int exchange_type = 0); //!< 0~all, 1~face_edge, 2~face); //!< V --> v
+               int exchange_type = 0); //!< 0~all, 1~face_edge, 2~face //!< V --> v
    
 };
 

@@ -54,7 +54,7 @@ GhostFluidOperator::Destroy()
 //-------------------------------------------------------------
 
 int
-GhostFluidOperator::PopulateInactiveNodesForViscosityOperator(SpaceVariable3D &V, 
+GhostFluidOperator::PopulateInactiveNodesForVisco(SpaceVariable3D &V, 
                         SpaceVariable3D &ID,
                         vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                         SpaceVariable3D &Velog)
@@ -505,10 +505,143 @@ update_image:
 
 //-------------------------------------------------------------
 
+int
+GhostFluidOperator::PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVariable3D &ID,
+                        std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
+{
+  assert(EBDS && EBDS->size()>0);
+
+  double*** id = ID.GetDataPointer();
+
+  // ----------------------------------------------------------------------------
+  // Step 1: Identify ghost nodes inside the subdomain that need to be populated
+  // ----------------------------------------------------------------------------
+  int number_of_ghosts = TagInactiveNodes(id, 2); //2 layers; Tag and ghosts_ijk get computed 
+
+  if(number_of_ghosts==0) {
+    ID.RestoreDataPointerToLocalVector();
+    return 0;
+  }
 
 
+  // ----------------------------------------------------------------------------
+  // Step 2: Find image points and the needed geometric information
+  // ----------------------------------------------------------------------------
+  vector<Vec3D> ghosts_xyz;
+  vector<Int3>  images_ijk;
+  vector<Vec3D> images_xi;
+  vector<Vec3D> images_xyz;
+  vector<Vec3D> ghosts_xp; //position of projection points on the interface
+  vector<Vec3D> ghosts_vp; //velocity at projection points on the interface
+
+  vector<int>   ghosts_tag; //-1: undetermined, 0: const extrap should be performed
+                            // 1: linear extrap should be performed, within this subdomain
+                            // 2: linear extrap should be performed; requires neighbor info
+
+  ProjectGhostsToInterface(EBDS, ghosts_xyz, ghosts_xp, ghosts_vp, 
+                           images_ijk, images_xi, images_xyz, ghosts_tag);
 
 
+  // ----------------------------------------------------------------------------
+  // Step 3: Find a usable image for each ghost node, starting w/ the one found above
+  //         Determine "ghosts_tag"
+  // ----------------------------------------------------------------------------
+  FindImagesForGhosts(id, ghosts_xyz, images_ijk, images_xi, images_xyz, ghosts_tag);
 
+
+  // ----------------------------------------------------------------------------
+  // Step 4: Populate ghost nodes
+  // ----------------------------------------------------------------------------
+  Vec3D*** vel = (Vec3D***)V3.GetDataPointer();
+
+  vector<Int3>           neighbor_requests;
+  map<int, vector<int> > outside_images;
+  vector<double>         neighbor_received; //will be fixed by neicomm
+
+  // 4.1: Get necessary info from neighbors
+  for(int n=0; n<(int)ghosts_ijk.size(); n++) {
+    if(ghosts_tag[n]==2) {
+      int i,j,k;
+      for(int dk=0; dk<=1; dk++) {
+        k = images_ijk[n][2]+dk;
+        for(int dj=0; dj<=1; dj++) {
+          j = images_ijk[n][1]+dj;
+          for(int di=0; di<=1; di++) {
+            i = images_ijk[n][0]+di;
+
+            if(!Tag.IsHere(i,j,k,true)) { //get from neighbor
+              neighbor_requests.push_back(Int3(i,j,k));
+              if(outside_images.find(n)==outside_images.end())
+                outside_images[n] = vector<int>();
+              outside_images[n].push_back(neighbor_requests.size()-1);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  neicomm.Request((double***)vel, 3, neighbor_requests, neighbor_received, 0);
+  assert(neighbor_received.size() == 3*neighbor_requests.size());
+
+  // 4.2: Populate ghost nodes
+  EmbeddedBoundaryFormula formula(EmbeddedBoundaryFormula::LINEAR_EXTRAPOLATION);
+
+  for(int n=0; n<(int)ghosts_ijk.size(); n++) {
+
+    if(ghosts_tag[n] == 0) {//constant extrapolation
+      vel[ghosts_ijk[n][2]][ghosts_ijk[n][1]][ghosts_ijk[n][0]] = ghosts_vp[n];
+    }
+    else {//linear extrapolation
+
+      double alpha = (ghosts_xyz[n]-ghosts_xp[n]).norm()
+                   / (ghosts_xyz[n]-images_xyz[n]).norm();
+      formula.BuildLinearExtrapolationFormula(ghosts_ijk[n], images_ijk[n], 
+                                              images_xi[n], alpha); 
+
+      if(ghosts_tag[n] == 1) {//within subdomain
+        vel[ghosts_ijk[n][2]][ghosts_ijk[n][1]][ghosts_ijk[n][0]] 
+            = formula.Evaluate3D(vel, ghosts_vp[n]);
+      }
+      else { //needs info outside subdomain
+
+        assert(ghosts_tag[n]==2);
+
+        vector<Int3>& nodes(formula.GetNodes());
+        vector<Vec3D> vloc(nodes.size());
+
+        for(int p=0; p<(int)nodes.size(); p++) {
+          if(Tag.IsHere(nodes[p][0],nodes[p][1],nodes[p][2],true)) {
+            vloc[p] = vel[nodes[p][2]][nodes[p][1]][nodes[p][0]];
+          }
+          else {
+            auto it = outside_images.find(n);
+            assert(it != outside_images.end());
+            bool foundit = false;
+            for(auto&& g : it->second) {
+              if(neighbor_requests[g]==nodes[p]) {//found you!
+                for(int dof=0; dof<3; dof++)
+                  vloc[p][dof] = neighbor_received[3*g+dof];
+                foundit = true;
+                break;
+              }
+            } 
+            assert(foundit);
+          }
+        }
+
+        vel[ghosts_ijk[n][2]][ghosts_ijk[n][1]][ghosts_ijk[n][0]]
+            = formula.Evaluate3D(vloc, ghosts_vp[n]); 
+      }
+
+    }
+  }
+
+  V3.RestoreDataPointerAndInsert();
+
+  ID.RestoreDataPointerToLocalVector();
+
+  return number_of_ghosts;
+}
 //-------------------------------------------------------------
 

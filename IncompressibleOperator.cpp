@@ -547,10 +547,10 @@ IncompressibleOperator::PopulateInactiveGhosts(SpaceVariable3D &V, SpaceVariable
   InterpolateVelocityToCellCenters(V, V3);
 
   assert(gfo);
-//  gfo->Populate I AM HERE
+  gfo->PopulateInactiveNodesForInco(V3, ID, EBDS);
 
 
-  //PopulateInactiveCellBoundaries(V3, V, ID);
+  PopulateInactiveCellBoundaries(V3, ID, V);
 }
 
 //--------------------------------------------------------------------------
@@ -3927,11 +3927,43 @@ IncompressibleOperator::CopyAndInterpolateVelocityToCellCenters(SpaceVariable3D 
   Vout.RestoreDataPointerAndInsert();
 }
 
-
 //--------------------------------------------------------------------------
 
+void
+IncompressibleOperator::PopulateInactiveCellBoundaries(SpaceVariable3D &V3, SpaceVariable3D &ID,
+                                                       SpaceVariable3D &V)
+{
+  GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
 
+  Vec3D***  v3 = (Vec3D***)V3.GetDataPointer();
+  double*** id = ID.GetDataPointer();
+  Vec5D***  v  = (Vec5D***)V.GetDataPointer();
 
+  double cm, cp;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        if(id[k][j][i] != INACTIVE_MATERIAL_ID)
+          continue;
+
+        cm = global_mesh.GetDx(i-1);
+        cp = global_mesh.GetDx(i);
+        v[k][j][i][1] = (cp*v3[k][j][i-1][0] + cm*v3[k][j][i][0])/(cm+cp);
+
+        cm = global_mesh.GetDy(j-1);
+        cp = global_mesh.GetDy(j);
+        v[k][j][i][2] = (cp*v3[k][j-1][i][1] + cm*v3[k][j][i][1])/(cm+cp);
+
+        cm = global_mesh.GetDz(k-1);
+        cp = global_mesh.GetDz(k);
+        v[k][j][i][3] = (cp*v3[k-1][j][i][2] + cm*v3[k][j][i][2])/(cm+cp);
+      }
+
+  ID.RestoreDataPointerToLocalVector();
+  V3.RestoreDataPointerToLocalVector();
+  V.RestoreDataPointerAndInsert();
+}
 
 //--------------------------------------------------------------------------
 
