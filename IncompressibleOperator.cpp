@@ -18,7 +18,7 @@ extern int INACTIVE_MATERIAL_ID;
 
 IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                                                vector<VarFcnBase*> &varFcn_, SpaceOperator &spo_, 
-                                               InterpolatorBase &interp_)
+                                               InterpolatorBase &interp_, bool with_embedded_boundary)
                       : comm(comm_), iod(iod_), vf(varFcn_), spo(spo_), interpolator(interp_), gfo(NULL),
                         V3(comm_, &(dm_all_.ghosted1_3dof))
 {
@@ -74,6 +74,10 @@ IncompressibleOperator::IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &
     }
   }
 
+  if(with_embedded_boundary) {
+    gfo = new GhostFluidOperator(comm_, dm_all_, global_mesh);
+    gfo->SetupCustomNeighborCommunicator(3); //3 layers should be enough
+  }
 }
 
 //--------------------------------------------------------------------------

@@ -30,8 +30,6 @@ class GhostFluidOperator {
 
   GlobalMeshInfo &global_mesh;
 
-  I AM HERE::: Add neighbour list (custom)
-
   SpaceVariable3D Tag;
   std::vector<Int3> ghosts_ijk;
 
@@ -59,6 +57,9 @@ public:
   ~GhostFluidOperator();
 
   void Destroy();
+
+  //! call neicomm to do the job (layer: graph distance, dist: physical distance)
+  int SetupCustomNeighborCommunicator(int layer, double dist = 0.0);
 
   int PopulateInactiveNodesForVisco(SpaceVariable3D &V, SpaceVariable3D &ID,
                                     std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,

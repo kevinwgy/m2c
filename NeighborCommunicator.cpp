@@ -5,6 +5,7 @@
 
 #include <NeighborCommunicator.h>
 #include <SpaceVariable.h>
+#include <OverlappingAxisAlignedBoxes.h>
 #include <cassert>
 #include <map>
 
@@ -32,23 +33,80 @@ NeighborCommunicator::~NeighborCommunicator()
 
 //----------------------------------------------------
 
-void
-BuildCustomNeighborList(int layer, double dist = 0.0)
+int
+NeighborCommunicator::BuildCustomNeighborList(int layer, double dist)
 {
-  global_mesh.BuildCustomNeighborList(subD_neighbors_custom, layer, dist);
+  assert(layer>=0 && dist>=0.0);
+  double eps = 1e-4*global_mesh.GetMinDXYZ();
+
+  std::get<0>(subD_neighbors_custom) = layer;
+  std::get<1>(subD_neighbors_custom) = dist;
+  std::get<2>(subD_neighbors_custom).clear();
+
+  int i0 = global_mesh.subD_ijk_min[rank][0];
+  int j0 = global_mesh.subD_ijk_min[rank][1];
+  int k0 = global_mesh.subD_ijk_min[rank][2];
+  int imax = global_mesh.subD_ijk_max[rank][0];
+  int jmax = global_mesh.subD_ijk_max[rank][1];
+  int kmax = global_mesh.subD_ijk_max[rank][2];
+  int NX = global_mesh.NX;
+  int NY = global_mesh.NY;
+  int NZ = global_mesh.NZ;
+
+  Vec3D xyz_min, xyz_max;
+  int id;
+
+  id = std::max(i0-layer,0);
+  xyz_min[0] = global_mesh.GetX(id) - 0.5*global_mesh.GetDx(id);
+  id = std::max(j0-layer,0);
+  xyz_min[1] = global_mesh.GetY(id) - 0.5*global_mesh.GetDy(id);
+  id = std::max(k0-layer,0);
+  xyz_min[2] = global_mesh.GetZ(id) - 0.5*global_mesh.GetDz(id);
+
+  for(int p=0; p<3; p++)
+    xyz_min[p] = std::min(xyz_max[p], global_mesh.subD_xyz_min[rank][p] - dist);
+
+  id = std::min(imax-1+layer,NX-1);
+  xyz_max[0] = global_mesh.GetX(id) + 0.5*global_mesh.GetDx(id);
+  id = std::min(jmax-1+layer,NY-1);
+  xyz_max[1] = global_mesh.GetY(id) + 0.5*global_mesh.GetDy(id);
+  id = std::min(kmax-1+layer,NZ-1);
+  xyz_max[2] = global_mesh.GetZ(id) + 0.5*global_mesh.GetDz(id);
+
+  for(int p=0; p<3; p++)
+    xyz_max[p] = std::max(xyz_max[p], global_mesh.subD_xyz_max[rank][p] + dist);
+
+  xyz_min -= eps;
+  xyz_max += eps;
+
+  assert(size == (int)global_mesh.subD_xyz_min.size());
+  for(int p=0; p<size; p++) {
+    if(p == rank)
+      continue; //exclude self
+    if(GeoTools::BoxesOverlapping3D(xyz_min, xyz_max,
+                                    global_mesh.subD_xyz_min[p], global_mesh.subD_xyz_max[p]))
+      std::get<2>(subD_neighbors_custom).push_back(p);
+  }
+
+  //TODO: I AM HERE NEED TO MAKE SURE mutual neighbors
+  return (int)std::get<2>(subD_neighbors_custom).size();
 }
 
 //----------------------------------------------------
 
 void
-NeighborCommunicator::Send(int exchange_type, // 0~all, 1~face_edge, 2~face
+NeighborCommunicator::Send(int exchange_type, // 0~all, 1~face_edge, 2~face, 3~custom
                            vector<vector<double> > &Export, vector<vector<double> > &Import)
 {
 
   //Sanity check
-  assert(exchange_type==2 || exchange_type==1 || exchange_type==0);
+  assert(exchange_type>=0 && exchange_type<=3);
+  if(exchange_type==3)
+    assert(std::get<0>(subD_neighbors_custom)>0 || std::get<1>(subD_neighbors_custom)>0.0); //make sure it is built
 
   std::vector<int> *neighbors_ptr; //points to the correct neighborhood
+  if(exchange_type==3)
+    neighbors_ptr = &std::get<2>(subD_neighbors_custom);
   if(exchange_type==2)
     neighbors_ptr = subD_neighbors_face;
   else if(exchange_type==1)
@@ -122,9 +180,13 @@ NeighborCommunicator::Request(SpaceVariable3D &V, vector<Int3> &Request, vector<
   double*** v = V.GetDataPointer();
 
   //Sanity check
-  assert(exchange_type==2 || exchange_type==1 || exchange_type==0);
+  assert(exchange_type>=0 && exchange_type<=3);
+  if(exchange_type==3)
+    assert(std::get<0>(subD_neighbors_custom)>0 || std::get<1>(subD_neighbors_custom)>0.0); //make sure it is built
 
   std::vector<int> *neighbors_ptr; //points to the correct neighborhood
+  if(exchange_type==3)
+    neighbors_ptr = &std::get<2>(subD_neighbors_custom);
   if(exchange_type==2)
     neighbors_ptr = subD_neighbors_face;
   else if(exchange_type==1)
@@ -151,7 +213,11 @@ NeighborCommunicator::Request(SpaceVariable3D &V, vector<Int3> &Request, vector<
 
     nei = std::find(neighbors_ptr->begin(), neighbors_ptr->end(), owner)
         - neighbors_ptr->begin();
-    assert(nei != Nneigh);
+    if(nei == Nneigh) {
+      fprintf(stderr,"\033[0;31mNeighborCommunicator[%d]: Subdomain %d is not a neighbor.\033[0m\n",
+              rank, owner);
+      exit(-1);
+    }
 
     neighbor_requests[nei].push_back(Request[n]);
     neighbor_received_map[nei].push_back(n);
@@ -263,9 +329,13 @@ NeighborCommunicator::Request(double*** v, int dof,
 {
 
   //Sanity check
-  assert(exchange_type==2 || exchange_type==1 || exchange_type==0);
+  assert(exchange_type>=0 && exchange_type<=3);
+  if(exchange_type==3)
+    assert(std::get<0>(subD_neighbors_custom)>0 || std::get<1>(subD_neighbors_custom)>0.0); //make sure it is built
 
   std::vector<int> *neighbors_ptr; //points to the correct neighborhood
+  if(exchange_type==3)
+    neighbors_ptr = &std::get<2>(subD_neighbors_custom);
   if(exchange_type==2)
     neighbors_ptr = subD_neighbors_face;
   else if(exchange_type==1)
@@ -292,7 +362,11 @@ NeighborCommunicator::Request(double*** v, int dof,
 
     nei = std::find(neighbors_ptr->begin(), neighbors_ptr->end(), owner)
         - neighbors_ptr->begin();
-    assert(nei != Nneigh);
+    if(nei == Nneigh) {
+      fprintf(stderr,"\033[0;31mNeighborCommunicator[%d]: Subdomain %d is not a neighbor.\033[0m\n",
+              rank, owner);
+      exit(-1);
+    }
 
     neighbor_requests[nei].push_back(Request[n]);
     neighbor_received_map[nei].push_back(n);

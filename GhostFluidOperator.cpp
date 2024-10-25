@@ -510,6 +510,8 @@ GhostFluidOperator::PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVaria
                         std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
   assert(EBDS && EBDS->size()>0);
+  assert(neicomm.GetCustomNeighborsLayer()>0 ||
+         neicomm.GetCustomNeighborsDist()>0.0); //make sure custom neighbor list is built
 
   double*** id = ID.GetDataPointer();
 
@@ -643,5 +645,14 @@ GhostFluidOperator::PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVaria
 
   return number_of_ghosts;
 }
+
+//-------------------------------------------------------------
+
+int
+GhostFluidOperator::SetupCustomNeighborCommunicator(int layer, double dist)
+{
+  return neicomm.BuildCustomNeighborList(layer, dist);
+}
+
 //-------------------------------------------------------------
 

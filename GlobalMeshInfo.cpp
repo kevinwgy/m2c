@@ -5,7 +5,7 @@
 
 #include<GlobalMeshInfo.h>
 #include<SpaceVariable.h>
-#include<algorithm> //std::upper_bound
+#include<algorithm> //std::upper_bound, min_element, max_element
 #include<cfloat> //DBL_MAX
 
 //------------------------------------------------------------------
@@ -44,6 +44,16 @@ GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double>
   domain_volume = ((x_glob[NX-1] + 0.5*dx_glob[NX-1]) - (x_glob[0] - 0.5*dx_glob[0]))
                 * ((y_glob[NY-1] + 0.5*dy_glob[NY-1]) - (y_glob[0] - 0.5*dy_glob[0]))
                 * ((z_glob[NZ-1] + 0.5*dz_glob[NZ-1]) - (z_glob[0] - 0.5*dz_glob[0]));
+
+  // calculate dxyz_min_glob and dxyz_max_glob
+  dxyz_min_glob = DBL_MAX;
+  if(dx_glob.size()>1) dxyz_min_glob = std::min(dxyz_min_glob, *min_element(dx_glob.begin(), dx_glob.end()));
+  if(dy_glob.size()>1) dxyz_min_glob = std::min(dxyz_min_glob, *min_element(dy_glob.begin(), dy_glob.end()));
+  if(dz_glob.size()>1) dxyz_min_glob = std::min(dxyz_min_glob, *min_element(dz_glob.begin(), dz_glob.end()));
+  dxyz_max_glob = -DBL_MAX;
+  if(dx_glob.size()>1) dxyz_max_glob = std::max(dxyz_max_glob, *max_element(dx_glob.begin(), dx_glob.end()));
+  if(dy_glob.size()>1) dxyz_max_glob = std::max(dxyz_max_glob, *max_element(dy_glob.begin(), dy_glob.end()));
+  if(dz_glob.size()>1) dxyz_max_glob = std::max(dxyz_max_glob, *max_element(dz_glob.begin(), dz_glob.end()));
 
 }
 
@@ -101,9 +111,9 @@ GlobalMeshInfo::FindSubdomainInfo(MPI_Comm& comm, DataManagers3D& dms)
 
   S.RestoreDataPointerAndInsert();
 
+  // let everyone know everyone else's 27 neighbors (including self)
   s = S.GetDataPointer();
   std::vector<int> neighbors_all(size*27, none);
-
   int myi, myj, myk;
   for(int k=0; k<3; k++)
     for(int j=0; j<3; j++)

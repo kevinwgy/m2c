@@ -47,6 +47,7 @@ public:
 
   std::vector<double> x_glob, y_glob, z_glob;
   std::vector<double> dx_glob, dy_glob, dz_glob;
+  double dxyz_min_glob, dxyz_max_glob;
 
   bool one_dimensional_x; //!< set to true if y and z have only one element
   bool one_dimensional_y; //!< set to true if x and z have only one element
@@ -112,6 +113,8 @@ public:
   //! If mesh is 2D, only consider dx and dy
   double GetMinDXYZ(Int3 ijk);
   double GetMaxDXYZ(Int3 ijk);
+  inline double GetMinDXYZ() {return dxyz_min_glob;} //!< global min
+  inline double GetMaxDXYZ() {return dxyz_max_glob;} //!< global max
 
   //! Duplicate of function in SpaceVariable (checking nodes/cells)
   inline bool OutsidePhysicalDomain(int i, int j, int k) {
