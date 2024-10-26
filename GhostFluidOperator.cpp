@@ -513,6 +513,9 @@ GhostFluidOperator::PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVaria
   assert(neicomm.GetCustomNeighborsLayer()>0 ||
          neicomm.GetCustomNeighborsDist()>0.0); //make sure custom neighbor list is built
 
+
+  //I AM HERE
+
   double*** id = ID.GetDataPointer();
 
   // ----------------------------------------------------------------------------

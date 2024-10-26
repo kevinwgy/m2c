@@ -676,6 +676,46 @@ GlobalMeshInfo::Get7NeighborhoodOfSub(int sub) {
 
 //------------------------------------------------------------------
 
+void
+GlobalMeshInfo::GetSubdomainBox(int sub, int layer, double dist, Vec3D& xyz_min, Vec3D& xyz_max)
+{
+  int size = subD_ijk_min.size();
+  assert(size>0); //confirm that FindSubdomainInfo has been called.
+
+  assert(sub>=0 && sub<size);
+  int i0 = subD_ijk_min[sub][0];
+  int j0 = subD_ijk_min[sub][1];
+  int k0 = subD_ijk_min[sub][2];
+  int imax = subD_ijk_max[sub][0];
+  int jmax = subD_ijk_max[sub][1];
+  int kmax = subD_ijk_max[sub][2];
+
+  int id;
+  id = std::max(i0-layer,0);
+  xyz_min[0] = GetX(id) - 0.5*GetDx(id);
+  id = std::max(j0-layer,0);
+  xyz_min[1] = GetY(id) - 0.5*GetDy(id);
+  id = std::max(k0-layer,0);
+  xyz_min[2] = GetZ(id) - 0.5*GetDz(id);
+
+  for(int p=0; p<3; p++)
+    xyz_min[p] = std::min(xyz_max[p], subD_xyz_min[sub][p] - dist);
+
+  id = std::min(imax-1+layer,NX-1);
+  xyz_max[0] = GetX(id) + 0.5*GetDx(id);
+  id = std::min(jmax-1+layer,NY-1);
+  xyz_max[1] = GetY(id) + 0.5*GetDy(id);
+  id = std::min(kmax-1+layer,NZ-1);
+  xyz_max[2] = GetZ(id) + 0.5*GetDz(id);
+
+  for(int p=0; p<3; p++)
+    xyz_max[p] = std::max(xyz_max[p], subD_xyz_max[sub][p] + dist);
+
+  assert(xyz_min[0]<=xyz_max[0] && xyz_min[1]<=xyz_max[1] && xyz_min[2]<=xyz_max[2]);
+}
+
+//------------------------------------------------------------------
+
 
 //------------------------------------------------------------------
 

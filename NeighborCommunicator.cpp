@@ -43,52 +43,34 @@ NeighborCommunicator::BuildCustomNeighborList(int layer, double dist)
   std::get<1>(subD_neighbors_custom) = dist;
   std::get<2>(subD_neighbors_custom).clear();
 
-  int i0 = global_mesh.subD_ijk_min[rank][0];
-  int j0 = global_mesh.subD_ijk_min[rank][1];
-  int k0 = global_mesh.subD_ijk_min[rank][2];
-  int imax = global_mesh.subD_ijk_max[rank][0];
-  int jmax = global_mesh.subD_ijk_max[rank][1];
-  int kmax = global_mesh.subD_ijk_max[rank][2];
-  int NX = global_mesh.NX;
-  int NY = global_mesh.NY;
-  int NZ = global_mesh.NZ;
-
+  //make sure if A is a neighbor of B, then B is a neighbor of A
   Vec3D xyz_min, xyz_max;
-  int id;
+  Vec3D xyz_min2, xyz_max2;
 
-  id = std::max(i0-layer,0);
-  xyz_min[0] = global_mesh.GetX(id) - 0.5*global_mesh.GetDx(id);
-  id = std::max(j0-layer,0);
-  xyz_min[1] = global_mesh.GetY(id) - 0.5*global_mesh.GetDy(id);
-  id = std::max(k0-layer,0);
-  xyz_min[2] = global_mesh.GetZ(id) - 0.5*global_mesh.GetDz(id);
-
-  for(int p=0; p<3; p++)
-    xyz_min[p] = std::min(xyz_max[p], global_mesh.subD_xyz_min[rank][p] - dist);
-
-  id = std::min(imax-1+layer,NX-1);
-  xyz_max[0] = global_mesh.GetX(id) + 0.5*global_mesh.GetDx(id);
-  id = std::min(jmax-1+layer,NY-1);
-  xyz_max[1] = global_mesh.GetY(id) + 0.5*global_mesh.GetDy(id);
-  id = std::min(kmax-1+layer,NZ-1);
-  xyz_max[2] = global_mesh.GetZ(id) + 0.5*global_mesh.GetDz(id);
-
-  for(int p=0; p<3; p++)
-    xyz_max[p] = std::max(xyz_max[p], global_mesh.subD_xyz_max[rank][p] + dist);
-
+  global_mesh.GetSubdomainBox(rank, layer, dist, xyz_min, xyz_max);
   xyz_min -= eps;
   xyz_max += eps;
 
-  assert(size == (int)global_mesh.subD_xyz_min.size());
   for(int p=0; p<size; p++) {
     if(p == rank)
       continue; //exclude self
+
     if(GeoTools::BoxesOverlapping3D(xyz_min, xyz_max,
-                                    global_mesh.subD_xyz_min[p], global_mesh.subD_xyz_max[p]))
+                                    global_mesh.subD_xyz_min[p], global_mesh.subD_xyz_max[p])) {
+      std::get<2>(subD_neighbors_custom).push_back(p);
+      continue;
+    }
+
+    //make sure if A is a neighbor of B, then B is a neighbor of A
+    global_mesh.GetSubdomainBox(p, layer, dist, xyz_min2, xyz_max2);
+    xyz_min2 -= eps;
+    xyz_max2 += eps;
+
+    if(GeoTools::BoxesOverlapping3D(xyz_min2, xyz_max2,
+                                    global_mesh.subD_xyz_min[rank], global_mesh.subD_xyz_max[rank]))
       std::get<2>(subD_neighbors_custom).push_back(p);
   }
 
-  //TODO: I AM HERE NEED TO MAKE SURE mutual neighbors
   return (int)std::get<2>(subD_neighbors_custom).size();
 }
 

@@ -174,10 +174,10 @@ public:
   std::vector<int> &Get19NeighborhoodOfSub(int sub);
   std::vector<int> &Get7NeighborhoodOfSub(int sub);
 
+  //! Get subdomain box with offset (+/- layer and/or +/- dist) 
+  void GetSubdomainBox(int sub, int layer, double dist, Vec3D& xyz_min, Vec3D& xyz_max);
+
 };
-
-
-
 
 
 #endif
