@@ -169,7 +169,12 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
   std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS
       = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
+  
   double*** id = ID.GetDataPointer();
+
+  if(embed || Phi.size()>0) //otherwise, homo = 0 everywhere
+    spo.TagInterfaceNodesBasedOnID(id, Homo, 1, 0); //homo = 1 away from ID discontinuity
+
   double*** homo = Homo.GetDataPointer();
 
   int iter, maxIter = time_step == 1 ? 10*iod.ts.semi_impl.maxIts : iod.ts.semi_impl.maxIts;
@@ -295,7 +300,7 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     //-----------------------------------------------------
     // Step 2: Solve the p' equation
     //-----------------------------------------------------
-    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, EBDS.get(),
+    inco.BuildPressureEquationSIMPLE(v, homo, id, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, EBDS.get(),
                                      fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
 
@@ -448,6 +453,11 @@ TimeIntegratorSIMPLE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID
     assert(R3_ptr);
     inco.CalculateMomentumChanges(v0, V, id, *R3_ptr);
   }
+
+
+  //TODO: Run explicit solvers
+  
+
 
   V0.RestoreDataPointerToLocalVector();
 
@@ -686,7 +696,7 @@ TimeIntegratorSIMPLER::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &I
       inco.CalculateCoefficientsSIMPLER(1, v0, v, id, homo, vlin_rows, Bv, VYstar, DY, Efactor, dt, LocalDt); //"Vhat"
     if(global_mesh.z_glob.size()>1)
       inco.CalculateCoefficientsSIMPLER(2, v0, v, id, homo, wlin_rows, Bw, VZstar, DZ, Efactor, dt, LocalDt); //"What"
-    inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, NULL/*EBDS.get()*/,
+    inco.BuildPressureEquationSIMPLE(v, homo, id, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, NULL/*EBDS.get()*/,
                                      fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
     plin_solver.SetLinearOperator(plin_rows);
     lin_success = plin_solver.Solve(B, P, NULL, &nLinIts, &lin_rnorm, &lin_rnorm_its);
@@ -1084,7 +1094,7 @@ TimeIntegratorPISO::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   //-----------------------------------------------------
   // Step 2: Solve the p' equation (First Corrector Step)
   //-----------------------------------------------------
-  inco.BuildPressureEquationSIMPLE(v, homo, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, NULL/*EBDS.get()*/,
+  inco.BuildPressureEquationSIMPLE(v, homo, id, VXstar, VYstar, VZstar, DX, DY, DZ, plin_rows, B, NULL/*EBDS.get()*/,
                                    fix_pressure_at_one_corner ? &ijk_zero_p : NULL);
   plin_solver.SetLinearOperator(plin_rows);
   Pprime.SetConstantValue(0.0, true); //!< This is p *correction*. Set init guess to 0 (Patankar 6.7-4)

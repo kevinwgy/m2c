@@ -2802,8 +2802,52 @@ SpaceOperator::ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariab
 
 }
 
+//-----------------------------------------------------
 
-  
+void
+SpaceOperator::TagInterfaceNodesBasedOnID(double*** id, SpaceVariable3D& Tag, int tag0, int tag1)
+{
+  // only consider nodes within physical domain
+  // tag0: default tag (i.e., away from interface)
+  // tag1: near interface --- having different ID with a direct neighbor
+
+  int ii0_in, jj0_in, kk0_in, iimax_in, jjmax_in, kkmax_in;
+  Tag.GetInternalGhostedCornerIndices(&ii0_in, &jj0_in, &kk0_in, &iimax_in, &jjmax_in, &kkmax_in);
+
+  double*** tag = Tag.GetDataPointer();
+
+  //!< check left, right, and bottom edges 
+  for(int k=k0; k<kkmax_in; k++)
+    for(int j=j0; j<jjmax_in; j++)
+      for(int i=i0; i<iimax_in; i++) {
+
+        tag[k][j][i] = tag0; //default
+
+        if(i-1>=0) //left neighbor within physical domain
+          if(id[k][j][i-1] != id[k][j][i]) {
+            tag[k][j][i-1] = tag1;
+            tag[k][j][i]   = tag1;
+          }
+
+        if(j-1>=0) //bottom neighbor within physical domain
+          if(id[k][j-1][i] != id[k][j][i]) {
+            tag[k][j-1][i] = tag1;
+            tag[k][j][i]   = tag1;
+          }
+
+        if(k-1>=0) //backward neighbor within physical domain
+          if(id[k-1][j][i] != id[k][j][i]) {
+            tag[k-1][j][i] = tag1;
+            tag[k][j][i]   = tag1;
+          }
+      }
+
+  Tag.RestoreDataPointerAndInsert();
+
+} 
+
+//-----------------------------------------------------
+
  
 
 //-----------------------------------------------------

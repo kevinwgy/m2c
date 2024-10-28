@@ -389,8 +389,8 @@ GhostFluidOperator::FindImagesForGhosts(double*** id, vector<Vec3D> &ghosts_xyz,
   std::set<int> undetermined;
   for(int n=0; n<(int)ghosts_ijk.size(); n++) {
     // if dist from ghost to interface <5% of element size, apply const extrap
-    //if((images_xyz[n]-ghosts_xyz[n]).norm() < 0.1*global_mesh.GetMinDXYZ(ghosts_ijk[n])) 
-    //  ghosts_tag[n] = 0;
+    if((images_xyz[n]-ghosts_xyz[n]).norm() < 0.1*global_mesh.GetMinDXYZ(ghosts_ijk[n])) 
+      ghosts_tag[n] = 0;
     //else if(ghosts_tag[n]<0)
     //  undetermined.insert(n);
     if(ghosts_tag[n]<0)
@@ -513,9 +513,6 @@ GhostFluidOperator::PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVaria
   assert(neicomm.GetCustomNeighborsLayer()>0 ||
          neicomm.GetCustomNeighborsDist()>0.0); //make sure custom neighbor list is built
 
-
-  //I AM HERE
-
   double*** id = ID.GetDataPointer();
 
   // ----------------------------------------------------------------------------
@@ -527,7 +524,6 @@ GhostFluidOperator::PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVaria
     ID.RestoreDataPointerToLocalVector();
     return 0;
   }
-
 
   // ----------------------------------------------------------------------------
   // Step 2: Find image points and the needed geometric information
@@ -586,7 +582,7 @@ GhostFluidOperator::PopulateInactiveNodesForInco(SpaceVariable3D &V3, SpaceVaria
     }
   }
 
-  neicomm.Request((double***)vel, 3, neighbor_requests, neighbor_received, 0);
+  neicomm.Request((double***)vel, 3, neighbor_requests, neighbor_received, 3);//custom
   assert(neighbor_received.size() == 3*neighbor_requests.size());
 
   // 4.2: Populate ghost nodes

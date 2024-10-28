@@ -154,6 +154,9 @@ public:
 
   void UpdateOversetGhostNodes(SpaceVariable3D &V);
 
+  //!< Tag nodes that have different ID with any direct neighbor
+  void TagInterfaceNodesBasedOnID(double*** id, SpaceVariable3D& Tag, int tag0 = 0, int tag1 = 1);
+
   void Destroy();
 
 
@@ -175,7 +178,8 @@ private:
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
                               RiemannSolutions *riemann_solutions = NULL,
-                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL, vector<SpaceVariable3D*> *KappaPhi = NULL,
+                              vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
+                              vector<SpaceVariable3D*> *KappaPhi = NULL,
                               vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr);
 
   Vec3D GetNormalForOneSidedRiemann(int d,/*0,1,2*/
@@ -194,7 +198,8 @@ private:
   Vec3D CalculateGradientAtCellInterface(int d/*0,1,2*/, int i, int j, int k, Vec3D*** coords,
                                          Vec3D*** dxyz, double*** phi);
 
-  double CalculateCurvatureAtCellInterface(int d/*0,1,2*/, double*** phi, double*** kappaPhi, int i, int j, int k);  
+  double CalculateCurvatureAtCellInterface(int d/*0,1,2*/, double*** phi, double*** kappaPhi,
+                                           int i, int j, int k);  
 
   bool TagNodesOutsideConRecDepth(vector<SpaceVariable3D*> *Phi, 
                                   vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,

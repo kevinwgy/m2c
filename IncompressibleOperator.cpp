@@ -545,14 +545,13 @@ IncompressibleOperator::ApplyBoundaryConditions(SpaceVariable3D &V)
 
 void
 IncompressibleOperator::PopulateInactiveGhosts(SpaceVariable3D &V, SpaceVariable3D &ID,
-                                               vector<SpaceVariable3D*>& Phi,
+                                               [[maybe_unused]] vector<SpaceVariable3D*>& Phi,
                                                std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
   InterpolateVelocityToCellCenters(V, V3);
 
   assert(gfo);
   gfo->PopulateInactiveNodesForInco(V3, ID, EBDS);
-
 
   PopulateInactiveCellBoundaries(V3, ID, V);
 }
@@ -1069,7 +1068,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
                                                     double*** homo, //node is in a homogeneous region?
                                                     vector<RowEntries> &vlin_rows, SpaceVariable3D &B,
                                                     SpaceVariable3D &Ddiag,
-                                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                                    [[maybe_unused]]vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                                     bool SIMPLEC, double Efactor,
                                                     double dt, SpaceVariable3D *LocalDt)
 {
@@ -1118,7 +1117,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
         row.SetRow(i,j,k);
         row_counter++;
 
-        if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0)) {
+        if((dir==0 && i==0) || (dir==1 && j==0) || (dir==2 && k==0) ||
+           id[k][j][i]==INACTIVE_MATERIAL_ID) {
           row.PushEntry(i,j,k, 1.0); 
           bb[k][j][i] = v[k][j][i][1+dir];
           diag[k][j][i] = 0.0; // not really used
@@ -1756,6 +1756,7 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
 
           bb[k][j][i] += v[k][j][i][0]*Sc_turb*dx*dy*dz; //updates bb
         }
+
         //------------------------------------------------------
         // END of evaluating the source term due to turbulent eddy viscosity
         //------------------------------------------------------
@@ -1792,14 +1793,14 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
 //--------------------------------------------------------------------------
 
 void
-IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, SpaceVariable3D &VXstar,
+IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, double*** id,
+                                                    SpaceVariable3D &VXstar,
                                                     SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                                     SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
                                                     vector<RowEntries> &plin_rows, SpaceVariable3D &B,
-                                                    vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
+                                                    [[maybe_unused]]vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                                     Int3 *ijk_zero_p)
 {
-  assert(!EBDS); //I AM HERE!
 
   GlobalMeshInfo& global_mesh(spo.GetGlobalMeshInfo());
 
@@ -1838,6 +1839,13 @@ IncompressibleOperator::BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, 
         // initialization
         ap = 0.0;
         bb[k][j][i] = 0.0;
+
+        // if cell is inactive, no need to update pressure
+        if(id[k][j][i]==INACTIVE_MATERIAL_ID) {
+          row.PushEntry(i,j,k, 1.0);
+          bb[k][j][i] = 0.0;
+          continue;
+        }
 
         // set p = 0? (Otherwise, the linear system is singular, but *may* still be solvable by iterative methods)
         if(ijk_zero_p && i==(*ijk_zero_p)[0] && j==(*ijk_zero_p)[1] && k==(*ijk_zero_p)[2]) {

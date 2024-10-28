@@ -80,7 +80,7 @@ public:
                                    double Efactor, double dt,
                                    SpaceVariable3D *LocalDt = NULL); 
 
-  void BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, SpaceVariable3D &VXstar,
+  void BuildPressureEquationSIMPLE(Vec5D*** v, double*** homo, double*** id, SpaceVariable3D &VXstar,
                                    SpaceVariable3D &VYstar, SpaceVariable3D &VZstar,
                                    SpaceVariable3D &DX, SpaceVariable3D &DY, SpaceVariable3D &DZ,
                                    std::vector<RowEntries> &plin_rows, SpaceVariable3D &B,
