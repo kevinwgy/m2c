@@ -103,10 +103,11 @@ public:
 
 
   //! update ID, V, and Phi due to embedded surface motion. Impose boundary conditions for ID, but not V and Phi
+  //! (for incompressible flow on MAC grid, velocity is not updated (use existing value stored on the node)
   int UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, SpaceVariable3D &ID,
                                          vector<SpaceVariable3D*> &Phi,
                                          std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
-                                         vector<Intersector*> *intersector);
+                                         vector<Intersector*> *intersector, bool incompressible_MAC = false);
 
   //! update Phi and ID to resolve any conflicts with embedded boundaries
   int ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*> &Phi,

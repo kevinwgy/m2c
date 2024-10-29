@@ -496,7 +496,8 @@ int
 MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, SpaceVariable3D &ID,
                                                        vector<SpaceVariable3D*> &Phi,
                                                        unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
-                                                       vector<Intersector*> *intersector)
+                                                       vector<Intersector*> *intersector,
+                                                       bool incompressible_MAC)
 {
 
   // --------------------------------------------------------
@@ -784,8 +785,12 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
           }
         }
 
-        v[k][j][i]  = vsum/sum_weight;
         id[k][j][i] = myid;
+        if(incompressible_MAC) {  // velocity is continuous; use values stored at the node
+          v[k][j][i][0]  = vsum[0]/sum_weight;
+          v[k][j][i][4]  = vsum[4]/sum_weight;
+        } else
+          v[k][j][i]  = vsum/sum_weight;
 
 
         // Fix any issues in phi: If the material subdomain corresponding to this ID is tracked by a phi, make sure the phi
