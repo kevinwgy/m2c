@@ -274,7 +274,7 @@ int main(int argc, char* argv[])
   IncompressibleOperator* inco = NULL;
   if(incompressible) {
     assert(interp);
-    inco = new IncompressibleOperator(comm, dms, iod, vf, spo, *interp, embed!=NULL);
+    inco = new IncompressibleOperator(comm, dms, iod, vf, spo, *interp);
     if(Vturb)
       inco->InitializeTurbulenceVariables(*Vturb);
   }

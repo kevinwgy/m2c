@@ -55,7 +55,7 @@ public:
 
   IncompressibleOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
                          std::vector<VarFcnBase*> &varFcn_, SpaceOperator &spo_,
-                         InterpolatorBase &interp_, bool with_embedded_boundary);
+                         InterpolatorBase &interp_);
   ~IncompressibleOperator();
 
   void Destroy();

@@ -434,7 +434,7 @@ int ClosestTriangle::findTesterStatus(Vec3D xt) const
 
   int sign;
   if(myMode<0) {
-//    fprintf(stdout,"WARNING: (in IntersectorFRG) Mode = %d!\n", myMode);
+//    fprintf(stdout,"Warning: (in IntersectorFRG) Mode = %d!\n", myMode);
 //    fprintf(stdout,"-- x = (%e %e %e), tester = (%e, %e, %e).\n", x[0], x[1], x[2], xt[0], xt[1], xt[2]);
     sign = 0;
   } else
