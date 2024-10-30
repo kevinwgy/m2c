@@ -3971,15 +3971,15 @@ IncompressibleOperator::PopulateInactiveCellBoundaries(SpaceVariable3D &V3, Spac
 
         cm = global_mesh.GetDx(i-1);
         cp = global_mesh.GetDx(i);
-        v[k][j][i][1] = (cp*v3[k][j][i-1][0] + cm*v3[k][j][i][0])/(cm+cp);
+        v[k][j][i][1] = i-1>=0 ? (cp*v3[k][j][i-1][0] + cm*v3[k][j][i][0])/(cm+cp) : v3[k][j][i][0];
 
         cm = global_mesh.GetDy(j-1);
         cp = global_mesh.GetDy(j);
-        v[k][j][i][2] = (cp*v3[k][j-1][i][1] + cm*v3[k][j][i][1])/(cm+cp);
+        v[k][j][i][2] = j-1>=0 ? (cp*v3[k][j-1][i][1] + cm*v3[k][j][i][1])/(cm+cp) : v3[k][j][i][1];
 
         cm = global_mesh.GetDz(k-1);
         cp = global_mesh.GetDz(k);
-        v[k][j][i][3] = (cp*v3[k-1][j][i][2] + cm*v3[k][j][i][2])/(cm+cp);
+        v[k][j][i][3] = k-1>=0 ? (cp*v3[k-1][j][i][2] + cm*v3[k][j][i][2])/(cm+cp) : v3[k][j][i][2];
       }
 
   ID.RestoreDataPointerToLocalVector();

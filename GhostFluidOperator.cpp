@@ -224,6 +224,8 @@ GhostFluidOperator::TagInactiveNodes(double*** id, int nLayers)
           for(int kk=k-1; kk<=k+1; kk++)
             for(int jj=j-1; jj<=j+1; jj++)
               for(int ii=i-1; ii<=i+1; ii++) {
+                if(global_mesh.OutsidePhysicalDomain(ii,jj,kk))
+                  continue;
                 if(id[kk][jj][ii] != INACTIVE_MATERIAL_ID) {
                   ghosts_ijk.push_back(Int3(i,j,k)); //first-layer ghost
                   tag[k][j][i] = 1;
@@ -391,9 +393,7 @@ GhostFluidOperator::FindImagesForGhosts(double*** id, vector<Vec3D> &ghosts_xyz,
     // if dist from ghost to interface <5% of element size, apply const extrap
     if((images_xyz[n]-ghosts_xyz[n]).norm() < 0.1*global_mesh.GetMinDXYZ(ghosts_ijk[n])) 
       ghosts_tag[n] = 0;
-    //else if(ghosts_tag[n]<0)
-    //  undetermined.insert(n);
-    if(ghosts_tag[n]<0)
+    else if(ghosts_tag[n]<0)
       undetermined.insert(n);
   }
  
