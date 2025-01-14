@@ -113,11 +113,11 @@ struct PlaneData {
 
 struct ParallelepipedData {
 
-  double x0, y0, z0; //!< point 1
+  double x0, y0, z0; //!< vertex 1
 
-  double ax, ay, az; //!< axis 1 and its length
-  double bx, by, bz; //!< axis 2 and its length
-  double cx, cy, cz; //!< axis 3 and its length
+  double ax, ay, az; //!< vertex 2 (defining axis 1 and its length)
+  double bx, by, bz; //!< vertex 3 (defining axis 2 and its length)
+  double cx, cy, cz; //!< vertex 4 (defining axis 3 and its length)
 
   enum InteriorOrExterior {INTERIOR = 0, EXTERIOR = 1} side;
   enum Inclusion {OVERRIDE = 0, INTERSECTION = 1, UNION = 2} inclusion;
