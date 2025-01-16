@@ -10,7 +10,7 @@
 #include<polylogarithm_function.h>
 #include<tuple>
 #include<boost/math/tools/roots.hpp>
-#include<boost/math/interpolators/cubic_b_spline.hpp>  //spline interpolation
+#include<boost/math/interpolators/cardinal_cubic_b_spline.hpp>  //spline interpolation
 
 extern double avogadro_number;
 
@@ -49,7 +49,7 @@ private:
   //! cubic splines for interpolating the polylogarithm functions involved in Debye function
   double splines_expmx_min, splines_expmx_max; //!< min and max of exp(-x) of the sample points
   std::vector<double> Li2, Li3, Li4; //!< sample values 
-  boost::math::cubic_b_spline<double> *spline_Li2, *spline_Li3, *spline_Li4;
+  boost::math::interpolators::cardinal_cubic_b_spline<double> *spline_Li2, *spline_Li3, *spline_Li4;
   
   //! Numerical parameters
   double tol_Debye; //!< non-dimensional error tolerance (hard-coded for the moment)
@@ -543,9 +543,12 @@ VarFcnANEOSEx1::InitializeInterpolationForDebyeFunction(double expmx_min, double
     Li3[i] = MathTools::polylogarithm_function(3, expmx, 100, tol_Debye);
     Li2[i] = MathTools::polylogarithm_function(2, expmx, 100, tol_Debye);
   }
-  spline_Li4 = new boost::math::cubic_b_spline<double>(Li4.begin(), Li4.end(), splines_expmx_min, delta);
-  spline_Li3 = new boost::math::cubic_b_spline<double>(Li3.begin(), Li3.end(), splines_expmx_min, delta);
-  spline_Li2 = new boost::math::cubic_b_spline<double>(Li2.begin(), Li2.end(), splines_expmx_min, delta);
+  spline_Li4 = new boost::math::interpolators::cardinal_cubic_b_spline<double>
+                   (Li4.begin(), Li4.end(), splines_expmx_min, delta);
+  spline_Li3 = new boost::math::interpolators::cardinal_cubic_b_spline<double>
+                   (Li3.begin(), Li3.end(), splines_expmx_min, delta);
+  spline_Li2 = new boost::math::interpolators::cardinal_cubic_b_spline<double>
+                   (Li2.begin(), Li2.end(), splines_expmx_min, delta);
 }
 
 //---------------------------------------------------------------------

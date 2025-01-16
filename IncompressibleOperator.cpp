@@ -1107,8 +1107,8 @@ IncompressibleOperator::BuildVelocityEquationSIMPLE(int dir, Vec5D*** v0, Vec5D*
   double dx, dy, dz, dxl, dxr, dyb, dyt, dzk, dzf, dxdy, dydz, dxdz;
   double cm(1.0), cp(1.0), cm_plus_cp(0.0), rhou1, rhou2;
   double a, ap, ap0, F, D, mu, mu1, mu2, anb;
-  double nut, nut1, nut2; //turbulent eddy viscosity (kinematic)
-  double rho, rho1, rho2;
+  double nut, nut1(0.0), nut2(0.0); //turbulent eddy viscosity (kinematic)
+  double rho(0.0), rho1(0.0), rho2(0.0);
 
   for(int k=k0; k<kmax; k++) {
     dz  = Dz[dir][k-k0];

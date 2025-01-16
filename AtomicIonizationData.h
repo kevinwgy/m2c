@@ -8,7 +8,7 @@
 
 #include<VarFcnBase.h>
 #include<tuple>
-#include<boost/math/interpolators/cubic_b_spline.hpp>  //spline interpolation
+#include<boost/math/interpolators/cardinal_cubic_b_spline.hpp>  //spline interpolation
 #include<mpi.h>
 
 /***********************************************************************
@@ -51,7 +51,7 @@ private:
   std::vector<std::tuple<double,double,double> > UsCoeffs; //!< for each r: ("factor", "expmin", "delta_exp")
   std::vector<int> max_terms; //!< number of terms in summation, up to E[r][n] <= I[r]
 
-  std::vector<std::vector<boost::math::cubic_b_spline<double>* > > spline; 
+  std::vector<std::vector<boost::math::interpolators::cardinal_cubic_b_spline<double>* > > spline; 
                                          //!< spline[r][k] --> r: charge, k: reduction of summation upperbound
   int sample_size; //!< the size of Us[r], r = 0,1,...,rmax
   double sample_Tmin, sample_Tmax;

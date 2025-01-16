@@ -1262,7 +1262,7 @@ double
 Intersector::CalculateUnsignedDistanceNearSurface(int nL)
 {
 
-  assert(nLayer = nL);
+  assert(nLayer == nL);
 
   double max_dist = -DBL_MAX;
 

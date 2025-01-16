@@ -8,7 +8,7 @@
 
 #include <VarFcnBase.h>
 #include <ordinary_differential_equations.h>
-//#include <boost/math/interpolators/cubic_b_spline.hpp>  //spline interpolation
+//#include <boost/math/interpolators/cardinal_cubic_b_spline.hpp>  //spline interpolation
 #include <fstream>
 #include <cassert>
 
@@ -104,7 +104,7 @@ private:
   //! Calculate Tr(eta) (eta>0) by uniform sampling & spline integration
   double delta_eta;
   std::vector<double> Trs;
-  //boost::math::cubic_b_spline<double>* Tr_spline;  //!< Tried. Not better (& slower) than linear interp
+  //boost::math::interpolators::cardinal_cubic_b_spline<double>* Tr_spline;  //!< Tried. Not better (& slower) than linear interp
   // -----------------------------
 
 public:
@@ -344,7 +344,8 @@ void VarFcnMGExt::SetupTrInterpolation()
     Trs[i] = exp(Gamma0*eta)*(T0 + coeff*Trs[i]);
   }
 
-  //Tr_spline = new boost::math::cubic_b_spline<double>(Trs.begin(), Trs.end(), eta0, delta_eta);
+  //Tr_spline = new boost::math::interpolators::cardinal_cubic_b_spline<double>
+  //                (Trs.begin(), Trs.end(), eta0, delta_eta);
 }
 
 //------------------------------------------------------------------------------

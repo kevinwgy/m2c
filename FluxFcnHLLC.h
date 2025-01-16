@@ -7,7 +7,7 @@
 #define _FLUX_FCN_HLLC_H_
 
 #include <FluxFcnBase.h>
-#include <math.h>
+#include <cmath>
 using std::fabs;
 /****************************************************************************************
  * Harten-Lax-van Leer-Contact (HLLC) flux for general EOS. Ref: Toro's book, Chapter 10
@@ -200,7 +200,7 @@ void FluxFcnHLLC::ComputeNumericalFluxAtCellInterface(int dir, double *Vm, doubl
   // estimates of min and max wave speeds
   double Sm = 0.0, Sp = 0.0;
   ComputeMinMaxWaveSpeedsByRoeAverage(dir, Vm, Vp, id, Sm, Sp);
-  if(!isfinite(Sm) || !isfinite(Sp)) {
+  if(!std::isfinite(Sm) || !std::isfinite(Sp)) {
     fprintf(stdout, "*** Error: id = %d, Vm = %e %e %e %e %e, Vp = %e %e %e %e %e\n", id, Vm[0], Vm[1], Vm[2], Vm[3], Vm[4],
             Vp[0], Vp[1], Vp[2], Vp[3], Vp[4]);
   }

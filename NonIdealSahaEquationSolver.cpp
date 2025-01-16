@@ -295,9 +295,9 @@ NonIdealSahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne
       // fail-safe
       if(trial>0) break;
 
-      if(!isfinite(sol.first) || sol.first<0)
+      if(!std::isfinite(sol.first) || sol.first<0)
         sol.first = one_over_lambD_0;
-      if(!isfinite(sol.second) || sol.second<sol.first)
+      if(!std::isfinite(sol.second) || sol.second<sol.first)
         sol.second = one_over_lambD_1;
       one_over_lambD_0 = sol.first;
       one_over_lambD_1 = sol.second;

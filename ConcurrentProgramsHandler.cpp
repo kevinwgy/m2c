@@ -64,7 +64,7 @@ ConcurrentProgramsHandler::ConcurrentProgramsHandler(IoData &iod_, MPI_Comm glob
     if(iod.concurrent.aerof.type     != AerofCouplingData::NONE)
       aerof_color = 2; //"AEROF_ID_FOR_M2C" in AERO-F
     if(iod.concurrent.m2c_twin.type  != M2CTwinningData::NONE) {
-      assert(twinning_status = LEADER);
+      assert(twinning_status == LEADER);
       m2c_twin_color = 2;
     }
 

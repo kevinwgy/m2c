@@ -7,7 +7,7 @@
 #define _FLUX_FCN_LLF_H_
 
 #include <FluxFcnBase.h>
-#include <math.h>
+#include <cmath>
 using std::fabs;
 using std::max;
 /****************************************************************************************

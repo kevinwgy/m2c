@@ -146,7 +146,7 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
   sample_Tmin = sample_Tmin_;
   sample_Tmax = sample_Tmax_;
   sample_size = sample_size_;
-  assert(isfinite(sample_size));
+  assert(std::isfinite(sample_size));
 
   if(interpolation) {
     assert(comm);
@@ -188,7 +188,8 @@ AtomicIonizationData::InitializeInterpolation(MPI_Comm &comm)
   spline.clear();
   if(interpolation == 1) {//cubic spline interpolation
     for(int r=0; r<rmax; r++) 
-      spline.push_back(vector<boost::math::cubic_b_spline<double>*>(ideal ? 1 : max_terms[r], NULL));
+      spline.push_back(vector<boost::math::interpolators::cardinal_cubic_b_spline<double>*>
+                       (ideal ? 1 : max_terms[r], NULL));
   }
 
   for(int r=0; r<rmax; r++)
@@ -259,7 +260,8 @@ AtomicIonizationData::InitializeInterpolationForCharge(int r, MPI_Comm &comm)
  
     //initialize spline interpolation
     if(interpolation == 1)
-      spline[r][k] = new boost::math::cubic_b_spline<double>(U[k].begin(), U[k].end(), expmin, delta_exp);
+      spline[r][k] = new boost::math::interpolators::cardinal_cubic_b_spline<double>
+                         (U[k].begin(), U[k].end(), expmin, delta_exp);
 
   }
 

@@ -29,8 +29,8 @@ struct RowEntries {
   std::vector<MatStencil> cols; //!< col numbers
   std::vector<double> vals; //entries (one per col)
 
-  RowEntries() {}
-  RowEntries(int nEntries) {
+  RowEntries() : row() {}
+  RowEntries(int nEntries) : row() {
     cols.reserve(nEntries);
     vals.reserve(nEntries);
   }

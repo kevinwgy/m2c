@@ -807,7 +807,7 @@ ProbeOutput::WriteSolutionAtProbes(double time, double dt, int time_step, SpaceV
     assert(heo && Xi); //this is a just a redundant check
     vector<Vec3D> sol; //to be filled
     heo->ComputePrincipalStressesAtProbes(*Xi, ID, ijk, ijk_valid, trilinear_coords, (Vec5D***)v, sol);
-    assert(numNodes = (int)sol.size());
+    assert(numNodes == (int)sol.size());
     for(int iNode=0; iNode<numNodes; iNode++) {
       print(file[Probes::PRINCIPAL_ELASTIC_STRESSES], "%16.8e    %16.8e    %16.8e   ",
             sol[iNode][0], sol[iNode][1], sol[iNode][2]);

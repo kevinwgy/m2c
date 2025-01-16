@@ -174,9 +174,9 @@ SahaEquationSolver::Solve(double* v, double& zav, double& nh, double& ne,
       // fail-safe
       if(trial>0) break;
 
-      if(!isfinite(sol.first) || sol.first<0)
+      if(!std::isfinite(sol.first) || sol.first<0)
         sol.first = 0.0;
-      if(!isfinite(sol.second) || sol.second<sol.first)
+      if(!std::isfinite(sol.second) || sol.second<sol.first)
         sol.second = zav1;
       zav0 = sol.first;
       zav1 = sol.second;

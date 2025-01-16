@@ -8,7 +8,7 @@
 
 #include <FluxFcnBase.h>
 #include <Vector5D.h>
-#include <math.h>
+#include <cmath>
 using std::fabs;
 
 /****************************************************************************************

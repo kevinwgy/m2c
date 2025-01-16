@@ -36,14 +36,22 @@ if(NOT DEFINED ENV{PETSC_DIR})
 endif()
 
 find_package(PETSc REQUIRED)
-link_directories("${PETSc_LIBRARY_DIR}")
-include_directories("${PETSc_INCLUDE_DIR}")
+if(NOT "${PETSc_LIBRARY_DIR}" STREQUAL "")
+  link_directories("${PETSc_LIBRARY_DIR}")
+endif()
+if(NOT "${PETSc_INCLUDE_DIR}" STREQUAL "")
+  include_directories("${PETSc_INCLUDE_DIR}")
+endif()
 
 find_package(Eigen3 3.3 REQUIRED)
-include_directories("$ENV{EIGEN3_INCLUDE_DIR}")
+if(NOT "$ENV{EIGEN3_INCLUDE_DIR}" STREQUAL "")
+  include_directories("$ENV{EIGEN3_INCLUDE_DIR}")
+endif()
 
-find_package(Boost 1.71 REQUIRED)
-include_directories("${Boost_INCLUDE_DIR}")
+find_package(Boost 1.72 REQUIRED)
+if(NOT "${Boost_INCLUDE_DIR}" STREQUAL "")
+  include_directories("${Boost_INCLUDE_DIR}")
+endif()
 
 #--------------------------------------------------------
 

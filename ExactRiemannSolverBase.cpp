@@ -1310,13 +1310,13 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
       double errBar = std::max(1.0e-8, std::min(1.0e-5, 100.0*tol_rarefaction) ); // one-step error of numerical integration 
       double uErrScaled = uErr / c + tiny;
       double rhoErrScaled = rhoErr / rho + tiny;
-      if (isnan(rhoErrScaled)) {
+      if (std::isnan(rhoErrScaled)) {
 	fprintf(stdout,"Warning: rhoErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhos_0 = %e, rhos_1 = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
 	    id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhos_0, rhos_1, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
 	exit(-1);
       }  
 
-      if (isnan(uErrScaled)) {
+      if (std::isnan(uErrScaled)) {
 	fprintf(stdout,"Warning: uErrScaled is nan. id = %d, p = %e, ps = %e, dp = %e, ps_0 = %e, ps_1 = %e, uErr = %e, uErrScaled = %e, rhoErr = %e, rhoErrScaled = %e, c = %e, rho = %e, path size = %ld.\n",
 	    id, p, ps, dp, ps_0, ps_1, uErr, uErrScaled, rhoErr, rhoErrScaled, c, rho, integrationPath.size());
 	exit(-1);
@@ -1849,7 +1849,7 @@ ExactRiemannSolverBase::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, int id,
   double du = (37./378./c_0/rho_0 + 250./621./c_2/rho_2 + 125./594./c_3/rho_3 + 512./1771./c_5/rho_5) * dp;
   double du_err = (2825./27648./c_0/rho_0 + 18575./48384./c_2/rho_2 + 13525./55296./c_3/rho_3 + 277./14336./c_4/rho_4 + 0.25/c_5/rho_5) * dp;
 
-  if (isnan(du) == 1 || isnan(du_err) ==1) {
+  if (std::isnan(du) == 1 || std::isnan(du_err) ==1) {
     // fprintf(stdout, "*** Error: du or du_err is nan: du = %e, du_err = %e.\n", du, du_err);
     return false;
   }
@@ -2948,7 +2948,7 @@ ExactRiemannSolverNonAdaptive::Rarefaction_OneStepRK4(int wavenumber/*1 or 3*/, 
   double drho = 1.0/6.0*dp*(1./c_0_square + 2.0*(1./c_1_square+1./c_2_square) + 1./c_3_square);
   double du = 1.0/6.0*dp*( 1./c_0/rho_0 + 2.0*(1./c_1/rho_1 + 1./c_2/rho_2) + 1./c_3/rho_3);
 
-  if (isnan(du) == 1) {
+  if (std::isnan(du) == 1) {
     return false;
   }
 
