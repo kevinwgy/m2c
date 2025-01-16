@@ -16,6 +16,9 @@ endif()
 SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
 
+# add path to find_package scripts
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 # compiler flags (turn on all the warnings)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-reorder")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
@@ -32,9 +35,16 @@ if(NOT DEFINED ENV{PETSC_DIR})
   message(FATAL_ERROR "ERROR: Could not find Petsc...")
 endif()
 
+find_package(PETSc REQUIRED)
+link_directories("${PETSc_LIBRARY_DIR}")
+include_directories("${PETSc_INCLUDE_DIR}")
+
 find_package(Eigen3 3.3 REQUIRED)
+include_directories("$ENV{EIGEN3_INCLUDE_DIR}")
 
 find_package(Boost 1.71 REQUIRED)
+include_directories("${Boost_INCLUDE_DIR}")
+
 #--------------------------------------------------------
 
 #-----------------------------------------
