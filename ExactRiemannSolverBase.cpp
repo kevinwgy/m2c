@@ -226,11 +226,11 @@ ExactRiemannSolverBase::ComputeRiemannSolution(double *dir,
 	<< rhor << ", " << ur << ", " << pr << ", " << idr << endl;
       cout << "         dir = " << dir[0] << "," << dir[1] << "," << dir[2]
 	<< ", f0 = " << f0 << ", f1 = " << f1 << endl;
-      p2 = 0.5*(p0+p1);
+      p2 = p0 + 0.5*(p1-p0);
     } else {
       p2 = p2 - f2*(p1-p0)/denom;  // update p2
       if(p2<=p0 || p2>=p1) //discard and switch to bisection
-	p2 = 0.5*(p0+p1);
+	p2 = p0 + 0.5*(p1-p0);
     }
 
     //fprintf(stdout,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
@@ -1545,7 +1545,7 @@ ExactRiemannSolverBase::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	drho = rhos1 - rhos0;
 	rhos2 = rhos2 - f2*(rhos1 - rhos0)/(f1 - f0); //secant method
 	if(rhos2 >= rhos1 || rhos2 <= rhos0) //discard and switch to bisection
-	  rhos2 = 0.5*(rhos0+rhos1);
+	  rhos2 = rhos0 + 0.5*(rhos1-rhos0);
 	f2 = hugo(rhos2);
 	if(f2==0.0) {
 	  sol.first = sol.second = rhos2;
@@ -2130,11 +2130,11 @@ ExactRiemannSolverBase::ComputeOneSidedRiemannSolution(double *dir/*unit normal 
 	<< ustar << endl;
       cout << "         dir = " << dir[0] << "," << dir[1] << "," << dir[2]
 	<< ", f0 = " << f0 << ", f1 = " << f1 << endl;
-      p2 = 0.5*(p0+p1);
+      p2 = p0 + 0.5*(p1-p0);
     } else {
       p2 = p2 - f2*(p1-p0)/denom;  // update p2
       if(p2<=p0 || p2>=p1) //discard and switch to bisection
-	p2 = 0.5*(p0+p1);
+	p2 = p0 + 0.5*(p1-p0);
     }
 
     //fprintf(stdout,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
@@ -2387,11 +2387,11 @@ ExactRiemannSolverNonAdaptive::ComputeRiemannSolution(double *dir,
 	<< rhor << ", " << ur << ", " << pr << ", " << idr << endl;
       cout << "         dir = " << dir[0] << "," << dir[1] << "," << dir[2]
 	<< ", f0 = " << f0 << ", f1 = " << f1 << endl;
-      p2 = 0.5*(p0+p1);
+      p2 = p0 + 0.5*(p1-p0);
     } else {
       p2 = p2 - f2*(p1-p0)/denom;  // update p2
       if(p2<=p0 || p2>=p1) //discard and switch to bisection
-	p2 = 0.5*(p0+p1);
+        p2 = p0 + 0.5*(p1-p0);
     }
 
     //fprintf(stdout,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
@@ -2814,7 +2814,7 @@ ExactRiemannSolverNonAdaptive::ComputeRhoUStar(int wavenumber /*1 or 3*/,
 	drho = rhos1 - rhos0;
 	rhos2 = rhos2 - f2*(rhos1 - rhos0)/(f1 - f0); //secant method
 	if(rhos2 >= rhos1 || rhos2 <= rhos0) //discard and switch to bisection
-	  rhos2 = 0.5*(rhos0+rhos1);
+	  rhos2 = rhos0 + 0.5*(rhos1-rhos0);
 	f2 = hugo(rhos2);
 	if(f2==0.0) {
 	  sol.first = sol.second = rhos2;

@@ -196,11 +196,11 @@ ExactRiemannSolverInterfaceJump::ComputeRiemannSolution(double *dir,
 	<< rhor << ", " << ur << ", " << pr << ", " << idr << endl;
       cout << "         dir = " << dir[0] << "," << dir[1] << "," << dir[2]
 	<< ", f0 = " << f0 << ", f1 = " << f1 << endl;
-      p2 = 0.5*(p0+p1);
+      p2 = p0 + 0.5*(p1-p0);
     } else {
       p2 = p2 - f2*(p1-p0)/denom;  // update p2
       if(p2<=p0 || p2>=p1) //discard and switch to bisection
-	p2 = 0.5*(p0+p1);
+        p2 = p0 + 0.5*(p1-p0);
     }
 
     //fprintf(stdout,"iter = %d, p0 = %e, p1 = %e, p2 = %e, f0 = %e, f1 = %e.\n", iter, p0, p1, p2, f0, f1);
