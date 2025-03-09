@@ -6,6 +6,7 @@
 #include <SpaceVariable.h>
 #include <GlobalMeshInfo.h>
 #include <petscviewer.h>
+//#include <petscviewerhdf5.h>
 #include <Utils.h>
 #include <bits/stdc++.h> //min_element, max_element
 using std::vector;
@@ -356,6 +357,23 @@ void SpaceVariable3D::WriteToVTRFile(const char *filename, const char *varname)
 
 //---------------------------------------------------------
 
+void SpaceVariable3D::WriteToHDF5File([[maybe_unused]] const char *filename, const char *varname)
+{
+  if(!dm)
+    return;
+
+  if(varname)
+    SetOutputVariableName(varname);
+
+  PetscViewer viewer;
+  //PetscViewerHDF5Open(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer); //NOT AVAILABLE?
+  VecView(globalVec, viewer);
+  PetscViewerDestroy(&viewer);
+  MPI_Barrier(*comm); 
+}
+
+//---------------------------------------------------------
+
 void SpaceVariable3D::WriteToCGNSFile(const char *filename, const char *varname)
 {
   if(!dm)
@@ -366,8 +384,7 @@ void SpaceVariable3D::WriteToCGNSFile(const char *filename, const char *varname)
 
   PetscViewer viewer;
   PetscViewerCreate(*comm, &viewer);
-// Not available yet!
-//  PetscViewerSetType(viewer, PETSCVIEWERCGNS);
+  //PetscViewerSetType(viewer, PETSCVIEWERCGNS); //NOT AVAILABLE?
   PetscViewerFileSetMode(viewer, FILE_MODE_WRITE);
   PetscViewerFileSetName(viewer, filename);
 

@@ -98,6 +98,7 @@ public:
 
   void StoreMeshCoordinates(SpaceVariable3D &coordinates);
   void WriteToVTRFile(const char *filename, const char *varname = NULL); //!< write vector to file (w/o mesh info)
+  void WriteToHDF5File(const char *filename, const char *varname = NULL);
   void WriteToCGNSFile(const char *filename, const char *varname = NULL);
   void WriteToMatlabFile(const char *filename, const char *varname = NULL);
   void SetOutputVariableName(const char *name); //!< give it a name, which will show up in output files (VTR/VTK)

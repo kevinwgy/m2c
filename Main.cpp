@@ -358,7 +358,7 @@ int main(int argc, char* argv[])
   std::multimap<int, std::pair<int,int> >
   id2closure = spinit.SetInitialCondition(V, ID, Phi, NPhi, KappaPhi, spo, lso, ghand,
                                           embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr);
-
+  
   // Boundary conditions are applied to V and Phi. But the ghost nodes of ID have not been populated.
   // ------------------------------------------------------------------------
 
