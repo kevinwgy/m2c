@@ -1441,7 +1441,7 @@ LevelSetOperator::PrescribeVelocityFieldForTesting([[maybe_unused]] SpaceVariabl
 #elif LEVELSET_TEST == 3
 
   // merging and separation of two circles
-  double aa = 1.75, rr = 1.5;
+  //double aa = 1.75, rr = 1.5;
   double s = time<1.0 ? 1.0 : -1.0;
   SpaceVariable3D NPhi(comm, &(dms.ghosted1_3dof)); //inefficient, but OK just for testing level set 
 

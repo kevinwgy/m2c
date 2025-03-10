@@ -1525,7 +1525,6 @@ SpaceInitializer::InitializePhiByDistance(vector<pair<int,int> > &order,
   double alpha = atan((x4[0]-x0[0])/(x0[1]-x4[1])); //half of the `opening angle'
   //fprintf(stdout,"alpha = %e.\n",alpha);
 
-  double dist;
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {

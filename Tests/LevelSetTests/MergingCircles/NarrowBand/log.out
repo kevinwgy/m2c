@@ -1,0 +1,1026 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: ee15af3+ | Branch: main | Tag: 
+Computation started at: 2025-03-10.10:36:11 EDT
+Using 128 processor cores (including concurrent programs).
+Command: ../../m2c/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+
+- Mesh Statistics:
+  X-Direction: [-5.000000e+00, 5.000000e+00], 128 nodes/cells, dx_min = 7.812500e-02, dx_max = 7.812500e-02.
+  Y-Direction: [-5.000000e+00, 5.000000e+00], 128 nodes/cells, dy_min = 7.812500e-02, dy_max = 7.812500e-02.
+  Z-Direction: [-4.000000e-02, 4.000000e-02], 1 nodes/cells, dz_min = 8.000000e-02, dz_max = 8.000000e-02.
+  Total number of nodes/cells: 16384.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 6052
+  o Number of ghost nodes outside computational domain: 46684
+
+
+[0;32m- Testing the Level Set Solver using a prescribed velocity field (3). N-S solver not activated.[0m
+
+- Initializing the state variables (V) and material id. (ID).
+
+- Initializing Phi[0] for tracking the boundary of material 1.
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+Step 1: t = 0.000000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7995e-01 s.
+Step 2: t = 5.000000e-03, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8147e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 3: t = 1.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8487e-01 s.
+Step 4: t = 1.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8580e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 5: t = 2.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8858e-01 s.
+Step 6: t = 2.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8947e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 7: t = 3.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.9232e-01 s.
+Step 8: t = 3.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.9317e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 9: t = 4.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.9607e-01 s.
+Step 10: t = 4.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.9693e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 11: t = 5.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.9974e-01 s.
+Step 12: t = 5.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.0057e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 13: t = 6.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.0319e-01 s.
+Step 14: t = 6.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.0423e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 15: t = 7.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.0691e-01 s.
+Step 16: t = 7.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.0778e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 17: t = 8.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.1067e-01 s.
+Step 18: t = 8.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.1148e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 19: t = 9.000000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.1427e-01 s.
+Step 20: t = 9.500000e-02, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.1511e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 21: t = 1.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.1784e-01 s.
+Step 22: t = 1.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.1868e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 23: t = 1.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.2143e-01 s.
+Step 24: t = 1.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.2225e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 25: t = 1.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.2500e-01 s.
+Step 26: t = 1.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.2585e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 27: t = 1.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.2863e-01 s.
+Step 28: t = 1.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.2944e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 29: t = 1.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.3219e-01 s.
+Step 30: t = 1.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.3305e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 31: t = 1.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.3580e-01 s.
+Step 32: t = 1.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.3662e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 33: t = 1.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.3938e-01 s.
+Step 34: t = 1.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.4020e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 35: t = 1.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.4301e-01 s.
+Step 36: t = 1.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.4384e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 37: t = 1.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.4824e-01 s.
+Step 38: t = 1.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.4909e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 39: t = 1.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.5189e-01 s.
+Step 40: t = 1.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.5273e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+- Wrote solution at 2.000000e-01 to solution_0001.vtr.
+Step 41: t = 2.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.6836e-01 s.
+Step 42: t = 2.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.6927e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 43: t = 2.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.7221e-01 s.
+Step 44: t = 2.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.7303e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 45: t = 2.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.7597e-01 s.
+Step 46: t = 2.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.7682e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 47: t = 2.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.8110e-01 s.
+Step 48: t = 2.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.8192e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 49: t = 2.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.9741e-01 s.
+Step 50: t = 2.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 2.9826e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 51: t = 2.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.0619e-01 s.
+Step 52: t = 2.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.0701e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 53: t = 2.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.1487e-01 s.
+Step 54: t = 2.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.1568e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 55: t = 2.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.2327e-01 s.
+Step 56: t = 2.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.2410e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 57: t = 2.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.2700e-01 s.
+Step 58: t = 2.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.2783e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 59: t = 2.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.3409e-01 s.
+Step 60: t = 2.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.3494e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 61: t = 3.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.3786e-01 s.
+Step 62: t = 3.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.3868e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 63: t = 3.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.4463e-01 s.
+Step 64: t = 3.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.4543e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 65: t = 3.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.4823e-01 s.
+Step 66: t = 3.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.4906e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 67: t = 3.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.5523e-01 s.
+Step 68: t = 3.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.5606e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 69: t = 3.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.5882e-01 s.
+Step 70: t = 3.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.5964e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 71: t = 3.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.6241e-01 s.
+Step 72: t = 3.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.6323e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 73: t = 3.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.6877e-01 s.
+Step 74: t = 3.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.6959e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 75: t = 3.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.7233e-01 s.
+Step 76: t = 3.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.7317e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 77: t = 3.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.7581e-01 s.
+Step 78: t = 3.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.7664e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 79: t = 3.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.8190e-01 s.
+Step 80: t = 3.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 3.8272e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+- Wrote solution at 4.000000e-01 to solution_0002.vtr.
+Step 81: t = 4.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.0004e-01 s.
+Step 82: t = 4.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.0090e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 83: t = 4.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.0363e-01 s.
+Step 84: t = 4.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.0443e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 85: t = 4.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.0973e-01 s.
+Step 86: t = 4.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.1078e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 87: t = 4.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.1358e-01 s.
+Step 88: t = 4.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.1443e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 89: t = 4.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.1722e-01 s.
+Step 90: t = 4.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.1805e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 91: t = 4.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.2065e-01 s.
+Step 92: t = 4.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.2145e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 93: t = 4.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.2637e-01 s.
+Step 94: t = 4.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.2719e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95: t = 4.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.3004e-01 s.
+Step 96: t = 4.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.3087e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 97: t = 4.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.3368e-01 s.
+Step 98: t = 4.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.3450e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 99: t = 4.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.3738e-01 s.
+Step 100: t = 4.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.3823e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 101: t = 5.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.4297e-01 s.
+Step 102: t = 5.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.4379e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 103: t = 5.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.4654e-01 s.
+Step 104: t = 5.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.4735e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 105: t = 5.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.4999e-01 s.
+Step 106: t = 5.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.5082e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 107: t = 5.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.5345e-01 s.
+Step 108: t = 5.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.5427e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 109: t = 5.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.5913e-01 s.
+Step 110: t = 5.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.5997e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 111: t = 5.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.6274e-01 s.
+Step 112: t = 5.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.6357e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 113: t = 5.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.6636e-01 s.
+Step 114: t = 5.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.6718e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 115: t = 5.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.6987e-01 s.
+Step 116: t = 5.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.7077e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 117: t = 5.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.7545e-01 s.
+Step 118: t = 5.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.7629e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 119: t = 5.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.7906e-01 s.
+Step 120: t = 5.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.7988e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+- Wrote solution at 6.000000e-01 to solution_0003.vtr.
+Step 121: t = 6.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.9782e-01 s.
+Step 122: t = 6.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 4.9865e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 123: t = 6.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.0123e-01 s.
+Step 124: t = 6.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.0213e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 125: t = 6.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.0702e-01 s.
+Step 126: t = 6.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.0785e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 127: t = 6.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.1069e-01 s.
+Step 128: t = 6.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.1150e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 129: t = 6.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.1433e-01 s.
+Step 130: t = 6.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.1517e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 131: t = 6.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.1812e-01 s.
+Step 132: t = 6.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.1895e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 133: t = 6.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.2188e-01 s.
+Step 134: t = 6.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.2269e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 135: t = 6.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.2733e-01 s.
+Step 136: t = 6.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.2815e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 137: t = 6.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.3091e-01 s.
+Step 138: t = 6.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.3174e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 139: t = 6.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.3433e-01 s.
+Step 140: t = 6.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.3516e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 141: t = 7.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.3793e-01 s.
+Step 142: t = 7.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.3876e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 143: t = 7.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.4152e-01 s.
+Step 144: t = 7.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.4235e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 145: t = 7.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.4687e-01 s.
+Step 146: t = 7.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.4771e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 147: t = 7.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.5049e-01 s.
+Step 148: t = 7.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.5131e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 149: t = 7.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.5409e-01 s.
+Step 150: t = 7.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.5492e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 151: t = 7.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.5768e-01 s.
+Step 152: t = 7.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.5849e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 153: t = 7.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.6128e-01 s.
+Step 154: t = 7.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.6210e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 155: t = 7.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.6661e-01 s.
+Step 156: t = 7.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.6743e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 157: t = 7.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.7019e-01 s.
+Step 158: t = 7.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.7100e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 159: t = 7.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.7380e-01 s.
+Step 160: t = 7.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 5.7463e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+- Wrote solution at 8.000000e-01 to solution_0004.vtr.
+Step 161: t = 8.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.0188e-01 s.
+Step 162: t = 8.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.0276e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 163: t = 8.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.0563e-01 s.
+Step 164: t = 8.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.0648e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 165: t = 8.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.1106e-01 s.
+Step 166: t = 8.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.1190e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 167: t = 8.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.1474e-01 s.
+Step 168: t = 8.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.1556e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 169: t = 8.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.1818e-01 s.
+Step 170: t = 8.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.1901e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 171: t = 8.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.2190e-01 s.
+Step 172: t = 8.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.2275e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 173: t = 8.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.2558e-01 s.
+Step 174: t = 8.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.2659e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 175: t = 8.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.3111e-01 s.
+Step 176: t = 8.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.3193e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 177: t = 8.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.3456e-01 s.
+Step 178: t = 8.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.3539e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 179: t = 8.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.3819e-01 s.
+Step 180: t = 8.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.3903e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 181: t = 9.000000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.4184e-01 s.
+Step 182: t = 9.050000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.4267e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 183: t = 9.100000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.4545e-01 s.
+Step 184: t = 9.150000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.4629e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 185: t = 9.200000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.5090e-01 s.
+Step 186: t = 9.250000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.5173e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 187: t = 9.300000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.5437e-01 s.
+Step 188: t = 9.350000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.5520e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 189: t = 9.400000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.5802e-01 s.
+Step 190: t = 9.450000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.5885e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 191: t = 9.500000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.6163e-01 s.
+Step 192: t = 9.550000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.6245e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 193: t = 9.600000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.6510e-01 s.
+Step 194: t = 9.650000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.6594e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 195: t = 9.700000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.6877e-01 s.
+Step 196: t = 9.750000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.6961e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 197: t = 9.800000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.7398e-01 s.
+Step 198: t = 9.850000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.7481e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 199: t = 9.900000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.7758e-01 s.
+Step 200: t = 9.950000e-01, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.7842e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+- Wrote solution at 1.000000e+00 to solution_0005.vtr.
+Step 201: t = 1.000000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.9216e-01 s.
+Step 202: t = 1.005000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.9301e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 203: t = 1.010000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.9637e-01 s.
+Step 204: t = 1.015000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 6.9722e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 205: t = 1.020000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.0062e-01 s.
+Step 206: t = 1.025000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.0144e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 207: t = 1.030000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.0458e-01 s.
+Step 208: t = 1.035000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.0540e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 209: t = 1.040000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.0822e-01 s.
+Step 210: t = 1.045000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.0907e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 211: t = 1.050000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.1174e-01 s.
+Step 212: t = 1.055000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.1255e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 213: t = 1.060000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.1522e-01 s.
+Step 214: t = 1.065000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.1604e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 215: t = 1.070000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.1882e-01 s.
+Step 216: t = 1.075000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.1964e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 217: t = 1.080000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.2257e-01 s.
+Step 218: t = 1.085000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.2340e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 219: t = 1.090000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.2674e-01 s.
+Step 220: t = 1.095000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.2758e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 221: t = 1.100000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.3090e-01 s.
+Step 222: t = 1.105000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.3172e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 223: t = 1.110000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.3461e-01 s.
+Step 224: t = 1.115000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.3542e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 225: t = 1.120000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.3835e-01 s.
+Step 226: t = 1.125000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.3917e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 227: t = 1.130000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.4185e-01 s.
+Step 228: t = 1.135000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.4269e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 229: t = 1.140000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.4568e-01 s.
+Step 230: t = 1.145000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.4652e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 231: t = 1.150000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.4931e-01 s.
+Step 232: t = 1.155000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.5014e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 233: t = 1.160000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.5279e-01 s.
+Step 234: t = 1.165000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.5362e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 235: t = 1.170000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.5624e-01 s.
+Step 236: t = 1.175000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.5707e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 237: t = 1.180000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.6000e-01 s.
+Step 238: t = 1.185000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.6083e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 239: t = 1.190000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.6379e-01 s.
+Step 240: t = 1.195000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.6463e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 241: t = 1.200000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.6739e-01 s.
+- Wrote solution at 1.205000e+00 to solution_0006.vtr.
+Step 242: t = 1.205000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 7.9995e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 243: t = 1.210000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.0291e-01 s.
+Step 244: t = 1.215000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.0380e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 245: t = 1.220000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.0672e-01 s.
+Step 246: t = 1.225000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.0758e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 247: t = 1.230000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.1047e-01 s.
+Step 248: t = 1.235000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.1131e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 249: t = 1.240000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.1410e-01 s.
+Step 250: t = 1.245000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.1501e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 251: t = 1.250000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.1795e-01 s.
+Step 252: t = 1.255000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.1883e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 253: t = 1.260000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.2187e-01 s.
+Step 254: t = 1.265000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.2277e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 255: t = 1.270000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.2581e-01 s.
+Step 256: t = 1.275000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.2669e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 257: t = 1.280000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.2939e-01 s.
+Step 258: t = 1.285000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.3043e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 259: t = 1.290000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.3312e-01 s.
+Step 260: t = 1.295000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.3399e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 261: t = 1.300000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.3721e-01 s.
+Step 262: t = 1.305000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.3809e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 263: t = 1.310000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.4081e-01 s.
+Step 264: t = 1.315000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.4168e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 265: t = 1.320000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.4453e-01 s.
+Step 266: t = 1.325000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.4540e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 267: t = 1.330000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.4817e-01 s.
+Step 268: t = 1.335000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.4906e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 269: t = 1.340000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.5208e-01 s.
+Step 270: t = 1.345000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.5295e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 271: t = 1.350000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.5584e-01 s.
+Step 272: t = 1.355000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.5672e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 273: t = 1.360000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.5958e-01 s.
+Step 274: t = 1.365000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.6045e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 275: t = 1.370000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.6315e-01 s.
+Step 276: t = 1.375000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.6402e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 277: t = 1.380000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.6689e-01 s.
+Step 278: t = 1.385000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.6777e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 279: t = 1.390000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.7051e-01 s.
+Step 280: t = 1.395000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.7138e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 281: t = 1.400000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.7411e-01 s.
+- Wrote solution at 1.405000e+00 to solution_0007.vtr.
+Step 282: t = 1.405000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.8337e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 283: t = 1.410000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.8598e-01 s.
+Step 284: t = 1.415000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.8681e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 285: t = 1.420000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.8976e-01 s.
+Step 286: t = 1.425000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.9058e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 287: t = 1.430000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.9335e-01 s.
+Step 288: t = 1.435000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.9424e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 289: t = 1.440000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.9689e-01 s.
+Step 290: t = 1.445000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 8.9773e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 291: t = 1.450000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.0036e-01 s.
+Step 292: t = 1.455000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.0119e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 293: t = 1.460000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.0400e-01 s.
+Step 294: t = 1.465000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.0484e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 295: t = 1.470000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.0747e-01 s.
+Step 296: t = 1.475000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.0830e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 297: t = 1.480000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.1100e-01 s.
+Step 298: t = 1.485000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.1183e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 299: t = 1.490000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.1449e-01 s.
+Step 300: t = 1.495000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.1532e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 301: t = 1.500000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.1827e-01 s.
+Step 302: t = 1.505000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.1912e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 303: t = 1.510000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.2190e-01 s.
+Step 304: t = 1.515000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.2273e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 305: t = 1.520000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.2543e-01 s.
+Step 306: t = 1.525000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.2628e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 307: t = 1.530000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.2892e-01 s.
+Step 308: t = 1.535000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.2976e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 309: t = 1.540000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.3258e-01 s.
+Step 310: t = 1.545000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.3344e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 311: t = 1.550000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.3605e-01 s.
+Step 312: t = 1.555000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.3708e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 313: t = 1.560000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.3979e-01 s.
+Step 314: t = 1.565000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.4077e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 315: t = 1.570000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.4336e-01 s.
+Step 316: t = 1.575000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.4417e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 317: t = 1.580000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.4714e-01 s.
+Step 318: t = 1.585000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.4798e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 319: t = 1.590000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.5076e-01 s.
+Step 320: t = 1.595000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.5158e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 321: t = 1.600000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.5422e-01 s.
+- Wrote solution at 1.605000e+00 to solution_0008.vtr.
+Step 322: t = 1.605000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.6375e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 323: t = 1.610000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.6643e-01 s.
+Step 324: t = 1.615000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.6725e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 325: t = 1.620000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.7001e-01 s.
+Step 326: t = 1.625000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.7082e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 327: t = 1.630000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.7346e-01 s.
+Step 328: t = 1.635000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.7430e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 329: t = 1.640000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.7694e-01 s.
+Step 330: t = 1.645000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.7777e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 331: t = 1.650000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.8071e-01 s.
+Step 332: t = 1.655000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.8154e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 333: t = 1.660000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.8450e-01 s.
+Step 334: t = 1.665000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.8533e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 335: t = 1.670000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.8797e-01 s.
+Step 336: t = 1.675000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.8881e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 337: t = 1.680000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.9142e-01 s.
+Step 338: t = 1.685000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.9224e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 339: t = 1.690000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.9501e-01 s.
+Step 340: t = 1.695000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.9584e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 341: t = 1.700000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.9844e-01 s.
+Step 342: t = 1.705000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 9.9928e-01 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 343: t = 1.710000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0019e+00 s.
+Step 344: t = 1.715000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0027e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 345: t = 1.720000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0053e+00 s.
+Step 346: t = 1.725000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0062e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 347: t = 1.730000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0091e+00 s.
+Step 348: t = 1.735000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0100e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 349: t = 1.740000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0127e+00 s.
+Step 350: t = 1.745000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0135e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 351: t = 1.750000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0162e+00 s.
+Step 352: t = 1.755000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0170e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 353: t = 1.760000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0197e+00 s.
+Step 354: t = 1.765000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0205e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 355: t = 1.770000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0234e+00 s.
+Step 356: t = 1.775000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0242e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 357: t = 1.780000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0269e+00 s.
+Step 358: t = 1.785000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0277e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 359: t = 1.790000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0303e+00 s.
+Step 360: t = 1.795000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0312e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 361: t = 1.800000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0338e+00 s.
+- Wrote solution at 1.805000e+00 to solution_0009.vtr.
+Step 362: t = 1.805000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0462e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 363: t = 1.810000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0492e+00 s.
+Step 364: t = 1.815000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0501e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 365: t = 1.820000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0529e+00 s.
+Step 366: t = 1.825000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0538e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 367: t = 1.830000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0567e+00 s.
+Step 368: t = 1.835000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0575e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 369: t = 1.840000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0602e+00 s.
+Step 370: t = 1.845000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0611e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 371: t = 1.850000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0639e+00 s.
+Step 372: t = 1.855000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0648e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 373: t = 1.860000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0676e+00 s.
+Step 374: t = 1.865000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0684e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 375: t = 1.870000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0712e+00 s.
+Step 376: t = 1.875000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0720e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 377: t = 1.880000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0747e+00 s.
+Step 378: t = 1.885000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0756e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 379: t = 1.890000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0787e+00 s.
+Step 380: t = 1.895000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0796e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 381: t = 1.900000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0824e+00 s.
+Step 382: t = 1.905000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0833e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 383: t = 1.910000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0860e+00 s.
+Step 384: t = 1.915000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0868e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 385: t = 1.920000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0897e+00 s.
+Step 386: t = 1.925000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0906e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 387: t = 1.930000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0935e+00 s.
+Step 388: t = 1.935000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0943e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 389: t = 1.940000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0971e+00 s.
+Step 390: t = 1.945000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.0980e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 391: t = 1.950000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1007e+00 s.
+Step 392: t = 1.955000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1016e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 393: t = 1.960000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1043e+00 s.
+Step 394: t = 1.965000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1051e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 395: t = 1.970000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1081e+00 s.
+Step 396: t = 1.975000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1090e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 397: t = 1.980000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1119e+00 s.
+Step 398: t = 1.985000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1128e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 399: t = 1.990000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1156e+00 s.
+Step 400: t = 1.995000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1165e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 401: t = 2.000000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1191e+00 s.
+- Wrote solution at 2.005000e+00 to solution_0010.vtr.
+Step 402: t = 2.005000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1506e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 403: t = 2.010000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1535e+00 s.
+Step 404: t = 2.015000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1545e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 405: t = 2.020000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1574e+00 s.
+Step 406: t = 2.025000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1583e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 407: t = 2.030000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1609e+00 s.
+Step 408: t = 2.035000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1618e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 409: t = 2.040000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1649e+00 s.
+Step 410: t = 2.045000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1659e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 411: t = 2.050000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1687e+00 s.
+Step 412: t = 2.055000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1696e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 413: t = 2.060000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1724e+00 s.
+Step 414: t = 2.065000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1732e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 415: t = 2.070000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1760e+00 s.
+Step 416: t = 2.075000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1768e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 417: t = 2.080000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1795e+00 s.
+Step 418: t = 2.085000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1803e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 419: t = 2.090000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1832e+00 s.
+Step 420: t = 2.095000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1840e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 421: t = 2.100000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1868e+00 s.
+Step 422: t = 2.105000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1876e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 423: t = 2.110000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1903e+00 s.
+Step 424: t = 2.115000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1912e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 425: t = 2.120000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1942e+00 s.
+Step 426: t = 2.125000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1951e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 427: t = 2.130000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1979e+00 s.
+Step 428: t = 2.135000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.1988e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 429: t = 2.140000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2016e+00 s.
+Step 430: t = 2.145000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2025e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 431: t = 2.150000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2053e+00 s.
+Step 432: t = 2.155000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2062e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 433: t = 2.160000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2091e+00 s.
+Step 434: t = 2.165000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2099e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 435: t = 2.170000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2125e+00 s.
+Step 436: t = 2.175000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2134e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 437: t = 2.180000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2161e+00 s.
+Step 438: t = 2.185000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2169e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 439: t = 2.190000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2195e+00 s.
+Step 440: t = 2.195000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2204e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 441: t = 2.200000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2234e+00 s.
+- Wrote solution at 2.205000e+00 to solution_0011.vtr.
+Step 442: t = 2.205000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2412e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 443: t = 2.210000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2442e+00 s.
+Step 444: t = 2.215000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2451e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 445: t = 2.220000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2479e+00 s.
+Step 446: t = 2.225000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2488e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 447: t = 2.230000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2514e+00 s.
+Step 448: t = 2.235000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2522e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 449: t = 2.240000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2551e+00 s.
+Step 450: t = 2.245000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2560e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 451: t = 2.250000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2587e+00 s.
+Step 452: t = 2.255000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2595e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 453: t = 2.260000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2622e+00 s.
+Step 454: t = 2.265000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2630e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 455: t = 2.270000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2660e+00 s.
+Step 456: t = 2.275000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2668e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 457: t = 2.280000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2710e+00 s.
+Step 458: t = 2.285000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2719e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 459: t = 2.290000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2747e+00 s.
+Step 460: t = 2.295000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2757e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 461: t = 2.300000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2785e+00 s.
+Step 462: t = 2.305000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2794e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 463: t = 2.310000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2820e+00 s.
+Step 464: t = 2.315000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2829e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 465: t = 2.320000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2856e+00 s.
+Step 466: t = 2.325000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2865e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 467: t = 2.330000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2891e+00 s.
+Step 468: t = 2.335000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2900e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 469: t = 2.340000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2927e+00 s.
+Step 470: t = 2.345000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2935e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 471: t = 2.350000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2962e+00 s.
+Step 472: t = 2.355000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.2971e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 473: t = 2.360000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3000e+00 s.
+Step 474: t = 2.365000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3008e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 475: t = 2.370000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3037e+00 s.
+Step 476: t = 2.375000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3046e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 477: t = 2.380000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3072e+00 s.
+Step 478: t = 2.385000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3081e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 479: t = 2.390000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3108e+00 s.
+Step 480: t = 2.395000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3116e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 481: t = 2.400000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3143e+00 s.
+- Wrote solution at 2.405000e+00 to solution_0012.vtr.
+Step 482: t = 2.405000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3337e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 483: t = 2.410000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3368e+00 s.
+Step 484: t = 2.415000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3377e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 485: t = 2.420000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3404e+00 s.
+Step 486: t = 2.425000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3413e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 487: t = 2.430000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3441e+00 s.
+Step 488: t = 2.435000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3449e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 489: t = 2.440000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3477e+00 s.
+Step 490: t = 2.445000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3485e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 491: t = 2.450000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3514e+00 s.
+Step 492: t = 2.455000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3523e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 493: t = 2.460000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3551e+00 s.
+Step 494: t = 2.465000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3560e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 495: t = 2.470000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3587e+00 s.
+Step 496: t = 2.475000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3595e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 497: t = 2.480000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3622e+00 s.
+Step 498: t = 2.485000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3631e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 499: t = 2.490000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3659e+00 s.
+Step 500: t = 2.495000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3668e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 501: t = 2.500000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3695e+00 s.
+Step 502: t = 2.505000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3704e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 503: t = 2.510000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3731e+00 s.
+Step 504: t = 2.515000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3740e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 505: t = 2.520000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3771e+00 s.
+Step 506: t = 2.525000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3780e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 507: t = 2.530000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3807e+00 s.
+Step 508: t = 2.535000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3818e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 509: t = 2.540000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3844e+00 s.
+Step 510: t = 2.545000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3853e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 511: t = 2.550000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3882e+00 s.
+Step 512: t = 2.555000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3891e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 513: t = 2.560000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3918e+00 s.
+Step 514: t = 2.565000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3927e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 515: t = 2.570000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3955e+00 s.
+Step 516: t = 2.575000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3963e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 517: t = 2.580000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.3994e+00 s.
+Step 518: t = 2.585000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4003e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 519: t = 2.590000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4030e+00 s.
+Step 520: t = 2.595000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4039e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 521: t = 2.600000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4068e+00 s.
+- Wrote solution at 2.605000e+00 to solution_0013.vtr.
+Step 522: t = 2.605000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4269e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 523: t = 2.610000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4296e+00 s.
+Step 524: t = 2.615000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4305e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 525: t = 2.620000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4333e+00 s.
+Step 526: t = 2.625000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4342e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 527: t = 2.630000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4370e+00 s.
+Step 528: t = 2.635000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4379e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 529: t = 2.640000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4407e+00 s.
+Step 530: t = 2.645000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4415e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 531: t = 2.650000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4444e+00 s.
+Step 532: t = 2.655000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4452e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 533: t = 2.660000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4481e+00 s.
+Step 534: t = 2.665000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4490e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 535: t = 2.670000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4518e+00 s.
+Step 536: t = 2.675000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4526e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 537: t = 2.680000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4557e+00 s.
+Step 538: t = 2.685000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4565e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 539: t = 2.690000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4592e+00 s.
+Step 540: t = 2.695000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4601e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 541: t = 2.700000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4632e+00 s.
+Step 542: t = 2.705000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4641e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 543: t = 2.710000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4670e+00 s.
+Step 544: t = 2.715000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4678e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 545: t = 2.720000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4707e+00 s.
+Step 546: t = 2.725000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4716e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 547: t = 2.730000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4746e+00 s.
+Step 548: t = 2.735000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4754e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 549: t = 2.740000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4784e+00 s.
+Step 550: t = 2.745000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4793e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 551: t = 2.750000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4825e+00 s.
+Step 552: t = 2.755000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4834e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 553: t = 2.760000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4865e+00 s.
+Step 554: t = 2.765000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4874e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 555: t = 2.770000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.4998e+00 s.
+Step 556: t = 2.775000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5006e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 557: t = 2.780000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5089e+00 s.
+Step 558: t = 2.785000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5097e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 559: t = 2.790000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5177e+00 s.
+Step 560: t = 2.795000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5185e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 561: t = 2.800000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5267e+00 s.
+- Wrote solution at 2.805000e+00 to solution_0014.vtr.
+Step 562: t = 2.805000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5427e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 563: t = 2.810000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5457e+00 s.
+Step 564: t = 2.815000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5465e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 565: t = 2.820000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5532e+00 s.
+Step 566: t = 2.825000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5540e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 567: t = 2.830000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5570e+00 s.
+Step 568: t = 2.835000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5579e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 569: t = 2.840000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5641e+00 s.
+Step 570: t = 2.845000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5650e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 571: t = 2.850000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5678e+00 s.
+Step 572: t = 2.855000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5686e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 573: t = 2.860000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5714e+00 s.
+Step 574: t = 2.865000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5723e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 575: t = 2.870000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5778e+00 s.
+Step 576: t = 2.875000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5786e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 577: t = 2.880000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5814e+00 s.
+Step 578: t = 2.885000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5822e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 579: t = 2.890000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5881e+00 s.
+Step 580: t = 2.895000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5889e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 581: t = 2.900000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5920e+00 s.
+Step 582: t = 2.905000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5929e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 583: t = 2.910000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5957e+00 s.
+Step 584: t = 2.915000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.5965e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 585: t = 2.920000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6018e+00 s.
+Step 586: t = 2.925000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6027e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 587: t = 2.930000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6055e+00 s.
+Step 588: t = 2.935000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6063e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 589: t = 2.940000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6091e+00 s.
+Step 590: t = 2.945000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6099e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 591: t = 2.950000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6153e+00 s.
+Step 592: t = 2.955000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6162e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 593: t = 2.960000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6190e+00 s.
+Step 594: t = 2.965000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6198e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 595: t = 2.970000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6224e+00 s.
+Step 596: t = 2.975000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6233e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 597: t = 2.980000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6261e+00 s.
+Step 598: t = 2.985000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6270e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 599: t = 2.990000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6320e+00 s.
+Step 600: t = 2.995000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6328e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 601: t = 3.000000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.6357e+00 s.
+- Wrote solution at 3.005000e+00 to solution_0015.vtr.
+Step 602: t = 3.005000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7466e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 603: t = 3.010000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7496e+00 s.
+Step 604: t = 3.015000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7504e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 605: t = 3.020000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7528e+00 s.
+Step 606: t = 3.025000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7536e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 607: t = 3.030000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7584e+00 s.
+Step 608: t = 3.035000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7592e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 609: t = 3.040000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7621e+00 s.
+Step 610: t = 3.045000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7629e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 611: t = 3.050000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7655e+00 s.
+Step 612: t = 3.055000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7663e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 613: t = 3.060000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7712e+00 s.
+Step 614: t = 3.065000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7720e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 615: t = 3.070000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7748e+00 s.
+Step 616: t = 3.075000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7756e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 617: t = 3.080000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7782e+00 s.
+Step 618: t = 3.085000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7790e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 619: t = 3.090000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7824e+00 s.
+Step 620: t = 3.095000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7832e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 621: t = 3.100000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7861e+00 s.
+Step 622: t = 3.105000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7868e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 623: t = 3.110000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7913e+00 s.
+Step 624: t = 3.115000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7921e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 625: t = 3.120000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7951e+00 s.
+Step 626: t = 3.125000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7958e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 627: t = 3.130000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7987e+00 s.
+Step 628: t = 3.135000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.7994e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 629: t = 3.140000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8022e+00 s.
+Step 630: t = 3.145000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8030e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 631: t = 3.150000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8074e+00 s.
+Step 632: t = 3.155000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8082e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 633: t = 3.160000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8106e+00 s.
+Step 634: t = 3.165000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8113e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 635: t = 3.170000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8141e+00 s.
+Step 636: t = 3.175000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8149e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 637: t = 3.180000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8177e+00 s.
+Step 638: t = 3.185000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8185e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 639: t = 3.190000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8229e+00 s.
+Step 640: t = 3.195000e+00, dt = 5.000000e-03, cfl = 7.5726e+02. Computation time: 1.8237e+00 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+- Wrote solution at 3.200000e+00 to solution_0016.vtr.
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 3.200000e+00)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 1.835623 sec.
+
