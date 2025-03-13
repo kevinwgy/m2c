@@ -8,6 +8,7 @@
 
 struct Vec3D;
 struct Vec5D;
+
 /*****************************************************************
  * class UserDefinedState is an interface for user to provide a
  * state variable field (V) and material ID through dynamic loading (see, e.g., dlopen)
@@ -21,7 +22,7 @@ public:
 
   virtual void GetUserDefinedState(int i0, int j0, int k0, int imax, int jmax, int kmax,
                                    Vec3D*** coords, Vec5D*** v, //!<  converted from Vec5D (dof = 5)
-                                   double*** id) = 0;
+                                   double*** id, std::vector<double***> phi) = 0;
 };
 
 typedef UserDefinedState* CreateUDS();

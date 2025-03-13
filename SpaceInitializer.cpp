@@ -116,13 +116,19 @@ SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, v
   vector<pair<int,int> > order;  //<geom type, geom dataMap index>
   [[maybe_unused]] int nGeom = OrderUserSpecifiedGeometries(order);
 
-  // Step 2: Apply initial conditions to V, ID (B.C. applied to V, but not ID!)
-  multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, spo, EBDS.get(), order);
 
-  // Step 3:: Apply initial conditions to Phi
+  // Step 2: Set phi to be a large positive number (domain_diagonal) everywhere
+  for(auto&& phi : Phi)
+    phi->SetConstantValue(domain_diagonal, true); //!< also populate the external ghosts
+
+  // Step 3: Apply initial conditions to V, ID (B.C. applied to V, but not ID!)
+  // NOTE: "Phi" is updated ONLY in ApplyUserDefinedState. Otherwise, it is untouched in this step
+  multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, Phi, spo, EBDS.get(), order);
+
+  // Step 4:: Apply initial conditions to Phi
   InitializePhi(ID, spo, Phi, NPhi, KappaPhi, lso, EBDS.get(), order, id2closure);
 
-  // Step 4:: Apply flooding if specified by user
+  // Step 5:: Apply flooding if specified by user
   if(ghand)
     ghand->UpdateInitialConditionByFlooding(V, ID, lso, Phi, EBDS.get());
 
@@ -221,12 +227,13 @@ SpaceInitializer::AddGeomToVector(int o, int type, int ind, string name, vector<
 //---------------------------------------------------------------------
 
 multimap<int, pair<int,int> >
-SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceOperator &spo,
-                                   vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
+SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
+                                   vector<SpaceVariable3D*> &Phi, //!< updated ONLY in ApplyUserDefinedState
+                                   SpaceOperator &spo, vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                                    vector<pair<int,int> > &order)
 {
 
-  multimap<int, pair<int,int> > id2closure; //only relevant when there are embedded boundaries
+  multimap<int, pair<int,int> > id2closure; //!< only relevant when there are embedded boundaries
 
   //----------------------------------------------------------------
   // Step 1: Get the needed data
@@ -601,9 +608,17 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, Spac
   //----------------------------------------------------------------
   // Step 6: Apply initial condition from dynamic shared object (If specified)
   //----------------------------------------------------------------
-  if(std::get<0>(state_calculator))
-    ApplyUserDefinedVandID(coords, v, id);
+  if(std::get<0>(state_calculator)) {
+    //! This is the only place in this function where Phi may be updated
+    vector<double***> phi(Phi.size(), NULL);
+    for(int i=0; i<(int)Phi.size(); i++)
+      phi[i] = Phi[i]->GetDataPointer();
 
+    ApplyUserDefinedState(coords, v, id, phi);
+
+    for(int i=0; i<(int)Phi.size(); i++)
+      Phi[i]->RestoreDataPointerAndInsert();
+  }
 
   //----------------------------------------------------------------
   // Step 7: Restore Data
@@ -1206,7 +1221,7 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
 //---------------------------------------------------------------------
 
 void
-SpaceInitializer::ApplyUserDefinedVandID(Vec3D*** coords, Vec5D*** v, double*** id)
+SpaceInitializer::ApplyUserDefinedState(Vec3D*** coords, Vec5D*** v, double*** id, vector<double***> phi)
 {
   if(!std::get<0>(state_calculator))
     return;
@@ -1214,7 +1229,7 @@ SpaceInitializer::ApplyUserDefinedVandID(Vec3D*** coords, Vec5D*** v, double*** 
   UserDefinedState *calculator(std::get<0>(state_calculator));
   assert(calculator);
     
-  calculator->GetUserDefinedState(i0,j0,k0,imax,jmax,kmax,coords,v,id);
+  calculator->GetUserDefinedState(i0,j0,k0,imax,jmax,kmax,coords,v,id,phi);
 }
 
 //---------------------------------------------------------------------
@@ -1282,11 +1297,6 @@ SpaceInitializer::InitializePhiByDistance(vector<pair<int,int> > &order,
   Vec3D***  coords = (Vec3D***)coordinates.GetDataPointer();
   double*** phi    = (double***)Phi.GetDataPointer();
 
-  //first, set phi to be a large number everywhere
-  for(int k=kk0; k<kkmax; k++)
-    for(int j=jj0; j<jjmax; j++)
-      for(int i=ii0; i<iimax; i++)
-        phi[k][j][i] = domain_diagonal;
 
   //TODO: Add this feature later
   if(iod.ic.specified[IcData::LEVELSET]) {
@@ -1851,7 +1861,6 @@ SpaceInitializer::InitializePhiWithinEnclosure(UserSpecifiedEnclosureData &enclo
   return applied_ic;
 }
 
-
 //---------------------------------------------------------------------
 
 void
@@ -1861,6 +1870,12 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
                                                   LevelSetOperator &lso,
                                                   vector<pair<int,int> > *surf_and_color)
 {
+
+  //Phi was originally initialized to a large positive number (domain_diagonal) everywhere. Before reaching here,
+  //some nodes may have been updated through UserDefinedState (see InitializeVandID). However, there can be other
+  //boundaries of the phase subdomain that were not taken care of in UserDefinedState. Therefore, before running
+  //reinitialization, we have to make some changes to phi.
+
   int materialid = lso.GetMaterialID();
   double*** id  = ID.GetDataPointer();
   double*** phi = Phi.GetDataPointer();
@@ -1868,43 +1883,88 @@ SpaceInitializer::InitializePhiByReinitialization(SpaceVariable3D &ID,
   // Calculate phi near subdomain boundary
   int myid;
   double dist;
+  bool user_defined, near_boundary;
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
+
+        user_defined = (phi[k][j][i] != domain_diagonal);
+        near_boundary = false;
+
         myid = id[k][j][i];
         dist = global_mesh.GetMinDXYZ(Int3(i,j,k));
         if(myid == materialid) {
-          if(i-1>=0 && id[k][j][i-1] != myid)
+          if(i-1>=0 && id[k][j][i-1] != myid) {
             dist = std::min(dist, 0.5*(global_mesh.GetX(i)-global_mesh.GetX(i-1)));
-          if(i+1<NX && id[k][j][i+1] != myid)
+            near_boundary = true;
+          }
+          if(i+1<NX && id[k][j][i+1] != myid) {
             dist = std::min(dist, 0.5*(global_mesh.GetX(i+1)-global_mesh.GetX(i)));
-          if(j-1>=0 && id[k][j-1][i] != myid)
+            near_boundary = true;
+          }
+          if(j-1>=0 && id[k][j-1][i] != myid) {
             dist = std::min(dist, 0.5*(global_mesh.GetY(j)-global_mesh.GetY(j-1)));
-          if(j+1<NY && id[k][j+1][i] != myid)
+            near_boundary = true;
+          }
+          if(j+1<NY && id[k][j+1][i] != myid) {
             dist = std::min(dist, 0.5*(global_mesh.GetY(j+1)-global_mesh.GetY(j)));
-          if(k-1>=0 && id[k-1][j][i] != myid)
+            near_boundary = true;
+          }
+          if(k-1>=0 && id[k-1][j][i] != myid) {
             dist = std::min(dist, 0.5*(global_mesh.GetZ(k)-global_mesh.GetZ(k-1)));
-          if(k+1<NZ && id[k+1][j][i] != myid)
+            near_boundary = true;
+          }
+          if(k+1<NZ && id[k+1][j][i] != myid) {
             dist = std::min(dist, 0.5*(global_mesh.GetZ(k+1)-global_mesh.GetZ(k)));
+            near_boundary = true;
+          }
 
-          phi[k][j][i] = -dist;
+          if(user_defined) {
+            if(phi[k][j][i]>=0.0)  //wrong sign! must reset (by convention, phi = 0 --> ``outside'')
+              phi[k][j][i] = -dist;
+            else if(near_boundary)
+              phi[k][j][i] = std::max(phi[k][j][i], -dist); //whichever closer to 0.0 (both are negative)
+            //otherwise, keep user-specified value.
+          } else
+            phi[k][j][i] = -dist;
+
         }
         else {
-          if(i-1>=0 && id[k][j][i-1] == materialid)
+          if(i-1>=0 && id[k][j][i-1] == materialid) {
             dist = std::min(dist, 0.5*(global_mesh.GetX(i)-global_mesh.GetX(i-1)));
-          if(i+1<NX && id[k][j][i+1] == materialid)
+            near_boundary = true;
+          }
+          if(i+1<NX && id[k][j][i+1] == materialid) {
             dist = std::min(dist, 0.5*(global_mesh.GetX(i+1)-global_mesh.GetX(i)));
-          if(j-1>=0 && id[k][j-1][i] == materialid)
+            near_boundary = true;
+          }
+          if(j-1>=0 && id[k][j-1][i] == materialid) {
             dist = std::min(dist, 0.5*(global_mesh.GetY(j)-global_mesh.GetY(j-1)));
-          if(j+1<NY && id[k][j+1][i] == materialid)
+            near_boundary = true;
+          }
+          if(j+1<NY && id[k][j+1][i] == materialid) {
             dist = std::min(dist, 0.5*(global_mesh.GetY(j+1)-global_mesh.GetY(j)));
-          if(k-1>=0 && id[k-1][j][i] == materialid)
+            near_boundary = true;
+          }
+          if(k-1>=0 && id[k-1][j][i] == materialid) {
             dist = std::min(dist, 0.5*(global_mesh.GetZ(k)-global_mesh.GetZ(k-1)));
-          if(k+1<NZ && id[k+1][j][i] == materialid)
+            near_boundary = true;
+          }
+          if(k+1<NZ && id[k+1][j][i] == materialid) {
             dist = std::min(dist, 0.5*(global_mesh.GetZ(k+1)-global_mesh.GetZ(k)));
+            near_boundary = true;
+          }
 
-          phi[k][j][i] = dist;
+          if(user_defined) {
+            if(phi[k][j][i]<0.0) //wrong sign! must reset 
+              phi[k][j][i] = dist;
+            else if(near_boundary)
+              phi[k][j][i] = std::min(phi[k][j][i], dist); //whichever closer to 0.0 (both are non-negative)
+            //otherwise, keep user-specified value.
+          } else
+            phi[k][j][i] = dist;
         }
+
       }
 
   ID.RestoreDataPointerToLocalVector();

@@ -3,6 +3,7 @@
  * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
  ************************************************************************/
 
+#include <vector>
 #include "UserDefinedState.h"
 #include "Vector3D.h"
 #include "Vector5D.h"
@@ -19,14 +20,15 @@ class MyStateCalculator : public UserDefinedState{
 
 public:
   void GetUserDefinedState(int i0, int j0, int k0, int imax, int jmax, int kmax,
-                           Vec3D*** coords, Vec5D*** v, double*** id);
+                           Vec3D*** coords, Vec5D*** v, double*** id, std::vector<double***> phi);
 };
 
 //------------------------------------------------------------
 
 void
 MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jmax, int kmax,
-                                       Vec3D*** coords, Vec5D*** v, double*** id)
+                                       Vec3D*** coords, Vec5D*** v, double*** id,
+                                       std::vector<double***> phi)
 {
   // Note:
   // 1. Each processor core calls this functio with different inputs.

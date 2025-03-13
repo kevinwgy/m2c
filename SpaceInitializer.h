@@ -60,7 +60,9 @@ private:
                        std::vector<int> &user_specified_order);
 
   std::multimap<int, std::pair<int,int> >
-  InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceOperator &spo,
+  InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
+                   std::vector<SpaceVariable3D*> &Phi, //!< updated ONLY in ApplyUserDefinedState
+                   SpaceOperator &spo,
                    std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
                    std::vector<std::pair<int,int> > &order);
 
@@ -77,7 +79,7 @@ private:
                           std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
                           std::vector<double***> &color, Vec5D*** v, double*** id);
 
-  void ApplyUserDefinedVandID(Vec3D*** coords, Vec5D*** v, double*** id);
+  void ApplyUserDefinedState(Vec3D*** coords, Vec5D*** v, double*** id, std::vector<double***> phi);
 
   void InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
                      std::vector<SpaceVariable3D*> &Phi, std::vector<SpaceVariable3D*> &NPhi,
