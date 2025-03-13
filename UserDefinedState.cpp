@@ -26,7 +26,7 @@ public:
 
 void
 MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jmax, int kmax,
-                                       Vec3D*** coords, Vec5D*** v, double*** id);
+                                       Vec3D*** coords, Vec5D*** v, double*** id)
 {
   // Note:
   // 1. Each processor core calls this functio with different inputs.
