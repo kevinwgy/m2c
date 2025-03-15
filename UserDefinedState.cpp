@@ -31,9 +31,10 @@ MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jma
                                        std::vector<double***> phi)
 {
   // Note:
-  // 1. Each processor core calls this functio with different inputs.
-  // 2. Override the original values of v and id. 
-  // 4. The state variables are each node are: rho,u,v,w,p.
+  // 1. Each processor core calls this function with different inputs.
+  // 2. Override the original values of v, id, and possibly phi.
+  // 3. If phi is updated, make sure it is consistent with id.
+  // 4. The state variables (v) are each node are: rho,u,v,w,p.
   // 3. Do NOT change coords.
 
   //TODO: The user should complete this function

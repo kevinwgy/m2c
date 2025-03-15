@@ -6,6 +6,8 @@
 #ifndef _USER_DEFINED_STATE_H_
 #define _USER_DEFINED_STATE_H_
 
+#include<vector>
+
 struct Vec3D;
 struct Vec5D;
 
