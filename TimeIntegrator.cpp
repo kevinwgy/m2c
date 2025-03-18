@@ -40,6 +40,14 @@ TimeIntegratorBase::TimeIntegratorBase(MPI_Comm &comm_, IoData& iod_, DataManage
 
   if(iod.ts.convergence_tolerance>0.0) //steady-state analysis
     sso = new SteadyStateOperator(comm_, iod.ts, spo.GetGlobalMeshInfo());
+
+  ls_correction_bucket = 0;
+  // sanity check
+  if(iod.multiphase.corrections_until_reinit<1) {
+    print_error("*** Error: MultiPhase::CorrectionsUntilReinitialization must be greater than 0.\n");
+    exit_mpi();
+  }
+    
 }
 
 //----------------------------------------------------------------------------
@@ -744,12 +752,13 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
       resolved_conflicts += mpo.ResolveConflictsWithEmbeddedSurfaces(Phi, IDn, ID, EBDS, embed->GetPointerToIntersectors());
     }
 
+    if(verbose>=1 && resolved_conflicts>0)
+      print("- Resolved %d conflicts between level sets and embedded boundaries.\n", resolved_conflicts);
+
     // Reinitialize level set (also apply boundary conditions)
-    if(resolved_conflicts>0) { //must reinitialize
-      if(verbose>=1) {
-        print("- Resolved %d conflicts between level sets and embedded boundaries. "
-              "Reinitialize level sets...\n", resolved_conflicts);
-      }
+    ls_correction_bucket += resolved_conflicts;
+    if(ls_correction_bucket >= iod.multiphase.corrections_until_reinit) {//must reinitialize
+      ls_correction_bucket = 0; //empty bucket
       for(int i=0; i<(int)Phi.size(); i++) 
         lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0/*no-special-maxIts*/, true/*"must_do"*/);
     } else {
