@@ -3334,7 +3334,6 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
   dynamics_calculator = "";
   force_calculator = "";
 
-
   conRec_depth = 0.0;
 }
 
@@ -3396,6 +3395,32 @@ Assigner *EmbeddedSurfaceData::getAssigner()
 
 //------------------------------------------------------------------------------
 
+SurfaceIntersectionData::SurfaceIntersectionData()
+{
+  surface1_id = -1;
+  surface2_id = -1;
+  enclosure_treatment = INACTIVE;
+}
+
+//------------------------------------------------------------------------------
+
+Assigner *SurfaceIntersectionData::getAssigner()
+{
+
+  ClassAssigner *ca = new ClassAssigner("normal", 3, nullAssigner);
+
+  new ClassToken<SurfaceIntersectionData> (ca, "Enclosure", this,
+     reinterpret_cast<int SurfaceIntersectionData::*>(&SurfaceIntersectionData::enclosure_treatment), 3,
+     "Inactive", 0, "IgnoreSurface1", 1, "IgnoreSurface2", 2);
+
+  new ClassInt<SurfaceIntersectionData>(ca, "Surface1", this, &SurfaceIntersectionData::surface1_id);
+  new ClassInt<SurfaceIntersectionData>(ca, "Surface2", this, &SurfaceIntersectionData::surface2_id);
+
+  return ca;
+}
+
+//------------------------------------------------------------------------------
+
 EmbeddedSurfacesData::EmbeddedSurfacesData()
 {
 
@@ -3405,9 +3430,11 @@ EmbeddedSurfacesData::EmbeddedSurfacesData()
 
 void EmbeddedSurfacesData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
 
   surfaces.setup("Surface", ca);
+
+  surface_intersections.setup("SurfaceIntersection", ca);
 }
 
 //------------------------------------------------------------------------------

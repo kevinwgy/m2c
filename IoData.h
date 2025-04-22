@@ -1588,13 +1588,30 @@ struct EmbeddedSurfaceData {
   //! flux calculation
   double conRec_depth; //!< depth (dimensional) where constant reconstruction is applied (default: 0)
 
-
   //! output displacement and nodal load
   LagrangianMeshOutputData output;
 
-
   EmbeddedSurfaceData();
   ~EmbeddedSurfaceData() {}
+
+  Assigner *getAssigner();
+
+};
+
+//------------------------------------------------------------------------------
+
+struct SurfaceIntersectionData {
+
+  int surface1_id;
+  int surface2_id;
+
+  /** Surface intersection may leads to new enclosures. If IGNORE_SURFACE1 and IGNORE_SURFACE2, the enclosed \n
+    * regions are ignored by ignoring either part of surface 1 or surface 2. INACTIVE means the enclosures \n
+    * are treated as an inactive region. Note: If surface1_id == surface2_id, only INACTIVE is supported. */
+  enum EnclosureTreatment{INACTIVE = 0, IGNORE_SURFACE1 = 1, IGNORE_SURFACE2 = 2} enclosure_treatment;
+
+  SurfaceIntersectionData();
+  ~SurfaceIntersectionData() {}
 
   Assigner *getAssigner();
 
@@ -1606,6 +1623,8 @@ struct EmbeddedSurfacesData {
 
   ObjectMap<EmbeddedSurfaceData> surfaces;
 
+  //! possible contact/intersections between multiple surfaces (or oneself)
+  ObjectMap<SurfaceIntersectionData> surface_intersections;
 
   EmbeddedSurfacesData();
   ~EmbeddedSurfacesData() {}

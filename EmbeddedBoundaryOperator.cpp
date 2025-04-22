@@ -107,6 +107,28 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // set NULL to intersector pointers
   intersector.assign(surfaces.size(), NULL);
 
+  // setup surface intersection detection
+  for(auto&& my_pair : iod_.ebm.embed_surfaces.surface_intersections.dataMap) {
+    SurfaceIntersectionData* inter(my_pair.second);
+    // sanity checks
+    if(inter->surface1_id<0 || inter->surface1_id>=(int)surfaces.size()) {
+      print_error("*** Error: Surface %d (in SurfaceIntersection) undefined.\n", inter->surface1_id);
+      exit_mpi();
+    }
+    if(inter->surface2_id<0 || inter->surface2_id>=(int)surfaces.size()) {
+      print_error("*** Error: Surface %d (in SurfaceIntersection) undefined.\n", inter->surface2_id);
+      exit_mpi();
+    }
+    if((inter->surface1_id == inter->surface2_id) && 
+       inter->enclosure_treatment != SurfaceIntersectionData::INACTIVE) {
+      print_error("*** Error: Self-intersection (in SurfaceIntersection) only supports Enclosure = Inactive.\n");
+      exit_mpi();
+    }
+
+    surfaceXpairs.push_back(std::make_tuple(inter->surface1_id, inter->surface2_id, inter->enclosure_treatment));
+  }
+
+
   // setup output
   for(int i=0; i<(int)surfaces.size(); i++)
     lagout.push_back(LagrangianOutput(comm, iod_embedded_surfaces[i]->output));
@@ -125,6 +147,7 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 //------------------------------------------------------------------------------------------------
 // A constructor for tracking a single embedded surface provided using a mesh file
 // The surface may contain multiple enclosures
+// NOTE: surface intersections IGNORED in this constructor
 EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurfaceData &iod_surface)
                         : comm(comm_), hasSurfFromOtherSolver(false),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
@@ -277,6 +300,9 @@ EmbeddedBoundaryOperator::SetupIntersectors()
     intersector[i] = new Intersector(comm, *dms_ptr, *iod_embedded_surfaces[i], surfaces[i],
                                      *coordinates_ptr, *ghost_nodes_inner_ptr, *ghost_nodes_outer_ptr,
                                      *global_mesh_ptr);
+
+    // also initialize inactive_elem_by_surfaceX (default: false, i.e., active)
+    inactive_elem_by_surfaceX.push_back(vector<bool>(surfaces[i].elems.size(), false));
   }
 }
 
@@ -1047,10 +1073,15 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
   vector<bool> hasOutlet(intersector.size(), false);
   vector<bool> hasOccluded(intersector.size(), false);
   vector<int> numRegions(intersector.size(), 0);
+
+
   for(int i = 0; i < (int)intersector.size(); i++) {
     bool a1, a2, b, c;
     int d;
     double max_dist0 = intersector[i]->TrackSurfaceFullCourse(a1, a2, b, c, d, phi_layers);
+
+
+
     if(max_dist0>max_dist)
       max_dist = max_dist0;
 
@@ -1059,6 +1090,10 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
     hasOutlet[i] = b;
     hasOccluded[i] = c;
     numRegions[i] = d;
+
+
+
+
 
 /*
     // debug only

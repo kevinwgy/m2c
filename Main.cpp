@@ -465,6 +465,7 @@ int main(int argc, char* argv[])
   Output out(comm, dms, iod, global_mesh, spo.GetPointerToOuterGhostNodes(), vf, laser, spo.GetMeshCoordinates(),
              spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), ion, heo, inco); 
   out.InitializeOutput(spo.GetMeshCoordinates());
+  mpi_barrier();
 
 
   //! Initialize time integrator

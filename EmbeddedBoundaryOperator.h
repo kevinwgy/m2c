@@ -46,12 +46,18 @@ class EmbeddedBoundaryOperator {
   //! inactive closures: pair of <surface number, color>, not including color = 0 (occluded)
   std::set<std::pair<int,int> > inactive_colors;
 
-  //! for each surface (i), inactive_elem_status[i][j] (j: 0 -- surfaces[i].elems.size()) shows weather one or both
+  //! for each surface (i), inactive_elem_status[i][j] (j: 0 -- surfaces[i].elems.size()) shows whether one or both
   //! sides of triangle element j is part of the inward-facing side of any inactive region. 
   //! Needed for force computation
   std::vector<std::vector<int> > inactive_elem_status;
 
   vector<std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> > dynamics_calculator; //!< the 1st one is the calculator
+
+  //! Embedded surface intersection detection & handling. Tuple: (Surface 1 ID, Surface 2 ID, Treatment)
+  vector<std::tuple<int, int, SurfaceIntersectionData::EnclosureTreatment> > surfaceXpairs;
+  //! whether each element is inactive due to surface-surface intersections
+  std::vector<std::vector<bool> > inactive_elem_by_surfaceX;
+
 
   //! Mesh info (Not used when the class is used for special purposes, e.g., DynamicLoadCalculator)
   //! These information are generally needed when the surface needs to be "tracked" within the M2C mesh
@@ -129,6 +135,8 @@ private:
   void ReadMeshFileInOBJFormat(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es);
 
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
+
+  bool DetectSurfaceIntersections(int surface1, int surface2);
 
   //! Compute "Fs" and "FAs".
   void ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs,
