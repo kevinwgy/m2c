@@ -174,10 +174,15 @@ public:
   //! Get surface half thickness
   inline double GetSurfaceHalfThickness() {return half_thickness;}
 
+  //! Get scope
+  void GetTrianglesInScope1(vector<int> &triangles); //!< ``triangles'' will be filled with element IDs
+
   //! Check if a line segment intersects with any triangles inside scope
   bool Intersects(Vec3D &X0, Vec3D &X1);
 
   //! Interface tracking functions
+  void BuildKDTreeAndFindIntersections();
+
   double TrackSurfaceFullCourse(bool &hasInlet_, bool &hasInlet2_, bool &hasOutlet_, bool &hasOcc_,
                                 int &nRegions_, int phi_layers);
 

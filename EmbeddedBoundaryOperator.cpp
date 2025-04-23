@@ -1068,36 +1068,37 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
   for(auto&& surf : surfaces)
     surf.CalculateNormalsAndAreas();
 
-  vector<bool> hasInlet(intersector.size(), false);
-  vector<bool> hasInlet2(intersector.size(), false);
-  vector<bool> hasOutlet(intersector.size(), false);
-  vector<bool> hasOccluded(intersector.size(), false);
-  vector<int> numRegions(intersector.size(), 0);
-
-
   for(int i = 0; i < (int)intersector.size(); i++) {
+    intersector[i]->BuildKDTreeAndFindIntersections();
+    bool hasOccluded = intersector[i]->FloodFillColors();
+  }
+
+  //check & handle potential surface intersections (if specified by user)
+  for(auto&& Xpair : surfaceXpairs) {
+    int s1 = std::get<0>(Xpair);
+    int s2 = std::get<1>(Xpair);
+    if(s1==s2)
+      continue; //this function is called at the beginning of simulation; self-intersection `handled' by user
+    if(!DetectSurfaceIntersections(s1,s2) && !DetectSurfaceIntersections(s2,s1))
+      continue; //these two do not intersect
+    
+I AM HERE
+    FloodFillWithMergedIntersections(s1,s2);
+  }
+
+
+
     bool a1, a2, b, c;
     int d;
     double max_dist0 = intersector[i]->TrackSurfaceFullCourse(a1, a2, b, c, d, phi_layers);
 
-
-
     if(max_dist0>max_dist)
       max_dist = max_dist0;
-
-    hasInlet[i] = a1;
-    hasInlet2[i] = a2;
-    hasOutlet[i] = b;
-    hasOccluded[i] = c;
-    numRegions[i] = d;
-
-
 
 
 
 /*
     // debug only
-    print("o Surface %d: Inlet %d, Inlet2 %d, Outlet %d, Occluded %d, numRegions %d.\n", i, a1, a2, b, c, d);
     unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
     string filename = "Phi_" + std::to_string(i) + ".vtr";
     EBDS->Phi_ptr->StoreMeshCoordinates(*coordinates_ptr);
@@ -1944,6 +1945,60 @@ EmbeddedBoundaryOperator::CombineSharedGaussPointData(vector<double>& data, vect
   assert(counter*2==Nshared);
 
   return counter;
+
+}
+
+//------------------------------------------------------------------------------------------------
+
+bool
+EmbeddedBoundaryOperator::DetectSurfaceIntersections(int surf1, int surf2)
+{
+  // sanity checks
+  assert(surf1>=0 && surf1<=(int)surfaces.size());
+  assert(surf2>=0 && surf2<=(int)surfaces.size());
+
+  // check surf1 edges against surf2 elements
+  vector<Vec3D>& Xs(surfaces[surf1].X);
+  vector<Int3>& Es(surfaces[surf1].elems);
+  vector<int> surf1_scope_1;
+  intersector[surf1]->GetTrianglesInScope1(surf1_scope_1);
+
+  // make sure each processor runs the same number of iterations (for MPI exchange). 
+  // Note: it may be more efficient to use one-sided comm (RMA), especially MPI_Win_lock/unlock.
+  //       But I couldn't make it work as expected.
+  int Niter = surf1_scope_1.size();
+  MPI_Allreduce(MPI_IN_PLACE, &Niter, 1, MPI_INT, MPI_MAX, comm);
+  int commFreq = std::max(10, Niter/10);
+  int found = 0;
+  for(int i=0; i<Niter; i++) {
+    if(i<(int)surf1_scope_1.size()) { //otherwise, do nothing
+      Int3 &nod(Es[surf1_scope_1[i]]);
+      if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]]) ||
+         intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]]) ||
+         intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]]) ) {
+        found = 1;
+      }
+    }
+
+    if(i%commFreq == commFreq-1) {//collect `found'
+      MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, comm);
+      if(found>0) //someone found an intersection
+        return true;
+    }
+  }
+
+  //one last communication
+  MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, comm);
+
+  return found != 0;
+}
+
+//------------------------------------------------------------------------------------------------
+
+void
+EmbeddedBoundaryOperator::FloodFillWithMergedIntersections(int surf1, int surf2)
+{
+  
 
 }
 

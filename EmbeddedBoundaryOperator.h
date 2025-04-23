@@ -6,7 +6,7 @@
 #ifndef _EMBEDDED_BOUNDARY_OPERATOR_H_
 #define _EMBEDDED_BOUNDARY_OPERATOR_H_
 
-#include<Intersector.h>
+#include<DualSurfaceIntersector.h>
 #include<UserDefinedDynamics.h>
 #include<LagrangianOutput.h>
 #include<cassert>
@@ -24,6 +24,8 @@ struct Vec5D;
  *****************************************************************/
 
 class EmbeddedBoundaryOperator {
+
+  friend class DualSurfaceIntersector;
 
   MPI_Comm &comm;
 
@@ -136,8 +138,6 @@ private:
 
   void SetupUserDefinedDynamicsCalculator(); //!< setup dynamics_calculator
 
-  bool DetectSurfaceIntersections(int surface1, int surface2);
-
   //! Compute "Fs" and "FAs".
   void ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D*** v, double*** id, vector<Vec3D> &Fs,
                                       vector<Vec3D> &FAs);
@@ -152,6 +152,11 @@ private:
 
   //! Compute one-sided traction from the "side" indicated by "normal"
   Vec3D CalculateTractionAtPoint(Vec3D &p, Vec3D &normal/*towards the "side"*/, Vec5D*** v, double*** id);
+
+  //! For handling surface-surface intersections and the resulting topological changes
+  bool DetectSurfaceIntersections(int surf1, int surf2); //!< check surf1 edges against surf2 elements
+
+  void FloodFillWithMergedIntersections(int surf1, int surf2);
 
 };
 

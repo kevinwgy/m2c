@@ -159,6 +159,16 @@ Intersector::GetElementsInScope1(std::vector<int> &elems_in_scope)
 
 //-------------------------------------------------------------------------
 
+void
+Intersector::BuildKDTreeAndFindIntersections()
+{
+  // This (smaller) one is for edge-surface intersections
+  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1);
+  FindIntersections(); //using scope_1 and tree_1
+}
+
+//-------------------------------------------------------------------------
+
 double
 Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasInlet2_, bool &hasOutlet_,
                                     bool &hasOcc_, int &nRegions_, int phi_layers)
@@ -401,9 +411,9 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
 
   // For completeness (to avoid confusion), we set external ghost cells to -1
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
-      Int3& ijk(it->ijk);
-      xf[ijk[2]][ijk[1]][ijk[0]] = -1; //setting all three components to -1
-      xb[ijk[2]][ijk[1]][ijk[0]] = -1;
+    Int3& ijk(it->ijk);
+    xf[ijk[2]][ijk[1]][ijk[0]] = -1; //setting all three components to -1
+    xb[ijk[2]][ijk[1]][ijk[0]] = -1;
   }
  
 
@@ -1627,6 +1637,17 @@ Intersector::Intersects(Vec3D &X0, Vec3D &X1)
 }
 
 //-------------------------------------------------------------------------
+
+void
+Intersector::GetTrianglesInScope1(vector<int> &triangles)
+{
+  triangles.resize(scope_1.size());
+  for(int i=0; i<(int)triangles.size(); i++)
+    triangles[i] = scope_1[i].trId();
+}
+
+//-------------------------------------------------------------------------
+
 
 
 //-------------------------------------------------------------------------
