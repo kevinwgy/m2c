@@ -6,7 +6,7 @@
 #ifndef _EMBEDDED_BOUNDARY_OPERATOR_H_
 #define _EMBEDDED_BOUNDARY_OPERATOR_H_
 
-#include<DualSurfaceIntersector.h>
+#include<MultiSurfaceIntersector.h>
 #include<UserDefinedDynamics.h>
 #include<LagrangianOutput.h>
 #include<cassert>
@@ -25,11 +25,11 @@ struct Vec5D;
 
 class EmbeddedBoundaryOperator {
 
-  friend class DualSurfaceIntersector;
-
   MPI_Comm &comm;
 
   bool hasSurfFromOtherSolver; //!< currently, at most 1 surface can come from another solver (to be generalized)
+
+  IoData &iod;
 
   //! data and tools for each surface
   vector<EmbeddedSurfaceData*> iod_embedded_surfaces; //!< iodata
@@ -55,11 +55,8 @@ class EmbeddedBoundaryOperator {
 
   vector<std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> > dynamics_calculator; //!< the 1st one is the calculator
 
-  //! Embedded surface intersection detection & handling. Tuple: (Surface 1 ID, Surface 2 ID, Treatment)
-  vector<std::tuple<int, int, SurfaceIntersectionData::EnclosureTreatment> > surfaceXpairs;
-  //! whether each element is inactive due to surface-surface intersections
-  std::vector<std::vector<bool> > inactive_elem_by_surfaceX;
-
+  //! Embedded surface intersection detection & handling
+  vector<MultiSurfaceIntersector*> multi_intersector;
 
   //! Mesh info (Not used when the class is used for special purposes, e.g., DynamicLoadCalculator)
   //! These information are generally needed when the surface needs to be "tracked" within the M2C mesh
@@ -80,7 +77,7 @@ public:
   EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver = false);
 
   //! Another constructor for tracking a single embedded surface provided using a mesh file
-  EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurfaceData &iod_surface);
+  EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, EmbeddedSurfaceData &iod_surface);
 
   ~EmbeddedBoundaryOperator();
 
@@ -152,11 +149,6 @@ private:
 
   //! Compute one-sided traction from the "side" indicated by "normal"
   Vec3D CalculateTractionAtPoint(Vec3D &p, Vec3D &normal/*towards the "side"*/, Vec5D*** v, double*** id);
-
-  //! For handling surface-surface intersections and the resulting topological changes
-  bool DetectSurfaceIntersections(int surf1, int surf2); //!< check surf1 edges against surf2 elements
-
-  void FloodFillWithMergedIntersections(int surf1, int surf2);
 
 };
 

@@ -316,7 +316,7 @@ LevelSetOperator::ApplyInitialConditionWithinEnclosure(UserSpecifiedEnclosureDat
   esd.filename                   = enclosure.surface_filename;
 
   //create the embedded operator to track the surface
-  EmbeddedBoundaryOperator embed(comm, esd);
+  EmbeddedBoundaryOperator embed(comm, iod, esd);
   embed.SetCommAndMeshInfo(dms, coordinates, spo_ghost_nodes_inner, spo_ghost_nodes_outer,
                            global_mesh);
   embed.SetupIntersectors();

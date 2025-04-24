@@ -105,6 +105,7 @@ TriangulatedSurface.cpp
 CrackingSurface.cpp
 Intersector.cpp
 FloodFill.cpp
+MultiSurfaceIntersector.cpp
 EmbeddedBoundaryOperator.cpp
 CustomCommunicator.cpp
 ExactRiemannSolverBase.cpp

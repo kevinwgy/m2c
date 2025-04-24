@@ -34,7 +34,6 @@
 
 class Intersector {
 
-
   //! Utility class to find and store bounding boxes for triangles
   class MyTriangle {
     int id;

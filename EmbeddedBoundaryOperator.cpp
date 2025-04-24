@@ -27,7 +27,7 @@ extern int verbose;
 //------------------------------------------------------------------------------------------------
 
 EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, bool surface_from_other_solver) 
-                        : comm(comm_), hasSurfFromOtherSolver(surface_from_other_solver),
+                        : comm(comm_), iod(iod_), hasSurfFromOtherSolver(surface_from_other_solver),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
                           ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL),
                           cylindrical_symmetry(false) 
@@ -107,26 +107,18 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
   // set NULL to intersector pointers
   intersector.assign(surfaces.size(), NULL);
 
-  // setup surface intersection detection
+  // set NULL to multi-surface intersector pointers (after santity check)
+  std::set<std::pair<int,int> > surface_pairs;
   for(auto&& my_pair : iod_.ebm.embed_surfaces.surface_intersections.dataMap) {
     SurfaceIntersectionData* inter(my_pair.second);
-    // sanity checks
-    if(inter->surface1_id<0 || inter->surface1_id>=(int)surfaces.size()) {
-      print_error("*** Error: Surface %d (in SurfaceIntersection) undefined.\n", inter->surface1_id);
-      exit_mpi();
-    }
-    if(inter->surface2_id<0 || inter->surface2_id>=(int)surfaces.size()) {
-      print_error("*** Error: Surface %d (in SurfaceIntersection) undefined.\n", inter->surface2_id);
-      exit_mpi();
-    }
-    if((inter->surface1_id == inter->surface2_id) && 
-       inter->enclosure_treatment != SurfaceIntersectionData::INACTIVE) {
-      print_error("*** Error: Self-intersection (in SurfaceIntersection) only supports Enclosure = Inactive.\n");
-      exit_mpi();
-    }
-
-    surfaceXpairs.push_back(std::make_tuple(inter->surface1_id, inter->surface2_id, inter->enclosure_treatment));
+    surface_pairs.insert(std::make_pair(std::min(inter->surface1_id, inter->surface2_id),
+                                        std::max(inter->surface1_id, inter->surface2_id)));
   }
+  if(surface_pairs.size() != iod_.ebm.embed_surfaces.surface_intersections.dataMap.size()) {
+    print_error("*** Error: Detected identical SurfaceIntersection pairs.\n");
+    exit_mpi();
+  }
+  multi_intersector.assign(surface_pairs.size(), NULL);
 
 
   // setup output
@@ -148,8 +140,8 @@ EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_
 // A constructor for tracking a single embedded surface provided using a mesh file
 // The surface may contain multiple enclosures
 // NOTE: surface intersections IGNORED in this constructor
-EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, EmbeddedSurfaceData &iod_surface)
-                        : comm(comm_), hasSurfFromOtherSolver(false),
+EmbeddedBoundaryOperator::EmbeddedBoundaryOperator(MPI_Comm &comm_, IoData &iod_, EmbeddedSurfaceData &iod_surface)
+                        : comm(comm_), iod(iod_), hasSurfFromOtherSolver(false),
                           dms_ptr(NULL), coordinates_ptr(NULL), ghost_nodes_inner_ptr(NULL),
                           ghost_nodes_outer_ptr(NULL), global_mesh_ptr(NULL)
 {
@@ -202,6 +194,10 @@ EmbeddedBoundaryOperator::~EmbeddedBoundaryOperator()
     if(intersector[i])
       delete intersector[i];
 
+  for(int i=0; i<(int)multi_intersector.size(); i++)
+    if(multi_intersector[i])
+      delete multi_intersector[i];
+
   for(auto it = dynamics_calculator.begin(); it != dynamics_calculator.end(); it++) {
     if(std::get<0>(*it)) {
       assert(std::get<2>(*it)); //this is the destruction function
@@ -221,6 +217,10 @@ EmbeddedBoundaryOperator::Destroy()
   for(int i=0; i<(int)intersector.size(); i++)
     if(intersector[i])
       intersector[i]->Destroy();
+
+  for(int i=0; i<(int)multi_intersector.size(); i++)
+    if(multi_intersector[i])
+      multi_intersector[i]->Destroy();
 }
 
 //------------------------------------------------------------------------------------------------
@@ -301,9 +301,17 @@ EmbeddedBoundaryOperator::SetupIntersectors()
                                      *coordinates_ptr, *ghost_nodes_inner_ptr, *ghost_nodes_outer_ptr,
                                      *global_mesh_ptr);
 
-    // also initialize inactive_elem_by_surfaceX (default: false, i.e., active)
-    inactive_elem_by_surfaceX.push_back(vector<bool>(surfaces[i].elems.size(), false));
   }
+
+  assert(multi_intersector.size() == iod.ebm.embed_surfaces.surface_intersections.dataMap.size());
+  int iter=0;
+  for(auto&& my_pair : iod.ebm.embed_surfaces.surface_intersections.dataMap) {
+    multi_intersector[iter] = new MultiSurfaceIntersector(comm, *dms_ptr, *my_pair.second, *coordinates_ptr,
+                                                          surfaces, intersector, *ghost_nodes_inner_ptr,
+                                                          *ghost_nodes_outer_ptr, *global_mesh_ptr);
+    iter++;
+  }
+ 
 }
 
 //------------------------------------------------------------------------------------------------
@@ -1074,19 +1082,21 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
   }
 
   //check & handle potential surface intersections (if specified by user)
-  for(auto&& Xpair : surfaceXpairs) {
-    int s1 = std::get<0>(Xpair);
-    int s2 = std::get<1>(Xpair);
-    if(s1==s2)
+  for(auto&& multiX : multi_intersector) {
+    if(multiX->GetNumberOfSurfaces() == 1)
       continue; //this function is called at the beginning of simulation; self-intersection `handled' by user
-    if(!DetectSurfaceIntersections(s1,s2) && !DetectSurfaceIntersections(s2,s1))
-      continue; //these two do not intersect
+    if(!multiX->CheckSurfaceIntersections())
+      continue;
+
+    //Now, we know these two surfaces intersect.
     
-I AM HERE
-    FloodFillWithMergedIntersections(s1,s2);
+    multiX->FloodFillWithMergedIntersections();
+
   }
 
 
+
+  for(int i = 0; i < (int)intersector.size(); i++) {
 
     bool a1, a2, b, c;
     int d;
@@ -1950,57 +1960,12 @@ EmbeddedBoundaryOperator::CombineSharedGaussPointData(vector<double>& data, vect
 
 //------------------------------------------------------------------------------------------------
 
-bool
-EmbeddedBoundaryOperator::DetectSurfaceIntersections(int surf1, int surf2)
-{
-  // sanity checks
-  assert(surf1>=0 && surf1<=(int)surfaces.size());
-  assert(surf2>=0 && surf2<=(int)surfaces.size());
-
-  // check surf1 edges against surf2 elements
-  vector<Vec3D>& Xs(surfaces[surf1].X);
-  vector<Int3>& Es(surfaces[surf1].elems);
-  vector<int> surf1_scope_1;
-  intersector[surf1]->GetTrianglesInScope1(surf1_scope_1);
-
-  // make sure each processor runs the same number of iterations (for MPI exchange). 
-  // Note: it may be more efficient to use one-sided comm (RMA), especially MPI_Win_lock/unlock.
-  //       But I couldn't make it work as expected.
-  int Niter = surf1_scope_1.size();
-  MPI_Allreduce(MPI_IN_PLACE, &Niter, 1, MPI_INT, MPI_MAX, comm);
-  int commFreq = std::max(10, Niter/10);
-  int found = 0;
-  for(int i=0; i<Niter; i++) {
-    if(i<(int)surf1_scope_1.size()) { //otherwise, do nothing
-      Int3 &nod(Es[surf1_scope_1[i]]);
-      if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]]) ||
-         intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]]) ||
-         intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]]) ) {
-        found = 1;
-      }
-    }
-
-    if(i%commFreq == commFreq-1) {//collect `found'
-      MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, comm);
-      if(found>0) //someone found an intersection
-        return true;
-    }
-  }
-
-  //one last communication
-  MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, comm);
-
-  return found != 0;
-}
 
 //------------------------------------------------------------------------------------------------
 
-void
-EmbeddedBoundaryOperator::FloodFillWithMergedIntersections(int surf1, int surf2)
-{
-  
 
-}
+
+
 
 //------------------------------------------------------------------------------------------------
 
