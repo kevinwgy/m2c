@@ -1090,10 +1090,13 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
 
     //Now, we know these two surfaces intersect.
     
-    multiX->FloodFillWithMergedIntersections();
-
+    int numNew = multiX->FindNewEnclosuresByFloodFill();
+    if(numNew>0) {
+      multiX->FindNewEnclosureBoundary();
+      multiX->UpdateIntersectionsAndOccludedNodes();
+      multiX->UpdateShortestDistance();
+    }
   }
-
 
 
   for(int i = 0; i < (int)intersector.size(); i++) {

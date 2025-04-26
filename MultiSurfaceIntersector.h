@@ -37,6 +37,7 @@ class MultiSurfaceIntersector {
 
   int ruling_surface_id; //!< the index (starting at 0) in the `intersector' vector (-1: inactive)
 
+  std::vector<int> new_enclosure_color; //!< color(s) from joint_intersector that represent new enclosure(s) 
 
 public:
 
@@ -53,11 +54,21 @@ public:
 
   bool CheckSurfaceIntersections();
 
-  void FloodFillWithMergedIntersections(); //!< use joint_intersector to do this
+  int FindNewEnclosuresByFloodFill(); //!< use joint_intersector; returns num. of new enclosures
+
+  void FindNewEnclosureBoundary();
+
+  void UpdateIntersectionsAndOccludedNodes();
+
+  void UpdateShortestDistance();
 
 private:
 
   bool CheckSurfaceIntersectionsOneWay(bool surf1_surf2);
+
+  int DetectNewEnclosures(int nPossiblePositiveColors,
+                          int nRegions1, int nRegions2, int nRegions_jnt, double*** color1, double*** color2,
+                          double*** color_jnt, std::vector<int>& new_enclosure_color);
 
 
 };

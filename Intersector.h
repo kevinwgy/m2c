@@ -127,7 +127,9 @@ class Intersector {
   //! Phi and Color communicate w/ neighbor subdomains. So their values are valid also at internal ghost nodes.
   SpaceVariable3D Phi; //!< unsigned distance from each node to the surface (not thickened). Independent from "occluded".
   int Phi_nLayer; //!< number of layers of nodes where Phi is calculated.
-  SpaceVariable3D Color; //!< GENERALIZED color: -N (inside enclosure #N), 0 (occluded), or N (inlet=1, outlet=2).
+  SpaceVariable3D Color; //!< GENERALIZED color: -N(in enclosure #N), 0(occluded), 1(inlet), 2(inlet2), 3(outlet)
+  int nPossiblePositiveColors; //!< Currently, 3
+  
   std::vector<int> ColorReachesBoundary; /**< stores whether each negative colored regions (i.e. enclosrures)  touches \n
                                              the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
                                              the size of this vector is "nRegions" calculated in FloodFillColors.*/

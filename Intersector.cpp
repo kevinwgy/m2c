@@ -40,6 +40,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              floodfiller(comm_, dms_, ghost_nodes_inner_, ghost_nodes_outer_)
 {
 
+  nPossiblePositiveColors = 3; //1: inlet, 2: inlet2, 3: outlet
+
   CandidatesIndex_1.SetConstantValue(-1, true);
   CandidatesIndex_n.SetConstantValue(-1, true);
   ClosestPointIndex.SetConstantValue(-1, true);
@@ -136,6 +138,7 @@ Intersector::GetPointerToResults()
   ebds->hasInlet2               = hasInlet2;
   ebds->hasOutlet               = hasOutlet;
   ebds->nRegions                = nRegions;
+  ebds->nPossiblePositiveColors = nPossiblePositiveColors;
   ebds->ClosestPointIndex_ptr   = &ClosestPointIndex;
   ebds->closest_points_ptr      = &closest_points;
   ebds->intersections_ptr       = &intersections;

@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include<MultiSurfaceIntersector.h>
+#include<CommunicationTools.h>
 
 using std::vector;
 using std::unique_ptr;
@@ -148,8 +149,8 @@ MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
 
 //-------------------------------------------------------------------------
 
-void
-MultiSurfaceIntersector::FloodFillWithMergedIntersections()
+int
+MultiSurfaceIntersector::FindNewEnclosuresByFloodFill()
 {
   assert(numSurfaces==2);
   assert(joint_intersector);
@@ -176,6 +177,8 @@ MultiSurfaceIntersector::FloodFillWithMergedIntersections()
         }
 
   EBDS_jnt->XForward_ptr->RestoreDataPointerToLocalVector(); //!< no need to sync (already filled ghosts)
+  EBDS1->XForward_ptr->RestoreDataPointerToLocalVector(); //should NOT sync! (See notes in Intersector.cpp)
+  EBDS2->XForward_ptr->RestoreDataPointerToLocalVector();
 
 
   // ------------------------------------------------------------
@@ -187,15 +190,143 @@ MultiSurfaceIntersector::FloodFillWithMergedIntersections()
   // ------------------------------------------------------------
   // Step 3: Flood fill using joint_intersector
   // ------------------------------------------------------------
-  int hasOccluded = joint_intersector->FloodFillColors();
+  joint_intersector->FloodFillColors();
 
+  // ------------------------------------------------------------
+  // Step 4: Search for new enclosures (topological change)
+  // ------------------------------------------------------------
+  new_enclosure_color.clear();
+  if(EBDS_jnt->nRegions == 0 || 
+     EBDS_jnt->nRegions == EBDS1->nRegions + EBDS2->nRegions)
+    return 0;
+  
+  double*** color1    = EBDS1->Color_ptr->GetDataPointer();
+  double*** color2    = EBDS2->Color_ptr->GetDataPointer();
+  double*** color_jnt = EBDS_jnt->Color_ptr->GetDataPointer();
+  DetectNewEnclosures(EBDS1->nPossiblePositiveColors, //a constant (3 at the moment) 
+                      EBDS1->nRegions, EBDS2->nRegions,
+                      EBDS_jnt->nRegions, color1, color2, color_jnt, new_enclosure_color);
+  EBDS1->Color_ptr->RestoreDataPointerToLocalVector();
+  EBDS2->Color_ptr->RestoreDataPointerToLocalVector();
+  EBDS_jnt->Color_ptr->RestoreDataPointerToLocalVector();
+  
+  return new_enclosure_color.size();
+  //SAVE new_enclosure_color, and move back. Then, write function to detect color boundary, delete intersections (re-order), and update occluded nodes;
+  //Re-compute shortest distance
 
-
-  EBDS1->XForward_ptr->RestoreDataPointerToLocalVector(); //should NOT sync! (See notes in Intersector.cpp)
-  EBDS2->XForward_ptr->RestoreDataPointerToLocalVector();
 }
 
 //-------------------------------------------------------------------------
+
+int
+MultiSurfaceIntersector::DetectNewEnclosures(int nPossiblePositiveColors,
+                                             int nRegions1, int nRegions2, int nRegions_jnt,
+                                             double*** color1, double*** color2, double*** color_jnt,
+                                             std::vector<int> &new_enclosure_color)
+{
+  if(nRegions_jnt == 0) { //trivial
+    new_enclosure_color.clear();
+    return 0;
+  }
+  
+  // color1 and color2 must be from two different intersectors/surfaces
+
+  // ---------------------------------------------------------------------
+  // Step 1: get color1 --> color_jnt and color2 --> color_jnt maps 
+  // ---------------------------------------------------------------------
+  vector<vector<int> > color1_new(nRegions1 + 1 + nPossiblePositiveColors);
+  vector<vector<int> > color2_new(nRegions2 + 1 + nPossiblePositiveColors);
+  //order: 0=>color=0(occluded), 1=>color=-1, ... nRegions1=>color=nRegions1, nRegions1+1=>color=1 (inlet),
+  //       nRegions1+2=>color=2, ...
+
+  int c1, c2, c;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        c = color_jnt[k][j][i];
+
+        c1 = color1[k][j][i];
+        vector<int> &me1(color1_new[c1<=0 ? -c1 : nRegions1+c1]); //see order above
+        if(std::find(me1.begin(), me1.end(), c) == me1.end())
+          me1.push_back(c); 
+
+        c2 = color2[k][j][i];
+        vector<int> &me2(color2_new[c2<=0 ? -c2 : nRegions2+c2]);
+        if(std::find(me2.begin(), me2.end(), c) == me2.end())
+          me2.push_back(c); 
+      }
+
+  for(auto&& cc : color1_new)
+    CommunicationTools::AllGatherVector(comm, cc);
+  for(auto&& cc : color2_new)
+    CommunicationTools::AllGatherVector(comm, cc);
+
+  // ---------------------------------------------------------------------
+  // Step 2: Find new enclosures
+  // ---------------------------------------------------------------------
+  // Enclosure i (1, 2, ..., nRegions_jnt) obtained from the joint intersector is a new enclosure IFF
+  // there exists a map c1->(i, ...) and a map c2->(i, ...), where c1 and c2 are two colors (not necessarily
+  // enclosures) from the two intersectors respectively, and (i, ...) means c1 is mapped to "i" AND at least
+  // one other color (not necessarily enclosure) from the joint intersector.
+  for(int i=1; i<=nRegions_jnt; i++) {
+    //check enclosure i
+    int counter = 0;
+    for(auto&& cc : color1_new) {
+      if(std::find(cc.begin(), cc.end(), -i) != cc.end()) {
+        counter++;
+        if(counter>=2)
+          break;
+      }
+    }
+    assert(counter>0); //sanity check
+    if(counter==1) 
+      continue;
+
+    counter = 0;
+    for(auto&& cc : color2_new) {
+      if(std::find(cc.begin(), cc.end(), -i) != cc.end()) {
+        counter++;
+        if(counter>=2)
+          break;
+      }
+    }
+    assert(counter>0); //sanity check
+      
+    if(counter>=2)
+      new_enclosure_color.push_back(-i); 
+  }
+
+  return new_enclosure_color.size();
+}
+
+//-------------------------------------------------------------------------
+
+void
+MultiSurfaceIntersector::FindNewEnclosureBoundary()
+{
+  
+}
+
+//-------------------------------------------------------------------------
+
+void
+MultiSurfaceIntersector::UpdateIntersectionsAndOccludedNodes()
+{
+  
+}
+
+//-------------------------------------------------------------------------
+
+void
+MultiSurfaceIntersector::UpdateShortestDistance()
+{
+  
+}
+
+//-------------------------------------------------------------------------
+
+
+
 
 
 

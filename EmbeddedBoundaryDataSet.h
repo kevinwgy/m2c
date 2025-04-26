@@ -89,6 +89,7 @@ public:
   std::vector<int> *ColorReachesBoundary_ptr;
   bool hasInlet, hasInlet2, hasOutlet;
   int nRegions;
+  int nPossiblePositiveColors; //!< inlet, inlet2, outlet (even if the mesh does not have these boundaries)
   SpaceVariable3D *ClosestPointIndex_ptr;
   std::vector<std::pair<Int3, ClosestPoint> > *closest_points_ptr;
   std::vector<IntersectionPoint> *intersections_ptr;
@@ -105,6 +106,7 @@ public:
                               XForward_ptr(nullptr), XBackward_ptr(nullptr), Phi_ptr(nullptr),
                               Phi_nLayer(0), Color_ptr(nullptr), ColorReachesBoundary_ptr(nullptr), 
                               hasInlet(false), hasInlet2(false), hasOutlet(false), nRegions(0),
+                              nPossiblePositiveColors(0),
                               ClosestPointIndex_ptr(nullptr), closest_points_ptr(nullptr), 
                               intersections_ptr(nullptr),
                               occluded_ptr(nullptr), firstLayer_ptr(nullptr),
