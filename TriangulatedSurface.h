@@ -46,6 +46,10 @@ struct TriangulatedSurface {
 
   ~TriangulatedSurface() {} 
 
+  TriangulatedSurface &operator=(const TriangulatedSurface &S2); //!< copy all members of S2
+
+  void Append(const TriangulatedSurface &S2); //!< append S2 at the end (node2node, etc. updated)
+
   void BuildConnectivities();
   void CalculateNormalsAndAreas(); //!< calculate the normal and area of each element
 

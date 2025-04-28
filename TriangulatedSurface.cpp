@@ -13,6 +13,80 @@ using std::pair;
 
 //----------------------------------------------------
 
+TriangulatedSurface&
+TriangulatedSurface::operator=(const TriangulatedSurface &S2)
+{
+  degenerate = S2.degenerate;
+
+  X0    = S2.X0;
+  X     = S2.X;
+  Udot  = S2.Udot;
+  elems = S2.elems;
+  
+  active_nodes = S2.active_nodes;
+  active_elems = S2.active_elems;
+
+  elemNorm = S2.elemNorm;
+  elemArea = S2.elemArea;
+
+  node2node = S2.node2node;
+  node2elem = S2.node2elem;
+  elem2elem = S2.elem2elem;
+
+  return *this;
+}
+
+//----------------------------------------------------
+
+void
+TriangulatedSurface::Append(const TriangulatedSurface &S2)
+{
+  // sanity checks
+  assert(S.degenerate == S2.degenerate);
+  assert(X0.empty() == S2.X0.empty());
+  assert(X.empty() == S2.X.empty());
+  assert(Udot.empty() == S2.Udot.empty());
+  assert(elems.empty() == S2.elems.empty());
+  assert(elemNorm.empty() == S2.elemNorm.empty()); //either both are empty, or both completely filled
+  assert(elemArea.empty() == S2.elemArea.empty());
+  assert(node2node.empty() == S2.node2node.empty());
+  assert(node2elem.empty() == S2.node2elem.empty());
+  assert(elem2elem.empty() == S2.elem2elem.empty());
+
+  int nNodes = X.size();
+  int nElems = elems.size(); //before appending
+
+  X0.insert(X0.end(), S2.X0.begin(), S2.X0.end());
+  X.insert(X.end(), S2.X.begin(), S2.X.end());
+  Udot.insert(Udot.end(), S2.Udot.begin(), S2.Udot.end());
+  elems.insert(elems.end(), S2.elems.begin(), S2.elems.end());
+
+  active_nodes += S2.active_nodes;
+  active_elems += S2.active_elems;
+
+  elemNorm.insert(elemNorm.end(), S2.elemNorm.begin(), S2.elemNorm.end());
+  elemArea.insert(elemArea.end(), S2.elemArea.begin(), S2.elemArea.end());
+
+  for(auto&& n2n : S2.node2node) {
+    node2node.push_back(n2n);
+    for(auto&& nid : node2node.back())
+      nid += nNodes; //shift index
+  }
+  for(auto&& n2e : S2.node2elem) {
+    node2elem.push_back(n2e);
+    for(auto&& eid : node2elem.back())
+      eid += nElems; //shift index
+  }
+  for(auto&& e2e : S2.elem2elem) {
+    elem2elem.push_back(e2e);
+    for(auto&& eid : elem2elem.back())
+      eid += nElems; //shift index
+  }
+  
+}
+
+//----------------------------------------------------
+
 void TriangulatedSurface::BuildConnectivities()
 {
   int nNodes = X.size();

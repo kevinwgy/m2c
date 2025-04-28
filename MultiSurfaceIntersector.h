@@ -32,8 +32,8 @@ class MultiSurfaceIntersector {
   std::vector<std::vector<bool> > elems_active;
 
   Intersector* joint_intersector; //!< constructed even for self-intersection (i.e., numSurfaces==1)
-  TriangulatedSurface surface_dummy; //!< empty surface provided to joint_intersector. (Not really used.)
-  EmbeddedSurfaceData iod_surface_dummy; //!< a dummy provided to joint_intersector. (Not really used.)
+  TriangulatedSurface joint_surface; //!< surface provided to joint_intersector. 
+  EmbeddedSurfaceData iod_surface_dummy; //!< a dummy (except for thickness) provided to joint_intersector. 
 
   int ruling_surface_id; //!< the index (starting at 0) in the `intersector' vector (-1: inactive)
 

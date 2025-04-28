@@ -21,7 +21,7 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
                                                  GlobalMeshInfo &global_mesh_)
                        : comm(comm_), coordinates(coordinates_),
                          ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
-                         global_mesh(global_mesh_), joint_intersector(NULL), surface_dummy(), iod_surface_dummy()
+                         global_mesh(global_mesh_), joint_intersector(NULL), joint_surface(), iod_surface_dummy()
 {
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -52,7 +52,19 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
   surface.push_back(&surface_[surf1]);
   intersector.push_back(intersector_[surf1]);
   elems_active.push_back(vector<bool>(surface_[surf1].elems.size(), true)); //!< default: active
+  iod_surface_dummy.surface_thickness = 2.0*intersector_[surf1]->GetSurfaceHalfThickness();
+
+  joint_surface = surface_[surf1]; 
+  
+
+
   if(surf2 != surf1) {
+    if(intersector_[surf1]->GetSurfaceHalfThickness() != intersector_[surf2]->GetSurfaceHalfThickness()) {
+      print_warning("Warning: Surfaces %d and %d (potentiall intersecting) have different thicknesses.\n",
+                    surf1, surf2);
+      iod_surface_dummy.surface_thickness = std::min(iod_surface_dummy.surface_thickness,
+                                                     2.0*intersector_[surf2]->GetSurfaceHalfThickness());
+    }
     surface.push_back(&surface_[surf2]);
     intersector.push_back(intersector_[surf2]);
     elems_active.push_back(vector<bool>(surface_[surf2].elems.size(), true)); //!< default: active
@@ -66,6 +78,9 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
   else if(iod_surfX_.enclosure_treatment == SurfaceIntersectionData::IGNORE_SURFACE2)
     ruling_surface_id = 0;
  
+  //create joint_surface
+
+
   joint_intersector = new Intersector(comm, dms_, iod_surface_dummy, surface_dummy, coordinates,
                                       ghost_nodes_inner, ghost_nodes_outer, global_mesh);
 
@@ -304,7 +319,24 @@ MultiSurfaceIntersector::DetectNewEnclosures(int nPossiblePositiveColors,
 void
 MultiSurfaceIntersector::FindNewEnclosureBoundary()
 {
+  if(new_enclosure_color.empty())
+    return;
   
+  unique_ptr<EmbeddedBoundaryDataSet> EBDS1    = intersector[0]->GetPointerToResults();
+  unique_ptr<EmbeddedBoundaryDataSet> EBDS_jnt = joint_intersector->GetPointerToResults();
+  EBDS_jnt->
+  
+  unique_ptr<EmbeddedBoundaryDataSet> EBDS2    = intersector[1]->GetPointerToResults();
+
+  Set surface.X, surface.elems, surface.elemNorm
+  vector<vector<int> > elem_status; //status = 0, 1, 2, or 3 (see Intersector.h)
+  for(auto&& cnew : new_enclosure_color) { //repeat the same for each new enclosure (TODO: can be more efficient)
+
+
+
+
+
+  }
 }
 
 //-------------------------------------------------------------------------
