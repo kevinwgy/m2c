@@ -52,13 +52,15 @@ public:
 
   int GetNumberOfSurfaces() {return numSurfaces;}
 
+  void UpdateJointSurface();
+
   bool CheckSurfaceIntersections();
 
   int FindNewEnclosuresByFloodFill(); //!< use joint_intersector; returns num. of new enclosures
 
-  void FindNewEnclosureBoundary();
+  void FindNewEnclosureBoundary(std::vector<vector<int> > &elem_status);
 
-  void UpdateIntersectionsAndOccludedNodes();
+  void UpdateIntersectionsAndOccludedNodes(std::vector<vector<int> > &elem_status);
 
   void UpdateShortestDistance();
 

@@ -55,8 +55,6 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
   iod_surface_dummy.surface_thickness = 2.0*intersector_[surf1]->GetSurfaceHalfThickness();
 
   joint_surface = surface_[surf1]; 
-  
-
 
   if(surf2 != surf1) {
     if(intersector_[surf1]->GetSurfaceHalfThickness() != intersector_[surf2]->GetSurfaceHalfThickness()) {
@@ -64,6 +62,7 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
                     surf1, surf2);
       iod_surface_dummy.surface_thickness = std::min(iod_surface_dummy.surface_thickness,
                                                      2.0*intersector_[surf2]->GetSurfaceHalfThickness());
+      joint_surface.Append(surface_[surf2]);
     }
     surface.push_back(&surface_[surf2]);
     intersector.push_back(intersector_[surf2]);
@@ -78,10 +77,9 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
   else if(iod_surfX_.enclosure_treatment == SurfaceIntersectionData::IGNORE_SURFACE2)
     ruling_surface_id = 0;
  
-  //create joint_surface
 
 
-  joint_intersector = new Intersector(comm, dms_, iod_surface_dummy, surface_dummy, coordinates,
+  joint_intersector = new Intersector(comm, dms_, iod_surface_dummy, joint_surface, coordinates,
                                       ghost_nodes_inner, ghost_nodes_outer, global_mesh);
 
 }
@@ -97,7 +95,53 @@ MultiSurfaceIntersector::~MultiSurfaceIntersector()
 
 void
 MultiSurfaceIntersector::Destroy()
-{ }
+{
+  if(joint_intersector)
+    joint_intersector->Destroy();
+}
+
+//-------------------------------------------------------------------------
+
+void
+MultiSurfaceIntersector::UpdateJointSurface()
+{
+  assert(numSurfaces==1 || numSurfaces==2);
+  assert(joint_surface.X0.size() == (numSurfaces==1 ? surface[0]->X0.size() :
+                                     surface[0]->X0.size() + surface[1]->X0.size()));
+  assert(joint_surface.elems.size() == (numSurfaces==1 ? surface[0]->elems.size() :
+                                        surface[0]->elems.size() + surface[1]->elems.size()));
+
+  for(int i=0; i<(int)surface[0]->X0.size(); i++) {
+    joint_surface.X0[i]   = surface[0]->X0[i];
+    joint_surface.X[i]    = surface[0]->X[i];
+    joint_surface.Udot[i] = surface[0]->Udot[i];
+  }
+  if(numSurfaces == 2) {
+    int N1 = surface[0]->X0.size();
+    for(int i=0; i<(int)surface[1]->X0.size(); i++) {
+      joint_surface.X0[N1+i]   = surface[1]->X0[i];
+      joint_surface.X[N1+i]    = surface[1]->X[i];
+      joint_surface.Udot[N1+i] = surface[1]->Udot[i];
+    }
+  }
+
+  for(int i=0; i<(int)surface[0]->elemNorm.size(); i++)
+    joint_surface.elemNorm[i] = surface[0]->elemNorm[i];
+  if(numSurfaces == 2) {
+    int N1 = surface[0]->elemNorm.size();
+    for(int i=0; i<(int)surface[1]->elemNorm.size(); i++)
+      joint_surface.elemNorm[N1+i] = surface[1]->elemNorm[i];
+  }
+
+  for(int i=0; i<(int)surface[0]->elemArea.size(); i++)
+    joint_surface.elemArea[i] = surface[0]->elemArea[i];
+  if(numSurfaces == 2) {
+    int N1 = surface[0]->elemArea.size();
+    for(int i=0; i<(int)surface[1]->elemArea.size(); i++)
+      joint_surface.elemArea[N1+i] = surface[1]->elemArea[i];
+  }
+
+}
 
 //-------------------------------------------------------------------------
 
@@ -317,34 +361,24 @@ MultiSurfaceIntersector::DetectNewEnclosures(int nPossiblePositiveColors,
 //-------------------------------------------------------------------------
 
 void
-MultiSurfaceIntersector::FindNewEnclosureBoundary()
+MultiSurfaceIntersector::FindNewEnclosureBoundary(vector<vector<int> > &elem_status)
 {
   if(new_enclosure_color.empty())
     return;
   
-  unique_ptr<EmbeddedBoundaryDataSet> EBDS1    = intersector[0]->GetPointerToResults();
-  unique_ptr<EmbeddedBoundaryDataSet> EBDS_jnt = joint_intersector->GetPointerToResults();
-  EBDS_jnt->
-  
-  unique_ptr<EmbeddedBoundaryDataSet> EBDS2    = intersector[1]->GetPointerToResults();
-
-  Set surface.X, surface.elems, surface.elemNorm
-  vector<vector<int> > elem_status; //status = 0, 1, 2, or 3 (see Intersector.h)
+  elem_status.clear(); //status = 0, 1, 2, or 3 (see Intersector.h)
   for(auto&& cnew : new_enclosure_color) { //repeat the same for each new enclosure (TODO: can be more efficient)
-
-
-
-
-
+    elem_status.push_back(vector<int>());
+    joint_intersector->FindColorBoundary(cnew, elem_status.back());
   }
 }
 
 //-------------------------------------------------------------------------
 
 void
-MultiSurfaceIntersector::UpdateIntersectionsAndOccludedNodes()
+MultiSurfaceIntersector::UpdateIntersectionsAndOccludedNodes(vector<vector<int> > &elem_status)
 {
-  
+  //Collect intersections in joint
 }
 
 //-------------------------------------------------------------------------

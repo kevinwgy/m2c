@@ -1092,8 +1092,10 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
     
     int numNew = multiX->FindNewEnclosuresByFloodFill();
     if(numNew>0) {
-      multiX->FindNewEnclosureBoundary();
-      multiX->UpdateIntersectionsAndOccludedNodes();
+      multiX->UpdateJointSurface();
+      vector<vector<int> > elem_new_enclosure_status;
+      multiX->FindNewEnclosureBoundary(elem_new_enclosure_status);
+      multiX->UpdateIntersectionsAndOccludedNodes(elem_new_enclosure_status);
       multiX->UpdateShortestDistance();
     }
   }

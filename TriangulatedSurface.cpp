@@ -42,12 +42,12 @@ void
 TriangulatedSurface::Append(const TriangulatedSurface &S2)
 {
   // sanity checks
-  assert(S.degenerate == S2.degenerate);
+  assert(degenerate == S2.degenerate);
   assert(X0.empty() == S2.X0.empty());
   assert(X.empty() == S2.X.empty());
   assert(Udot.empty() == S2.Udot.empty());
   assert(elems.empty() == S2.elems.empty());
-  assert(elemNorm.empty() == S2.elemNorm.empty()); //either both are empty, or both completely filled
+  assert(elemNorm.empty() == S2.elemNorm.empty()); //either both are empty, or both filled
   assert(elemArea.empty() == S2.elemArea.empty());
   assert(node2node.empty() == S2.node2node.empty());
   assert(node2elem.empty() == S2.node2elem.empty());
@@ -68,19 +68,19 @@ TriangulatedSurface::Append(const TriangulatedSurface &S2)
   elemArea.insert(elemArea.end(), S2.elemArea.begin(), S2.elemArea.end());
 
   for(auto&& n2n : S2.node2node) {
-    node2node.push_back(n2n);
-    for(auto&& nid : node2node.back())
-      nid += nNodes; //shift index
+    node2node.push_back(set<int>());
+    for(auto&& nid : n2n)
+      node2node.back().insert(nid + nNodes); //shift index
   }
   for(auto&& n2e : S2.node2elem) {
-    node2elem.push_back(n2e);
-    for(auto&& eid : node2elem.back())
-      eid += nElems; //shift index
+    node2elem.push_back(set<int>());
+    for(auto&& eid : n2e)
+      node2elem.back().insert(eid + nElems); //shift index
   }
   for(auto&& e2e : S2.elem2elem) {
-    elem2elem.push_back(e2e);
-    for(auto&& eid : elem2elem.back())
-      eid += nElems; //shift index
+    elem2elem.push_back(set<int>());
+    for(auto&& eid : e2e)
+      elem2elem.back().insert(eid + nElems); //shift index
   }
   
 }
