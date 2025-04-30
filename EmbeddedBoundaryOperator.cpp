@@ -1090,14 +1090,13 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
 
     //Now, we know these two surfaces intersect.
     
-    int numNew = multiX->FindNewEnclosuresByFloodFill();
+    int numNew = multiX->FindNewEnclosures();
     if(numNew>0) {
-      multiX->UpdateJointSurface();
-      vector<vector<int> > elem_new_enclosure_status;
-      multiX->FindNewEnclosureBoundary(elem_new_enclosure_status);
-      multiX->UpdateIntersectionsAndOccludedNodes(elem_new_enclosure_status);
-      multiX->UpdateShortestDistance();
+      if(verbose>=1)
+        print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
+      multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
     }
+
   }
 
 

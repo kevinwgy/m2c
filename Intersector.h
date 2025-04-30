@@ -227,7 +227,7 @@ public:
   //! surface.elems. For each element, status = 0 means this element does not belong to the boundary of "color",\n
   //! 1 means the positive side (i.e. along "elemNorm") faces the interior, 2 means the negative side faces the\n
   //! interior; 3 means both sides face the interior.
-  //! Note: This function assumes intersections and colors "i.e. Color" have been calculated
+  //! Note: This function assumes colors "i.e. Color" have been calculated
   void FindColorBoundary(int color, std::vector<int> &status);
 
   //! Get pointers to all the results

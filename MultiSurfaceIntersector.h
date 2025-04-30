@@ -38,6 +38,7 @@ class MultiSurfaceIntersector {
   int ruling_surface_id; //!< the index (starting at 0) in the `intersector' vector (-1: inactive)
 
   std::vector<int> new_enclosure_color; //!< color(s) from joint_intersector that represent new enclosure(s) 
+  std::vector<std::vector<int> > elem_new_status; //!< for each new enclosure, status (0,1,2,3) marks its boundary
 
 public:
 
@@ -56,21 +57,29 @@ public:
 
   bool CheckSurfaceIntersections();
 
-  int FindNewEnclosuresByFloodFill(); //!< use joint_intersector; returns num. of new enclosures
+  int FindNewEnclosures();
 
-  void FindNewEnclosureBoundary(std::vector<vector<int> > &elem_status);
+  void UpdateIntersectors();
 
-  void UpdateIntersectionsAndOccludedNodes(std::vector<vector<int> > &elem_status);
-
-  void UpdateShortestDistance();
 
 private:
 
   bool CheckSurfaceIntersectionsOneWay(bool surf1_surf2);
 
+  int FindNewEnclosuresByFloodFill(); //!< use joint_intersector; returns num. of new enclosures
   int DetectNewEnclosures(int nPossiblePositiveColors,
                           int nRegions1, int nRegions2, int nRegions_jnt, double*** color1, double*** color2,
                           double*** color_jnt, std::vector<int>& new_enclosure_color);
+
+
+  void FindNewEnclosureBoundary(); //!< fills elem_new_status
+
+  void MoidfyIntersectionsAndOccludedNodes(int id, std::vector<bool> elem_drop_status,
+                                           std::set<int> elem_to_drop); //!< modifies intersector[id]
+
+  void ModifyShortestDistance(int id, std::vector<bool> elem_drop_status,
+                              std::set<int> elem_to_drop); //!< modifies intersector[id]);
+
 
 
 };

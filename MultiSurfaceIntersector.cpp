@@ -209,6 +209,75 @@ MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
 //-------------------------------------------------------------------------
 
 int
+MultiSurfaceIntersector::FindNewEnclosures()
+{
+  new_enclosure_color.clear();
+  elem_new_status.clear();
+
+  int nNew = FindNewEnclosuresByFloodFill(); // fills new_enclosure_color
+  if(nNew>0) {
+    UpdateJointSurface();
+    FindNewEnclosureBoundary(); // fills elem_new_status
+  }
+ 
+  return nNew;
+}
+
+//-------------------------------------------------------------------------
+
+void
+MultiSurfaceIntersector::UpdateIntersectors()
+{
+  // Currently, each processor handles the entire surface (can be improved)
+  
+  if(new_enclosure_color.empty())
+    return; //nothing to do
+
+  if(ruling_surface_id == -1)
+    return; //should not drop any intersections, occluded nodes, and change shortest distance
+  
+  assert(numSurfaces==2); //otherwise, ruling_surface_id should be -1
+
+  if(ruling_surface_id == 0) { //modify intersector[1]
+    int N1 = surface[0]->elems.size();
+    int N2 = surface[1]->elems.size();
+    vector<bool> elem_drop_status(N2, false);
+    std::set<int> elem_to_drop;
+    for(auto&& status : elem_new_status) {
+      assert(status.size()-N1 == N2);
+      for(int i=N1; i<(int)status.size(); i++) {
+        if(status[i]>0) {//add it to drop-it list
+          elem_drop_status[i-N1] = true;
+          elem_to_drop.insert(i-N1); 
+        }
+      }
+    }
+    ModifyIntersectionsAndOccludedNodes(1, elem_drop_status, elem_to_drop);
+    ModifyShortestDistance(1, elem_drop_status, elem_to_drop);
+  }
+  else {
+    assert(ruling_surface_id == 1);
+    int N1 = surface[0]->elems.size();
+    vector<bool> elem_drop_status(N1, false);
+    std::set<int> elem_to_drop;
+    for(auto&& status : elem_new_status) {
+      for(int i=0; i<N1; i++) {
+        if(status[i]>0) {//add it to drop-it list
+          elem_drop_status[i] = true;
+          elem_to_drop.insert(i); 
+        }
+      }
+    }
+    ModifyIntersectionsAndOccludedNodes(0, elem_drop_status, elem_to_drop);
+    ModifyShortestDistance(0, elem_drop_status, elem_to_drop);
+  }
+  
+
+}
+
+//-------------------------------------------------------------------------
+
+int
 MultiSurfaceIntersector::FindNewEnclosuresByFloodFill()
 {
   assert(numSurfaces==2);
@@ -361,30 +430,118 @@ MultiSurfaceIntersector::DetectNewEnclosures(int nPossiblePositiveColors,
 //-------------------------------------------------------------------------
 
 void
-MultiSurfaceIntersector::FindNewEnclosureBoundary(vector<vector<int> > &elem_status)
+MultiSurfaceIntersector::FindNewEnclosureBoundary()
 {
   if(new_enclosure_color.empty())
     return;
   
-  elem_status.clear(); //status = 0, 1, 2, or 3 (see Intersector.h)
+  elem_new_status.clear(); //status = 0, 1, 2, or 3 (see Intersector.h)
   for(auto&& cnew : new_enclosure_color) { //repeat the same for each new enclosure (TODO: can be more efficient)
-    elem_status.push_back(vector<int>());
-    joint_intersector->FindColorBoundary(cnew, elem_status.back());
+    elem_new_status.push_back(vector<int>());
+    joint_intersector->FindColorBoundary(cnew, elem_new_status.back());
   }
 }
 
 //-------------------------------------------------------------------------
 
 void
-MultiSurfaceIntersector::UpdateIntersectionsAndOccludedNodes(vector<vector<int> > &elem_status)
+MultiSurfaceIntersector::MoidfyIntersectionsAndOccludedNodes(int id, vector<bool> elem_drop_status,
+                                                             std::set<int> elem_to_drop)
 {
-  //Collect intersections in joint
+  assert(id==0 || id==1); //currently assuming at most two surfaces involved
+
+  unique_ptr<EmbeddedBoundaryDataSet> EBDS = intersector[id]->GetPointerToResults();
+
+  // -------------------------------
+  // Step 1: Drop intersections
+  // -------------------------------
+  Vec3D*** xf = (Vec3D***) EBDS->XForward_ptr->GetDataPointer();
+  Vec3D*** xb = (Vec3D***) EBDS->XBackward_ptr->GetDataPointer();
+  
+  vector<IntersectionPoint>& intersections(*EBDS->intersections_ptr);
+
+  int tid;
+  bool double_intersection;
+  vector<int> dropped_intersections;
+  int special_tag = -314;
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++) {
+        for(int p=0; p<3; p++) {
+          // xf and xb must be both -1, or both >=0
+          if(xf[k][j][i][p]>=0) {
+
+            assert(xb[k][j][i][p]>=0);
+            double_intersection = (xf[k][j][i][p] != xb[k][j][i][p]);
+
+            tid = intersections[xf[k][j][i][p]].tid;
+            if(elem_drop_status[tid]) {
+              dropped_intersections.push_back(xf[k][j][i][p]);
+              intersections[xf[k][j][i][p]].tid = special_tag;
+              xf[k][j][i][p] = -1;
+            }
+
+            tid = intersections[xb[k][j][i][p]].tid;
+            if(elem_drop_status[tid]) {
+              if(double_intersection) {//otherwise, already inserted
+                dropped_intersections.push_back(xb[k][j][i][p]);
+                intersections[xb[k][j][i][p]].tid = special_tag;
+              }
+              xb[k][j][i][p] = -1;
+            }
+          }
+        }
+      }
+
+  //re-order intersections (remove the dropped ones)
+  vector<int> old2new(intersections.size(),-1);
+  vector<int> new2old(intersections.size() - dropped_intersections.size(),-1);
+  
+  int skipped = 0;
+  for(int i=0; i<(int)intersections.size(); i++) {
+    if(intersections[i].tid == special_tag) {//to be dropped
+      skipped++;
+      old2new[i] = special_tag; //should not be used...
+    } else {
+      old2new[i] = i-skipped;
+      new2old[i-skipped] = i;
+    }
+  }          
+  assert(skipped == (int)dropped_intersections.size());
+              
+  for(int i=0; i<(int)new2old.size(); i++) {
+    assert(new2old[i]>=0);
+    intersections[i] = intersections[new2old[i]];
+  }
+  intersections.resize(new2old.size());
+
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++) {
+        for(int p=0; p<3; p++) {
+          if(xf[k][j][i][p]>=0) {
+            xf[k][j][i][p] = old2new[xf[k][j][i][p]];
+            xb[k][j][i][p] = old2new[xb[k][j][i][p]];
+          }
+        }
+      }
+
+  EBDS->XForward_ptr->RestoreDataPointerToLocalVector(); //can NOT sync (because intersections do not sync)
+  EBDS->XBackward_ptr->RestoreDataPointerToLocalVector(); 
+
+
+  // -------------------------------
+  // Step 2: Update occluded 
+  // -------------------------------
+  
+  
 }
 
 //-------------------------------------------------------------------------
 
 void
-MultiSurfaceIntersector::UpdateShortestDistance()
+MultiSurfaceIntersector::ModifyShortestDistance(int id, vector<bool> elem_drop_status,
+                                                std::set<int> elem_to_drop)
 {
   
 }
