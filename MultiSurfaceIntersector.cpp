@@ -244,7 +244,7 @@ MultiSurfaceIntersector::UpdateIntersectors()
     vector<bool> elem_drop_status(N2, false);
     std::set<int> elem_to_drop;
     for(auto&& status : elem_new_status) {
-      assert(status.size()-N1 == N2);
+      assert((int)status.size()-N1 == N2);
       for(int i=N1; i<(int)status.size(); i++) {
         if(status[i]>0) {//add it to drop-it list
           elem_drop_status[i-N1] = true;
@@ -445,15 +445,17 @@ MultiSurfaceIntersector::FindNewEnclosureBoundary()
 //-------------------------------------------------------------------------
 
 void
-MultiSurfaceIntersector::MoidfyIntersectionsAndOccludedNodes(int id, vector<bool> elem_drop_status,
-                                                             std::set<int> elem_to_drop)
+MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool> elem_drop_status,
+                                                             [[maybe_unused]] std::set<int> elem_to_drop)
 {
+  //NOTE: Currently, this function does not deal with `imposed_occluded'.
+
   assert(id==0 || id==1); //currently assuming at most two surfaces involved
 
   unique_ptr<EmbeddedBoundaryDataSet> EBDS = intersector[id]->GetPointerToResults();
 
   // -------------------------------
-  // Step 1: Drop intersections
+  // Step 1: Delete intersections (and LayerTag)
   // -------------------------------
   Vec3D*** xf = (Vec3D***) EBDS->XForward_ptr->GetDataPointer();
   Vec3D*** xb = (Vec3D***) EBDS->XBackward_ptr->GetDataPointer();
@@ -515,14 +517,28 @@ MultiSurfaceIntersector::MoidfyIntersectionsAndOccludedNodes(int id, vector<bool
   }
   intersections.resize(new2old.size());
 
+  double*** layer = EBDS->LayerTag_ptr->GetDataPointer(); 
+
   for(int k=kk0_in; k<kkmax_in; k++)
     for(int j=jj0_in; j<jjmax_in; j++)
       for(int i=ii0_in; i<iimax_in; i++) {
-        for(int p=0; p<3; p++) {
-          if(xf[k][j][i][p]>=0) {
-            xf[k][j][i][p] = old2new[xf[k][j][i][p]];
-            xb[k][j][i][p] = old2new[xb[k][j][i][p]];
-          }
+
+        layer[k][j][i] = -1;
+
+        if(xf[k][j][i][0]>=0) {
+          xf[k][j][i][0] = old2new[xf[k][j][i][0]];
+          xb[k][j][i][0] = old2new[xb[k][j][i][0]];
+          layer[k][j][i-1] = layer[k][j][i] = 1;
+        }
+        if(xf[k][j][i][1]>=0) {
+          xf[k][j][i][1] = old2new[xf[k][j][i][1]];
+          xb[k][j][i][1] = old2new[xb[k][j][i][1]];
+          layer[k][j-1][i] = layer[k][j][i] = 1;
+        }
+        if(xf[k][j][i][2]>=0) {
+          xf[k][j][i][2] = old2new[xf[k][j][i][2]];
+          xb[k][j][i][2] = old2new[xb[k][j][i][2]];
+          layer[k-1][j][i] = layer[k][j][i] = 1;
         }
       }
 
@@ -531,10 +547,24 @@ MultiSurfaceIntersector::MoidfyIntersectionsAndOccludedNodes(int id, vector<bool
 
 
   // -------------------------------
-  // Step 2: Update occluded 
+  // Step 2: Update occluded (and LayerTag)
   // -------------------------------
-  
-  
+  double*** occid  = EBDS->OccTriangle_ptr->GetDataPointer(); 
+  std::set<Int3>& occluded(*EBDS->occluded_ptr);
+  for(auto it = occluded.begin(); it != occluded.end(); ) { //includes internal ghosts (see Intersector.h)
+    int tid = occid[(*it)[2]][(*it)[1]][(*it)[0]];
+    assert(tid>=0 && tid<(int)elem_drop_status.size());
+    if(elem_drop_status[tid]) {//drop this occluded node
+      occid[(*it)[2]][(*it)[1]][(*it)[0]] = -1;
+      it = occluded.erase(it); //it points to the next element
+    } else {
+      layer[(*it)[2]][(*it)[1]][(*it)[0]] = 0;
+      it++;
+    }
+  }
+  EBDS->OccTriangle_ptr->RestoreDataPointerToLocalVector(); //already taken care of internal ghosts
+
+  EBDS->LayerTag_ptr->RestoreDataPointerAndInsert();
 }
 
 //-------------------------------------------------------------------------

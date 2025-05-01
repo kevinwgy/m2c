@@ -98,6 +98,9 @@ public:
   std::set<Int3> *firstLayer_ptr;
   std::set<Int3> *imposed_occluded_ptr;
 
+  SpaceVariable3D *OccTriangle_ptr;
+  SpaceVariable3D *LayerTag_ptr;
+
   std::set<Int3> *swept_ptr;
 
 
@@ -109,7 +112,8 @@ public:
                               nPossiblePositiveColors(0),
                               ClosestPointIndex_ptr(nullptr), closest_points_ptr(nullptr), 
                               intersections_ptr(nullptr),
-                              occluded_ptr(nullptr), firstLayer_ptr(nullptr),
+                              occluded_ptr(nullptr), OccTriangle_ptr(nullptr),
+                              firstLayer_ptr(nullptr), LayerTag_ptr(nullptr),
                               imposed_occluded_ptr(nullptr), swept_ptr(nullptr)
   { }
 

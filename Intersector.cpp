@@ -27,8 +27,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
              BBmax_1(comm_, &(dms_.ghosted1_3dof)),
              BBmin_n(comm_, &(dms_.ghosted1_3dof)),
              BBmax_n(comm_, &(dms_.ghosted1_3dof)),
-             TMP(comm_, &(dms_.ghosted1_1dof)),
-             TMP2(comm_, &(dms_.ghosted1_1dof)),
+             OccTriangle(comm_, &(dms_.ghosted1_1dof)),
+             LayerTag(comm_, &(dms_.ghosted1_1dof)),
              CandidatesIndex_1(comm_, &(dms_.ghosted1_1dof)),
              CandidatesIndex_n(comm_, &(dms_.ghosted1_1dof)),
              ClosestPointIndex(comm_, &(dms_.ghosted1_1dof)),
@@ -108,8 +108,8 @@ Intersector::Destroy()
   BBmax_1.Destroy();
   BBmin_n.Destroy();
   BBmax_n.Destroy();
-  TMP.Destroy();
-  TMP2.Destroy();
+  OccTriangle.Destroy();
+  LayerTag.Destroy();
   CandidatesIndex_1.Destroy();
   CandidatesIndex_n.Destroy();
   ClosestPointIndex.Destroy();
@@ -143,8 +143,10 @@ Intersector::GetPointerToResults()
   ebds->closest_points_ptr      = &closest_points;
   ebds->intersections_ptr       = &intersections;
   ebds->occluded_ptr            = &occluded;
+  ebds->OccTriangle_ptr         = &OccTriangle;
   ebds->firstLayer_ptr          = &firstLayer;
   ebds->imposed_occluded_ptr    = &imposed_occluded;
+  ebds->LayerTag_ptr            = &LayerTag;
   ebds->swept_ptr               = &swept;
 
   return ebds;
@@ -388,8 +390,8 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
   double*** candid = CandidatesIndex_1.GetDataPointer();
   double*** color  = Color.GetDataPointer();
   
-  double*** occid  = TMP.GetDataPointer(); //occluding triangle id
-  double*** layer  = TMP2.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
+  double*** occid  = OccTriangle.GetDataPointer(); //occluding triangle id
+  double*** layer  = LayerTag.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
 
   //Clear previous values
   intersections.clear();
@@ -563,13 +565,13 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
 
       }
 
-  // Exchange Color and TMP so internal ghost nodes are accounted for
+  // Exchange Color and OccTriangle so internal ghost nodes are accounted for
   CandidatesIndex_1.RestoreDataPointerToLocalVector();
   Color.RestoreDataPointerAndInsert();
-  TMP.RestoreDataPointerAndInsert();
-  TMP2.RestoreDataPointerAndInsert();
+  OccTriangle.RestoreDataPointerAndInsert();
+  LayerTag.RestoreDataPointerAndInsert();
 
-  occid  = TMP.GetDataPointer();
+  occid  = OccTriangle.GetDataPointer();
 
   // ----------------------------------------------------------------------------
   // Make sure all edges connected to occluded nodes have intersections
@@ -772,7 +774,7 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
 
 
 
-  TMP.RestoreDataPointerToLocalVector();
+  OccTriangle.RestoreDataPointerToLocalVector();
 
   XForward.RestoreDataPointerToLocalVector(); //Cannot exchange data, because "intersections" does not communicate
   XBackward.RestoreDataPointerToLocalVector(); //Cannot exchange data, because "intersections" does not communicate
@@ -792,7 +794,7 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
   occluded.clear();
   firstLayer.clear();
 
-  layer  = TMP2.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
+  layer  = LayerTag.GetDataPointer(); //"layer" of each node: 0(occluded), 1, or -1 (unknown)
 
   for(int k=kk0_in; k<kkmax_in; k++)
     for(int j=jj0_in; j<jjmax_in; j++)
@@ -804,13 +806,13 @@ Intersector::FindIntersections() //also finds occluded and first layer nodes
           firstLayer.insert(Int3(i,j,k));
       }
 
-  TMP2.RestoreDataPointerToLocalVector();
+  LayerTag.RestoreDataPointerToLocalVector();
 
 /*
-  TMP2.StoreMeshCoordinates(coordinates);
-  TMP2.WriteToVTRFile("TMP2.vtr", "layer");
-  TMP.StoreMeshCoordinates(coordinates);
-  TMP.WriteToVTRFile("TMP.vtr", "occid");
+  LayerTag.StoreMeshCoordinates(coordinates);
+  LayerTag.WriteToVTRFile("LayerTag.vtr", "layer");
+  OccTriangle.StoreMeshCoordinates(coordinates);
+  OccTriangle.WriteToVTRFile("OccTriangle.vtr", "occid");
   Color.StoreMeshCoordinates(coordinates);
   Color.WriteToVTRFile("Color.vtr", "color");
 */

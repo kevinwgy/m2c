@@ -101,8 +101,6 @@ class Intersector {
   int nLayer; //!< number of layers of neighbors included in the b.b. In most cases, should = Phi_nLayer
 
 
-  SpaceVariable3D TMP, TMP2; //!< For temporary use.
-
   /************************
    * Results
    ************************/
@@ -151,6 +149,9 @@ class Intersector {
   std::set<Int3> imposed_occluded; /**< tracks nodes whose color cannot be resolved; these nodes are FORCED to have\n
                                         the color of occluded(0), but intersections from these nodes to neighbors\n
                                         may not exist! Includes internal ghost nodes.*/
+  SpaceVariable3D OccTriangle; //!< Triangle ID that covers node (-1: node not occluded)
+  SpaceVariable3D LayerTag; //!< 0: occluded; 1: first-layer (involved in intersections); -1: otherwise
+
                                         
 
   //! tracks nodes that are swept by the surface during small motion (e.g., in one time step)

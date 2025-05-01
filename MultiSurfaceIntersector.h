@@ -74,7 +74,7 @@ private:
 
   void FindNewEnclosureBoundary(); //!< fills elem_new_status
 
-  void MoidfyIntersectionsAndOccludedNodes(int id, std::vector<bool> elem_drop_status,
+  void ModifyIntersectionsAndOccludedNodes(int id, std::vector<bool> elem_drop_status,
                                            std::set<int> elem_to_drop); //!< modifies intersector[id]
 
   void ModifyShortestDistance(int id, std::vector<bool> elem_drop_status,
