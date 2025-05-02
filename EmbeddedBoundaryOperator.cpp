@@ -1126,7 +1126,7 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
 
 //------------------------------------------------------------------------------------------------
 
-double
+void
 EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 {
   double max_dist = -DBL_MAX;
@@ -1139,12 +1139,44 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 
     surfaces[i].CalculateNormalsAndAreas();
 
-    double max_dist0 = intersector[i]->RecomputeFullCourse(surfaces_prev[i].X, phi_layers);
+    intersector[i]->BuildKDTreeAndFindIntersections();
+    intersector[i]->FindSweptNodes(surfaces_prev[i].X);
+    intersector[i]->RefillAfterSurfaceUpdate();
+  }
+
+  //check & handle potential surface intersections (if specified by user)
+  vector<bool> modified(intersector.size(), false);
+  for(auto&& multiX : multi_intersector) {
+    if(multiX->GetNumberOfSurfaces() == 1)
+      continue; //this function is called at the beginning of simulation; self-intersection `handled' by user
+    if(!multiX->CheckSurfaceIntersections())
+      continue;
+
+    //Now, we know these two surfaces intersect.
+    
+    int numNew = multiX->FindNewEnclosures(); //TODO: THIS NEEDS TO BE REPLACED BY LOCAL VERSION
+    if(numNew>0) {
+      if(verbose>=1)
+        print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
+      int xid = multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
+      if(xid>=0) //indeed, an interesector was modified
+        modified[xid] = true;
+
+      //NOTE: COLOR IS NOT UPDATED!
+    }
+  }
+
+  for(int i = 0; i < (int)intersector.size(); i++) {
+    if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
+       strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+      continue;
+    double max_dist0 = intersector[i]->ComputeUnsignedDistance(phi_layers, modified[i] ? 1 : -1);
     if(max_dist0>max_dist)
       max_dist = max_dist0;
   }
 
-  return max_dist;
+  //return max_dist; //WARNING: IF ALL SURFACES ARE FIXED, MAX_DIST gets garbage
+  return;
 }
 
 //------------------------------------------------------------------------------------------------
