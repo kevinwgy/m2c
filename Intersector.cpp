@@ -187,13 +187,7 @@ Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasInlet2_, bool &has
 
   bool hasOcc = FloodFillColors();
 
-  // Calculate unsigned distance
-  if(nLayer != phi_layers) {
-    BuildNodalAndSubdomainBoundingBoxes(phi_layers, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
-    nLayer = phi_layers;
-  }
-  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
-  double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
+  double dist_max = ComputeUnsignedDistance(phi_layers);
 
   hasInlet_  = hasInlet;
   hasInlet2_ = hasInlet2;
@@ -235,11 +229,21 @@ Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
   FindSweptNodes(Xprev);
   RefillAfterSurfaceUpdate();
 
+  double dist_max = ComputeUnsignedDistance(phi_layers);
+
+  return dist_max;
+}
+
+//-------------------------------------------------------------------------
+
+double
+Intersector::ComputeUnsignedDistance(int phi_layers, int elem_drop_tag)
+{
   if(nLayer != phi_layers) {
     BuildNodalAndSubdomainBoundingBoxes(phi_layers, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
     nLayer = phi_layers;
   }
-  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n);
+  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n, elem_drop_tag);
   double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
 
   return dist_max;
@@ -297,13 +301,18 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin,
 
 void
 Intersector::BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &subD_bbmax, 
-                                          vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree)//updating the tree itself
+                                          vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree,
+                                          int elem_drop_tag)//updating the tree itself
 {
   scope.clear();
 
   vector<Vec3D>& Xs(surface.X);
   vector<Int3>&  Es(surface.elems);
   for(auto it = Es.begin(); it != Es.end(); it++) {
+
+    if(elem_drop_tag>=0 && surface.elemtag[it - Es.begin()]==elem_drop_tag)
+      continue; //ignore it
+
     MyTriangle tri(it - Es.begin(), Xs[(*it)[0]], Xs[(*it)[1]], Xs[(*it)[2]]);
     bool inside = true;
     for(int i=0; i<3; i++) {
@@ -315,8 +324,6 @@ Intersector::BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &
     if(inside) 
       scope.push_back(tri); //creating a copy of "tri" and store it in scope
   }
-
-//  fprintf(stdout,"scope size: %d.\n", (int)scope.size());
 
   // build the tree
   if(*tree)

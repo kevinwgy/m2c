@@ -28,6 +28,10 @@ struct TriangulatedSurface {
   int active_nodes;
   int active_elems;
 
+  //!< integer tags, can be used for various purposes
+  std::vector<int> nodetag;
+  std::vector<int> elemtag;
+
   std::vector<Vec3D> elemNorm;
   std::vector<double> elemArea;
   std::vector<std::set<int> > node2node;
@@ -40,6 +44,8 @@ struct TriangulatedSurface {
       : degenerate(degen_), X(X_), elems(e_) {
     active_nodes = X.size();
     active_elems = elems.size();
+    nodetag.assign(X.size(),0);
+    elemtag.assign(elems.size(),0);
     BuildConnectivities();
     CalculateNormalsAndAreas();
   }

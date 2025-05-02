@@ -26,10 +26,9 @@ class MultiSurfaceIntersector {
   GlobalMeshInfo &global_mesh;
 
   int numSurfaces; //!< number of surfaces considered (has to be 1 or 2 at the moment)
-
+  std::vector<int> surface_id; //!< surface ID; size = numSurfaces
   std::vector<TriangulatedSurface*> surface; //!< size = numSurfaces;
   std::vector<Intersector*> intersector; //!< size = numSurfaces
-  std::vector<std::vector<bool> > elems_active;
 
   Intersector* joint_intersector; //!< constructed even for self-intersection (i.e., numSurfaces==1)
   TriangulatedSurface joint_surface; //!< surface provided to joint_intersector. 
@@ -53,13 +52,15 @@ public:
 
   int GetNumberOfSurfaces() {return numSurfaces;}
 
+  int GetSurfaceID(int i) {assert(i>=0 && i<(int)surface_id.size()); return surface_id[i];}
+
   void UpdateJointSurface();
 
   bool CheckSurfaceIntersections();
 
   int FindNewEnclosures();
 
-  void UpdateIntersectors();
+  int UpdateIntersectors(); //!< returns the intersector id that is actually modified (-1 for N/A)
 
 
 private:
@@ -76,9 +77,6 @@ private:
 
   void ModifyIntersectionsAndOccludedNodes(int id, std::vector<bool> elem_drop_status,
                                            std::set<int> elem_to_drop); //!< modifies intersector[id]
-
-  void ModifyShortestDistance(int id, std::vector<bool> elem_drop_status,
-                              std::set<int> elem_to_drop); //!< modifies intersector[id]);
 
 
 

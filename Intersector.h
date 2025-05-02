@@ -198,8 +198,9 @@ public:
   void BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin, SpaceVariable3D &BBmax,
                                            Vec3D &subD_bbmin, Vec3D &subD_bbmax); //!< build bounding boxes
 
-  void BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &subD_bbmax,
-                                    std::vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree); //!< Requires bounding box
+  void BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &subD_bbmax, 
+                                    std::vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree,
+                                    int elem_drop_tag = -1); //!< Requires bounding box
 
   //! Many functions below assume that bounding boxes, scope, and tree have already been constructed.
 
@@ -212,6 +213,9 @@ public:
 
   bool FloodFillColors(); /**< determine the generalized color function ("Color").\n 
                                Returns whether some nodes are occluded.\n"*/
+
+  double ComputeUnsignedDistance(int nL, int elem_drop_tag = -1); //!< if tag>0, ignore tagged elements
+
   //! Fill "swept". The inputs are firstLayer nodes and surface nodal coords in the previous time step
   void FindSweptNodes(std::vector<Vec3D> &X0); //!< candidates only need to account for 1 layer
 
@@ -221,7 +225,6 @@ public:
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
   void RefillAfterSurfaceUpdate();
 
-  double CalculateUnsignedDistanceNearSurface(int nL); //!< Calculate "Phi" for small "nL"
 
   //! Find the elements of the embedded surface that constitute the boundary of a "color". For each element in\n
   //! in this set, determine which side(s) of it faces the interior of this color. "status" has the size of\n
@@ -261,6 +264,7 @@ private:
                                          double len, MyTriangle* tri, int nTri, 
                                          IntersectionPoint &xf, IntersectionPoint &xb); //!< 2 points, maybe the same
 
+  double CalculateUnsignedDistanceNearSurface(int nL); //!< Calculate "Phi" for small "nL"
 
 };
 

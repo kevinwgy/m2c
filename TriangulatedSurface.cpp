@@ -26,6 +26,9 @@ TriangulatedSurface::operator=(const TriangulatedSurface &S2)
   active_nodes = S2.active_nodes;
   active_elems = S2.active_elems;
 
+  nodetag = S2.nodetag;
+  elemtag = S2.elemtag;
+
   elemNorm = S2.elemNorm;
   elemArea = S2.elemArea;
 
@@ -63,6 +66,9 @@ TriangulatedSurface::Append(const TriangulatedSurface &S2)
 
   active_nodes += S2.active_nodes;
   active_elems += S2.active_elems;
+
+  nodetag.insert(nodetag.end(), S2.nodetag.begin(), S2.nodetag.end());
+  elemtag.insert(elemtag.end(), S2.elemtag.begin(), S2.elemtag.end());
 
   elemNorm.insert(elemNorm.end(), S2.elemNorm.begin(), S2.elemNorm.end());
   elemArea.insert(elemArea.end(), S2.elemArea.begin(), S2.elemArea.end());

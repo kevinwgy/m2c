@@ -49,9 +49,9 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
     exit_mpi();
   }
 
+  surface_id.push_back(surf1);
   surface.push_back(&surface_[surf1]);
   intersector.push_back(intersector_[surf1]);
-  elems_active.push_back(vector<bool>(surface_[surf1].elems.size(), true)); //!< default: active
   iod_surface_dummy.surface_thickness = 2.0*intersector_[surf1]->GetSurfaceHalfThickness();
 
   joint_surface = surface_[surf1]; 
@@ -64,9 +64,9 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
                                                      2.0*intersector_[surf2]->GetSurfaceHalfThickness());
       joint_surface.Append(surface_[surf2]);
     }
+    surface_id.push_back(surf2);
     surface.push_back(&surface_[surf2]);
     intersector.push_back(intersector_[surf2]);
-    elems_active.push_back(vector<bool>(surface_[surf2].elems.size(), true)); //!< default: active
   }
 
   numSurfaces = surface.size();
@@ -225,18 +225,20 @@ MultiSurfaceIntersector::FindNewEnclosures()
 
 //-------------------------------------------------------------------------
 
-void
+int
 MultiSurfaceIntersector::UpdateIntersectors()
 {
   // Currently, each processor handles the entire surface (can be improved)
   
   if(new_enclosure_color.empty())
-    return; //nothing to do
+    return -1; //nothing to do
 
   if(ruling_surface_id == -1)
-    return; //should not drop any intersections, occluded nodes, and change shortest distance
+    return -1; //should not drop any intersections, occluded nodes, and change shortest distance
   
   assert(numSurfaces==2); //otherwise, ruling_surface_id should be -1
+
+  int intersector_modified = -1; //!< ID of modified intersector
 
   if(ruling_surface_id == 0) { //modify intersector[1]
     int N1 = surface[0]->elems.size();
@@ -252,8 +254,16 @@ MultiSurfaceIntersector::UpdateIntersectors()
         }
       }
     }
-    ModifyIntersectionsAndOccludedNodes(1, elem_drop_status, elem_to_drop);
-    ModifyShortestDistance(1, elem_drop_status, elem_to_drop);
+    if(!elem_to_drop.empty()) {
+      intersector_modified = surface_id[1];
+      ModifyIntersectionsAndOccludedNodes(1, elem_drop_status, elem_to_drop);
+      //tag dropped elements
+      std::vector<int>& eTag(surface[1]->elemtag);
+      for(int i=0; i<(int)eTag.size(); i++) {
+        if(elem_drop_status[i])
+          eTag[i] = 1; //!< means dropped
+      }
+    } 
   }
   else {
     assert(ruling_surface_id == 1);
@@ -268,11 +278,19 @@ MultiSurfaceIntersector::UpdateIntersectors()
         }
       }
     }
-    ModifyIntersectionsAndOccludedNodes(0, elem_drop_status, elem_to_drop);
-    ModifyShortestDistance(0, elem_drop_status, elem_to_drop);
+    if(!elem_to_drop.empty()) {
+      intersector_modified = surface_id[0];
+      ModifyIntersectionsAndOccludedNodes(0, elem_drop_status, elem_to_drop);
+      //tag dropped elements
+      std::vector<int>& eTag(surface[0]->elemtag);
+      for(int i=0; i<(int)eTag.size(); i++) {
+        if(elem_drop_status[i])
+          eTag[i] = 1; //!< means dropped
+      }
+    }
   }
   
-
+  return intersector_modified;
 }
 
 //-------------------------------------------------------------------------
@@ -569,12 +587,6 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
 
 //-------------------------------------------------------------------------
 
-void
-MultiSurfaceIntersector::ModifyShortestDistance(int id, vector<bool> elem_drop_status,
-                                                std::set<int> elem_to_drop)
-{
-  
-}
 
 //-------------------------------------------------------------------------
 

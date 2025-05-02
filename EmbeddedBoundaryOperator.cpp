@@ -1078,10 +1078,11 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
 
   for(int i = 0; i < (int)intersector.size(); i++) {
     intersector[i]->BuildKDTreeAndFindIntersections();
-    bool hasOccluded = intersector[i]->FloodFillColors();
+    intersector[i]->FloodFillColors();
   }
 
   //check & handle potential surface intersections (if specified by user)
+  vector<bool> modified(intersector.size(), false);
   for(auto&& multiX : multi_intersector) {
     if(multiX->GetNumberOfSurfaces() == 1)
       continue; //this function is called at the beginning of simulation; self-intersection `handled' by user
@@ -1094,22 +1095,19 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
     if(numNew>0) {
       if(verbose>=1)
         print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
-      multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
-    }
+      int xid = multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
+      if(xid>=0) //indeed, an interesector was modified
+        modified[xid] = true;
 
+      //NOTE: COLOR IS NOT UPDATED!
+    }
   }
 
-
+  // compute unsigned shortest distance
   for(int i = 0; i < (int)intersector.size(); i++) {
-
-    bool a1, a2, b, c;
-    int d;
-    double max_dist0 = intersector[i]->TrackSurfaceFullCourse(a1, a2, b, c, d, phi_layers);
-
+    double max_dist0 = intersector[i]->ComputeUnsignedDistance(phi_layers, modified[i] ? 1 : -1);
     if(max_dist0>max_dist)
       max_dist = max_dist0;
-
-
 
 /*
     // debug only
