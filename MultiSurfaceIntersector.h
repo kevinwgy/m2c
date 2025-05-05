@@ -25,12 +25,12 @@ class MultiSurfaceIntersector {
 
   GlobalMeshInfo &global_mesh;
 
-  int numSurfaces; //!< number of surfaces considered (has to be 1 or 2 at the moment)
+  int numSurfaces; //!< number of surfaces considered (MUST BE 2 at the moment)
   std::vector<int> surface_id; //!< surface ID; size = numSurfaces
   std::vector<TriangulatedSurface*> surface; //!< size = numSurfaces;
   std::vector<Intersector*> intersector; //!< size = numSurfaces
 
-  Intersector* joint_intersector; //!< constructed even for self-intersection (i.e., numSurfaces==1)
+  Intersector* joint_intersector; 
   TriangulatedSurface joint_surface; //!< surface provided to joint_intersector. 
   EmbeddedSurfaceData iod_surface_dummy; //!< a dummy (except for thickness) provided to joint_intersector. 
 
@@ -50,8 +50,6 @@ public:
 
   void Destroy();
 
-  int GetNumberOfSurfaces() {return numSurfaces;}
-
   int GetSurfaceID(int i) {assert(i>=0 && i<(int)surface_id.size()); return surface_id[i];}
 
   void UpdateJointSurface();
@@ -59,6 +57,8 @@ public:
   bool CheckSurfaceIntersections();
 
   int FindNewEnclosures();
+
+  int FindNewEnclosuresAfterSurfaceUpdate(); //!< assuming `swept nodes' have been detected
 
   int UpdateIntersectors(); //!< returns the intersector id that is actually modified (-1 for N/A)
 

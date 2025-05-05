@@ -81,6 +81,7 @@ class Intersector {
 
   GlobalMeshInfo &global_mesh;
 
+  bool allow_self_intersection; //!< default: false; when set to true, self-intersections (new enclosures) allowed
 
   //! Infrastructure #1. One layer of neighbors
   SpaceVariable3D BBmin_1, BBmax_1; /**< The min and max coords of nodal bounding boxes. Only for nodes \n
@@ -190,6 +191,7 @@ public:
 
   double RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
 
+  bool AllowSelfIntersection() {return allow_self_intersection;}
 
 /** Below is like the a la carte menu. Try to use the pre-defined "combos" above as much as you can. 
  *  The functions below are not all independent with each other!*/

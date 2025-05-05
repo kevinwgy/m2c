@@ -1084,8 +1084,6 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
   //check & handle potential surface intersections (if specified by user)
   vector<bool> modified(intersector.size(), false);
   for(auto&& multiX : multi_intersector) {
-    if(multiX->GetNumberOfSurfaces() == 1)
-      continue; //this function is called at the beginning of simulation; self-intersection `handled' by user
     if(!multiX->CheckSurfaceIntersections())
       continue;
 
@@ -1147,14 +1145,13 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
   //check & handle potential surface intersections (if specified by user)
   vector<bool> modified(intersector.size(), false);
   for(auto&& multiX : multi_intersector) {
-    if(multiX->GetNumberOfSurfaces() == 1)
-      continue; //this function is called at the beginning of simulation; self-intersection `handled' by user
+
     if(!multiX->CheckSurfaceIntersections())
       continue;
 
     //Now, we know these two surfaces intersect.
     
-    int numNew = multiX->FindNewEnclosures(); //TODO: THIS NEEDS TO BE REPLACED BY LOCAL VERSION
+    int numNew = multiX->FindNewEnclosuresAfterSurfaceUpdate();
     if(numNew>0) {
       if(verbose>=1)
         print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
@@ -1164,6 +1161,8 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 
       //NOTE: COLOR IS NOT UPDATED!
     }
+
+    int numNew = multiX->RefillAfterSurfaceUpdate();
   }
 
   for(int i = 0; i < (int)intersector.size(); i++) {

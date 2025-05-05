@@ -1564,6 +1564,8 @@ struct EmbeddedSurfaceData {
   enum Type {None = 0, Wall = 1, Symmetry = 2, DirectState = 3, MassFlow = 4, PorousWall = 5,
              Size = 6} type;
   enum YesNo {NO = 0, YES = 1} provided_by_another_solver;
+  YesNo allow_self_intersection; //!< suppresses warning message
+
   const char *filename; //!< file for nodal coordinates and elements
   enum ThermalCondition {Adiabatic = 0, Isothermal = 1, Source = 2} thermal;
   double wall_temperature; //!< used only in the case of isothermal wall 
@@ -1603,11 +1605,11 @@ struct EmbeddedSurfaceData {
 struct SurfaceIntersectionData {
 
   int surface1_id;
-  int surface2_id;
+  int surface2_id; //!< must be different from surface1_id
 
   /** Surface intersection may leads to new enclosures. If IGNORE_SURFACE1 and IGNORE_SURFACE2, the enclosed \n
     * regions are ignored by ignoring either part of surface 1 or surface 2. INACTIVE means the enclosures \n
-    * are treated as an inactive region. Note: If surface1_id == surface2_id, only INACTIVE is supported. */
+    * are treated as an inactive region. */
   enum EnclosureTreatment{INACTIVE = 0, IGNORE_SURFACE1 = 1, IGNORE_SURFACE2 = 2} enclosure_treatment;
 
   SurfaceIntersectionData();

@@ -3318,6 +3318,8 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 {
   provided_by_another_solver = NO;
 
+  allow_self_intersection = NO;
+
   surface_thickness = 1.0e-8;
 
   // force calculation
@@ -3342,10 +3344,14 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 14, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 15, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
+     "No", 0, "Yes", 1);
+
+  new ClassToken<EmbeddedSurfaceData> (ca, "AllowSelfIntersection", this,
+     reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::allow_self_intersection), 2,
      "No", 0, "Yes", 1);
 
   new ClassDouble<EmbeddedSurfaceData>(ca, "SurfaceThickness", this, 

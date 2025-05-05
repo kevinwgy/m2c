@@ -43,9 +43,8 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
     print_error("*** Error: Surface %d (in SurfaceIntersection) undefined.\n", surf2);
     exit_mpi();
   }
-  if((surf1 == surf2) &&
-     iod_surfX_.enclosure_treatment != SurfaceIntersectionData::INACTIVE) {
-    print_error("*** Error: Self-intersection (in SurfaceIntersection) only supports Enclosure = Inactive.\n");
+  if(surf1 == surf2) {
+    print_error("*** Error: Self-intersection should be specified under EmbeddedSurface.\n");
     exit_mpi();
   }
 
@@ -56,20 +55,19 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
 
   joint_surface = surface_[surf1]; 
 
-  if(surf2 != surf1) {
-    if(intersector_[surf1]->GetSurfaceHalfThickness() != intersector_[surf2]->GetSurfaceHalfThickness()) {
-      print_warning("Warning: Surfaces %d and %d (potentiall intersecting) have different thicknesses.\n",
-                    surf1, surf2);
-      iod_surface_dummy.surface_thickness = std::min(iod_surface_dummy.surface_thickness,
-                                                     2.0*intersector_[surf2]->GetSurfaceHalfThickness());
-      joint_surface.Append(surface_[surf2]);
-    }
-    surface_id.push_back(surf2);
-    surface.push_back(&surface_[surf2]);
-    intersector.push_back(intersector_[surf2]);
+  if(intersector_[surf1]->GetSurfaceHalfThickness() != intersector_[surf2]->GetSurfaceHalfThickness()) {
+    print_warning("Warning: Surfaces %d and %d (potentiall intersecting) have different thicknesses.\n",
+                  surf1, surf2);
+    iod_surface_dummy.surface_thickness = std::min(iod_surface_dummy.surface_thickness,
+                                                   2.0*intersector_[surf2]->GetSurfaceHalfThickness());
+    joint_surface.Append(surface_[surf2]);
   }
+  surface_id.push_back(surf2);
+  surface.push_back(&surface_[surf2]);
+  intersector.push_back(intersector_[surf2]);
 
   numSurfaces = surface.size();
+  assert(numSurfaces==2);
 
   ruling_surface_id = -1; //default: inactive within overlapped region
   if(iod_surfX_.enclosure_treatment == SurfaceIntersectionData::IGNORE_SURFACE1)
@@ -77,7 +75,6 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
   else if(iod_surfX_.enclosure_treatment == SurfaceIntersectionData::IGNORE_SURFACE2)
     ruling_surface_id = 0;
  
-
 
   joint_intersector = new Intersector(comm, dms_, iod_surface_dummy, joint_surface, coordinates,
                                       ghost_nodes_inner, ghost_nodes_outer, global_mesh);
@@ -105,41 +102,33 @@ MultiSurfaceIntersector::Destroy()
 void
 MultiSurfaceIntersector::UpdateJointSurface()
 {
-  assert(numSurfaces==1 || numSurfaces==2);
-  assert(joint_surface.X0.size() == (numSurfaces==1 ? surface[0]->X0.size() :
-                                     surface[0]->X0.size() + surface[1]->X0.size()));
-  assert(joint_surface.elems.size() == (numSurfaces==1 ? surface[0]->elems.size() :
-                                        surface[0]->elems.size() + surface[1]->elems.size()));
+  assert(numSurfaces==2);
+  assert(joint_surface.X0.size() == surface[0]->X0.size() + surface[1]->X0.size());
+  assert(joint_surface.elems.size() == surface[0]->elems.size() + surface[1]->elems.size());
 
   for(int i=0; i<(int)surface[0]->X0.size(); i++) {
     joint_surface.X0[i]   = surface[0]->X0[i];
     joint_surface.X[i]    = surface[0]->X[i];
     joint_surface.Udot[i] = surface[0]->Udot[i];
   }
-  if(numSurfaces == 2) {
-    int N1 = surface[0]->X0.size();
-    for(int i=0; i<(int)surface[1]->X0.size(); i++) {
-      joint_surface.X0[N1+i]   = surface[1]->X0[i];
-      joint_surface.X[N1+i]    = surface[1]->X[i];
-      joint_surface.Udot[N1+i] = surface[1]->Udot[i];
-    }
+  int N1 = surface[0]->X0.size();
+  for(int i=0; i<(int)surface[1]->X0.size(); i++) {
+    joint_surface.X0[N1+i]   = surface[1]->X0[i];
+    joint_surface.X[N1+i]    = surface[1]->X[i];
+    joint_surface.Udot[N1+i] = surface[1]->Udot[i];
   }
 
   for(int i=0; i<(int)surface[0]->elemNorm.size(); i++)
     joint_surface.elemNorm[i] = surface[0]->elemNorm[i];
-  if(numSurfaces == 2) {
-    int N1 = surface[0]->elemNorm.size();
-    for(int i=0; i<(int)surface[1]->elemNorm.size(); i++)
-      joint_surface.elemNorm[N1+i] = surface[1]->elemNorm[i];
-  }
+  int N1 = surface[0]->elemNorm.size();
+  for(int i=0; i<(int)surface[1]->elemNorm.size(); i++)
+    joint_surface.elemNorm[N1+i] = surface[1]->elemNorm[i];
 
   for(int i=0; i<(int)surface[0]->elemArea.size(); i++)
     joint_surface.elemArea[i] = surface[0]->elemArea[i];
-  if(numSurfaces == 2) {
-    int N1 = surface[0]->elemArea.size();
-    for(int i=0; i<(int)surface[1]->elemArea.size(); i++)
-      joint_surface.elemArea[N1+i] = surface[1]->elemArea[i];
-  }
+  int N1 = surface[0]->elemArea.size();
+  for(int i=0; i<(int)surface[1]->elemArea.size(); i++)
+    joint_surface.elemArea[N1+i] = surface[1]->elemArea[i];
 
 }
 
@@ -148,7 +137,7 @@ MultiSurfaceIntersector::UpdateJointSurface()
 bool
 MultiSurfaceIntersector::CheckSurfaceIntersections()
 {
-  if(CheckSurfaceIntersectionsOneWay(true) || (numSurfaces==2 && CheckSurfaceIntersectionsOneWay(false)))
+  if(CheckSurfaceIntersectionsOneWay(true) || CheckSurfaceIntersectionsOneWay(false))
     return true;
   return false;
 }
@@ -160,9 +149,7 @@ MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
 {
   //Assuming just two surfaces
   int surf1, surf2;
-  if(numSurfaces==1) {
-    surf1 = surf2 = 0;
-  } else if(surf1_surf2) {
+  if(surf1_surf2) {
     surf1 = 0;
     surf2 = 1;
   } else {
@@ -236,7 +223,7 @@ MultiSurfaceIntersector::UpdateIntersectors()
   if(ruling_surface_id == -1)
     return -1; //should not drop any intersections, occluded nodes, and change shortest distance
   
-  assert(numSurfaces==2); //otherwise, ruling_surface_id should be -1
+  assert(numSurfaces==2);
 
   int intersector_modified = -1; //!< ID of modified intersector
 
@@ -586,6 +573,22 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
 }
 
 //-------------------------------------------------------------------------
+
+int
+MultiSurfaceIntersector::FindNewEnclosuresAfterSurfaceUpdate()
+{
+  new_enclosure_color.clear();
+  elem_new_status.clear();
+
+  int nNew = FindNewEnclosuresByFloodFill(); // fills new_enclosure_color
+  if(nNew>0) {
+    UpdateJointSurface();
+    FindNewEnclosureBoundary(); // fills elem_new_status
+  }
+ 
+  return nNew;
+}
+
 
 
 //-------------------------------------------------------------------------

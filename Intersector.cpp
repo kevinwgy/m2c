@@ -56,6 +56,8 @@ Intersector::Intersector(MPI_Comm &comm_, DataManagers3D &dms_, EmbeddedSurfaceD
     exit_mpi();
   }
 
+  allow_self_intersection = (iod_surface.allow_self_intersection == EmbeddedSurfaceData::YES);
+
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
   coordinates.GetGhostedCornerIndices(&ii0, &jj0, &kk0, &iimax, &jjmax, &kkmax);
   coordinates.GetInternalGhostedCornerIndices(&ii0_in, &jj0_in, &kk0_in, &iimax_in, &jjmax_in, &kkmax_in);
@@ -1188,8 +1190,9 @@ Intersector::RefillAfterSurfaceUpdate()
   // fill remaining nodes as FORCED occluded
   imposed_occluded.clear();
   if(total_remaining_nodes>0) {
-    print_warning("Warning: Found %d unresolved nodes after performing %d iterations of refill. "
-                   "Setting them to be occluded.\n", total_remaining_nodes, max_it);
+    if(!allow_self_intersection)
+      print_warning("Warning: Found %d unresolved nodes after performing %d iterations of refill. "
+                     "Setting them to be occluded.\n", total_remaining_nodes, max_it);
     imposed_occluded = nodes2fill;
     for(auto it = imposed_occluded.begin(); it != imposed_occluded.end(); it++) 
       color[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
