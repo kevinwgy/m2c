@@ -60,6 +60,7 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
                   surf1, surf2);
     iod_surface_dummy.surface_thickness = std::min(iod_surface_dummy.surface_thickness,
                                                    2.0*intersector_[surf2]->GetSurfaceHalfThickness());
+    iod_surface_dummy.allow_self_intersection = EmbeddedSurfaceData::YES;
     joint_surface.Append(surface_[surf2]);
   }
   surface_id.push_back(surf2);
@@ -120,13 +121,13 @@ MultiSurfaceIntersector::UpdateJointSurface()
 
   for(int i=0; i<(int)surface[0]->elemNorm.size(); i++)
     joint_surface.elemNorm[i] = surface[0]->elemNorm[i];
-  int N1 = surface[0]->elemNorm.size();
+  N1 = surface[0]->elemNorm.size();
   for(int i=0; i<(int)surface[1]->elemNorm.size(); i++)
     joint_surface.elemNorm[N1+i] = surface[1]->elemNorm[i];
 
   for(int i=0; i<(int)surface[0]->elemArea.size(); i++)
     joint_surface.elemArea[i] = surface[0]->elemArea[i];
-  int N1 = surface[0]->elemArea.size();
+  N1 = surface[0]->elemArea.size();
   for(int i=0; i<(int)surface[1]->elemArea.size(); i++)
     joint_surface.elemArea[N1+i] = surface[1]->elemArea[i];
 
@@ -342,6 +343,7 @@ MultiSurfaceIntersector::FindNewEnclosuresByFloodFill()
   EBDS1->Color_ptr->RestoreDataPointerToLocalVector();
   EBDS2->Color_ptr->RestoreDataPointerToLocalVector();
   EBDS_jnt->Color_ptr->RestoreDataPointerToLocalVector();
+  
   
   return new_enclosure_color.size();
   //SAVE new_enclosure_color, and move back. Then, write function to detect color boundary, delete intersections (re-order), and update occluded nodes;
@@ -574,28 +576,93 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
 
 //-------------------------------------------------------------------------
 
-int
+bool
 MultiSurfaceIntersector::FindNewEnclosuresAfterSurfaceUpdate()
 {
-  new_enclosure_color.clear();
   elem_new_status.clear();
 
-  int nNew = FindNewEnclosuresByFloodFill(); // fills new_enclosure_color
-  if(nNew>0) {
+  int newColor(0);
+  if(new_enclosure_color.empty()) {
+    joint_intersector->GetColors(NULL,NULL,NULL,&newColor); //get nRegions
+    newColor++;
+  } else
+    newColor = new_enclosure_color[0]; //use an existing color
+
+  FindNewEnclosuresByRefill(newColor); // fills new_enclosure_color
+  if(!new_enclosure_color.empty()) {
     UpdateJointSurface();
     FindNewEnclosureBoundary(); // fills elem_new_status
   }
  
-  return nNew;
+  return !new_enclosure_color.empty();
 }
 
+//-------------------------------------------------------------------------
 
+void
+MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
+{
+  assert(numSurfaces==2);
+  assert(joint_intersector);
+
+  unique_ptr<EmbeddedBoundaryDataSet> EBDS1    = intersector[0]->GetPointerToResults();
+  unique_ptr<EmbeddedBoundaryDataSet> EBDS2    = intersector[1]->GetPointerToResults();
+  unique_ptr<EmbeddedBoundaryDataSet> EBDS_jnt = joint_intersector->GetPointerToResults();
+
+  // ------------------------------------------------------------
+  // Step 1: Merge intersections and pass them to joint_intersector
+  // ------------------------------------------------------------
+  Vec3D*** xf1    = (Vec3D***)EBDS1->XForward_ptr->GetDataPointer();
+  Vec3D*** xf2    = (Vec3D***)EBDS2->XForward_ptr->GetDataPointer();
+  Vec3D*** xf_jnt = (Vec3D***)EBDS_jnt->XForward_ptr->GetDataPointer();
+
+  for(int k=kk0_in; k<kkmax_in; k++)
+    for(int j=jj0_in; j<jjmax_in; j++)
+      for(int i=ii0_in; i<iimax_in; i++)
+        for(int p=0; p<3; p++) {
+          if(xf1[k][j][i][p]>=0 || xf2[k][j][i][p]>=0)
+            xf_jnt[k][j][i][p] = 0; //xf1 & xf2 contain the intersection index; Not used here. (Just set to 0)
+          else
+            xf_jnt[k][j][i][p] = -1; //non-blocking
+        }
+
+  EBDS_jnt->XForward_ptr->RestoreDataPointerToLocalVector(); //!< no need to sync (already filled ghosts)
+  EBDS1->XForward_ptr->RestoreDataPointerToLocalVector(); //should NOT sync! (See notes in Intersector.cpp)
+  EBDS2->XForward_ptr->RestoreDataPointerToLocalVector();
+
+
+  // ------------------------------------------------------------
+  // Step 2: Merge occluded nodes (in subD) and pass to joint_intersector
+  // ------------------------------------------------------------
+  *EBDS_jnt->occluded_ptr = *EBDS1->occluded_ptr; //copy EBDS1 to EBDS_jnt
+  EBDS_jnt->occluded_ptr->merge(*EBDS2->occluded_ptr); //merge with EBDS2
+
+
+  // ------------------------------------------------------------
+  // Step 3: Merge swept nodes (in subD) and pass to joint_intersector
+  // ------------------------------------------------------------
+  *EBDS_jnt->swept_ptr = *EBDS1->swept_ptr; //copy EBDS1 to EBDS_jnt
+  EBDS_jnt->swept_ptr->merge(*EBDS2->swept_ptr); //merge with EBDS2
+
+  // ------------------------------------------------------------
+  // Step 4: Refill using joint_intersector
+  // ------------------------------------------------------------
+  bool new_enclosure = joint_intersector->RefillAfterSurfaceUpdate(color4new);
+  
+  // ------------------------------------------------------------
+  // Step 5: Update new_enclosure_color
+  // ------------------------------------------------------------
+  if(new_enclosure) {
+    if(std::find(new_enclosure_color.begin(), new_enclosure_color.end(), color4new) == new_enclosure_color.end())
+      new_enclosure_color.push_back(color4new);
+  }
+
+}
 
 //-------------------------------------------------------------------------
 
 
-
-
+//-------------------------------------------------------------------------
 
 
 

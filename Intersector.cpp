@@ -1059,11 +1059,12 @@ Intersector::FloodFillColors()
 }
 
 //-------------------------------------------------------------------------
-
+/*
 void
 Intersector::RefillAfterSurfaceUpdate()
 {
-  // "FindSweptNodes" should be called before calling this function. So, in most cases, "nodal_cands_calculated" should be true
+  // "FindSweptNodes" should be called before calling this function.
+  // TODO(K.W.) Could have used intersections that have already been computed.
   
   // Assuming occluded nodes already have the correct color. We do not deal with them here.
   
@@ -1094,13 +1095,13 @@ Intersector::RefillAfterSurfaceUpdate()
     if(total_remaining_nodes == 0) //Yeah
       break;
   
-/*
-    if(total_remaining_nodes>0) {
-      fprintf(stdout,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
-      Color.StoreMeshCoordinates(coordinates);
-      Color.WriteToVTRFile("Color.vtr", "color");
-    }
-*/
+
+//    if(total_remaining_nodes>0) {
+//      fprintf(stdout,"Hey total_remaining_nodes = %d.\n", total_remaining_nodes);
+//      Color.StoreMeshCoordinates(coordinates);
+//      Color.WriteToVTRFile("Color.vtr", "color");
+//    }
+
 
     if(!color) //first iteration
       color = Color.GetDataPointer();
@@ -1128,6 +1129,7 @@ Intersector::RefillAfterSurfaceUpdate()
       assert(cands.size()>0);
 
       //go over first layer neighbors, find a nonblocked reliable neighbor
+      // TODO(KW,2025): This is inconsistent with FloodFill as it also checks diagonal neighbors!
       for(int k=k0-1; k<=k0+1; k++)
         for(int j=j0-1; j<=j0+1; j++)
           for(int i=i0-1; i<=i0+1; i++) {
@@ -1220,9 +1222,196 @@ Intersector::RefillAfterSurfaceUpdate()
   CandidatesIndex_1.RestoreDataPointerToLocalVector();
 
 }
+*/
+//-------------------------------------------------------------------------
+ 
+bool
+Intersector::RefillAfterSurfaceUpdate(int color4new)
+{
+  // "FindSweptNodes" and "FindIntersections" should be called before calling this function.
+  // Assuming occluded nodes already have the correct color. We do not deal with them here.
+  
+  assert(color4new<=0);
+  if(color4new<0)
+    assert(allow_self_intersection);
+
+  //add swept nodes to nodes2fill (including internal ghosts)
+  std::set<Int3> nodes2fill = swept;
+  std::set<Int3> nodes2fill2;
+
+  // go over swept nodes, correct their colors
+  int i,j,k;
+  int BAD_SIGN = -999999; //used temporarily.
+  int max_it = 100;
+
+  double*** color = NULL;
+  Vec3D*** xf = NULL;
+  int total_remaining_nodes = 0;
+  for(int iter = 0; iter < max_it; iter++) {
+
+    int prev_remaining = total_remaining_nodes;
+    total_remaining_nodes = nodes2fill.size();
+    MPI_Allreduce(MPI_IN_PLACE, &total_remaining_nodes, 1, MPI_INT, MPI_SUM, comm);
+    if(total_remaining_nodes == 0 || total_remaining_nodes == prev_remaining)
+      break;  //either done with refill :) or no progress :(
+  
+    if(!color) //first iteration
+      color = Color.GetDataPointer();
+    if(!xf)
+      xf = (Vec3D***) XForward.GetDataPointer();
+
+    nodes2fill2 = nodes2fill;
+
+    for(auto it = nodes2fill.begin(); it != nodes2fill.end(); it++) {
+      i = (*it)[0];
+      j = (*it)[1];
+      k = (*it)[2]; 
+
+      if(iter==0 && !coordinates.IsHere(i,j,k,false)) { //an internal ghost. we let its owner fix it.
+        nodes2fill2.erase(nodes2fill2.find(*it)); 
+        continue;
+      }
+
+      if(iter==0 && color[k][j][i] == 0) { //occluded
+        nodes2fill2.erase(nodes2fill2.find(*it)); 
+        continue;
+      }
+
+      color[k][j][i] = BAD_SIGN;
+
+      //go over first layer neighbors, find a nonblocked reliable neighbor
+      auto valid_neighbor = [&](int ii, int jj, int kk) {
+        if(nodes2fill2.find(Int3(ii,jj,kk)) != nodes2fill2.end())
+          return false; //this neighbor needs to be taken care of too.
+        if(color[kk][jj][ii] == 0)
+          return false; //this neighbor is occluded (naturally or "forced").
+        return true;
+      };
+
+      //Left neighbor
+      if(i-1>=0 && valid_neighbor(i-1,j,k) && xf[k][j][i][0]<0) {
+        color[k][j][i] = color[k][j][i-1];
+        nodes2fill2.erase(nodes2fill2.find(*it)); //erase from nodes2fill2, NOT nodes2fill (would mess up pointer)
+        continue;
+      }
+      //Right neighbor
+      if(i+1<NX && valid_neighbor(i+1,j,k) && xf[k][j][i+1][0]<0) {
+        color[k][j][i] = color[k][j][i+1];
+        nodes2fill2.erase(nodes2fill2.find(*it));
+        continue;
+      }
+      //Bottom neighbor
+      if(j-1>=0 && valid_neighbor(i,j-1,k) && xf[k][j][i][1]<0) {
+        color[k][j][i] = color[k][j-1][i];
+        nodes2fill2.erase(nodes2fill2.find(*it));
+        continue;
+      }
+      //Top neighbor
+      if(j+1<NY && valid_neighbor(i,j+1,k) && xf[k][j+1][i][1]<0) {
+        color[k][j][i] = color[k][j+1][i];
+        nodes2fill2.erase(nodes2fill2.find(*it));
+        continue;
+      }
+      //Back neighbor
+      if(k-1>=0 && valid_neighbor(i,j,k-1) && xf[k][j][i][2]<0) {
+        color[k][j][i] = color[k-1][j][i];
+        nodes2fill2.erase(nodes2fill2.find(*it));
+        continue;
+      }
+      //Top neighbor
+      if(k+1<NZ && valid_neighbor(i,j,k+1) && xf[k+1][j][i][2]<0) {
+        color[k][j][i] = color[k+1][j][i];
+        nodes2fill2.erase(nodes2fill2.find(*it));
+        continue;
+      }
+      
+    }
+    nodes2fill = nodes2fill2;
+
+    Color.RestoreDataPointerAndInsert();
+
+    // Get new data
+    color = Color.GetDataPointer();
+
+    if(nodes2fill.size() != nodes2fill2.size()) //some node(s) got erased
+      nodes2fill = nodes2fill2;
+  }
+
+  // fill remaining nodes (new enclosure)
+  imposed_occluded.clear();
+  if(total_remaining_nodes>0) {
+    if(!allow_self_intersection) {
+      print_warning("Warning: Found %d unresolved nodes after performing %d iterations of refill. "
+                     "Setting them to be occluded.\n", total_remaining_nodes, max_it);
+      imposed_occluded = nodes2fill;
+      for(auto it = imposed_occluded.begin(); it != imposed_occluded.end(); it++) 
+        color[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
+    }
+    else {//new enclosure (even if there are separate new enclosureS, they will have the same color)
+      for(auto it = nodes2fill.begin(); it != nodes2fill.end(); it++) 
+        color[(*it)[2]][(*it)[1]][(*it)[0]] = color4new;
+      for(int cc=nRegions+1; cc<=-color4new; cc++) //activated only if nRegions<-color4new
+        ColorReachesBoundary.push_back(0);
+      nRegions = -color4new;
+    }
+  }
+
+
+  // Update "ColorReachesBoundary"
+  if(color) {
+    std::fill(ColorReachesBoundary.begin(), ColorReachesBoundary.end(), 0); //reset to 0
+    for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
+      if(it->type_projection != GhostPoint::FACE)
+        continue;
+      Int3& ijk(it->image_ijk);
+      int mycolor = color[ijk[2]][ijk[1]][ijk[0]];
+      if(mycolor<0) 
+        ColorReachesBoundary[-mycolor] = 1;
+    }
+    MPI_Allreduce(MPI_IN_PLACE, ColorReachesBoundary.data(), ColorReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
+  }
+
+
+  if(color)
+    Color.RestoreDataPointerToLocalVector();
+  if(xf)
+    XForward.RestoreDataPointerToLocalVector();
+
+
+  return total_remaining_nodes>0;
+}
 
 //-------------------------------------------------------------------------
  
+bool
+Intersector::IsColorActive(int mycolor)
+{
+
+  if(mycolor<-nRegions || mycolor>nPossiblePositiveColors)
+    return false;
+
+  double*** color  = Color.GetDataPointer();
+
+  int active = 0;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        if(color[k][j][i] == mycolor) {//this is the color for the new enclosure(s)
+          active = 1;
+          goto DONE_WITH_IT;
+        }
+      }
+
+DONE_WITH_IT:
+  MPI_Allreduce(MPI_IN_PLACE, &active, 1, MPI_INT, MPI_MAX, comm);  
+
+  Color.RestoreDataPointerToLocalVector();
+
+  return active>0;
+}
+
+//-------------------------------------------------------------------------
+
 void
 Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
 {

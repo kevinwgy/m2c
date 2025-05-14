@@ -1097,7 +1097,7 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
       if(xid>=0) //indeed, an interesector was modified
         modified[xid] = true;
 
-      //NOTE: COLOR IS NOT UPDATED!
+      //NOTE: COLOR IN Intersectors ARE NOT UPDATED!
     }
   }
 
@@ -1151,10 +1151,10 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 
     //Now, we know these two surfaces intersect.
     
-    int numNew = multiX->FindNewEnclosuresAfterSurfaceUpdate();
-    if(numNew>0) {
+    bool hasNew = multiX->FindNewEnclosuresAfterSurfaceUpdate();
+    if(hasNew) {
       if(verbose>=1)
-        print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
+        print("    o Found new enclosure(s) due to embedded surface intersections.\n");
       int xid = multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
       if(xid>=0) //indeed, an interesector was modified
         modified[xid] = true;
@@ -1162,7 +1162,6 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
       //NOTE: COLOR IS NOT UPDATED!
     }
 
-    int numNew = multiX->RefillAfterSurfaceUpdate();
   }
 
   for(int i = 0; i < (int)intersector.size(); i++) {

@@ -191,8 +191,6 @@ public:
 
   double RecomputeFullCourse(std::vector<Vec3D> &X0, int phi_layers); 
 
-  bool AllowSelfIntersection() {return allow_self_intersection;}
-
 /** Below is like the a la carte menu. Try to use the pre-defined "combos" above as much as you can. 
  *  The functions below are not all independent with each other!*/
 public:
@@ -225,7 +223,7 @@ public:
    *  the "Color" of swept nodes. It is faster, and also maintains the same "colors". Calling the original "FloodFill" function may 
    *  lead to color(tag) change for the same enclosure.
    *  Note: This function must be called AFTER calling "findSweptNodes"*/
-  void RefillAfterSurfaceUpdate();
+  bool RefillAfterSurfaceUpdate(int color4new = 0); //!< color4new applied to new enclosures
 
 
   //! Find the elements of the embedded surface that constitute the boundary of a "color". For each element in\n
@@ -249,6 +247,9 @@ public:
     if(hasOutlet_) *hasOutlet_ = hasOutlet; 
     if(nRegions_)   *nRegions_ = nRegions;
   }
+
+  //! Check if a color is actually used at any node within physical domain
+  bool IsColorActive(int mycolor);
 
 private: 
 

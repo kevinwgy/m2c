@@ -56,7 +56,7 @@ class EmbeddedBoundaryOperator {
   vector<std::tuple<UserDefinedDynamics*, void*, DestroyUDD*> > dynamics_calculator; //!< the 1st one is the calculator
 
   //! Embedded surface intersection detection & handling
-  vector<MultiSurfaceIntersector*> multi_intersector;
+  std::vector<MultiSurfaceIntersector*> multi_intersector;
 
   //! Mesh info (Not used when the class is used for special purposes, e.g., DynamicLoadCalculator)
   //! These information are generally needed when the surface needs to be "tracked" within the M2C mesh

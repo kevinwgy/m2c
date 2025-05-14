@@ -58,7 +58,7 @@ public:
 
   int FindNewEnclosures();
 
-  int FindNewEnclosuresAfterSurfaceUpdate(); //!< assuming `swept nodes' have been detected
+  bool FindNewEnclosuresAfterSurfaceUpdate(); //!< assuming `swept nodes' have been detected
 
   int UpdateIntersectors(); //!< returns the intersector id that is actually modified (-1 for N/A)
 
@@ -68,6 +68,7 @@ private:
   bool CheckSurfaceIntersectionsOneWay(bool surf1_surf2);
 
   int FindNewEnclosuresByFloodFill(); //!< use joint_intersector; returns num. of new enclosures
+  void FindNewEnclosuresByRefill(int color4new); //!< use joint_intersector (not running flood-fill)
   int DetectNewEnclosures(int nPossiblePositiveColors,
                           int nRegions1, int nRegions2, int nRegions_jnt, double*** color1, double*** color2,
                           double*** color_jnt, std::vector<int>& new_enclosure_color);
