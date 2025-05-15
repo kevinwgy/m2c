@@ -233,6 +233,9 @@ int main(int argc, char* argv[])
     embed->SetupIntersectors();
     embed->TrackSurfaces();
   }
+
+  print("I am here.\n");
+  exit_mpi();
   
   //! Initialize interpolator
   InterpolatorBase *interp = NULL;

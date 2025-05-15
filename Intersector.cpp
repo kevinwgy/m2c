@@ -1795,13 +1795,16 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 //-------------------------------------------------------------------------
 
 bool
-Intersector::Intersects(Vec3D &X0, Vec3D &X1)
+Intersector::Intersects(Vec3D &X0, Vec3D &X1, bool use_singleLayer_bb)
 {
 
-  if(!tree_n) //this subdomain is not even close to the embedded surface.
-    return false;
+  if(!use_singleLayer_bb)
+    assert(nLayer>=1); //make sure tree_n has been constructed...
 
-  assert(nLayer>=1);
+
+  auto tree = use_singleLayer_bb ? tree_1 : tree_n;
+  if(!tree) //this subdomain is not even close to the embedded surface.
+    return false;
 
   // Step 1: Find candidates using the KDTree
   Vec3D bmin(std::min(X0[0],X1[0]), std::min(X0[1],X1[1]), std::min(X0[2],X1[2]));
@@ -1811,11 +1814,11 @@ Intersector::Intersects(Vec3D &X0, Vec3D &X1)
 
   int maxCand = 1000;
   vector<MyTriangle> cands(maxCand);
-  int found = tree_n->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+  int found = tree->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
   if(found>maxCand) {
     maxCand = found;
     cands.resize(maxCand);
-    found = tree_n->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
+    found = tree->findCandidatesInBox(bmin,bmax,cands.data(),maxCand);
   }
 
   if(!found)

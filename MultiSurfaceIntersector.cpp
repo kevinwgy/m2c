@@ -60,9 +60,11 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
                   surf1, surf2);
     iod_surface_dummy.surface_thickness = std::min(iod_surface_dummy.surface_thickness,
                                                    2.0*intersector_[surf2]->GetSurfaceHalfThickness());
-    iod_surface_dummy.allow_self_intersection = EmbeddedSurfaceData::YES;
-    joint_surface.Append(surface_[surf2]);
   }
+
+  iod_surface_dummy.allow_self_intersection = EmbeddedSurfaceData::YES;
+  joint_surface.Append(surface_[surf2]);
+
   surface_id.push_back(surf2);
   surface.push_back(&surface_[surf2]);
   intersector.push_back(intersector_[surf2]);
@@ -174,9 +176,9 @@ MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
   for(int i=0; i<Niter; i++) {
     if(i<(int)surf1_scope_1.size()) { //otherwise, do nothing
       Int3 &nod(Es[surf1_scope_1[i]]);
-      if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]]) ||
-         intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]]) ||
-         intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]]) ) {
+      if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]], true) ||
+         intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]], true) ||
+         intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]], true) ) {
         found = 1;
       }
     }
@@ -190,6 +192,8 @@ MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
 
   //one last communication
   MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, comm);
+
+  print("found = %d.\n", found);
 
   return found != 0;
 }
@@ -325,11 +329,14 @@ MultiSurfaceIntersector::FindNewEnclosuresByFloodFill()
   // Step 3: Flood fill using joint_intersector
   // ------------------------------------------------------------
   joint_intersector->FloodFillColors();
+  EBDS_jnt = joint_intersector->GetPointerToResults(); //some info (e.g., nRegions) have changed
+
 
   // ------------------------------------------------------------
   // Step 4: Search for new enclosures (topological change)
   // ------------------------------------------------------------
   new_enclosure_color.clear();
+
   if(EBDS_jnt->nRegions == 0 || 
      EBDS_jnt->nRegions == EBDS1->nRegions + EBDS2->nRegions)
     return 0;
@@ -391,45 +398,99 @@ MultiSurfaceIntersector::DetectNewEnclosures(int nPossiblePositiveColors,
           me2.push_back(c); 
       }
 
-  for(auto&& cc : color1_new)
+  for(auto&& cc : color1_new) {
     CommunicationTools::AllGatherVector(comm, cc);
-  for(auto&& cc : color2_new)
+    //remove duplicates after MPI gathering
+    std::sort(cc.begin(), cc.end());
+    cc.erase(std::unique(cc.begin(), cc.end()), cc.end());
+  }
+
+  for(auto&& cc : color2_new) {
     CommunicationTools::AllGatherVector(comm, cc);
+    //remove duplicates after MPI gathering
+    std::sort(cc.begin(), cc.end());
+    cc.erase(std::unique(cc.begin(), cc.end()), cc.end());
+  }
+
 
   // ---------------------------------------------------------------------
-  // Step 2: Find new enclosures
+  // Step 2: Find new enclosures -- Possibility A
   // ---------------------------------------------------------------------
-  // Enclosure i (1, 2, ..., nRegions_jnt) obtained from the joint intersector is a new enclosure IFF
-  // there exists a map c1->(i, ...) and a map c2->(i, ...), where c1 and c2 are two colors (not necessarily
-  // enclosures) from the two intersectors respectively, and (i, ...) means c1 is mapped to "i" AND at least
-  // one other color (not necessarily enclosure) from the joint intersector.
+  // Enclosure i (1, 2, ..., nRegions_jnt) obtained from the joint intersector is a new enclosure IF
+  // there exists a map c1->(i, ...) and a map c2->(i, ...), where c1 and c2 are two enclosures
+  // from the two intersectors respectively, and (i, ...) means c1 is mapped to "i" AND at least
+  // one other color (must be enclosure) from the joint intersector.
   for(int i=1; i<=nRegions_jnt; i++) {
     //check enclosure i
-    int counter = 0;
-    for(auto&& cc : color1_new) {
+    bool found = false;
+    for(int j=1; j<=nRegions1; j++) {
+      vector<int> &cc(color1_new[j]);
       if(std::find(cc.begin(), cc.end(), -i) != cc.end()) {
-        counter++;
-        if(counter>=2)
-          break;
+        for(auto&& c : cc)
+          if(c<0 && c!=-i) {
+            found = true;
+            break;
+          }
       }
+      if(found)
+        break;
     }
-    assert(counter>0); //sanity check
-    if(counter==1) 
+    if(!found)
       continue;
 
-    counter = 0;
-    for(auto&& cc : color2_new) {
+    found = false;
+    for(int j=1; j<=nRegions2; j++) {
+      vector<int> &cc(color2_new[j]);
       if(std::find(cc.begin(), cc.end(), -i) != cc.end()) {
-        counter++;
-        if(counter>=2)
-          break;
+        for(auto&& c : cc)
+          if(c<0 && c!=-i) {
+            found = true;
+            break;
+          }
       }
+      if(found)
+        break;
     }
-    assert(counter>0); //sanity check
       
-    if(counter>=2)
+    if(found)
       new_enclosure_color.push_back(-i); 
   }
+
+  // ---------------------------------------------------------------------
+  // Step 3: Find new enclosures -- Possibility B
+  // ---------------------------------------------------------------------
+  // Enclosure i (1, 2, ..., nRegions_jnt) obtained from the joint intersector is a new enclosure IF
+  // there exists a map c1->(i, ...) and a map c2->(i, ...), where c1 and c2 are both colors connected
+  // to far-field (i.e., enclosure i belongs to far-field in both intersector 1 & 2
+  for(int i=1; i<=nRegions_jnt; i++) {
+    //check enclosure i
+    bool found = false;
+    for(int j=nRegions1+1; j<(int)color1_new.size(); j++) {
+      vector<int> &cc(color1_new[j]);
+      if(std::find(cc.begin(), cc.end(), -i) != cc.end()) {
+        found = true;
+        break;
+      }
+    }
+    if(!found)
+      continue;
+
+    found = false;
+    for(int j=nRegions2+1; j<(int)color2_new.size(); j++) {
+      vector<int> &cc(color2_new[j]);
+      if(std::find(cc.begin(), cc.end(), -i) != cc.end()) {
+        found = true;
+        break;
+      }
+    }
+     
+    if(found) {
+      if(std::find(new_enclosure_color.begin(), new_enclosure_color.end(), -i) 
+           == new_enclosure_color.end())
+        new_enclosure_color.push_back(-i); //avoid duplicates (won't happen anyway?)
+    }
+  }
+
 
   return new_enclosure_color.size();
 }

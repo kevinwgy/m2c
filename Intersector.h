@@ -180,8 +180,8 @@ public:
   //! Get scope
   void GetTrianglesInScope1(vector<int> &triangles); //!< ``triangles'' will be filled with element IDs
 
-  //! Check if a line segment intersects with any triangles inside scope
-  bool Intersects(Vec3D &X0, Vec3D &X1);
+  //! Check if a line segment intersects with any triangles inside scope (default: use tree_n)
+  bool Intersects(Vec3D &X0, Vec3D &X1, bool use_singleLayer_bb = false);
 
   //! Interface tracking functions
   void BuildKDTreeAndFindIntersections();

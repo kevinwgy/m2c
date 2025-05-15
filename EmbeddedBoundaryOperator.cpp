@@ -1076,23 +1076,31 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
   for(auto&& surf : surfaces)
     surf.CalculateNormalsAndAreas();
 
+  print("Here 0.\n");
+
   for(int i = 0; i < (int)intersector.size(); i++) {
     intersector[i]->BuildKDTreeAndFindIntersections();
     intersector[i]->FloodFillColors();
   }
 
+  print("Here 1.\n");
+
   //check & handle potential surface intersections (if specified by user)
   vector<bool> modified(intersector.size(), false);
   for(auto&& multiX : multi_intersector) {
+
+    print("here 2.\n");
     if(!multiX->CheckSurfaceIntersections())
       continue;
 
     //Now, we know these two surfaces intersect.
     
+    print("here 3.\n");
     int numNew = multiX->FindNewEnclosures();
     if(numNew>0) {
       if(verbose>=1)
         print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
+      print("here 4, numNew = %d.\n", numNew);
       int xid = multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
       if(xid>=0) //indeed, an interesector was modified
         modified[xid] = true;
@@ -1101,12 +1109,15 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
     }
   }
 
+  print("here 5.\n");
   // compute unsigned shortest distance
   for(int i = 0; i < (int)intersector.size(); i++) {
+    print("here 6.\n");
     double max_dist0 = intersector[i]->ComputeUnsignedDistance(phi_layers, modified[i] ? 1 : -1);
     if(max_dist0>max_dist)
       max_dist = max_dist0;
 
+    print("here 7.\n");
 /*
     // debug only
     unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
@@ -1119,6 +1130,7 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
 */
   }
 
+  print("here 8.\n");
   return max_dist;
 }
 
