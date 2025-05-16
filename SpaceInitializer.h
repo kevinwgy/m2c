@@ -15,6 +15,7 @@
 
 class SpaceOperator;
 class EmbeddedBoundaryDataSet;
+class MultiSurfaceIntersector;
 class LevelSetOperator;
 class GravityHandler;
 struct Vec3D;
@@ -50,7 +51,8 @@ public:
   SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, std::vector<SpaceVariable3D*> &Phi,
                       std::vector<SpaceVariable3D*> &NPhi, std::vector<SpaceVariable3D*> &KappaPhi,
                       SpaceOperator &spo, std::vector<LevelSetOperator*> &lso, GravityHandler *ghand = NULL,
-                      std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr);
+                      std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS = nullptr,
+                      std::vector<MultiSurfaceIntersector*>* multi_intersector = nullptr);
 
 private:
 
@@ -64,6 +66,7 @@ private:
                    std::vector<SpaceVariable3D*> &Phi, //!< updated ONLY in ApplyUserDefinedState
                    SpaceOperator &spo,
                    std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
+                   std::vector<MultiSurfaceIntersector*>* multi_intersector,
                    std::vector<std::pair<int,int> > &order);
 
   void ApplyUserSpecifiedInitialConditionFile(Vec3D*** coords, Vec5D*** v, double*** id);
@@ -77,6 +80,7 @@ private:
   std::pair<int, std::pair<int,int> >
   InitializeVandIDByPoint(PointData& point,
                           std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
+                          std::vector<MultiSurfaceIntersector*>* multi_intersector,
                           std::vector<double***> &color, Vec5D*** v, double*** id);
 
   void ApplyUserDefinedState(Vec3D*** coords, Vec5D*** v, double*** id, std::vector<double***> phi);
@@ -85,6 +89,7 @@ private:
                      std::vector<SpaceVariable3D*> &Phi, std::vector<SpaceVariable3D*> &NPhi,
                      std::vector<SpaceVariable3D*> &KappaPhi, std::vector<LevelSetOperator*> &lso,
                      std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
+                     std::vector<MultiSurfaceIntersector*>* multi_intersector,
                      std::vector<std::pair<int,int> > &order,
                      std::multimap<int, std::pair<int,int> > &id2closure);
 

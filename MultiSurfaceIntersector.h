@@ -29,6 +29,7 @@ class MultiSurfaceIntersector {
   std::vector<int> surface_id; //!< surface ID; size = numSurfaces
   std::vector<TriangulatedSurface*> surface; //!< size = numSurfaces;
   std::vector<Intersector*> intersector; //!< size = numSurfaces
+  std::vector<std::vector<int> > intersecting_elems; //!< stores the ID of elems in each surf (entire surf) that intersect others
 
   Intersector* joint_intersector; 
   TriangulatedSurface joint_surface; //!< surface provided to joint_intersector. 
@@ -51,6 +52,12 @@ public:
   void Destroy();
 
   int GetSurfaceID(int i) {assert(i>=0 && i<(int)surface_id.size()); return surface_id[i];}
+
+  int GetRulingSurfaceRealID() {return ruling_surface_id<0 ? ruling_surface_id //-1-->inactive
+                                                           : GetSurfaceID(ruling_surface_id);}
+
+  //! Get pointer to joint_intersector
+  Intersector* GetPointerToJointIntersector() {return joint_intersector;}
 
   void UpdateJointSurface();
 

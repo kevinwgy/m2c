@@ -96,6 +96,7 @@ public:
   std::unique_ptr<std::vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > GetPointerToEmbeddedBoundaryData();
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToEmbeddedBoundaryData(int i); 
 
+  std::vector<MultiSurfaceIntersector*>*  GetPointerToMultiSurfaceIntersectors() {return &multi_intersector;}
 
   void SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable3D &coordinates_, 
                           std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_,

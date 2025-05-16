@@ -8,6 +8,7 @@
 #include <LevelSetOperator.h>
 #include <EmbeddedBoundaryDataSet.h>
 #include <EmbeddedBoundaryOperator.h>
+#include <MultiSurfaceIntersector.h>
 #include <GravityHandler.h>
 #include <DistancePointToParallelepiped.h>
 #include <DistancePointToSpheroid.h>
@@ -98,7 +99,8 @@ SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, v
                                       vector<SpaceVariable3D*> &NPhi, vector<SpaceVariable3D*> &KappaPhi,
                                       SpaceOperator &spo, vector<LevelSetOperator*> &lso,
                                       GravityHandler* ghand,
-                                      unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS)
+                                      unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
+                                      vector<MultiSurfaceIntersector*>* multi_intersector)
 {
 
   // Step 1: Setup the operation order for user-specified geometries.
@@ -123,14 +125,19 @@ SpaceInitializer::SetInitialCondition(SpaceVariable3D &V, SpaceVariable3D &ID, v
 
   // Step 3: Apply initial conditions to V, ID (B.C. applied to V, but not ID!)
   // NOTE: "Phi" is updated ONLY in ApplyUserDefinedState. Otherwise, it is untouched in this step
-  multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, Phi, spo, EBDS.get(), order);
+  multimap<int, pair<int,int> > id2closure = InitializeVandID(V, ID, Phi, spo, EBDS.get(),
+                                                              multi_intersector, order);
 
   // Step 4:: Apply initial conditions to Phi
-  InitializePhi(ID, spo, Phi, NPhi, KappaPhi, lso, EBDS.get(), order, id2closure);
+  InitializePhi(ID, spo, Phi, NPhi, KappaPhi, lso, EBDS.get(), multi_intersector, order, id2closure);
 
   // Step 5:: Apply flooding if specified by user
-  if(ghand)
+  if(ghand) {
+    if(multi_intersector)
+      print_warning("Warning: Multi-Surface Intersections are currently IGNORED"
+                    " while initializing states by flooding.\n"); 
     ghand->UpdateInitialConditionByFlooding(V, ID, lso, Phi, EBDS.get());
+  }
 
   return id2closure;
 }
@@ -230,6 +237,7 @@ multimap<int, pair<int,int> >
 SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
                                    vector<SpaceVariable3D*> &Phi, //!< updated ONLY in ApplyUserDefinedState
                                    SpaceOperator &spo, vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
+                                   std::vector<MultiSurfaceIntersector*>* multi_intersector,
                                    vector<pair<int,int> > &order)
 {
 
@@ -276,12 +284,18 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
   //----------------------------------------------------------------
   // Step 3: Apply dummy i.c. within embedded closed surfaces
   //----------------------------------------------------------------
-  vector<double***> color;
+  vector<double***> color; //also includes multi-intersector results (if provided)
   if(EBDS != nullptr) {
     color.assign(EBDS->size(), NULL);
     for(int i=0; i<(int)EBDS->size(); i++) {
       assert((*EBDS)[i]->Color_ptr);
       color[i] = (*EBDS)[i]->Color_ptr->GetDataPointer();
+    }
+    if(multi_intersector) {
+      for(auto&& multiX : *multi_intersector) {
+        auto ebds_jnt = multiX->GetPointerToJointIntersector()->GetPointerToResults(); 
+        color.push_back(ebds_jnt->Color_ptr->GetDataPointer());
+      }
     }
 
     for(int k=k0; k<kmax; k++)
@@ -563,7 +577,7 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
         exit_mpi();
       }
 
-      id2closure.insert(InitializeVandIDByPoint(*it->second, *EBDS, color, v, id));
+      id2closure.insert(InitializeVandIDByPoint(*it->second, *EBDS, multi_intersector, color, v, id));
     }
     else {
       print_error("*** Error: Found unrecognized object id (%d).\n", obj.first);
@@ -573,7 +587,7 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 
   // Verification (can be deleted): occluded nodes should have inactive_material_id
-  if(EBDS != nullptr) {
+  if(EBDS != nullptr && !multi_intersector) { //!< if multi-surface intersections occur, it is different
     int i,j,k;
     for(int surf=0; surf<(int)EBDS->size(); surf++) {
       set<Int3> *occluded = (*EBDS)[surf]->occluded_ptr;
@@ -627,6 +641,10 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
     for(int i=0; i<(int)EBDS->size(); i++)
       (*EBDS)[i]->Color_ptr->RestoreDataPointerToLocalVector();
   }
+  if(multi_intersector) {
+    for(auto&& multiX : *multi_intersector)
+      multiX->GetPointerToJointIntersector()->GetPointerToResults()->Color_ptr->RestoreDataPointerToLocalVector();
+  }
   V.RestoreDataPointerAndInsert();
   ID.RestoreDataPointerAndInsert();
   coordinates.RestoreDataPointerToLocalVector(); //!< data was not changed.
@@ -636,6 +654,8 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
   //----------------------------------------------------------------
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
+
+  ID.StoreMeshCoordinates(coordinates);
 
   return id2closure;
 
@@ -1064,10 +1084,32 @@ SpaceInitializer::InitializeVandIDWithinEnclosure(UserSpecifiedEnclosureData &en
 pair<int, pair<int,int> > 
 SpaceInitializer::InitializeVandIDByPoint(PointData& point,
                                           vector<unique_ptr<EmbeddedBoundaryDataSet> > &EBDS,
+                                          vector<MultiSurfaceIntersector*>* multi_intersector,
                                           vector<double***> &color,
                                           Vec5D*** v, double*** id)
 {
   assert(EBDS.size()>0);
+
+  //Step 0. If multi_intersector is provided, a priority sequence needs to be set to resolve overlapping/conflicts
+  vector<Int3> surf_priority;
+  if(multi_intersector) {
+    assert(color.size() == EBDS.size() + multi_intersector->size());
+    int counter = 0;
+    for(auto&& multiX : *multi_intersector) {
+      int ruling = multiX->GetRulingSurfaceRealID();
+      int s1     = multiX->GetSurfaceID(0);
+      int s2     = multiX->GetSurfaceID(1);
+      if(ruling<0) //overlapped region is inactive
+        surf_priority.push_back(Int3(counter+EBDS.size(), s1, s2)); //order of s1 and s2 does not matter (I think)
+      else {
+        if(ruling == s1)
+          surf_priority.push_back(Int3(s1, counter+EBDS.size(), s2));
+        else
+          surf_priority.push_back(Int3(s2, counter+EBDS.size(), s1));
+      }
+      counter++;
+    }
+  }
 
   //Step 1. Locate the point within the mesh
   Vec3D this_point(point.x, point.y, point.z);
@@ -1096,8 +1138,8 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
 
 
   //Step 2. Loop through embedded boundaries and determine the color at user-specified point from each boundary
-  vector<int> mycolor(EBDS.size(), INT_MIN);
-  for(int surf = 0; surf < (int)EBDS.size(); surf++) {
+  vector<int> mycolor(color.size(), INT_MIN);
+  for(int surf = 0; surf < (int)color.size(); surf++) {
 
     vector<int> max_color(vertices.size(), INT_MIN);
     vector<int> min_color(vertices.size(), INT_MAX);
@@ -1173,21 +1215,49 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
         mycolor_final = mycolor[i];
       }
       else { //need to resolve a "conflict"
-        if((*EBDS[i]->ColorReachesBoundary_ptr)[-mycolor[i]] == 0) {
-          if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 0)
-            print_warning("Warning: User-specified point (%e %e %e) is inside isolated regions in "
-                          "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
-                          ruling_surface, i);
-          ruling_surface = i;
-          mycolor_final = mycolor[i];
-        }
-        else {
-          if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 1) {
-            print_warning("Warning: User-specified point (%e %e %e) is inside isolated(*) regions in "
-                          "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
-                          ruling_surface, i);
+        bool resolved_by_priority = false;
+        for(auto&& triple : surf_priority) { //first, use surf_priority if available
+          int p = 0;
+          for(p=0; p<3; p++)
+            if(triple[p] == ruling_surface)
+              break;
+          if(p==0) {
+            resolved_by_priority = true;
+            break;
+          } else if(p>=3) //not found
+            break;
+          // p = 1 or 2
+          int q = 0;
+          for(q=0; q<3; q++)
+            if(triple[q] == i)
+              break;
+          if(q>=3) //not found
+            break;
+          // q = 0, 1, or 2
+          resolved_by_priority = true;
+          assert(q!=p);
+          if(q<p) {
             ruling_surface = i;
             mycolor_final = mycolor[i];
+          }
+        }
+        if(!resolved_by_priority) { 
+          if((*EBDS[i]->ColorReachesBoundary_ptr)[-mycolor[i]] == 0) {
+            if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 0)
+              print_warning("Warning: User-specified point (%e %e %e) is inside isolated regions in "
+                            "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
+                            ruling_surface, i);
+            ruling_surface = i;
+            mycolor_final = mycolor[i];
+          }
+          else {
+            if((*EBDS[ruling_surface]->ColorReachesBoundary_ptr)[-mycolor_final] == 1) {
+              print_warning("Warning: User-specified point (%e %e %e) is inside isolated(*) regions in "
+                            "two surfaces: %d and %d. Enforcing the latter.\n", point.x, point.y, point.z,
+                            ruling_surface, i);
+              ruling_surface = i;
+              mycolor_final = mycolor[i];
+            }
           }
         }
       }
@@ -1215,6 +1285,7 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
           }
         }
 
+
   return make_pair(point.initialConditions.materialid, make_pair(ruling_surface, mycolor_final));
 }
 
@@ -1239,9 +1310,15 @@ SpaceInitializer::InitializePhi(SpaceVariable3D &ID, SpaceOperator &spo,
                                 vector<SpaceVariable3D*> &Phi, vector<SpaceVariable3D*> &NPhi,
                                 vector<SpaceVariable3D*> &KappaPhi, vector<LevelSetOperator*> &lso,
                                 vector<unique_ptr<EmbeddedBoundaryDataSet> >* EBDS,
+                                vector<MultiSurfaceIntersector*>* multi_intersector,
                                 vector<pair<int,int> > &order,
                                 multimap<int, pair<int,int> > &id2closure)
 {
+  if(multi_intersector && !iod.schemes.ls.dataMap.empty()) {
+    print_error("*** Error: Currently, cannot handle level-sets together with multi-surface intersections.\n");
+    exit_mpi();
+  }
+
   for(auto it = iod.schemes.ls.dataMap.begin(); it != iod.schemes.ls.dataMap.end(); it++) {
     int matid = it->second->materialid;
 

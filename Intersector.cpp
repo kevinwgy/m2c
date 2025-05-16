@@ -310,6 +310,7 @@ Intersector::BuildSubdomainScopeAndKDTree(const Vec3D &subD_bbmin, const Vec3D &
 
   vector<Vec3D>& Xs(surface.X);
   vector<Int3>&  Es(surface.elems);
+  
   for(auto it = Es.begin(); it != Es.end(); it++) {
 
     if(elem_drop_tag>=0 && surface.elemtag[it - Es.begin()]==elem_drop_tag)
@@ -1524,6 +1525,9 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
       j = (*it)[1];
       k = (*it)[2];
 
+      if(candid[k][j][i]<0)
+        fprintf(stdout,"candid[%d][%d][%d] = %d (coords:[%e,%e,%e]).\n", k, j, i, (int)candid[k][j][i],
+                x_glob[i], y_glob[j], z_glob[k]);
       assert(candid[k][j][i]>=0);
       vector<MyTriangle> &cands(candidates_n[candid[k][j][i]].second);
       assert(cands.size()>0);
@@ -1795,12 +1799,14 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 //-------------------------------------------------------------------------
 
 bool
-Intersector::Intersects(Vec3D &X0, Vec3D &X1, bool use_singleLayer_bb)
+Intersector::Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr, bool use_singleLayer_bb)
 {
 
   if(!use_singleLayer_bb)
     assert(nLayer>=1); //make sure tree_n has been constructed...
 
+  if(tid_ptr)
+    *tid_ptr = -1; //default: no intersection
 
   auto tree = use_singleLayer_bb ? tree_1 : tree_n;
   if(!tree) //this subdomain is not even close to the embedded surface.
@@ -1824,20 +1830,30 @@ Intersector::Intersects(Vec3D &X0, Vec3D &X1, bool use_singleLayer_bb)
   if(!found)
     return false;
 
+
   // Step 2: Check if X0 or X1 is occluded (-->intersection)
-  int tid; //not used
-  if(IsPointOccludedByTriangles(X0, cands.data(), found, half_thickness, tid))
+  int tid;
+  if(IsPointOccludedByTriangles(X0, cands.data(), found, half_thickness, tid)) {
+    if(tid_ptr)
+      *tid_ptr = tid;
     return true;
-  if(IsPointOccludedByTriangles(X1, cands.data(), found, half_thickness, tid))
+  }
+  if(IsPointOccludedByTriangles(X1, cands.data(), found, half_thickness, tid)) {
+    if(tid_ptr)
+      *tid_ptr = tid;
     return true;
+  }
 
   // Step 3: Check for intersection
   vector<Vec3D>& Xs(surface.X);
   vector<Int3>&  Es(surface.elems);
   for(int i=0; i<found; i++) {
     Int3 &nodes(Es[cands[i].trId()]);
-    if(GeoTools::LineSegmentIntersectsTriangle(X0, X1, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]]))
+    if(GeoTools::LineSegmentIntersectsTriangle(X0, X1, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]])) {
+      if(tid_ptr)
+        *tid_ptr = cands[i].trId();
       return true;
+    }
   }
 
   return false;

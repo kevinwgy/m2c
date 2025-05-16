@@ -72,6 +72,8 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
   numSurfaces = surface.size();
   assert(numSurfaces==2);
 
+  intersecting_elems.assign(2, vector<int>());
+
   ruling_surface_id = -1; //default: inactive within overlapped region
   if(iod_surfX_.enclosure_treatment == SurfaceIntersectionData::IGNORE_SURFACE1)
     ruling_surface_id = 1;
@@ -140,8 +142,15 @@ MultiSurfaceIntersector::UpdateJointSurface()
 bool
 MultiSurfaceIntersector::CheckSurfaceIntersections()
 {
-  if(CheckSurfaceIntersectionsOneWay(true) || CheckSurfaceIntersectionsOneWay(false))
+  for(auto&& x : intersecting_elems)
+    x.clear();
+
+  bool found1 = CheckSurfaceIntersectionsOneWay(true);
+  bool found2 = CheckSurfaceIntersectionsOneWay(false);
+
+  if(found1 || found2)
     return true;
+
   return false;
 }
 
@@ -150,6 +159,9 @@ MultiSurfaceIntersector::CheckSurfaceIntersections()
 bool
 MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
 {
+  //NOTE: This function can be much faster if we just want to know YES or NO intersection
+  //      However, we also want to find all the intersecting elements for later use
+
   //Assuming just two surfaces
   int surf1, surf2;
   if(surf1_surf2) {
@@ -166,36 +178,48 @@ MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
   vector<int> surf1_scope_1;
   intersector[surf1]->GetTrianglesInScope1(surf1_scope_1);
 
-  // make sure each processor runs the same number of iterations (for MPI exchange).
-  // Note: it may be more efficient to use one-sided comm (RMA), especially MPI_Win_lock/unlock.
-  //       But I couldn't make it work as expected.
-  int Niter = surf1_scope_1.size();
-  MPI_Allreduce(MPI_IN_PLACE, &Niter, 1, MPI_INT, MPI_MAX, comm);
-  int commFreq = std::max(10, Niter/10);
-  int found = 0;
-  for(int i=0; i<Niter; i++) {
-    if(i<(int)surf1_scope_1.size()) { //otherwise, do nothing
-      Int3 &nod(Es[surf1_scope_1[i]]);
-      if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]], true) ||
-         intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]], true) ||
-         intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]], true) ) {
-        found = 1;
-      }
+  int tid;
+  for(auto&& eid : surf1_scope_1) {
+    Int3 &nod(Es[eid]);
+    if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]], &tid, true)) {
+      intersecting_elems[surf2].push_back(tid);
+      intersecting_elems[surf1].push_back(eid);
     }
-
-    if(i%commFreq == commFreq-1) {//collect `found'
-      MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, comm);
-      if(found>0) //someone found an intersection
-        return true;
+    if(intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]], &tid, true)) {
+      intersecting_elems[surf2].push_back(tid);
+      intersecting_elems[surf1].push_back(eid);
+    }
+    if(intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]], &tid, true)) {
+      intersecting_elems[surf2].push_back(tid);
+      intersecting_elems[surf1].push_back(eid);
     }
   }
 
-  //one last communication
-  MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, comm);
+  // Get rid of duplicates and all-gather through MPI
+  std::sort(intersecting_elems[surf1].begin(), intersecting_elems[surf1].end());
+  intersecting_elems[surf1].erase(std::unique(intersecting_elems[surf1].begin(), intersecting_elems[surf1].end()),
+                                  intersecting_elems[surf1].end());
+  std::sort(intersecting_elems[surf2].begin(), intersecting_elems[surf2].end());
+  intersecting_elems[surf2].erase(std::unique(intersecting_elems[surf2].begin(), intersecting_elems[surf2].end()),
+                                  intersecting_elems[surf2].end());
 
-  print("found = %d.\n", found);
+  CommunicationTools::AllGatherVector(comm, intersecting_elems[surf1]);
+  CommunicationTools::AllGatherVector(comm, intersecting_elems[surf2]);
 
-  return found != 0;
+  // Remove duplicates again
+  std::sort(intersecting_elems[surf1].begin(), intersecting_elems[surf1].end());
+  intersecting_elems[surf1].erase(std::unique(intersecting_elems[surf1].begin(), intersecting_elems[surf1].end()),
+                                  intersecting_elems[surf1].end());
+  std::sort(intersecting_elems[surf2].begin(), intersecting_elems[surf2].end());
+  intersecting_elems[surf2].erase(std::unique(intersecting_elems[surf2].begin(), intersecting_elems[surf2].end()),
+                                  intersecting_elems[surf2].end());
+  
+  //intersecting_elems[surf1] and ...[surf2] must be both empty or both non-empty
+
+  if(intersecting_elems[surf1].empty())
+    return false;
+
+  return true;
 }
 
 //-------------------------------------------------------------------------
@@ -240,7 +264,10 @@ MultiSurfaceIntersector::UpdateIntersectors()
     for(auto&& status : elem_new_status) {
       assert((int)status.size()-N1 == N2);
       for(int i=N1; i<(int)status.size(); i++) {
-        if(status[i]>0) {//add it to drop-it list
+        if(status[i]>0 &&
+           std::find(intersecting_elems[1].begin(),intersecting_elems[1].end(),i-N1)==intersecting_elems[1].end()) {
+          // belong to the new enclosure boundary, and not an intersecting elem
+          // (Note: we keep intersecting elems to avoid gaps or 'leaking')
           elem_drop_status[i-N1] = true;
           elem_to_drop.insert(i-N1); 
         }
@@ -251,6 +278,7 @@ MultiSurfaceIntersector::UpdateIntersectors()
       ModifyIntersectionsAndOccludedNodes(1, elem_drop_status, elem_to_drop);
       //tag dropped elements
       std::vector<int>& eTag(surface[1]->elemtag);
+      eTag.assign(N2, 0); //default tag = 0
       for(int i=0; i<(int)eTag.size(); i++) {
         if(elem_drop_status[i])
           eTag[i] = 1; //!< means dropped
@@ -264,7 +292,8 @@ MultiSurfaceIntersector::UpdateIntersectors()
     std::set<int> elem_to_drop;
     for(auto&& status : elem_new_status) {
       for(int i=0; i<N1; i++) {
-        if(status[i]>0) {//add it to drop-it list
+        if(status[i]>0 &&
+           std::find(intersecting_elems[0].begin(),intersecting_elems[0].end(),i)==intersecting_elems[0].end()) {
           elem_drop_status[i] = true;
           elem_to_drop.insert(i); 
         }
@@ -275,6 +304,7 @@ MultiSurfaceIntersector::UpdateIntersectors()
       ModifyIntersectionsAndOccludedNodes(0, elem_drop_status, elem_to_drop);
       //tag dropped elements
       std::vector<int>& eTag(surface[0]->elemtag);
+      eTag.assign(N1, 0); //default tag = 0
       for(int i=0; i<(int)eTag.size(); i++) {
         if(elem_drop_status[i])
           eTag[i] = 1; //!< means dropped
@@ -516,7 +546,12 @@ void
 MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool> elem_drop_status,
                                                              [[maybe_unused]] std::set<int> elem_to_drop)
 {
-  //NOTE: Currently, this function does not deal with `imposed_occluded'.
+/*
+  print("elem_to_drop: ");
+  for(auto&& e :elem_to_drop)
+    print("%d ", e);
+  print("\n");
+*/  
 
   assert(id==0 || id==1); //currently assuming at most two surfaces involved
 
@@ -580,12 +615,15 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
   assert(skipped == (int)dropped_intersections.size());
               
   for(int i=0; i<(int)new2old.size(); i++) {
-    assert(new2old[i]>=0);
+    assert(new2old[i]>=i);
     intersections[i] = intersections[new2old[i]];
   }
   intersections.resize(new2old.size());
 
   double*** layer = EBDS->LayerTag_ptr->GetDataPointer(); 
+  std::set<Int3> &firstLayer(*EBDS->firstLayer_ptr);
+
+  firstLayer.clear(); //reset
 
   for(int k=kk0_in; k<kkmax_in; k++)
     for(int j=jj0_in; j<jjmax_in; j++)
@@ -597,16 +635,25 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
           xf[k][j][i][0] = old2new[xf[k][j][i][0]];
           xb[k][j][i][0] = old2new[xb[k][j][i][0]];
           layer[k][j][i-1] = layer[k][j][i] = 1;
+          if(i-1>=0)
+            firstLayer.insert(Int3(i-1,j,k));
+          firstLayer.insert(Int3(i,j,k));
         }
         if(xf[k][j][i][1]>=0) {
           xf[k][j][i][1] = old2new[xf[k][j][i][1]];
           xb[k][j][i][1] = old2new[xb[k][j][i][1]];
           layer[k][j-1][i] = layer[k][j][i] = 1;
+          if(j-1>=0)
+            firstLayer.insert(Int3(i,j-1,k));
+          firstLayer.insert(Int3(i,j,k));
         }
         if(xf[k][j][i][2]>=0) {
           xf[k][j][i][2] = old2new[xf[k][j][i][2]];
           xb[k][j][i][2] = old2new[xb[k][j][i][2]];
           layer[k-1][j][i] = layer[k][j][i] = 1;
+          if(k-1>=0)
+            firstLayer.insert(Int3(i,j,k-1));
+          firstLayer.insert(Int3(i,j,k));
         }
       }
 
@@ -615,7 +662,7 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
 
 
   // -------------------------------
-  // Step 2: Update occluded (and LayerTag)
+  // Step 2: Update occluded, firstLayer (and LayerTag)
   // -------------------------------
   double*** occid  = EBDS->OccTriangle_ptr->GetDataPointer(); 
   std::set<Int3>& occluded(*EBDS->occluded_ptr);
@@ -627,6 +674,7 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
       it = occluded.erase(it); //it points to the next element
     } else {
       layer[(*it)[2]][(*it)[1]][(*it)[0]] = 0;
+      firstLayer.insert(*it);
       it++;
     }
   }
