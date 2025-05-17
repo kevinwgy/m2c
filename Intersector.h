@@ -182,7 +182,8 @@ public:
 
   //! Check if a line segment intersects with any triangles inside scope (default: use tree_n)
   //! If tid_ptr is passed in, it will carry the intersecting element ID (-1 if not intersecting)
-  bool Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr = NULL, bool use_singleLayer_bb = false);
+  bool Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr = NULL, bool use_singleLayer_bb = false,
+                  int ignore_elem_tag = -1); //!< if tag>=0, check surface elemtag and ignore...
 
   //! Interface tracking functions
   void BuildKDTreeAndFindIntersections();

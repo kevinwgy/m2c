@@ -1149,12 +1149,15 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
   vector<bool> modified(intersector.size(), false);
   for(auto&& multiX : multi_intersector) {
 
+    print("ok.\n");
     if(!multiX->CheckSurfaceIntersections())
       continue;
 
+    print("ok 2.\n");
     //Now, we know these two surfaces intersect.
     
     bool hasNew = multiX->FindNewEnclosuresAfterSurfaceUpdate();
+    print("ok 3.\n");
     if(hasNew) {
       if(verbose>=1)
         print("    o Found new enclosure(s) due to embedded surface intersections.\n");
@@ -1331,6 +1334,11 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
   for(auto it = scope.begin(); it != scope.end(); it++) {
 
     int tid = *it; //triangle id
+
+    if(!multi_intersector.empty() && //there can be dropped elements...
+       (int)surfaces[surf].elemtag.size()>tid && surfaces[surf].elemtag[tid] == 1) //"1" means dropped
+      continue;
+
     Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
 
     // Get Gauss points (before lofting)
@@ -1841,7 +1849,7 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, Vec3D &normal, Vec5
           Vec3D x(global_mesh_ptr->GetX(i), global_mesh_ptr->GetY(j), global_mesh_ptr->GetZ(k));
           sameside[dk][dj][di] = true; //start w/ true
           for(auto&& xter : intersector) {
-            if(xter->Intersects(x, ref_point)) {
+            if(xter->Intersects(x, ref_point, NULL, false, 1)) { //ignore dropped elems due to multi_intersector
               sameside[dk][dj][di] = false;
               break;
             }

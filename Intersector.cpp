@@ -1253,6 +1253,8 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
     int prev_remaining = total_remaining_nodes;
     total_remaining_nodes = nodes2fill.size();
     MPI_Allreduce(MPI_IN_PLACE, &total_remaining_nodes, 1, MPI_INT, MPI_SUM, comm);
+
+    print("  - iter %d: total_remaining_nodes = %d.\n", iter, total_remaining_nodes);
     if(total_remaining_nodes == 0 || total_remaining_nodes == prev_remaining)
       break;  //either done with refill :) or no progress :(
   
@@ -1799,7 +1801,8 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
 //-------------------------------------------------------------------------
 
 bool
-Intersector::Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr, bool use_singleLayer_bb)
+Intersector::Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr, bool use_singleLayer_bb,
+                        int ignore_elem_tag)
 {
 
   if(!use_singleLayer_bb)
@@ -1834,20 +1837,36 @@ Intersector::Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr, bool use_singleLayer
   // Step 2: Check if X0 or X1 is occluded (-->intersection)
   int tid;
   if(IsPointOccludedByTriangles(X0, cands.data(), found, half_thickness, tid)) {
-    if(tid_ptr)
-      *tid_ptr = tid;
-    return true;
-  }
-  if(IsPointOccludedByTriangles(X1, cands.data(), found, half_thickness, tid)) {
+    if(ignore_elem_tag>=0 && 
+       (int)surface.elemtag.size()>tid && surface.elemtag[tid] == ignore_elem_tag)
+      goto SKIP_1;
     if(tid_ptr)
       *tid_ptr = tid;
     return true;
   }
 
+SKIP_1:
+
+  if(IsPointOccludedByTriangles(X1, cands.data(), found, half_thickness, tid)) {
+    if(ignore_elem_tag>=0 && 
+       (int)surface.elemtag.size()>tid && surface.elemtag[tid] == ignore_elem_tag)
+      goto SKIP_2;
+    if(tid_ptr)
+      *tid_ptr = tid;
+    return true;
+  }
+
+SKIP_2:
+
   // Step 3: Check for intersection
   vector<Vec3D>& Xs(surface.X);
   vector<Int3>&  Es(surface.elems);
   for(int i=0; i<found; i++) {
+    if(ignore_elem_tag>=0 &&
+       (int)surface.elemtag.size()>cands[i].trId() &&
+       surface.elemtag[cands[i].trId()] == ignore_elem_tag)
+      continue;
+       
     Int3 &nodes(Es[cands[i].trId()]);
     if(GeoTools::LineSegmentIntersectsTriangle(X0, X1, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]])) {
       if(tid_ptr)

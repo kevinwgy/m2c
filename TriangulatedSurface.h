@@ -30,7 +30,7 @@ struct TriangulatedSurface {
 
   //!< integer tags, can be used for various purposes
   std::vector<int> nodetag;
-  std::vector<int> elemtag;
+  std::vector<int> elemtag; //!<-1: unused; 0: default, 1: dropped, ... (may be undefined)
 
   std::vector<Vec3D> elemNorm;
   std::vector<double> elemArea;

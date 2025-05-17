@@ -268,7 +268,7 @@ MultiPhaseOperator::UpdateMaterialIDByLevelSet(vector<SpaceVariable3D*> &Phi0, v
               Vec3D x1(global_mesh.GetX(neighi), global_mesh.GetY(neighj), global_mesh.GetZ(neighk));
               bool connected = true;
               for(auto&& xter : *intersector) {
-                if(xter->Intersects(x0,x1)) {
+                if(xter->Intersects(x0,x1,NULL,false,1)) {
                   connected = false;
                   break; //this neighbor is blocked to current node by an embedded surface
                 }
@@ -1166,7 +1166,7 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
               if(intersector) {
                 bool connected = true;
                 for(auto&& xter : *intersector) {
-                  if(xter->Intersects(x0,x1)) {
+                  if(xter->Intersects(x0,x1,NULL,false,1)) {
                     connected = false;
                     break; //this neighbor is blocked to current node by an embedded surface
                   }
@@ -1308,7 +1308,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
           if(intersector) {
             bool connected = true; 
             for(auto&& xter : *intersector) {
-              if(xter->Intersects(x0,x1)) {
+              if(xter->Intersects(x0,x1,NULL,false,1)) {
                 connected = false;
                 break; //this neighbor is blocked to current node by an embedded surface
               }
@@ -1410,7 +1410,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
             if(intersector) {
               bool connected = true;
               for(auto&& xter : *intersector) {
-                if(xter->Intersects(x0,x1)) {
+                if(xter->Intersects(x0,x1,NULL,false,1)) {
                   connected = false;
                   break; //this neighbor is blocked to current node by an embedded surface
                 }
@@ -2268,7 +2268,7 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
         bool connected = true;
         X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
         for(auto&& xter : *intersector) {
-          if(xter->Intersects(X0, X1)) {
+          if(xter->Intersects(X0,X1,NULL,false,1)) {
             connected = false;
             break;
           }
@@ -2309,7 +2309,7 @@ MultiPhaseOperator::IsOrphanAcrossEmbeddedSurfaces(int i, int j, int k, double**
         bool connected = true;
         X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
         for(auto&& xter : *intersector) {
-          if(xter->Intersects(X0, X1)) {
+          if(xter->Intersects(X0,X1,NULL,false,1)) {
             connected = false;
             break;
           }

@@ -181,15 +181,15 @@ MultiSurfaceIntersector::CheckSurfaceIntersectionsOneWay(bool surf1_surf2)
   int tid;
   for(auto&& eid : surf1_scope_1) {
     Int3 &nod(Es[eid]);
-    if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]], &tid, true)) {
+    if(intersector[surf2]->Intersects(Xs[nod[0]], Xs[nod[1]], &tid, true, -1)) {
       intersecting_elems[surf2].push_back(tid);
       intersecting_elems[surf1].push_back(eid);
     }
-    if(intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]], &tid, true)) {
+    if(intersector[surf2]->Intersects(Xs[nod[1]], Xs[nod[2]], &tid, true, -1)) {
       intersecting_elems[surf2].push_back(tid);
       intersecting_elems[surf1].push_back(eid);
     }
-    if(intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]], &tid, true)) {
+    if(intersector[surf2]->Intersects(Xs[nod[2]], Xs[nod[0]], &tid, true, -1)) {
       intersecting_elems[surf2].push_back(tid);
       intersecting_elems[surf1].push_back(eid);
     }
@@ -697,6 +697,8 @@ MultiSurfaceIntersector::FindNewEnclosuresAfterSurfaceUpdate()
   } else
     newColor = new_enclosure_color[0]; //use an existing color
 
+  print("newColor = %d. new_enclosure_color.size = %d.\n", newColor, (int)new_enclosure_color.size());
+
   FindNewEnclosuresByRefill(newColor); // fills new_enclosure_color
   if(!new_enclosure_color.empty()) {
     UpdateJointSurface();
@@ -757,7 +759,7 @@ MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
   // Step 4: Refill using joint_intersector
   // ------------------------------------------------------------
   bool new_enclosure = joint_intersector->RefillAfterSurfaceUpdate(color4new);
-  
+
   // ------------------------------------------------------------
   // Step 5: Update new_enclosure_color
   // ------------------------------------------------------------
