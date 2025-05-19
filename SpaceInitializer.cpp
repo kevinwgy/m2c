@@ -293,8 +293,10 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
     }
     if(multi_intersector) {
       for(auto&& multiX : *multi_intersector) {
-        auto ebds_jnt = multiX->GetPointerToJointIntersector()->GetPointerToResults(); 
-        color.push_back(ebds_jnt->Color_ptr->GetDataPointer());
+        if(multiX->FoundMultiSurfIntersection()) { //!< BE CAREFUL with restore (below)!
+          auto ebds_jnt = multiX->GetPointerToJointIntersector()->GetPointerToResults(); 
+          color.push_back(ebds_jnt->Color_ptr->GetDataPointer());
+        }
       }
     }
 
@@ -643,7 +645,8 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
   if(multi_intersector) {
     for(auto&& multiX : *multi_intersector)
-      multiX->GetPointerToJointIntersector()->GetPointerToResults()->Color_ptr->RestoreDataPointerToLocalVector();
+      if(multiX->FoundMultiSurfIntersection()) //!< Must be the same as the condition for getting pointer (above)
+        multiX->GetPointerToJointIntersector()->GetPointerToResults()->Color_ptr->RestoreDataPointerToLocalVector();
   }
   V.RestoreDataPointerAndInsert();
   ID.RestoreDataPointerAndInsert();
@@ -1093,9 +1096,10 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
   //Step 0. If multi_intersector is provided, a priority sequence needs to be set to resolve overlapping/conflicts
   vector<Int3> surf_priority;
   if(multi_intersector) {
-    assert(color.size() == EBDS.size() + multi_intersector->size());
     int counter = 0;
     for(auto&& multiX : *multi_intersector) {
+      if(!multiX->FoundMultiSurfIntersection())
+        continue;
       int ruling = multiX->GetRulingSurfaceRealID();
       int s1     = multiX->GetSurfaceID(0);
       int s2     = multiX->GetSurfaceID(1);
@@ -1109,6 +1113,7 @@ SpaceInitializer::InitializeVandIDByPoint(PointData& point,
       }
       counter++;
     }
+    assert(color.size() == EBDS.size() + counter);
   }
 
   //Step 1. Locate the point within the mesh

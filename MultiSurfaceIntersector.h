@@ -40,6 +40,12 @@ class MultiSurfaceIntersector {
   std::vector<int> new_enclosure_color; //!< color(s) from joint_intersector that represent new enclosure(s) 
   std::vector<std::vector<int> > elem_new_status; //!< for each new enclosure, status (0,1,2,3) marks its boundary
 
+  bool found_multi_surf_intersection;
+
+  //!< NOTE: Some of the member objects are well-defined ONLY IF found_multi_surf_intersection is true.
+  //!<       This reduces computational cost, but it also means one should CHECK found_multi_surf_intersection
+  //!<       BEFORE USING THIS CLASS' MEMBER OBJECTS!
+
 public:
 
   MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D &dms_, SurfaceIntersectionData &iod_surfX_,
@@ -61,7 +67,8 @@ public:
 
   void UpdateJointSurface();
 
-  bool CheckSurfaceIntersections();
+  bool CheckSurfaceIntersections(); //!< also updates 'found_multi_surf_intersection'
+  bool FoundMultiSurfIntersection() {return found_multi_surf_intersection;}
 
   int FindNewEnclosures();
 

@@ -517,6 +517,10 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
       else
         it++;
     }
+
+    for(auto&& sw : swept.back())
+      fprintf(stdout,"swept (%d,%d,%d).\n", sw[0], sw[1], sw[2]);
+
   }
 
   // Clean up tag

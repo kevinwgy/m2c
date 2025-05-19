@@ -359,13 +359,18 @@ int main(int argc, char* argv[])
   id2closure = spinit.SetInitialCondition(V, ID, Phi, NPhi, KappaPhi, spo, lso, ghand,
                                           embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr,
                                           embed ? embed->GetPointerToMultiSurfaceIntersectors() : nullptr);
-  
+
+  ID.StoreMeshCoordinates(spo.GetMeshCoordinates());
+
+
   // Boundary conditions are applied to V and Phi. But the ghost nodes of ID have not been populated.
   // ------------------------------------------------------------------------
 
   if(embed) //even if id2closure is empty, we must still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
+  for(auto&& mm : id2closure)
+    print("MatID %d: surf %d, color %d.\n", mm.first, mm.second.first, mm.second.second);
 
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
@@ -556,7 +561,6 @@ int main(int argc, char* argv[])
   if(laser) //initialize L (otherwise the initial output will only have 0s)
     laser->ComputeLaserRadiance(V, ID, *L, t, time_step);
 
-  print("I got here.\n");
   //! Compute force on embedded surfaces (if any) using initial state
   if(embed) {
     embed->ComputeForces(V, ID);
@@ -566,11 +570,9 @@ int main(int argc, char* argv[])
     embed->OutputResults(t, dt, time_step, true/*force_write*/); //!< write displacement and nodal loads to file
   }
 
-  print("I got here 2.\n");
   //! write initial condition to file
   out.OutputSolutions(t, dt, time_step, V, ID, Phi, NPhi, KappaPhi, L, Xi, Vturb, true/*force_write*/);
 
-  print("I got here 3.\n");
   if(concurrent.Coupled()) {
     concurrent.CommunicateBeforeTimeStepping(&spo.GetMeshCoordinates(), &dms,
                                              spo.GetPointerToInnerGhostNodes(),
@@ -611,16 +613,14 @@ int main(int argc, char* argv[])
   }
 
   if(embed) {
-    print("I got here 4.\n");
     embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not concurrent solver)
-    print("I got here 5.\n");
+    print("I got here 1.\n");
     embed->TrackUpdatedSurfaces();
-    print("I got here 6.\n");
-    mpi_barrier();
-    exit_mpi(); 
+    print("I got here 2.\n");
     int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                  embed->GetPointerToEmbeddedBoundaryData(),
                                  embed->GetPointerToIntersectors()); //update V, ID, Phi
+    print("I got here 3.\n");
     spo.ClipDensityAndPressure(V,ID);
     if(boundary_swept) {
       if(incompressible)
@@ -728,12 +728,14 @@ int main(int argc, char* argv[])
     } while (concurrent.Coupled() && dtleft != 0.0);
 
 
+    print("I got here 4.1.\n");
     if(embed) {
       embed->ComputeForces(V, ID);
       embed->UpdateSurfacesPrevAndFPrev();
 
       embed->OutputResults(t, dts, time_step, false/*force_write*/); //!< write displacement and nodal loads to file
     }
+    print("I got here 4.2.\n");
 
 
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
@@ -757,11 +759,14 @@ int main(int argc, char* argv[])
     }
 
     if(embed) {
+      print("I got here 4.3.\n");
       embed->ApplyUserDefinedSurfaceDynamics(t, dts0); //update surfaces provided through input (not concurrent solver)
       embed->TrackUpdatedSurfaces();
+      print("I got here 4.4.\n");
       int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                    embed->GetPointerToEmbeddedBoundaryData(),
                                    embed->GetPointerToIntersectors()); //update V, ID, Phi
+      print("I got here 4.5.\n");
       spo.ClipDensityAndPressure(V,ID);
       if(boundary_swept) {
         spo.ApplyBoundaryConditions(V);

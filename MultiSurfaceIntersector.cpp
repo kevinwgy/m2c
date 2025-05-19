@@ -21,7 +21,8 @@ MultiSurfaceIntersector::MultiSurfaceIntersector(MPI_Comm &comm_, DataManagers3D
                                                  GlobalMeshInfo &global_mesh_)
                        : comm(comm_), coordinates(coordinates_),
                          ghost_nodes_inner(ghost_nodes_inner_), ghost_nodes_outer(ghost_nodes_outer_),
-                         global_mesh(global_mesh_), joint_intersector(NULL), joint_surface(), iod_surface_dummy()
+                         global_mesh(global_mesh_), joint_intersector(NULL), joint_surface(), iod_surface_dummy(),
+                         found_multi_surf_intersection(false)
 {
 
   coordinates.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
@@ -148,9 +149,12 @@ MultiSurfaceIntersector::CheckSurfaceIntersections()
   bool found1 = CheckSurfaceIntersectionsOneWay(true);
   bool found2 = CheckSurfaceIntersectionsOneWay(false);
 
-  if(found1 || found2)
+  if(found1 || found2) {
+    found_multi_surf_intersection = true;
     return true;
+  }
 
+  found_multi_surf_intersection = false;
   return false;
 }
 
@@ -353,17 +357,23 @@ MultiSurfaceIntersector::FindNewEnclosuresByFloodFill()
   // Step 2: Merge occluded nodes (in subD) and pass to joint_intersector
   // ------------------------------------------------------------
   *EBDS_jnt->occluded_ptr = *EBDS1->occluded_ptr; //copy EBDS1 to EBDS_jnt
-  EBDS_jnt->occluded_ptr->merge(*EBDS2->occluded_ptr); //merge with EBDS2
+  EBDS_jnt->occluded_ptr->insert(EBDS2->occluded_ptr->begin(), EBDS2->occluded_ptr->end()); //add EBDS2
 
   // ------------------------------------------------------------
-  // Step 3: Flood fill using joint_intersector
+  // Step 3: Merge swept nodes (in subD) and pass to joint_intersector (unnecessary?)
+  // ------------------------------------------------------------
+  *EBDS_jnt->swept_ptr = *EBDS1->swept_ptr; //copy EBDS1 to EBDS_jnt
+  EBDS_jnt->swept_ptr->insert(EBDS2->swept_ptr->begin(), EBDS2->swept_ptr->end()); //add EBDS2
+
+  // ------------------------------------------------------------
+  // Step 4: Flood fill using joint_intersector
   // ------------------------------------------------------------
   joint_intersector->FloodFillColors();
   EBDS_jnt = joint_intersector->GetPointerToResults(); //some info (e.g., nRegions) have changed
 
 
   // ------------------------------------------------------------
-  // Step 4: Search for new enclosures (topological change)
+  // Step 5: Search for new enclosures (topological change)
   // ------------------------------------------------------------
   new_enclosure_color.clear();
 
@@ -538,6 +548,11 @@ MultiSurfaceIntersector::FindNewEnclosureBoundary()
     elem_new_status.push_back(vector<int>());
     joint_intersector->FindColorBoundary(cnew, elem_new_status.back());
   }
+
+  for(int i=0; i<(int)elem_new_status[0].size(); i++)
+    if(elem_new_status[0][i]>0)
+      fprintf(stderr,"status[%d] = %d.\n", i, elem_new_status[0][i]);
+    
 }
 
 //-------------------------------------------------------------------------
@@ -565,29 +580,33 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
   
   vector<IntersectionPoint>& intersections(*EBDS->intersections_ptr);
 
-  int tid;
+  int tid_b, tid_f;
   bool double_intersection;
   vector<int> dropped_intersections;
   int special_tag = -314;
   for(int k=kk0_in; k<kkmax_in; k++)
     for(int j=jj0_in; j<jjmax_in; j++)
       for(int i=ii0_in; i<iimax_in; i++) {
+
         for(int p=0; p<3; p++) {
           // xf and xb must be both -1, or both >=0
+          assert((xf[k][j][i][p]>=0) == (xb[k][j][i][p]>=0));
+          
           if(xf[k][j][i][p]>=0) {
 
-            assert(xb[k][j][i][p]>=0);
             double_intersection = (xf[k][j][i][p] != xb[k][j][i][p]);
 
-            tid = intersections[xf[k][j][i][p]].tid;
-            if(elem_drop_status[tid]) {
+            //need to get both, xf[k][j][i][p] and xb[k][j][i][p] may be same => 'corrupted' after the first part
+            tid_f = intersections[xf[k][j][i][p]].tid;
+            tid_b = intersections[xb[k][j][i][p]].tid; 
+
+            if(elem_drop_status[tid_f]) {
               dropped_intersections.push_back(xf[k][j][i][p]);
               intersections[xf[k][j][i][p]].tid = special_tag;
               xf[k][j][i][p] = -1;
             }
 
-            tid = intersections[xb[k][j][i][p]].tid;
-            if(elem_drop_status[tid]) {
+            if(elem_drop_status[tid_b]) {
               if(double_intersection) {//otherwise, already inserted
                 dropped_intersections.push_back(xb[k][j][i][p]);
                 intersections[xb[k][j][i][p]].tid = special_tag;
@@ -596,6 +615,7 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
             }
           }
         }
+
       }
 
   //re-order intersections (remove the dropped ones)
@@ -692,19 +712,19 @@ MultiSurfaceIntersector::FindNewEnclosuresAfterSurfaceUpdate()
 
   int newColor(0);
   if(new_enclosure_color.empty()) {
-    joint_intersector->GetColors(NULL,NULL,NULL,&newColor); //get nRegions
-    newColor++;
+    int nRegions1(0), nRegions2(0);
+    intersector[0]->GetColors(NULL,NULL,NULL,&nRegions1);
+    intersector[1]->GetColors(NULL,NULL,NULL,&nRegions2);
+    newColor = -(nRegions1 + nRegions2 + 1); //This would be the color for any new enclosure in joint_intersector
   } else
     newColor = new_enclosure_color[0]; //use an existing color
-
-  print("newColor = %d. new_enclosure_color.size = %d.\n", newColor, (int)new_enclosure_color.size());
 
   FindNewEnclosuresByRefill(newColor); // fills new_enclosure_color
   if(!new_enclosure_color.empty()) {
     UpdateJointSurface();
     FindNewEnclosureBoundary(); // fills elem_new_status
   }
- 
+
   return !new_enclosure_color.empty();
 }
 
@@ -746,14 +766,14 @@ MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
   // Step 2: Merge occluded nodes (in subD) and pass to joint_intersector
   // ------------------------------------------------------------
   *EBDS_jnt->occluded_ptr = *EBDS1->occluded_ptr; //copy EBDS1 to EBDS_jnt
-  EBDS_jnt->occluded_ptr->merge(*EBDS2->occluded_ptr); //merge with EBDS2
+  EBDS_jnt->occluded_ptr->insert(EBDS2->occluded_ptr->begin(), EBDS2->occluded_ptr->end()); //add EBDS2
 
 
   // ------------------------------------------------------------
   // Step 3: Merge swept nodes (in subD) and pass to joint_intersector
   // ------------------------------------------------------------
   *EBDS_jnt->swept_ptr = *EBDS1->swept_ptr; //copy EBDS1 to EBDS_jnt
-  EBDS_jnt->swept_ptr->merge(*EBDS2->swept_ptr); //merge with EBDS2
+  EBDS_jnt->swept_ptr->insert(EBDS2->swept_ptr->begin(), EBDS2->swept_ptr->end()); //add EBDS2
 
   // ------------------------------------------------------------
   // Step 4: Refill using joint_intersector

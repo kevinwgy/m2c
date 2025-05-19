@@ -1232,6 +1232,13 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
   // "FindSweptNodes" and "FindIntersections" should be called before calling this function.
   // Assuming occluded nodes already have the correct color. We do not deal with them here.
   
+  print(stdout,"Hello, color4new = %d.\n", color4new);
+/*
+  if(color4new==-3) {
+    Color.StoreMeshCoordinates(coordinates);
+    Color.WriteToVTRFile("Color_jnt.vtr", "Color");
+  }
+*/
   assert(color4new<=0);
   if(color4new<0)
     assert(allow_self_intersection);
@@ -1254,7 +1261,11 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
     total_remaining_nodes = nodes2fill.size();
     MPI_Allreduce(MPI_IN_PLACE, &total_remaining_nodes, 1, MPI_INT, MPI_SUM, comm);
 
-    print("  - iter %d: total_remaining_nodes = %d.\n", iter, total_remaining_nodes);
+    if(total_remaining_nodes>0) {
+      print("  - iter %d: total_remaining_nodes = %d.\n", iter, total_remaining_nodes);
+//      exit_mpi();
+    }
+
     if(total_remaining_nodes == 0 || total_remaining_nodes == prev_remaining)
       break;  //either done with refill :) or no progress :(
   
@@ -1294,41 +1305,49 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
       //Left neighbor
       if(i-1>=0 && valid_neighbor(i-1,j,k) && xf[k][j][i][0]<0) {
         color[k][j][i] = color[k][j][i-1];
+        if(color4new==-3) fprintf(stdout,"[L] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it)); //erase from nodes2fill2, NOT nodes2fill (would mess up pointer)
         continue;
       }
       //Right neighbor
       if(i+1<NX && valid_neighbor(i+1,j,k) && xf[k][j][i+1][0]<0) {
         color[k][j][i] = color[k][j][i+1];
+        if(color4new==-3) fprintf(stdout,"[R] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       //Bottom neighbor
       if(j-1>=0 && valid_neighbor(i,j-1,k) && xf[k][j][i][1]<0) {
         color[k][j][i] = color[k][j-1][i];
+        if(color4new==-3) fprintf(stdout,"[BT] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       //Top neighbor
       if(j+1<NY && valid_neighbor(i,j+1,k) && xf[k][j+1][i][1]<0) {
         color[k][j][i] = color[k][j+1][i];
+        if(color4new==-3) fprintf(stdout,"[T] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       //Back neighbor
       if(k-1>=0 && valid_neighbor(i,j,k-1) && xf[k][j][i][2]<0) {
         color[k][j][i] = color[k-1][j][i];
+        if(color4new==-3) fprintf(stdout,"[BK] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
-      //Top neighbor
+      //Front neighbor
       if(k+1<NZ && valid_neighbor(i,j,k+1) && xf[k+1][j][i][2]<0) {
         color[k][j][i] = color[k+1][j][i];
+        if(color4new==-3) fprintf(stdout,"[F] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       
     }
+
+
     nodes2fill = nodes2fill2;
 
     Color.RestoreDataPointerAndInsert();
@@ -1351,14 +1370,18 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
         color[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
     }
     else {//new enclosure (even if there are separate new enclosureS, they will have the same color)
-      for(auto it = nodes2fill.begin(); it != nodes2fill.end(); it++) 
+      for(auto it = nodes2fill.begin(); it != nodes2fill.end(); it++) {
         color[(*it)[2]][(*it)[1]][(*it)[0]] = color4new;
+        fprintf(stdout,"setting color[%d][%d][%d] = %d.\n", (*it)[2], (*it)[1], (*it)[0], color4new);
+      }
+      fprintf(stdout,"nRegions = %d, color4new = %d.\n", nRegions, color4new);
       for(int cc=nRegions+1; cc<=-color4new; cc++) //activated only if nRegions<-color4new
         ColorReachesBoundary.push_back(0);
       nRegions = -color4new;
     }
   }
 
+  print(" - Hello 7. total_remaining_nodes = %d. color4new = %d.\n", total_remaining_nodes, color4new);
 
   // Update "ColorReachesBoundary"
   if(color) {
@@ -1368,18 +1391,18 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
         continue;
       Int3& ijk(it->image_ijk);
       int mycolor = color[ijk[2]][ijk[1]][ijk[0]];
-      if(mycolor<0) 
+      if(mycolor<0) {
+        assert(mycolor<(int)ColorReachesBoundary.size());
         ColorReachesBoundary[-mycolor] = 1;
+      }
     }
     MPI_Allreduce(MPI_IN_PLACE, ColorReachesBoundary.data(), ColorReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
   }
-
 
   if(color)
     Color.RestoreDataPointerToLocalVector();
   if(xf)
     XForward.RestoreDataPointerToLocalVector();
-
 
   return total_remaining_nodes>0;
 }

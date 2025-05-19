@@ -341,6 +341,8 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
     } 
   }
 
+  for(auto&& ic : inactive_colors)
+    fprintf(stdout,"surf[%d], color %d inactive.\n", ic.first, ic.second);
 
   // Part 2: Find inactive_elem_status. Needed for force computation
   inactive_elem_status.resize(surfaces.size());
@@ -1149,18 +1151,20 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
   vector<bool> modified(intersector.size(), false);
   for(auto&& multiX : multi_intersector) {
 
-    print("ok.\n");
+    bool already_found = multiX->FoundMultiSurfIntersection();
     if(!multiX->CheckSurfaceIntersections())
       continue;
 
-    print("ok 2.\n");
+    print("I am here, already_found = %d.\n", (int)already_found);
+
     //Now, we know these two surfaces intersect.
-    
-    bool hasNew = multiX->FindNewEnclosuresAfterSurfaceUpdate();
-    print("ok 3.\n");
-    if(hasNew) {
+    //
+    int numNew = already_found ? multiX->FindNewEnclosuresAfterSurfaceUpdate() //true->1
+                               : multiX->FindNewEnclosures();
+    print("I am here, numNew = %d.\n", numNew);
+    if(numNew>0) {
       if(verbose>=1)
-        print("    o Found new enclosure(s) due to embedded surface intersections.\n");
+        print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
       int xid = multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
       if(xid>=0) //indeed, an interesector was modified
         modified[xid] = true;
@@ -1178,6 +1182,9 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
     if(max_dist0>max_dist)
       max_dist = max_dist0;
   }
+
+  
+
 
   //return max_dist; //WARNING: IF ALL SURFACES ARE FIXED, MAX_DIST gets garbage
   return;
@@ -1898,9 +1905,9 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, Vec3D &normal, Vec5
 
   double avg_pressure;
   if(n_pressure==0) {
-    fprintf(stdout,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
-                   "Gauss point (%e, %e, %e). Try adjusting surface thickness.\033[0m\n",
-                   p[0], p[1], p[2]);
+//    fprintf(stdout,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
+//                   "Gauss point (%e, %e, %e). Try adjusting surface thickness.\033[0m\n",
+//                   p[0], p[1], p[2]);
     avg_pressure = 0.0;
   } else
     avg_pressure = total_pressure/n_pressure;
