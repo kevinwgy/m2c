@@ -204,6 +204,8 @@ public:
                                     std::vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree,
                                     int elem_drop_tag = -1); //!< Requires bounding box
 
+  void BuildLayer1SubdomainScopeAndKDTree();
+
   //! Many functions below assume that bounding boxes, scope, and tree have already been constructed.
 
   //! find nearby triangles for each node based on bounding boxes and KDTree
@@ -234,7 +236,7 @@ public:
   //! 1 means the positive side (i.e. along "elemNorm") faces the interior, 2 means the negative side faces the\n
   //! interior; 3 means both sides face the interior.
   //! Note: This function assumes colors "i.e. Color" have been calculated
-  void FindColorBoundary(int color, std::vector<int> &status);
+  void FindColorBoundary(int color, std::vector<int> &status, bool double_check = false);
 
   //! Get pointers to all the results
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();

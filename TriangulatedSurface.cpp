@@ -62,7 +62,9 @@ TriangulatedSurface::Append(const TriangulatedSurface &S2)
   X0.insert(X0.end(), S2.X0.begin(), S2.X0.end());
   X.insert(X.end(), S2.X.begin(), S2.X.end());
   Udot.insert(Udot.end(), S2.Udot.begin(), S2.Udot.end());
-  elems.insert(elems.end(), S2.elems.begin(), S2.elems.end());
+
+  for(auto&& e : S2.elems)
+    elems.push_back(Int3(e[0]+nNodes, e[1]+nNodes, e[2]+nNodes)); //shift index
 
   active_nodes += S2.active_nodes;
   active_elems += S2.active_elems;

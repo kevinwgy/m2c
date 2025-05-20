@@ -719,6 +719,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
           continue;
         }
 
+ 
         // Preparation: Collect useful neighbors and intersection info
         FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,
                                           *(*EBDS)[surf]->occluded_ptr,
@@ -2249,7 +2250,6 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
 
   Vec3D X0(global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k)), X1;
 
-  // Loop through neighbors
   for(int k2=k-1; k2<=k+1; k2++)
     for(int j2=j-1; j2<=j+1; j2++)
       for(int i2=i-1; i2<=i+1; i2++) {
@@ -2271,7 +2271,9 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
 
         bool connected = true;
         X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
+        int mycounter = 0;
         for(auto&& xter : *intersector) {
+          mycounter++;
           if(xter->Intersects(X0,X1,NULL,false,1)) {
             connected = false;
             break;

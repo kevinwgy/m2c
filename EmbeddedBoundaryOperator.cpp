@@ -341,8 +341,6 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
     } 
   }
 
-  for(auto&& ic : inactive_colors)
-    fprintf(stdout,"surf[%d], color %d inactive.\n", ic.first, ic.second);
 
   // Part 2: Find inactive_elem_status. Needed for force computation
   inactive_elem_status.resize(surfaces.size());
@@ -1161,7 +1159,6 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
     //
     int numNew = already_found ? multiX->FindNewEnclosuresAfterSurfaceUpdate() //true->1
                                : multiX->FindNewEnclosures();
-    print("I am here, numNew = %d.\n", numNew);
     if(numNew>0) {
       if(verbose>=1)
         print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);

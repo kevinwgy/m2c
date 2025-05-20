@@ -176,6 +176,14 @@ Intersector::BuildKDTreeAndFindIntersections()
 
 //-------------------------------------------------------------------------
 
+void
+Intersector::BuildLayer1SubdomainScopeAndKDTree()
+{
+  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1);
+}
+
+//-------------------------------------------------------------------------
+
 double
 Intersector::TrackSurfaceFullCourse(bool &hasInlet_, bool &hasInlet2_, bool &hasOutlet_,
                                     bool &hasOcc_, int &nRegions_, int phi_layers)
@@ -1232,13 +1240,6 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
   // "FindSweptNodes" and "FindIntersections" should be called before calling this function.
   // Assuming occluded nodes already have the correct color. We do not deal with them here.
   
-  print(stdout,"Hello, color4new = %d.\n", color4new);
-/*
-  if(color4new==-3) {
-    Color.StoreMeshCoordinates(coordinates);
-    Color.WriteToVTRFile("Color_jnt.vtr", "Color");
-  }
-*/
   assert(color4new<=0);
   if(color4new<0)
     assert(allow_self_intersection);
@@ -1305,42 +1306,36 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
       //Left neighbor
       if(i-1>=0 && valid_neighbor(i-1,j,k) && xf[k][j][i][0]<0) {
         color[k][j][i] = color[k][j][i-1];
-        if(color4new==-3) fprintf(stdout,"[L] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it)); //erase from nodes2fill2, NOT nodes2fill (would mess up pointer)
         continue;
       }
       //Right neighbor
       if(i+1<NX && valid_neighbor(i+1,j,k) && xf[k][j][i+1][0]<0) {
         color[k][j][i] = color[k][j][i+1];
-        if(color4new==-3) fprintf(stdout,"[R] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       //Bottom neighbor
       if(j-1>=0 && valid_neighbor(i,j-1,k) && xf[k][j][i][1]<0) {
         color[k][j][i] = color[k][j-1][i];
-        if(color4new==-3) fprintf(stdout,"[BT] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       //Top neighbor
       if(j+1<NY && valid_neighbor(i,j+1,k) && xf[k][j+1][i][1]<0) {
         color[k][j][i] = color[k][j+1][i];
-        if(color4new==-3) fprintf(stdout,"[T] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       //Back neighbor
       if(k-1>=0 && valid_neighbor(i,j,k-1) && xf[k][j][i][2]<0) {
         color[k][j][i] = color[k-1][j][i];
-        if(color4new==-3) fprintf(stdout,"[BK] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
       //Front neighbor
       if(k+1<NZ && valid_neighbor(i,j,k+1) && xf[k+1][j][i][2]<0) {
         color[k][j][i] = color[k+1][j][i];
-        if(color4new==-3) fprintf(stdout,"[F] setting swept color[%d][%d][%d] = %d.\n", k,j,i, (int)color[k][j][i]);
         nodes2fill2.erase(nodes2fill2.find(*it));
         continue;
       }
@@ -1374,14 +1369,11 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
         color[(*it)[2]][(*it)[1]][(*it)[0]] = color4new;
         fprintf(stdout,"setting color[%d][%d][%d] = %d.\n", (*it)[2], (*it)[1], (*it)[0], color4new);
       }
-      fprintf(stdout,"nRegions = %d, color4new = %d.\n", nRegions, color4new);
       for(int cc=nRegions+1; cc<=-color4new; cc++) //activated only if nRegions<-color4new
         ColorReachesBoundary.push_back(0);
       nRegions = -color4new;
     }
   }
-
-  print(" - Hello 7. total_remaining_nodes = %d. color4new = %d.\n", total_remaining_nodes, color4new);
 
   // Update "ColorReachesBoundary"
   if(color) {
@@ -1616,7 +1608,7 @@ Intersector::CalculateUnsignedDistanceNearSurface(int nL)
 //-------------------------------------------------------------------------
 
 void
-Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
+Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool double_check)
 {
 
   // Step 0. Check if the domain (not just this subdomain) has the input color
@@ -1752,16 +1744,118 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status)
 
     }
 
-    // assemble data
-    if(side==0)
-      MPI_Allreduce(MPI_IN_PLACE, positive_side.data(), positive_side.size(), MPI_INT, MPI_MAX, comm);
-    else
-      MPI_Allreduce(MPI_IN_PLACE, negative_side.data(), negative_side.size(), MPI_INT, MPI_MAX, comm);
+  }
 
+
+
+  // ----------------------------------------------
+  // Step 4. Double check. Go over firstLayer nodes, make sure the 
+  //         triangles blocking them are properly marked (with status).
+  //         This can be important when an enclosure is relatively small
+  //         compared with embedded triangles' size
+  // NOTE: This double-check is currently only used by MultiSurfaceIntersector.
+  //       In this case, XF only stores -1 (no X) or 0 (X). XB not filled.
+  //       'intersections' not filled either. This is why we use the intersector
+  //       to find intersections.
+  // ----------------------------------------------
+  if(double_check) {
+    vector<Int3> nodes2check;
+    for(auto&& ijk : firstLayer) {
+      if(color[ijk[2]][ijk[1]][ijk[0]] == this_color) //check it
+        nodes2check.push_back(ijk);
+    }
+    int total_num = nodes2check.size();
+    MPI_Allreduce(MPI_IN_PLACE, &total_num, 1, MPI_INT, MPI_SUM, comm);
+    if(total_num>0) { //have nodes to check
+
+      Vec3D*** xf = (Vec3D***) XForward.GetDataPointer();
+      int i,j,k,tid;
+      for(auto&& ijk : nodes2check) {
+        i = ijk[0];
+        j = ijk[1];
+        k = ijk[2];
+
+        bool gotyou = false;
+        if(ijk[0]==105 && ijk[1]==0 && ijk[2]==0) {
+          fprintf(stdout,"I got you (%d,%d,%d): color = %d.\n", ijk[0], ijk[1], ijk[2], (int)color[ijk[2]][ijk[1]][ijk[0]]);
+          gotyou = true;
+        }
+
+        //self->left
+        if(xf[k][j][i][0]>=0) {
+          Intersects(coords[k][j][i], coords[k][j][i-1], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][0]>=0.0) //normal points +x
+            positive_side[tid] = 1;
+          else //normal points -x
+            negative_side[tid] = 1;
+          if(gotyou)
+            fprintf(stdout,"got you L. tid = %d, positive_side = %d, negative_side = %d.\n", tid, positive_side[tid], negative_side[tid]);
+        }
+
+        //self->right
+        if(i+1<iimax_in && xf[k][j][i+1][0]>=0) {
+          Intersects(coords[k][j][i], coords[k][j][i+1], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][0]>=0.0) //normal points +x
+            negative_side[tid] = 1;
+          else //normal points -x
+            positive_side[tid] = 1;
+          if(gotyou)
+            fprintf(stdout,"got you R. tid = %d, positive_side = %d, negative_side = %d.\n", tid, positive_side[tid], negative_side[tid]);
+        }
+
+        //self->bottom
+        if(xf[k][j][i][1]>=0) {
+          Intersects(coords[k][j][i], coords[k][j-1][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][1]>=0.0) //normal points +y
+            positive_side[tid] = 1;
+          else //normal points -y
+            negative_side[tid] = 1;
+        }
+
+        //self->top
+        if(j+1<jjmax_in && xf[k][j+1][i][1]>=0) {
+          Intersects(coords[k][j][i], coords[k][j+1][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][1]>=0.0) //normal points +y
+            negative_side[tid] = 1;
+          else //normal points -y
+            positive_side[tid] = 1;
+        }
+
+        //self->back
+        if(xf[k][j][i][2]>=0) {
+          Intersects(coords[k][j][i], coords[k-1][j][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][2]>=0.0) //normal points +z
+            positive_side[tid] = 1;
+          else //normal points -z
+            negative_side[tid] = 1;
+        }
+
+        //self->top
+        if(k+1<kkmax_in && xf[k+1][j][i][2]>=0) {
+          Intersects(coords[k][j][i], coords[k+1][j][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][2]>=0.0) //normal points +z
+            negative_side[tid] = 1;
+          else //normal points -z
+            positive_side[tid] = 1;
+        }
+      }
+      XForward.RestoreDataPointerToLocalVector();
+    }
   }
 
   
-  // Step 4. Finalize output
+
+  // assemble data
+  MPI_Allreduce(MPI_IN_PLACE, positive_side.data(), positive_side.size(), MPI_INT, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, negative_side.data(), negative_side.size(), MPI_INT, MPI_MAX, comm);
+
+  // Step 5. Finalize output
   status.assign(Es.size(), 0);
   for(int i=0; i<(int)Es.size(); i++) {
     if(positive_side[i]>0) {

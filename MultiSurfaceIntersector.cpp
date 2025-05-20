@@ -366,14 +366,20 @@ MultiSurfaceIntersector::FindNewEnclosuresByFloodFill()
   EBDS_jnt->swept_ptr->insert(EBDS2->swept_ptr->begin(), EBDS2->swept_ptr->end()); //add EBDS2
 
   // ------------------------------------------------------------
-  // Step 4: Flood fill using joint_intersector
+  // Step 4: Merge firstLayer (in subD) and pass to joint_intersector (unnecessary?)
+  // ------------------------------------------------------------
+  *EBDS_jnt->firstLayer_ptr = *EBDS1->firstLayer_ptr; //copy EBDS1 to EBDS_jnt
+  EBDS_jnt->firstLayer_ptr->insert(EBDS2->firstLayer_ptr->begin(), EBDS2->firstLayer_ptr->end()); //add EBDS2
+
+  // ------------------------------------------------------------
+  // Step 5: Flood fill using joint_intersector
   // ------------------------------------------------------------
   joint_intersector->FloodFillColors();
   EBDS_jnt = joint_intersector->GetPointerToResults(); //some info (e.g., nRegions) have changed
 
 
   // ------------------------------------------------------------
-  // Step 5: Search for new enclosures (topological change)
+  // Step 6: Search for new enclosures (topological change)
   // ------------------------------------------------------------
   new_enclosure_color.clear();
 
@@ -544,15 +550,14 @@ MultiSurfaceIntersector::FindNewEnclosureBoundary()
     return;
   
   elem_new_status.clear(); //status = 0, 1, 2, or 3 (see Intersector.h)
+
+  joint_intersector->BuildLayer1SubdomainScopeAndKDTree(); //need this to find intersections
+
   for(auto&& cnew : new_enclosure_color) { //repeat the same for each new enclosure (TODO: can be more efficient)
     elem_new_status.push_back(vector<int>());
-    joint_intersector->FindColorBoundary(cnew, elem_new_status.back());
+    joint_intersector->FindColorBoundary(cnew, elem_new_status.back(), true); //true->captures initial enclosure
   }
 
-  for(int i=0; i<(int)elem_new_status[0].size(); i++)
-    if(elem_new_status[0][i]>0)
-      fprintf(stderr,"status[%d] = %d.\n", i, elem_new_status[0][i]);
-    
 }
 
 //-------------------------------------------------------------------------
@@ -775,13 +780,21 @@ MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
   *EBDS_jnt->swept_ptr = *EBDS1->swept_ptr; //copy EBDS1 to EBDS_jnt
   EBDS_jnt->swept_ptr->insert(EBDS2->swept_ptr->begin(), EBDS2->swept_ptr->end()); //add EBDS2
 
+
   // ------------------------------------------------------------
-  // Step 4: Refill using joint_intersector
+  // Step 4: Merge firstLayer (in subD) and pass to joint_intersector
+  // ------------------------------------------------------------
+  *EBDS_jnt->firstLayer_ptr = *EBDS1->firstLayer_ptr; //copy EBDS1 to EBDS_jnt
+  EBDS_jnt->firstLayer_ptr->insert(EBDS2->firstLayer_ptr->begin(), EBDS2->firstLayer_ptr->end()); //add EBDS2
+
+
+  // ------------------------------------------------------------
+  // Step 5: Refill using joint_intersector
   // ------------------------------------------------------------
   bool new_enclosure = joint_intersector->RefillAfterSurfaceUpdate(color4new);
 
   // ------------------------------------------------------------
-  // Step 5: Update new_enclosure_color
+  // Step 6: Update new_enclosure_color
   // ------------------------------------------------------------
   if(new_enclosure) {
     if(std::find(new_enclosure_color.begin(), new_enclosure_color.end(), color4new) == new_enclosure_color.end())

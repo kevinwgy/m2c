@@ -614,13 +614,10 @@ int main(int argc, char* argv[])
 
   if(embed) {
     embed->ApplyUserDefinedSurfaceDynamics(t, dt); //update surfaces provided through input (not concurrent solver)
-    print("I got here 1.\n");
     embed->TrackUpdatedSurfaces();
-    print("I got here 2.\n");
     int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                  embed->GetPointerToEmbeddedBoundaryData(),
                                  embed->GetPointerToIntersectors()); //update V, ID, Phi
-    print("I got here 3.\n");
     spo.ClipDensityAndPressure(V,ID);
     if(boundary_swept) {
       if(incompressible)
@@ -728,14 +725,12 @@ int main(int argc, char* argv[])
     } while (concurrent.Coupled() && dtleft != 0.0);
 
 
-    print("I got here 4.1.\n");
     if(embed) {
       embed->ComputeForces(V, ID);
       embed->UpdateSurfacesPrevAndFPrev();
 
       embed->OutputResults(t, dts, time_step, false/*force_write*/); //!< write displacement and nodal loads to file
     }
-    print("I got here 4.2.\n");
 
 
     //Exchange data with concurrent programs (Note: This chunk should be at the end of each time-step.)
@@ -759,14 +754,11 @@ int main(int argc, char* argv[])
     }
 
     if(embed) {
-      print("I got here 4.3.\n");
       embed->ApplyUserDefinedSurfaceDynamics(t, dts0); //update surfaces provided through input (not concurrent solver)
       embed->TrackUpdatedSurfaces();
-      print("I got here 4.4.\n");
       int boundary_swept = mpo.UpdateCellsSweptByEmbeddedSurfaces(V, ID, Phi,
                                    embed->GetPointerToEmbeddedBoundaryData(),
                                    embed->GetPointerToIntersectors()); //update V, ID, Phi
-      print("I got here 4.5.\n");
       spo.ClipDensityAndPressure(V,ID);
       if(boundary_swept) {
         spo.ApplyBoundaryConditions(V);
