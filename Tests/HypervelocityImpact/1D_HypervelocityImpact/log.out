@@ -1,0 +1,468 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: bccd946 | Branch: main | Tag: 
+Computation started at: 2025-05-29.20:46:19 EDT
+Using 1 processor cores (including concurrent programs).
+Command: ../../../m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+
+- Mesh Statistics:
+  X-Direction: [0.000000e+00, 1.000000e+00], 1000 nodes/cells, dx_min = 1.000000e-03, dx_max = 1.000000e-03.
+  Y-Direction: [-3.000000e-02, 3.000000e-02], 1 nodes/cells, dy_min = 6.000000e-02, dy_max = 6.000000e-02.
+  Z-Direction: [-3.000000e-02, 3.000000e-02], 1 nodes/cells, dz_min = 6.000000e-02, dz_max = 6.000000e-02.
+  Total number of nodes/cells: 1000.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 0
+  o Number of ghost nodes outside computational domain: 8018
+
+
+- Initializing the state variables (V) and material id. (ID).
+[0;35mWarning: Material ID of the default initial state is 1. In most cases, it should be 0.
+[0m  o Found Plane[0]: (4.000000e-01 0.000000e+00 0.000000e+00) | normal: (1.000000e+00 0.000000e+00 0.000000e+00). material id: 1.
+
+- Initializing Phi[0] for tracking the boundary of material 1.
+
+- [Line Plot] (2.500000e-03, 0.000000e+00, 0.000000e+00) --> (9.975000e-01, 0.000000e+00, 0.000000e+00), 200 points.
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 1: t = 0.000000e+00, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4137e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 2: t = 3.944534e-10, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4485e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 3: t = 7.889067e-10, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4813e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 4: t = 1.183360e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6401e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 5: t = 1.577813e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6729e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 6: t = 1.972267e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.7920e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 7: t = 2.366720e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.8248e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 8: t = 2.761173e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.9618e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 9: t = 3.155627e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.9946e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 10: t = 3.550080e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.1069e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 11: t = 3.944534e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.1397e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 12: t = 4.338987e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.3021e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 13: t = 4.733440e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.3349e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 14: t = 5.127894e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.4459e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 15: t = 5.522347e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.4787e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 16: t = 5.916800e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.6455e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 17: t = 6.311254e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.6783e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 18: t = 6.705707e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.7874e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 19: t = 7.100160e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.8203e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 20: t = 7.494614e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.9276e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 21: t = 7.889067e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 2.9605e-01 s.
+- Wrote solution at 8.283520e-09 to solution_0001.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 22: t = 8.283520e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.2106e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 23: t = 8.677974e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.2436e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 24: t = 9.072427e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.4093e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 25: t = 9.466881e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.4423e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 26: t = 9.861334e-09, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.5378e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 27: t = 1.025579e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.5707e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 28: t = 1.065024e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.7094e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 29: t = 1.104469e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.7422e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 30: t = 1.143915e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.8457e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 31: t = 1.183360e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.8787e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 32: t = 1.222805e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 3.9857e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 33: t = 1.262251e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.0186e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 34: t = 1.301696e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.1392e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 35: t = 1.341141e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.1721e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 36: t = 1.380587e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.2688e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 37: t = 1.420032e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.3017e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 38: t = 1.459477e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.4027e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 39: t = 1.498923e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.4354e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 40: t = 1.538368e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.5312e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 41: t = 1.577813e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.5642e-01 s.
+- Wrote solution at 1.617259e-08 to solution_0002.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 42: t = 1.617259e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.7417e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 43: t = 1.656704e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.7746e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 44: t = 1.696149e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.8629e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 45: t = 1.735595e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.8956e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 46: t = 1.775040e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 4.9995e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 47: t = 1.814485e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.0323e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 48: t = 1.853931e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.1756e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 49: t = 1.893376e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.2084e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 50: t = 1.932821e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.3006e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 51: t = 1.972267e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.3336e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 52: t = 2.011712e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.4314e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 53: t = 2.051157e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.4642e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 54: t = 2.090603e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.5673e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 55: t = 2.130048e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.6001e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 56: t = 2.169493e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.7220e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 57: t = 2.208939e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.7547e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 58: t = 2.248384e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.8529e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 59: t = 2.287829e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.8856e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 60: t = 2.327275e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 5.9806e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 61: t = 2.366720e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.0134e-01 s.
+- Wrote solution at 2.406165e-08 to solution_0003.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 62: t = 2.406165e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.1832e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 63: t = 2.445611e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.2161e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 64: t = 2.485056e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.3191e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 65: t = 2.524501e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.3521e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 66: t = 2.563947e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.4547e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 67: t = 2.603392e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.4877e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 68: t = 2.642837e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.5857e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 69: t = 2.682283e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.6185e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 70: t = 2.721728e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.7165e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 71: t = 2.761173e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.7493e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 72: t = 2.800619e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.8618e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 73: t = 2.840064e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.8947e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 74: t = 2.879509e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 6.9274e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 75: t = 2.918955e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.0276e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 76: t = 2.958400e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.0603e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 77: t = 2.997846e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.1708e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 78: t = 3.037291e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.2038e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 79: t = 3.076736e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.3859e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 80: t = 3.116182e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.4187e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 81: t = 3.155627e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.5527e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 82: t = 3.195072e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.5856e-01 s.
+- Wrote solution at 3.234518e-08 to solution_0004.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 83: t = 3.234518e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.8321e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 84: t = 3.273963e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 7.8652e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 85: t = 3.313408e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.0923e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 86: t = 3.352854e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.1255e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 87: t = 3.392299e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.2388e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 88: t = 3.431744e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.2717e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 89: t = 3.471190e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.4416e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 90: t = 3.510635e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.4744e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 91: t = 3.550080e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.5667e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 92: t = 3.589526e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.5996e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 93: t = 3.628971e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.8345e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 94: t = 3.668416e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.8678e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 95: t = 3.707862e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.9651e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 96: t = 3.747307e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 8.9979e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 97: t = 3.786752e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.1050e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 98: t = 3.826198e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.1379e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 99: t = 3.865643e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.2363e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 100: t = 3.905088e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.2691e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 101: t = 3.944534e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.3792e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 102: t = 3.983979e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.4120e-01 s.
+- Wrote solution at 4.023424e-08 to solution_0005.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 103: t = 4.023424e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.5898e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 104: t = 4.062870e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.6228e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 105: t = 4.102315e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.7137e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 106: t = 4.141760e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.7464e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 107: t = 4.181206e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.8506e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 108: t = 4.220651e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.8835e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 109: t = 4.260096e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 9.9763e-01 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 110: t = 4.299542e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0009e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 111: t = 4.338987e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0106e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 112: t = 4.378432e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0139e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 113: t = 4.417878e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0239e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 114: t = 4.457323e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0272e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 115: t = 4.496768e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0370e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 116: t = 4.536214e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0402e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 117: t = 4.575659e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0496e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 118: t = 4.615104e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0529e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 119: t = 4.654550e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0628e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 120: t = 4.693995e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0661e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 121: t = 4.733440e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0773e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 122: t = 4.772886e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0805e+00 s.
+- Wrote solution at 4.812331e-08 to solution_0006.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 123: t = 4.812331e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.0980e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 124: t = 4.851776e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1013e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 125: t = 4.891222e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1109e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 126: t = 4.930667e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1142e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 127: t = 4.970112e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1243e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 128: t = 5.009558e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1276e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 129: t = 5.049003e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1402e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 130: t = 5.088448e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1435e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 131: t = 5.127894e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1539e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 132: t = 5.167339e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1572e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 133: t = 5.206784e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1673e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 134: t = 5.246230e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1706e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 135: t = 5.285675e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1849e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 136: t = 5.325120e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.1882e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 137: t = 5.364566e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2003e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 138: t = 5.404011e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2036e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 139: t = 5.443456e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2131e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 140: t = 5.482902e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2164e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 141: t = 5.522347e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2265e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 142: t = 5.561792e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2298e+00 s.
+- Wrote solution at 5.601238e-08 to solution_0007.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 143: t = 5.601238e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2477e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 144: t = 5.640683e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2510e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 145: t = 5.680128e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2609e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 146: t = 5.719574e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2641e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 147: t = 5.759019e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2674e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 148: t = 5.798464e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2780e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 149: t = 5.837910e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2813e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 150: t = 5.877355e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2916e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 151: t = 5.916800e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.2949e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 152: t = 5.956246e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3061e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 153: t = 5.995691e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3094e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 154: t = 6.035136e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3198e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 155: t = 6.074582e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3231e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 156: t = 6.114027e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3337e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 157: t = 6.153472e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3369e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 158: t = 6.192918e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3475e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 159: t = 6.232363e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3508e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 160: t = 6.271808e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3599e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 161: t = 6.311254e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3632e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 162: t = 6.350699e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3726e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 163: t = 6.390144e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.3758e+00 s.
+- Wrote solution at 6.429590e-08 to solution_0008.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 164: t = 6.429590e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4002e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 165: t = 6.469035e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4035e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 166: t = 6.508480e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4138e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 167: t = 6.547926e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4171e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 168: t = 6.587371e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4270e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 169: t = 6.626816e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4303e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 170: t = 6.666262e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4404e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 171: t = 6.705707e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4437e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 172: t = 6.745152e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4535e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 173: t = 6.784598e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4568e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 174: t = 6.824043e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4668e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 175: t = 6.863488e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4700e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 176: t = 6.902934e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4809e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 177: t = 6.942379e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4841e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 178: t = 6.981824e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4940e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 179: t = 7.021270e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.4973e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 180: t = 7.060715e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5076e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 181: t = 7.100160e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5109e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 182: t = 7.139606e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5210e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 183: t = 7.179051e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5242e+00 s.
+- Wrote solution at 7.218496e-08 to solution_0009.vtr.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 184: t = 7.218496e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5431e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 185: t = 7.257942e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5464e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 186: t = 7.297387e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5555e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 187: t = 7.336832e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5588e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 188: t = 7.376278e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5686e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 189: t = 7.415723e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5718e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 190: t = 7.455168e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5818e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 191: t = 7.494614e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.5851e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 192: t = 7.534059e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6048e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 193: t = 7.573504e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6081e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 194: t = 7.612950e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6243e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 195: t = 7.652395e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6276e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 196: t = 7.691840e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6398e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 197: t = 7.731286e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6431e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 198: t = 7.770731e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6524e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 199: t = 7.810176e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6557e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 200: t = 7.849622e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6739e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 201: t = 7.889067e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6772e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 202: t = 7.928512e-08, dt = 3.944534e-10, cfl = 8.0000e-01. Computation time: 1.6871e+00 s.
+- Maximum values: rho = 2.485000e-03, p = 1.000000e+05, c = 2.028123e+06, Mach = 0.000000e+00, char. speed = 2.028123e+06.
+Step 203: t = 7.967958e-08, dt = 3.204222e-10, cfl = 6.4986e-01. Computation time: 1.6904e+00 s.
+- Wrote solution at 8.000000e-08 to solution_0010.vtr.
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 8.000000e-08)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 1.717631 sec.
+
