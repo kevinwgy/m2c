@@ -193,10 +193,10 @@ under Ionization {
       MolarMass = 180.95; //g/mol
       AtomicNumber = 73;
       MaxChargeNumber = 73;
-      IonizationEnergyFile = "AtomicData_g_mm_s_K_A/I_18.txt";
-      ExcitationEnergyFilesPrefix = "AtomicData_g_mm_s_K_A/E_18_";
+      IonizationEnergyFile = "AtomicData_g_mm_s_K_A/I_73.txt";
+      ExcitationEnergyFilesPrefix = "AtomicData_g_mm_s_K_A/E_73_";
       ExcitationEnergyFilesSuffix = ".txt";
-      DegeneracyFilesPrefix  = "AtomicData_g_mm_s_K_A/g_18_";
+      DegeneracyFilesPrefix  = "AtomicData_g_mm_s_K_A/g_73_";
       DegeneracyFilesSuffix  = ".txt";
     }
   }  

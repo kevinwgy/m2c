@@ -81,7 +81,7 @@ AtomicIonizationData::Setup(AtomicIonizationModel* iod_aim, double h_, double e_
     if(!file.is_open()) {
       if(i<rmax) 
         print_warning("Warning: Cannot open excitation energy file %s. Skipping higher "
-                      "states of ionization.\n", filename.c_str());
+                      "states of ionization. (rmax = %d)\n", filename.c_str(), rmax);
       //if i>=rmax, no need to throw a warning.
       E.resize(i);
       break;

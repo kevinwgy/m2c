@@ -2,7 +2,5 @@
 <VTKFile type="Collection" version="0.1"
 byte_order="LittleEndian">
   <Collection>
-  <DataSet timestep="0.000000e+00" file="solution_0000.vtr"/>
-  <DataSet timestep="2.588853e-08" file="solution_0001.vtr"/>
   </Collection>
 </VTKFile>
