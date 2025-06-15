@@ -196,10 +196,10 @@ ConcurrentProgramsHandler::Destroy()
 
   if(m2c_twin)
     m2c_twin->Destroy();
-/*
+
   for(int i=0; i<(int)c.size(); i++)
     MPI_Comm_free(&c[i]);
-*/
+
 }
 
 //---------------------------------------------------------
