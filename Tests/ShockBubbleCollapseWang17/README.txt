@@ -5,3 +5,7 @@ Interaction in Shockwave Lithotripsy," IJNMBE 2017, also shown
 in S. Cao et al, "Shock-Induced Bubble Collapse Near Solid 
 Materials: Effect of Acoustic Impedance," JFM 2021 (Figure 13,
 the rigid wall case)
+
+Step 1: Compile the user-specified initial condition file in "IC".
+        (See the header of the .cpp file.)
+Step 2: Run M2C with input.st. (See log.out for reference.)
