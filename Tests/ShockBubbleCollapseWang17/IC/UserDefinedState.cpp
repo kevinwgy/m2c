@@ -43,7 +43,7 @@ MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jma
   double Pstiff = 4.1e8; //Pa
   double rho0 = 1.0e-3; //g/mm3 
   double p0 = 1.01e5;; //Pa
-  double soundspeed = gamma*(p0+Pstiff)/rho0;
+  double soundspeed = sqrt(gamma*(p0+Pstiff)/rho0);
 
   // pressure signal
   double ps = 3.5e7; //Pa;
@@ -55,8 +55,8 @@ MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jma
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
-        x = -(coords[k][j][i][0] + 0.18);
-        if(x>0 && x<3.7) { //within the wave form
+        x = -(coords[k][j][i][0] + 0.2);
+        if(x>0 && x<4.5) { //within the wave form
           t = x/soundspeed; 
           p = 2.0*ps*exp(-1.0*alpha*t)*cos(omega*t+PI/3.0);
           v[k][j][i][0] = rho0;
