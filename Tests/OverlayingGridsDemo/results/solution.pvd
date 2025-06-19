@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1"
+byte_order="LittleEndian">
+  <Collection>
+  <DataSet timestep="0.000000e+00" file="solution_0000.vtr"/>
+  <DataSet timestep="1.000837e-07" file="solution_0001.vtr"/>
+  <DataSet timestep="2.003675e-07" file="solution_0002.vtr"/>
+  <DataSet timestep="3.001917e-07" file="solution_0003.vtr"/>
+  <DataSet timestep="4.001906e-07" file="solution_0004.vtr"/>
+  <DataSet timestep="5.002798e-07" file="solution_0005.vtr"/>
+  <DataSet timestep="6.003488e-07" file="solution_0006.vtr"/>
+  <DataSet timestep="7.003351e-07" file="solution_0007.vtr"/>
+  <DataSet timestep="8.002084e-07" file="solution_0008.vtr"/>
+  <DataSet timestep="9.004043e-07" file="solution_0009.vtr"/>
+  <DataSet timestep="1.000399e-06" file="solution_0010.vtr"/>
+  <DataSet timestep="1.100161e-06" file="solution_0011.vtr"/>
+  <DataSet timestep="1.200152e-06" file="solution_0012.vtr"/>
+  <DataSet timestep="1.300365e-06" file="solution_0013.vtr"/>
+  <DataSet timestep="1.400285e-06" file="solution_0014.vtr"/>
+  <DataSet timestep="1.500357e-06" file="solution_0015.vtr"/>
+  <DataSet timestep="1.600071e-06" file="solution_0016.vtr"/>
+  <DataSet timestep="1.700405e-06" file="solution_0017.vtr"/>
+  <DataSet timestep="1.800329e-06" file="solution_0018.vtr"/>
+  <DataSet timestep="1.900243e-06" file="solution_0019.vtr"/>
+  <DataSet timestep="2.000000e-06" file="solution_0020.vtr"/>
+  </Collection>
+</VTKFile>
