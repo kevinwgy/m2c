@@ -104,15 +104,16 @@ NeighborCommunicator::Send(int exchange_type, // 0~all, 1~face_edge, 2~face, 3~c
 
   //Step 1: Get the size of each package
   vector<int> counter(Nneigh, 0);
-   
-  int proc, count;
+  vector<int> counter2(Nneigh, 0); 
+
+  int proc;
   vector<MPI_Request> send_requests;
   vector<MPI_Request> recv_requests;
   for(int p=0; p<Nneigh; p++) {
     send_requests.push_back(MPI_Request());
     proc = (*neighbors_ptr)[p];
-    count = Export[p].size();
-    MPI_Isend(&count, 1, MPI_INT, proc, rank/*tag*/, comm, &send_requests.back());
+    counter2[p] = Export[p].size();
+    MPI_Isend(&counter2[p], 1, MPI_INT, proc, rank/*tag*/, comm, &send_requests.back());
 
     recv_requests.push_back(MPI_Request());
     MPI_Irecv(&counter[p], 1, MPI_INT, proc, proc, comm, &recv_requests.back());
@@ -213,15 +214,16 @@ NeighborCommunicator::Request(SpaceVariable3D &V, vector<Int3> &Request, vector<
 
   //Step 2: Get the size of each package
   vector<int> counter(Nneigh, 0);
+  vector<int> counter2(Nneigh, 0);
    
-  int proc, count;
+  int proc;
   vector<MPI_Request> send_requests;
   vector<MPI_Request> recv_requests;
   for(int p=0; p<Nneigh; p++) {
     send_requests.push_back(MPI_Request());
     proc = (*neighbors_ptr)[p];
-    count = neighbor_requests[p].size();
-    MPI_Isend(&count, 1, MPI_INT, proc, rank/*tag*/, comm, &send_requests.back());
+    counter2[p] = neighbor_requests[p].size();
+    MPI_Isend(&counter2[p], 1, MPI_INT, proc, rank/*tag*/, comm, &send_requests.back());
 
     recv_requests.push_back(MPI_Request());
     MPI_Irecv(&counter[p], 1, MPI_INT, proc, proc, comm, &recv_requests.back());
@@ -362,15 +364,16 @@ NeighborCommunicator::Request(double*** v, int dof,
 
   //Step 2: Get the size of each package
   vector<int> counter(Nneigh, 0);
+  vector<int> counter2(Nneigh, 0);
    
-  int proc, count;
+  int proc;
   vector<MPI_Request> send_requests;
   vector<MPI_Request> recv_requests;
   for(int p=0; p<Nneigh; p++) {
     send_requests.push_back(MPI_Request());
     proc = (*neighbors_ptr)[p];
-    count = neighbor_requests[p].size();
-    MPI_Isend(&count, 1, MPI_INT, proc, rank/*tag*/, comm, &send_requests.back());
+    counter2[p] = neighbor_requests[p].size();
+    MPI_Isend(&counter2[p], 1, MPI_INT, proc, rank/*tag*/, comm, &send_requests.back());
 
     recv_requests.push_back(MPI_Request());
     MPI_Irecv(&counter[p], 1, MPI_INT, proc, proc, comm, &recv_requests.back());

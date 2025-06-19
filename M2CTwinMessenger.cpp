@@ -103,11 +103,12 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<Vec3D> import_all_coords;
     for(auto&& ghost : *ghost_nodes_outer)
       if(ghost.bcType == (int)MeshData::OVERSET && 
-         ghost.type_projection == GhostPoint::FACE) {
-        if(!coordinates->IsHereOrConnectedGhost(ghost.ijk[0], ghost.ijk[1], ghost.ijk[2]))
-          continue; //Skip ghost nodes at corners/edges of the subdomain --- they are not needed
-        import_all.push_back(ghost.ijk);
-        import_all_coords.push_back(global_mesh->GetXYZ(ghost.ijk));
+         ghost.type_projection == GhostPoint::FACE) { //Skip corner/edge ghosts --- they are not needed
+        Int3& im(ghost.image_ijk);
+        if(coordinates->IsHere(im[0], im[1], im[2])) {
+          import_all.push_back(ghost.ijk);
+          import_all_coords.push_back(global_mesh->GetXYZ(ghost.ijk));
+        }
       }
 
     int nNodes_all = import_all.size();
@@ -196,10 +197,11 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       for(auto&& nod : duplicates) 
         dups[nod.first].push_back(nod.second);
  
+      vector<int> ndup(numFollowerProcs,0);
       for(int proc = 0; proc < numFollowerProcs; proc++) {
         send_requests.push_back(MPI_Request());
-        int ndup = dups[proc].size();
-        MPI_Isend(&ndup, 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
+        ndup[proc] = dups[proc].size(); //Cannot just be an int ndup (non-blocking MPI_Isend)
+        MPI_Isend(&ndup[proc], 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
       }
       MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
       send_requests.clear();
@@ -288,6 +290,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     // Step 6. Locate nodes and send a package to each follower proc
     // -----------------------------------------------
     export_points.resize(numFollowerProcs);
+    vector<int> count(numFollowerProcs,0);
     for(int proc=0; proc<numFollowerProcs; proc++) {
 
       found[proc].clear();
@@ -307,9 +310,9 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
         }
       }
 
-      int count = export_points[proc].size();
+      count[proc] = export_points[proc].size();
       send_requests.push_back(MPI_Request());
-      MPI_Isend(&count, 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
+      MPI_Isend(&count[proc], 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
     }
     MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
     send_requests.clear();
@@ -406,6 +409,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<MPI_Request> send_requests;
     export_points.resize(numLeaderProcs);
     vector<int> found[numLeaderProcs];
+    vector<int> count(numLeaderProcs,0);
     for(int proc = 0; proc < numLeaderProcs; proc++) {
 
       if(export_points_all[proc].empty())
@@ -423,9 +427,9 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
         }
       }
 
-      int count = export_points[proc].size();
+      count[proc] = export_points[proc].size();
       send_requests.push_back(MPI_Request());
-      MPI_Isend(&count, 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
+      MPI_Isend(&count[proc], 1, MPI_INT, proc, m2c_rank/*tag*/, joint_comm, &send_requests.back());
     }
 
     MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
@@ -734,6 +738,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     recv_requests.clear();
     nNodes.assign(numLeaderProcs,0);
     if(nNodes_all>0) {
+      nNodes.assign(numLeaderProcs,100);
       for(int proc=0; proc<numLeaderProcs; proc++) {
         recv_requests.push_back(MPI_Request());
         MPI_Irecv(&nNodes[proc], 1, MPI_INT, proc, proc, joint_comm, &recv_requests.back());
@@ -793,10 +798,11 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
       for(auto&& nod : duplicates)
         dups[nod.first].push_back(nod.second);
 
+      vector<int> ndup(numLeaderProcs,0);
       for(int proc=0; proc<numLeaderProcs; proc++) {
         send_requests.push_back(MPI_Request());
-        int ndup = dups[proc].size();
-        MPI_Isend(&ndup, 1, MPI_INT, proc, m2c_rank, joint_comm, &send_requests.back()); 
+        ndup[proc] = dups[proc].size();
+        MPI_Isend(&ndup[proc], 1, MPI_INT, proc, m2c_rank, joint_comm, &send_requests.back()); 
       }
       MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
       send_requests.clear();

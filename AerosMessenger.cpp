@@ -579,12 +579,10 @@ AerosMessenger::SendForce()
     for(int proc = 0; proc < numAerosProcs; proc++) {
       if(numStrNodes[proc][0] > 0) {
         int size = 3*numStrNodes[proc][0];
-
-        double *localBuffer = temp_buffer.data() + 3*numStrNodes[proc][1];
-
         send_requests.push_back(MPI_Request());
-        MPI_Isend(localBuffer, size, MPI_DOUBLE, proc, FORCE_TAG, 
-              joint_comm, &(send_requests[send_requests.size()-1]));
+        MPI_Isend((double*)(temp_buffer.data() + 3*numStrNodes[proc][1]),
+                  size, MPI_DOUBLE, proc, FORCE_TAG, 
+                  joint_comm, &(send_requests[send_requests.size()-1]));
       }
     }
     MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
@@ -608,9 +606,8 @@ AerosMessenger::GetDisplacementAndVelocity()
         int size = bufsize*numStrNodes[proc][0]; 
         int first_index =  bufsize*numStrNodes[proc][1];
 
-        double *localBuffer = temp_buffer.data() + first_index;
-
-        MPI_Recv(localBuffer, size, MPI_DOUBLE, proc, DISP_TAG, joint_comm, MPI_STATUS_IGNORE);
+        MPI_Recv((double*)(temp_buffer.data() + first_index),
+                 size, MPI_DOUBLE, proc, DISP_TAG, joint_comm, MPI_STATUS_IGNORE);
       }
     }
 
