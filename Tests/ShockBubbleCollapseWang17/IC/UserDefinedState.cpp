@@ -58,7 +58,7 @@ MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jma
         x = -(coords[k][j][i][0] + 0.2);
         if(x>0 && x<4.5) { //within the wave form
           t = x/soundspeed; 
-          p = 2.0*ps*exp(-1.0*alpha*t)*cos(omega*t+PI/3.0);
+          p = p0 + 2.0*ps*exp(-1.0*alpha*t)*cos(omega*t+PI/3.0);
           v[k][j][i][0] = rho0;
           v[k][j][i][1] = (p - p0)/(rho0*soundspeed);
           v[k][j][i][2] = 0.0;

@@ -368,8 +368,10 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 
 #if PRINT_RIEMANN_SOLUTION == 1
   // the 2-wave
-  sol1d.push_back(vector<double>{u2 - std::max(1e-6, 0.001*fabs(u2)), rhol2, u2, p2, (double)idl});
-  sol1d.push_back(vector<double>{u2, rhor2, u2, p2, (double)idr});
+  double u2minus = u2 - std::max(1e-6, 0.001*fabs(u2));
+  sol1d.push_back(vector<double>{u2minus, rhol2, u2, p2, (double)idl});
+  sol1d.push_back(vector<double>{u2,      rhor2, u2, p2, (double)idr});
+ 
   // 1- and 3- waves
   integrationPath1.clear();
   integrationPath3.clear();
@@ -396,6 +398,16 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
     std::cout <<  "*** Error: ComputeRhoUStar(3) failed when finalizng the solution." << std::endl;
     exit(-1);
   } 
+
+  //ComputeRhoUStar may "overshoot", depending on error tolerances. We eliminate those.
+  std::sort(sol1d.begin(), sol1d.end(), 
+      [](vector<double> v1, vector<double> v2){return v1[0]<v2[0];});
+  for(auto it = sol1d.begin(); it != sol1d.end();)
+    if(((*it)[0]>u2      && (*it)[4]==idl) ||
+       ((*it)[0]<u2minus && (*it)[4]==idr))
+      it = sol1d.erase(it);
+    else
+      it++;
 #endif
 
   Vs[0] = Vs[1] = Vs[2] = Vs[3] = Vs[4] = 0.0;
