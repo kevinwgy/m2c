@@ -1,0 +1,81 @@
+************************************** 
+* Units: mm, s, g, Pa, ...
+************************************** 
+CONTROL
+cylinder2d
+1
+"nodeset"
+"elemset"
+************************************** 
+DYNAM
+newmark
+mech 0.0 0.5
+time 0.0 1.25e-8 4.5e-3
+stable 0
+RAYDAMP 1.0e-8 1.0e-4
+************************************** 
+CONSTRAINTS
+multipliers
+************************************** 
+NONLINEAR
+*
+************************************** 
+AERO
+C0 0.5 0.375
+EMBEDDED 8
+************************************** 
+OUTPUT
+gdisplac "results/disp"      800
+gacceler "results/accel"     800 
+stressp1 "results/stressp1"  800
+stressp2 "results/stressp2"  800
+stressp3 "results/stressp3"  800
+effpstrn "results/epstrain"  800
+strainvm "results/vmstrain"  800
+stressvm "results/vmstress"  800
+*AEROFORX "results/fx" 200
+*AEROFORY "results/fy" 200
+*AEROFORZ "results/fz" 200
+*
+OUTPUT6
+gdisplac "results/disp.1" 200 1 
+gvelocit "results/velo.1" 200 1
+gdisplac "results/disp.101" 200 101
+gvelocit "results/velo.101" 200 101
+gdisplac "results/disp.201" 200 201
+gvelocit "results/velo.201" 200 201 
+gacceler "results/accel.1" 200 1
+gacceler "results/accel.101" 200 101
+gacceler "results/accel.201" 200 201
+************************************** 
+*RESTART
+*"restart/rst_fem" 200000
+**"restart/rst_fem" ".2"
+************************************** 
+* Nodes, topology, surfaces
+include "mesh.include"
+************************************** 
+*DISP
+*SURFACE 1 1 0.0
+*SURFACE 8 1 0.0
+************************************** 
+ATTR
+1,2000    1
+************************************** 
+MATERIAL
+* shell: Al 6061-T6 from Farhat, Wang, etc., IJSS 2013 
+1   0   6.96e+10   0.33  2.779e-3  0  0  0  0  0  0  0  0  0  0
+**************************************
+MATUSAGE
+1,2000    1
+**************************************
+MATLAW
+* Al 6061-T6 from Farhat, Wang, etc., IJSS 2013 
+1 FiniteStrainPlastic 2.779e-3  6.96e+10  0.33  6.74e+8  2.92e+8  1
+**************************************
+************************************** 
+CONTACTSURFACES
+* SURF_PAIR_ID# MASTER SLAVE KPART_TYPE NORMAL_TOL TANGENTIAL_TOL NUM_ITER CONVERG_TOL FRIC_COEF CONSTRAINT_METHOD
+  1             1          1          1       0.1           0.001      20       1e-16       0.0      
+**************************************
+END
