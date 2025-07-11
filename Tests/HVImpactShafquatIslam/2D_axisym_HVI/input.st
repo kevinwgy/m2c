@@ -273,7 +273,7 @@ under BoundaryConditions {
       under BoundaryState { //the state of the projectile
         MaterialID = 2;
         Density = 16.65e-3;
-        VelocityX = 6.0e6; //mm/s
+        VelocityX = 5.0e6; //mm/s
         VelocityY = 0.0;
         VelocityZ = 0.0;
         Pressure = 1.0e5;

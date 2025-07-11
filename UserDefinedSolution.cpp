@@ -4,31 +4,32 @@
  ************************************************************************/
 
 #include <vector>
-#include "UserDefinedState.h"
+#include "UserDefinedSolution.h"
 #include "Vector3D.h"
 #include "Vector5D.h"
 
 //------------------------------------------------------------
 // This is a template for users to fill. Not compiled w/ M2C.
-// If multiple UserDefinedState need to be defined, they should
-// have different names (e.g., MyStateCalculator1, MyStateCalculator2, etc.)
+// If multiple UserDefinedSolutions are to be defined, they should
+// have different names (e.g., MySolutionCalculator1, MySolutionCalculator2, etc.)
 // Compilation script (an example):
-// g++ -O3 -fPIC -I/path/to/folder/that/contains/UserDefinedState.h -c UserDefinedState.cpp; g++ -shared UserDefinedState.o -o UserDefinedState.so; rm UserDefinedState.o
+// g++ -O3 -fPIC -I/path/to/folder/that/contains/UserDefinedSolution.h -c UserDefinedSolution.cpp; g++ -shared UserDefinedSolution.o -o UserDefinedSolution.so; rm UserDefinedSolution.o
 //------------------------------------------------------------
 
-class MyStateCalculator : public UserDefinedState{
+class MySolutionCalculator : public UserDefinedSolution{
 
 public:
-  void GetUserDefinedState(int i0, int j0, int k0, int imax, int jmax, int kmax,
-                           Vec3D*** coords, Vec5D*** v, double*** id, std::vector<double***> phi);
+  void GetUserDefinedSolution(int i0, int j0, int k0, int imax, int jmax, int kmax,
+                              Vec3D*** coords, Vec5D*** v, double*** id, std::vector<double***> phi,
+                              double time);
 };
 
 //------------------------------------------------------------
 
 void
-MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jmax, int kmax,
-                                       Vec3D*** coords, Vec5D*** v, double*** id,
-                                       std::vector<double***> phi)
+MySolutionCalculator::GetUserDefinedSolution(int i0, int j0, int k0, int imax, int jmax, int kmax,
+                                             Vec3D*** coords, Vec5D*** v, double*** id,
+                                             std::vector<double***> phi, double time)
 {
   // Note:
   // 1. Each processor core calls this function with different inputs.
@@ -41,7 +42,7 @@ MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jma
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
-        if(false) {
+        if(time>0.0 && false) {
           v[k][j][i]  = 0.0; //Vec5D
           id[k][j][i] = 0.0;
         }
@@ -50,13 +51,13 @@ MyStateCalculator::GetUserDefinedState(int i0, int j0, int k0, int imax, int jma
 }
 
 //------------------------------------------------------------
-// The class factory (Note: Do NOT change these functions except the word "MyStateCalculator".)
-extern "C" UserDefinedState* Create() {
-  return new MyStateCalculator; //TODO: If you've changed the name of the derived class, this needs to be updated.
+// The class factory (Note: Do NOT change these functions except the word "MySolutionCalculator".)
+extern "C" UserDefinedSolution* Create() {
+  return new MySolutionCalculator; //TODO: If you've changed the name of the derived class, this needs to be updated.
 }
 
-extern "C" void Destroy(UserDefinedState* uds) {
-  delete uds;
+extern "C" void Destroy(UserDefinedSolution* udsl) {
+  delete udsl;
 }
 
 //------------------------------------------------------------

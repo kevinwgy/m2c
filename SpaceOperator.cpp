@@ -17,7 +17,7 @@
 #include <KDTree.h>
 #include <rbf_interp.hpp>
 #include <memory> //unique_ptr
-#include <tuple>
+#include <dlfcn.h> //dlopen, dlclose
 using std::cout;
 using std::endl;
 using std::max;
@@ -55,6 +55,7 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
     Utmp(comm_, &(dm_all_.ghosted1_5dof)),
     Tag(comm_, &(dm_all_.ghosted1_1dof)),
     symm(NULL), visco(NULL), heat_diffusion(NULL), heo(NULL), smooth(NULL),
+    solution_calculator(std::make_tuple(nullptr, nullptr, nullptr)),
     frozen_nodes_ptr(NULL)
 {
   
@@ -75,6 +76,31 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
     smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
     
+  // set-up user-defined solution calculator
+  if(strcmp(iod.schemes.ps.solution_calculator, "") !=0) {
+    std::get<1>(solution_calculator) = dlopen(iod.schemes.ps.solution_calculator, RTLD_NOW);
+    if(!std::get<1>(solution_calculator)) {
+      print_error("*** Error: Unable to load object %s.\n", iod.schemes.ps.solution_calculator);
+      exit_mpi();
+    }
+    dlerror();
+    CreateUDSL* create = (CreateUDSL*) dlsym(std::get<1>(solution_calculator), "Create");
+    const char* dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Create in %s.\n", iod.schemes.ps.solution_calculator);
+      exit_mpi();
+    }
+    std::get<2>(solution_calculator) = (DestroyUDSL*) dlsym(std::get<1>(solution_calculator), "Destroy");
+    dlsym_error = dlerror();
+    if(dlsym_error) {
+      print_error("*** Error: Unable to find function Destroy in %s.\n", iod.schemes.ps.solution_calculator);
+      exit_mpi();
+    }
+    //This is the actual calculator
+    std::get<0>(solution_calculator) = create();
+    print("- Loaded user-defined solution calculator from %s.\n", iod.schemes.ps.solution_calculator);
+  }
+
   if(iod.multiphase.flux == MultiPhaseData::LOCAL_LAX_FRIEDRICHS) {
     if(iod.multiphase.phasechange_type == MultiPhaseData::RIEMANN_SOLUTION) {
       print_error("*** Error: MultiPhase::Flux = LocalLaxFriedrichs is incompatible with PhaseChange = RiemannSolution.\n");
@@ -94,6 +120,13 @@ SpaceOperator::~SpaceOperator()
   if(heat_diffusion) delete heat_diffusion;
   if(smooth) delete smooth;
   if(interfluxFcn) delete interfluxFcn;
+
+  if(std::get<0>(solution_calculator)) {
+    assert(std::get<2>(solution_calculator)); //this is the destruction function
+    std::get<2>(solution_calculator)(std::get<0>(solution_calculator)); //use it to destroy the calculator
+    assert(std::get<1>(solution_calculator));
+    dlclose(std::get<1>(solution_calculator));
+  }
 }
 
 //-----------------------------------------------------
@@ -797,6 +830,31 @@ SpaceOperator::ApplySmoothingFilter(double time, double dt, int time_step, Space
     ClipDensityAndPressure(V,ID);
     ApplyBoundaryConditions(V);
   } 
+}
+
+//-----------------------------------------------------
+
+void
+SpaceOperator::ApplyUserDefinedSolution(double time, SpaceVariable3D &V, SpaceVariable3D &ID,
+                                        vector<SpaceVariable3D*> &Phi)
+{
+  assert(std::get<0>(solution_calculator));
+
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+  Vec5D***      v = (Vec5D***)V.GetDataPointer();
+  double***    id = ID.GetDataPointer();
+  vector<double***> phi(Phi.size(), NULL);
+  for(int i=0; i<(int)Phi.size(); i++)
+    phi[i] = Phi[i]->GetDataPointer();
+
+  UserDefinedSolution *calculator(std::get<0>(solution_calculator));
+  calculator->GetUserDefinedSolution(i0,j0,k0,imax,jmax,kmax,coords,v,id,phi,time);
+
+  for(int i=0; i<(int)Phi.size(); i++)
+      Phi[i]->RestoreDataPointerAndInsert();
+  ID.RestoreDataPointerAndInsert();
+  V.RestoreDataPointerAndInsert();
+  coordinates.RestoreDataPointerToLocalVector();
 }
 
 //-----------------------------------------------------

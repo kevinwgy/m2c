@@ -767,6 +767,21 @@ struct PrescribedMotionData {
 };
 
 //------------------------------------------------------------------------------
+/** Allows user to provide a function (compiled separately & dynamically linked) to modify solution
+  * fields at the end of each time step. A generalization of PrescribedMotionData. */
+
+struct PrescribedSolutionData {
+
+  const char *solution_calculator; //!< dynamically linked library 
+
+  PrescribedSolutionData();
+  ~PrescribedSolutionData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
 
 struct LevelSetSchemeData {
 
@@ -810,6 +825,8 @@ struct SchemesData {
 
   ObjectMap<PrescribedMotionData> pm;
 
+  PrescribedSolutionData ps;
+  
   SchemesData();
   ~SchemesData() {}
 
@@ -1109,7 +1126,7 @@ struct IcData {
   std::vector<double> user_data2[SIZE]; //!< for radial variation 
   //-----------------------------------------------------------------------
 
-  const char *state_calculator; //!< dynamically loaded object / user-specified i.c.
+  const char *state_calculator; //!< dynamically linked library / user-specified i.c.
 
   //-----------------------------------------------------------------------
   //! initial condition specified through "flooding".

@@ -1469,6 +1469,23 @@ Assigner *PrescribedMotionData::getAssigner()
 
 //------------------------------------------------------------------------------
 
+PrescribedSolutionData::PrescribedSolutionData()
+{
+  solution_calculator = "";
+}
+
+//------------------------------------------------------------------------------
+
+void PrescribedSolutionData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassStr<PrescribedSolutionData>(ca, "UserDefinedSolutionCalculator", 
+                                       this, &PrescribedSolutionData::solution_calculator);
+}
+
+//------------------------------------------------------------------------------
+
 LevelSetSchemeData::LevelSetSchemeData() 
 {
   materialid = -1;
@@ -1563,7 +1580,7 @@ SchemesData::SchemesData()
 void SchemesData::setup(const char *name, ClassAssigner *father)
 {
 
-  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+  ClassAssigner *ca = new ClassAssigner(name, 5, father);
 
   ns.setup("NavierStokes", ca);
 
@@ -1573,6 +1590,7 @@ void SchemesData::setup(const char *name, ClassAssigner *father)
 
   pm.setup("PrescribedMotion", ca);
 
+  ps.setup("PrescribedSolution", ca);
 }
 
 //------------------------------------------------------------------------------

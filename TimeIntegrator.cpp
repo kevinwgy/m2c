@@ -836,6 +836,11 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     spo.ApplyBoundaryConditions(V); //to be safe...
   }
 
+  // User-specified solution modification (if provided by user)
+  // NOTE: User needs to take care of boundary / ghost nodes if needed.
+  if(strcmp(iod.schemes.ps.solution_calculator, "") !=0)
+    spo.ApplyUserDefinedSolution(time, V, ID, Phi);
+
 }
 
 //----------------------------------------------------------------------------

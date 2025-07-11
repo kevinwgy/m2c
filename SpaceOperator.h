@@ -15,6 +15,7 @@
 #include <FluxFcnBase.h>
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
+#include <UserDefinedSolution.h>
 
 class EmbeddedBoundaryDataSet;
 class TriangulatedSurface;
@@ -73,6 +74,9 @@ class SpaceOperator
   //! Class for smoothing the solution
   SmoothingOperator* smooth;
 
+  //! User-specified solution calculator (default is null)
+  std::tuple<UserDefinedSolution*, void*, DestroyUDSL*> solution_calculator;
+
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;
 
@@ -119,6 +123,9 @@ public:
   void ApplyBoundaryConditions(SpaceVariable3D &V);
 
   void ApplySmoothingFilter(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID);
+
+  void ApplyUserDefinedSolution(double time, SpaceVariable3D &V, SpaceVariable3D &ID,
+                                vector<SpaceVariable3D*> &Phi);
 
   void FindExtremeValuesOfFlowVariables(SpaceVariable3D &V, SpaceVariable3D &ID,
                                         double *Vmin, double *Vmax, double &cmin, 
