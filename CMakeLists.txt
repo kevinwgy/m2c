@@ -32,7 +32,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 #--------------------------------------------------------
 # find packages 
 if(NOT DEFINED ENV{PETSC_DIR})
-  message(FATAL_ERROR "ERROR: Could not find Petsc...")
+  message(FATAL_ERROR "ERROR: Could not find Petsc. Environment variable PETSC_DIR needs to be set.")
 endif()
 
 find_package(PETSc REQUIRED)
@@ -44,8 +44,11 @@ if(NOT "${PETSc_INCLUDE_DIR}" STREQUAL "")
 endif()
 
 find_package(Eigen3 3.3 REQUIRED)
-if(NOT "$ENV{EIGEN3_INCLUDE_DIR}" STREQUAL "")
-  include_directories("$ENV{EIGEN3_INCLUDE_DIR}")
+if(NOT "${EIGEN3_INCLUDE_DIR}" STREQUAL "")
+  message("-- Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
+  include_directories("${EIGEN3_INCLUDE_DIR}")
+else()
+  message(FATAL_ERROR "ERROR: Found Eigen3 but EIGEN3_INCLUDE_DIR undefined. (Try again with -DEIGEN3_INCLUDE_DIR=<provide-path-here>")
 endif()
 
 find_package(Boost 1.72 REQUIRED)
