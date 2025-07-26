@@ -1,0 +1,60 @@
+************************************** 
+* Units: mm, s, g, Pa, ...
+************************************** 
+CONTROL
+ExampleCapsule
+1
+"nodeset"
+"elemset"
+************************************** 
+DYNAM
+newmark
+mech 0.0 0.5
+time 0.0 2.0e-8 2e-3
+*stable 0
+************************************** 
+CONSTRAINTS
+penalty 1e12
+************************************** 
+NONLINEAR
+*
+************************************** 
+AERO
+C0 0.5 0.375
+EMBEDDED 1
+************************************** 
+DECOMPOSE
+NSUBS 16
+************************************** 
+BINARY
+BINARYOUTPUT On
+************************************** 
+OUTPUT
+gdisplac "results/disp"      400
+stressvm "results/vmstress"  400
+strainvm "results/vmstrain"  400 
+effpstrn "results/epstrain"  400
+************************************** 
+RESTART
+"restart/rst_fem" 10000
+*"restart/rst_fem" ".restart"
+************************************** 
+* Nodes, topology, surfaces
+include "StructModel/mesh.include"
+************************************** 
+DISP
+include "StructModel/disp.include"
+************************************** 
+ATTR
+1,16509    1
+************************************** 
+MATERIAL
+1   0.0    2.1e+11     0.3   7.9e-3   0.0   0.0  5.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+**************************************
+MATUSAGE
+1,16509    1
+**************************************
+MATLAW
+1 PlaneStressBilinearPlastic 7.9e-3  2.1e+11  0.3  0.0  3.55e+8  1.0  5.0
+***************************************
+END
