@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #!/bin/bash
-#SBATCH --job-name=giordano           # Job name
+#SBATCH --job-name=shocked_panel      # Job name
 #SBATCH --output=srun_log.out         # Output file
 #SBATCH --error=srun_log.out          # Error file
 #SBATCH --nodes=1                     # Number of nodes
@@ -17,11 +17,11 @@ cd $SLURM_SUBMIT_DIR
 
 # Run the job
 M2C_SIZE=120
-M2C_EXE=~/tinkercliffs/m2c/m2c
+M2C_EXE=~/tinkercliffs/zoey7/m2c
 M2C_INPUT=input.st
 
 AEROS_SIZE=1
-AEROS_EXE=~/tinkercliffs/FEMWorkingFoam/bin/aeros
+AEROS_EXE=~/tinkercliffs/FEMWorking/bin/aeros
 AEROS_INPUT=fem.in
 
 mpiexec -n $M2C_SIZE $M2C_EXE $M2C_INPUT :\

@@ -1262,10 +1262,9 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
     total_remaining_nodes = nodes2fill.size();
     MPI_Allreduce(MPI_IN_PLACE, &total_remaining_nodes, 1, MPI_INT, MPI_SUM, comm);
 
-    if(total_remaining_nodes>0) {
-      print("  - iter %d: total_remaining_nodes = %d.\n", iter, total_remaining_nodes);
-//      exit_mpi();
-    }
+//    if(total_remaining_nodes>0) {
+//      print("  - iter %d: total_remaining_nodes = %d.\n", iter, total_remaining_nodes);
+//    }
 
     if(total_remaining_nodes == 0 || total_remaining_nodes == prev_remaining)
       break;  //either done with refill :) or no progress :(
