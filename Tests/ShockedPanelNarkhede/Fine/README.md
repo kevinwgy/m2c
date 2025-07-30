@@ -3,9 +3,9 @@
 This example case presents the coupled fluid-structure interaction problem
 in which a deforming cantilever beam is subjected to a planar shock wave. 
 
-![Numerical setup.](.images/NumericalModelProblem.jpg)
+![Numerical setup.](results/ref_images/NumericalModelProblem.jpg)
 
-# Verification
+# Comparison with reference
 
 This problem has been studied both numerically and experimentally by
 Giordano *et. al.* in "Shock wave impacts on deforming panel, an application 
@@ -24,7 +24,7 @@ of the flexible panel is plotted in subfigure **(b)**. The simulation
 captures the initial pressure jump due to the incident shock, followed by
 unsteady fluctuations resulting from shock reflections and panel motion.
 
-![Sensor results.](.images/GiordanoExperimentVerification.jpg)
+![Sensor results.](results/ref_images/GiordanoExperimentVerification.jpg)
 
 A qualitative comparison of the overall fluid dynamics is presented below by
 comparing the synthetic Schlieren fields from the present study 
@@ -32,4 +32,4 @@ comparing the synthetic Schlieren fields from the present study
 experimental shadowgraph (subfigure **(a)**) images extracted from the 
 reference.
 
-![Qualitative comparisons](.images/GiordanoQualitativeComparisons.jpg)
+![Qualitative comparisons](results/ref_images/GiordanoQualitativeComparisons.jpg)
