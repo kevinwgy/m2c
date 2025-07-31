@@ -369,9 +369,6 @@ int main(int argc, char* argv[])
   if(embed) //even if id2closure is empty, we must still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
-  for(auto&& mm : id2closure)
-    print("MatID %d: surf %d, color %d.\n", mm.first, mm.second.first, mm.second.second);
-
   //! Initialize multiphase operator (for updating "phase change")
   MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
   if((int)lso.size()>1) { //at each node, at most one "phi" can be negative
