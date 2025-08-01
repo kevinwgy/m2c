@@ -56,13 +56,6 @@ under EmbeddedBoundaryMethod {
         Solution = "surface_load.txt";
         ContactSurfaceOutput = "surface_contact.top";
       }
-/*
-      under RBFOutput {
-        Frequency = 40;
-        Prefix = "results/force/";
-        Pressure = "pressure";
-      }
-*/
     }
   }
 }
@@ -170,21 +163,8 @@ under Output {
   Velocity = On;
   Pressure = On;
   MaterialID = On;
-  SoundSpeed = On;
   InternalEnergyPerUnitMass = On;
-  //LevelSet0 = On;
   //MeshPartition = "partition";
-
-/*
-  under LinePlot[0] {
-    FileName = "line";
-    Frequency = 100;
-    NumberOfPoints = 10000;
-    X0 = 0.0;  Xmax = 800.0;
-    Y0 = 0.0;  Ymax = 0.0;
-    Z0 = 0.0;  Zmax = 0.0;
-  }
-*/
 
   under EnergyIntegration {
     Frequency = 50;
