@@ -130,6 +130,10 @@ protected:
   double UpdateStates(Vec5D*** v, SpaceVariable3D &P, SpaceVariable3D &Pprime, SpaceVariable3D &DX,
                       SpaceVariable3D &DY, SpaceVariable3D &DZ, SpaceVariable3D &VX,
                       SpaceVariable3D &VY, SpaceVariable3D &VZ);
+
+private:
+  using TimeIntegratorSIMPLE::UpdateStates; //!< parent class function, shouldn't be used here.
+
 };  
 
 

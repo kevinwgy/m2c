@@ -72,6 +72,9 @@ protected:
   //! PK2->Cauchy. Input: P2D, F2D, J (not J2D). Output: sigma_2D[0,1,2] (2x2 matrix, w/ symmetry)
   void ConvertPK2ToCauchy(double* P, double *F, double J, double *sigma); //!< sigma[0-2] (by symmetry)
 
+private:
+  using HyperelasticityFcnBase::GetCauchyStressTensor; //!< base class function, shouldn't be used here
+ 
 };
 
 //---------------------------------------------------------------------------------

@@ -177,6 +177,8 @@ protected:
                             double dp /*step size*/,
                             double &rho, double &u, double &p, double &xi /*output*/);
 
+private:
+  using ExactRiemannSolverBase::Rarefaction_OneStepRK4; //non-adaptive version, shouldn't be used in derived class
  
 };
 

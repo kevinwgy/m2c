@@ -42,7 +42,7 @@ class SpaceOperator
   //! Mesh info
   SpaceVariable3D coordinates;
   SpaceVariable3D delta_xyz;
-  SpaceVariable3D volume; //!< volume of node-centered control volumes
+  SpaceVariable3D volume; //!< volume of control volumes
   
   vector<GhostPoint> ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   vector<GhostPoint> ghost_nodes_outer; //!< ghost nodes outside the physical domain

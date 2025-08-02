@@ -109,13 +109,13 @@ EnergyIntegrationOutput::~EnergyIntegrationOutput()
 }
 
 //------------------------------------------------------------------------------------------------------
-void EnergyIntegrationOutput::WriteSolutionOfIntegrationEnergy(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                                        SpaceVariable3D* L, bool force_write)
+void
+EnergyIntegrationOutput::WriteSolutionOfIntegrationEnergy(double time, double dt, int time_step, SpaceVariable3D &V,
+                                                          SpaceVariable3D &ID, SpaceVariable3D* L, bool force_write)
 {
  
   if(!isTimeToWrite(time,dt,time_step,frequency_dt,frequency,last_snapshot_time,force_write))
     return;
-
 
   if(file[EnergyIntegrationData::VOLUME]) {
     print(file[EnergyIntegrationData::VOLUME], "%10d    %16.8e    ", time_step, time);
@@ -264,12 +264,12 @@ void EnergyIntegrationOutput::IntegrateVolume(SpaceVariable3D &ID, double* vol)
             if(coords[k][j][i][2] >= iod_output.energy_integration.z_min &&
                coords[k][j][i][2] <= iod_output.energy_integration.z_max){
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 vol[myid] += cell[k][j][i]*scale;
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 vol[myid] += cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 vol[myid] += cell[k][j][i]*scalor;
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 vol[myid] += cell[k][j][i]*scalar;
                }
                else
                  vol[myid] += cell[k][j][i];
@@ -323,12 +323,12 @@ void EnergyIntegrationOutput::IntegrateMass(SpaceVariable3D &V, SpaceVariable3D 
             if(coords[k][j][i][2] >= iod_output.energy_integration.z_min &&
                coords[k][j][i][2] <= iod_output.energy_integration.z_max){
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 mass[myid] += v[k][j][i][0]*cell[k][j][i]*scale;
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 mass[myid] += v[k][j][i][0]*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 mass[myid] += v[k][j][i][0]*cell[k][j][i]*scalor;
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 mass[myid] += v[k][j][i][0]*cell[k][j][i]*scalar;
                }
                else
                  mass[myid] += v[k][j][i][0]*cell[k][j][i];
@@ -384,12 +384,12 @@ void EnergyIntegrationOutput::IntegrateTotalEnergy(SpaceVariable3D &V, SpaceVari
                               + v[k][j][i][3]*v[k][j][i][3];
                double e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 E[myid] += v[k][j][i][0]*(0.5*vsquare+e)*cell[k][j][i]*scale;
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 E[myid] += v[k][j][i][0]*(0.5*vsquare+e)*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 E[myid] += v[k][j][i][0]*(0.5*vsquare+e)*cell[k][j][i]*scalor;
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 E[myid] += v[k][j][i][0]*(0.5*vsquare+e)*cell[k][j][i]*scalar;
                }
                else
                  E[myid] += v[k][j][i][0]*(0.5*vsquare+e)*cell[k][j][i];
@@ -446,12 +446,12 @@ void EnergyIntegrationOutput::IntegrateTotalEnthalpy(SpaceVariable3D &V, SpaceVa
                               + v[k][j][i][3]*v[k][j][i][3];
                double e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i]*scale;
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i]*scalor;
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i]*scalar;
                }
                else
                  H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i];
@@ -507,12 +507,12 @@ void EnergyIntegrationOutput::IntegrateKineticEnergy(SpaceVariable3D &V, SpaceVa
                double vsquare = v[k][j][i][1]*v[k][j][i][1] + v[k][j][i][2]*v[k][j][i][2]
                               + v[k][j][i][3]*v[k][j][i][3];
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 kinetic[myid] += 0.5*v[k][j][i][0]*vsquare*cell[k][j][i]*scale;
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 kinetic[myid] += 0.5*v[k][j][i][0]*vsquare*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 kinetic[myid] += 0.5*v[k][j][i][0]*vsquare*cell[k][j][i]*scalor;
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 kinetic[myid] += 0.5*v[k][j][i][0]*vsquare*cell[k][j][i]*scalar;
                }
                else
                  kinetic[myid] += 0.5*v[k][j][i][0]*vsquare*cell[k][j][i];
@@ -567,12 +567,12 @@ void EnergyIntegrationOutput::IntegrateInternalEnergy(SpaceVariable3D &V, SpaceV
                coords[k][j][i][2] <= iod_output.energy_integration.z_max){
                double e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 internal[myid] += v[k][j][i][0]*e*cell[k][j][i]*scale;
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 internal[myid] += v[k][j][i][0]*e*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 internal[myid] += v[k][j][i][0]*e*cell[k][j][i]*scalor;
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 internal[myid] += v[k][j][i][0]*e*cell[k][j][i]*scalar;
                }
                else
                  internal[myid] += v[k][j][i][0]*e*cell[k][j][i];
@@ -626,12 +626,12 @@ void EnergyIntegrationOutput::IntegratePotentialEnergy(SpaceVariable3D &V, Space
             if(coords[k][j][i][2] >= iod_output.energy_integration.z_min &&
                coords[k][j][i][2] <= iod_output.energy_integration.z_max){
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 potential[myid] += abs(v[k][j][i][4])*cell[k][j][i]*scale;
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 potential[myid] += abs(v[k][j][i][4])*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 potential[myid] += abs(v[k][j][i][4])*cell[k][j][i]*scalor;
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 potential[myid] += abs(v[k][j][i][4])*cell[k][j][i]*scalar;
                }
                else
                  potential[myid] += abs(v[k][j][i][4])*cell[k][j][i];
@@ -686,18 +686,18 @@ void EnergyIntegrationOutput::IntegrateLaserRadiation(SpaceVariable3D &V, SpaceV
             if(coords[k][j][i][2] >= iod_output.energy_integration.z_min &&
                coords[k][j][i][2] <= iod_output.energy_integration.z_max){
                if(iod_mesh.type == MeshData::SPHERICAL){
-                 double scale = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+                 double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
                  e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
                  myT = vf[myid]->GetTemperature(v[k][j][i][0], e);
                  eta = laser->GetAbsorptionCoefficient(myT, myid);
-                 radiation[myid] += eta*l[k][j][i]*cell[k][j][i]*scale;
+                 radiation[myid] += eta*l[k][j][i]*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
-                 double scalor = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+                 double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
                  e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
                  myT = vf[myid]->GetTemperature(v[k][j][i][0], e);
                  eta = laser->GetAbsorptionCoefficient(myT, myid);
-                 radiation[myid] += eta*l[k][j][i]*cell[k][j][i]*scalor;
+                 radiation[myid] += eta*l[k][j][i]*cell[k][j][i]*scalar;
                }
                else{
                  e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
