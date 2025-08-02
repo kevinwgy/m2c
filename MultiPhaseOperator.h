@@ -88,7 +88,7 @@ public:
                              SpaceVariable3D &V, vector<int> &phi_updated, vector<Int3> *new_useful_nodes);
 
   //! add stored latent heat (Lambda) to cells that changed phase due to interface motion
-  void AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
+  void AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
 
   //! if the boundaries of multiple material subdomains meet, ensure that the phi's are consistent
   int ResolveConflictsInLevelSets(int time_step, vector<SpaceVariable3D*> &Phi);

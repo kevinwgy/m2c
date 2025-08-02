@@ -798,7 +798,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     }
 
     // add stored latent heat (Lambda) to cells that changed phase due to interface motion
-    mpo.AddLambdaToEnthalpyAfterInterfaceMotion(IDn, ID, V);
+    mpo.AddLambdaToInternalEnergyAfterInterfaceMotion(IDn, ID, V);
 
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);

@@ -1543,11 +1543,11 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
     for(int j=jj0; j<jjmax; j++)
       for(int i=ii0; i<iimax; i++) {
 
-        myid = (int)id[k][j][i];
         // skip nodes outside the physical domain
         if(coordinates.OutsidePhysicalDomain(i,j,k))
           continue;
 
+        myid = (int)id[k][j][i];
 //        if(lam[k][j][i]>0)
 //          fprintf(stdout,"lam[%d][%d][%d] = %e.\n", k,j,i, lam[k][j][i]);
 
@@ -2011,7 +2011,7 @@ MultiPhaseOperator::UpdateLevelSetsInUnresolvedCells(vector<SpaceVariable3D*> &P
 //-------------------------------------------------------------------------
 
 void
-MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
+MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
                                                             SpaceVariable3D &V)
 {
 
@@ -2045,12 +2045,10 @@ MultiPhaseOperator::AddLambdaToEnthalpyAfterInterfaceMotion(SpaceVariable3D &IDn
             continue;
 
           //---------------------------------------------------------------------
-          // Now, do the actual work: Add lam to enthalpy
+          // Now, do the actual work: Add lam to internal energy (originally added to enthalpy, see Xuning JCP)
           double rho = v[k][j][i][0];
-          //double p   = v[k][j][i][4];
           double e   = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          //double h   = e + p/rho + lam[k][j][i]; //adding lam
-          e += lam[k][j][i]; //Correction of phase-change model (see Xuning JFM)
+          e += lam[k][j][i]; //Corrected --> add to energy not enthalpy (see Xuning JFM)
           lam[k][j][i] = 0.0;
           // update p to account for the increase of enthalpy (rho is fixed)
           v[k][j][i][4] = varFcn[myid]->GetPressure(rho, e);
