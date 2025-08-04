@@ -13,7 +13,10 @@
 #include <TerminalVisualization.h>
 #include <HyperelasticityOperator.h>
 #include <IncompressibleOperator.h>
+#include <PhaseTransitionOutput.h>
 #include <stdio.h>
+
+class MultiPhaseOperator;
 
 /** Class Output is responsible  for writing solutions to files. It uses PETSc functionalities
  *  to write VTK files. It should not try to do post-processing work that can be done by some
@@ -33,6 +36,9 @@ class Output
 
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
+
+  //! Multiphase/multi-material operator
+  PhaseTransitionOutput* pto;
 
   //! Laser absorption solver
   LaserAbsorptionSolver* laser;
@@ -69,7 +75,7 @@ public:
   Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
          std::vector<GhostPoint>* ghost_nodes_outer_, vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_,
          SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
-         IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL,
+         MultiPhaseOperator& mpo_, IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL,
          IncompressibleOperator* inco_ = NULL);
 
   ~Output();

@@ -11,7 +11,6 @@
  * class EnergyIntegrationOperator integrates the energy 
  * required by user within the specified region
  * ********************************************************/
-using namespace std;
 
 class EnergyIntegrationOutput
 {

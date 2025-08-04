@@ -53,9 +53,12 @@ class MultiPhaseOperator
 
   //! phase transition 
   vector<vector<PhaseTransitionBase*> > trans;  //!< trans[i] contains all possible destinations of phase i
+  double lam_transitioned, lam_dumped; //!< output only (can be improved to distinguish different transitions)
+  double lam_transitioned_new, lam_dumped_new;
 
   //! latent heat reservoir (for modeling phase transition)
   SpaceVariable3D Lambda;
+
 
 public:
   MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_,
@@ -113,6 +116,9 @@ public:
   int ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*> &Phi,
           SpaceVariable3D &IDn, SpaceVariable3D &ID,
           vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS, vector<Intersector*> *intersector);
+
+  void GetPhaseTransitionStats(double& l1, double& l2, double& l1_new, double& l2_new) {
+    l1 = lam_transitioned; l2 = lam_dumped; l1_new = lam_transitioned_new; l2_new = lam_dumped_new;}
 
   void Destroy();
 

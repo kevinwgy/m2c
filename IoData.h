@@ -1484,6 +1484,23 @@ struct RANSTurbulenceModelData {
 
 //------------------------------------------------------------------------------
 
+struct MaterialTransitionOutputData {
+
+  int frequency;
+  double frequency_dt; //!< -1 by default. To activate it, set it to a positive number
+  
+  enum YesNo {NO = 0, YES = 1} skip_no_transition_timesteps;
+
+  const char *filename;
+
+  MaterialTransitionOutputData();
+  ~MaterialTransitionOutputData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+};
+
+//------------------------------------------------------------------------------
+
 struct OutputData {
 
   const char *prefix; //!< path
@@ -1530,6 +1547,8 @@ struct OutputData {
   Probes probes;
 
   EnergyIntegrationData energy_integration;
+
+  MaterialTransitionOutputData mat_transition;
 
   ObjectMap<LinePlot> linePlots;
 

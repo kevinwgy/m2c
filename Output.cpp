@@ -12,8 +12,8 @@
 
 Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
                std::vector<GhostPoint>* ghost_nodes_outer_, vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_,
-               SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, 
-               SpaceVariable3D &cell_volume, IonizationOperator* ion_, HyperelasticityOperator* heo_,
+               SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
+               MultiPhaseOperator &mpo_, IonizationOperator* ion_, HyperelasticityOperator* heo_,
                IncompressibleOperator* inco_) : 
     comm(comm_), 
     iod(iod_), global_mesh(global_mesh_), ghost_nodes_outer(*ghost_nodes_outer_), vf(vf_), laser(laser_),
@@ -89,6 +89,19 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
                 "hyperelasticity model.\n");
     exit_mpi();
   }
+
+  // check material/phase transition request
+  if(strcmp(iod.output.mat_transition.filename, "")) {
+    if(iod.eqs.transitions.dataMap.empty()) {
+      print_error("*** Error: User requested material/phase transition output without specifying "
+                  "transition model(s).\n");
+      exit_mpi();
+    }
+    //create object
+    pto = new PhaseTransitionOutput(comm, iod.output, mpo_);
+  } else
+    pto = NULL;
+
 }
 
 //--------------------------------------------------------------------------
@@ -96,6 +109,8 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
 Output::~Output()
 {
   if(pvdfile) fclose(pvdfile);
+  if(pto) delete pto;
+
   for(int i=0; i<(int)line_outputs.size(); i++)
     if(line_outputs[i]) delete line_outputs[i];
   for(int i=0; i<(int)plane_outputs.size(); i++)
@@ -160,7 +175,6 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
   // ---------------------------------------
   // outputs related to turbulence -- computing eddy viscosity
   //SpaceVariable3D NuT = *Vturb; SpaceVariable3D *Nu_T = &NuT;
-  //fprintf(stdout,"\n After instantiaiting NuT\n");
   [[maybe_unused]] SpaceVariable3D *scalar_ptr = &scalar;
   if(iod.output.kinematic_eddy_viscosity==OutputData::ON) {
     if(Vturb == NULL || inco == NULL) {
@@ -169,12 +183,11 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
     }
     inco->ComputeKinematicEddyViscosity(*Vturb, V, ID, scalar);
   }
- else scalar_ptr = NULL;
- //fprintf(stdout,"\nAfter compute of 1st eddy visc.\n");
+  else scalar_ptr = NULL;
   // ---------------------------------------
 
   for(int i=0; i<(int)line_outputs.size(); i++)
-    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, *Vout, ID, Phi, L,scalar_ptr, force_write);
+    line_outputs[i]->WriteAllSolutionsAlongLine(time, dt, time_step, *Vout, ID, Phi, L, scalar_ptr, force_write);
 
   //write solutions on planes
   for(auto&& plane : plane_outputs)
@@ -186,6 +199,10 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
   //write terminal visualization 
   terminal.PrintSolutionSnapshot(time, dt, time_step, *Vout, ID, Phi, L, force_write);
 
+  //write phase transition stats
+  if(pto)
+    pto->WriteStatsToFile(time, dt, time_step, force_write);
+  
 }
 
 //--------------------------------------------------------------------------

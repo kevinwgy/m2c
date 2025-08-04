@@ -104,7 +104,7 @@ EnergyIntegrationOutput::EnergyIntegrationOutput(MPI_Comm &comm_, IoData &iod, O
 
 EnergyIntegrationOutput::~EnergyIntegrationOutput()
 {
-   for(int i=0; i<EnergyIntegrationData::SIZE; i++)
+  for(int i=0; i<EnergyIntegrationData::SIZE; i++)
     if(file[i]) fclose(file[i]);
 }
 

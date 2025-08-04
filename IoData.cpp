@@ -2917,6 +2917,30 @@ void MaterialVolumes::setup(const char *name, ClassAssigner *father)
 
 //------------------------------------------------------------------------------
 
+MaterialTransitionOutputData::MaterialTransitionOutputData()
+{
+  filename = "";
+  frequency = 1;
+  frequency_dt = -1.0;
+  skip_no_transition_timesteps = YES;
+}
+
+//------------------------------------------------------------------------------
+
+void MaterialTransitionOutputData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 4, father);
+
+  new ClassInt<MaterialTransitionOutputData>(ca, "Frequency", this, &MaterialTransitionOutputData::frequency);
+  new ClassDouble<MaterialTransitionOutputData>(ca, "TimeInterval", this, &MaterialTransitionOutputData::frequency_dt);
+  new ClassToken<MaterialTransitionOutputData>(ca, "SkipNoTransitionTimeSteps", this,
+    reinterpret_cast<int MaterialTransitionOutputData::*>(&MaterialTransitionOutputData::skip_no_transition_timesteps),
+    2, "No", 0, "Yes", 1);
+  new ClassStr<MaterialTransitionOutputData>(ca, "FileName", this, &MaterialTransitionOutputData::filename);
+} 
+
+//------------------------------------------------------------------------------
+
 OutputData::OutputData()
 {
   prefix = "";
@@ -3080,6 +3104,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   probes.setup("Probes", ca);
 
   energy_integration.setup("EnergyIntegration", ca);
+
+  mat_transition.setup("MaterialTransition", ca);
 
   linePlots.setup("LinePlot", ca);
 

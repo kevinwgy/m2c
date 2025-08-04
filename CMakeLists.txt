@@ -125,6 +125,7 @@ ViscosityOperator.cpp
 HeatDiffusionOperator.cpp
 ProbeOutput.cpp
 EnergyIntegrationOutput.cpp
+PhaseTransitionOutput.cpp
 PlaneOutput.cpp
 MaterialVolumeOutput.cpp
 Output.cpp

@@ -369,7 +369,7 @@ int main(int argc, char* argv[])
   if(embed) //even if id2closure is empty, we must still call this function to set "inactive_elem_status"
     embed->FindSolidBodies(id2closure);  //tracks the colors of solid bodies
 
-  //! Initialize multiphase operator (for updating "phase change")
+  //! Initialize multiphase operator (handles "phase change" and other tasks)
   MultiPhaseOperator mpo(comm, dms, iod, vf, global_mesh, spo, lso);
   if((int)lso.size()>1) { //at each node, at most one "phi" can be negative
     int overlap = mpo.CheckLevelSetOverlapping(Phi);
@@ -466,7 +466,7 @@ int main(int argc, char* argv[])
 
   //! Initialize output
   Output out(comm, dms, iod, global_mesh, spo.GetPointerToOuterGhostNodes(), vf, laser, spo.GetMeshCoordinates(),
-             spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), ion, heo, inco); 
+             spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), mpo, ion, heo, inco); 
   out.InitializeOutput(spo.GetMeshCoordinates());
   mpi_barrier();
 

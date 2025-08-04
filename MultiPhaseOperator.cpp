@@ -101,6 +101,10 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
   } else
     trans.resize(0);
 
+  //Debug only
+  lam_transitioned = lam_transitioned_new = 0.0;
+  lam_dumped = lam_dumped_new = 0.0;
+  
 }
 
 //-----------------------------------------------------
@@ -1538,6 +1542,8 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
   v = (Vec5D***) V.GetDataPointer();
 */
 
+  lam_transitioned_new = 0.0;
+
   int myid;
   for(int k=kk0; k<kkmax; k++)
     for(int j=jj0; j<jjmax; j++)
@@ -1548,8 +1554,6 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
           continue;
 
         myid = (int)id[k][j][i];
-//        if(lam[k][j][i]>0)
-//          fprintf(stdout,"lam[%d][%d][%d] = %e.\n", k,j,i, lam[k][j][i]);
 
         for(auto it = trans[myid].begin(); it != trans[myid].end(); it++) {
 
@@ -1563,6 +1567,15 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
                                                             //      return value is FALSE
             // detected phase transition
 
+            //--------------------------------
+            if(coordinates.IsHere(i,j,k)) {
+              double pi = 2.0*acos(0.0);
+              double area = global_mesh.GetDx(i)*global_mesh.GetDy(j);
+              double r = global_mesh.GetY(j);
+              lam_transitioned_new += 2.0*pi*r*area*rho0*(*it)->latent_heat;
+            }
+            //--------------------------------
+            
             // register the node
             changed.push_back(std::make_tuple(Int3(i,j,k), myid, (*it)->toID));
 
@@ -1579,7 +1592,8 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             double p1 = v[k][j][i][4];
             double e1 = varFcn[(*it)->toID]->GetInternalEnergyPerUnitMass(rho1, p1);
             double T1 = varFcn[(*it)->toID]->GetTemperature(rho1, e1);
-            fprintf(stdout,"Detected phase transition at (%d,%d,%d)(%d->%d). rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
+            fprintf(stdout,"  + Detected phase transition at (%d,%d,%d)(%d->%d). "
+                    "rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
                     i,j,k, myid, (*it)->toID, rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
             // ------------------------------------------------------------------------
 
@@ -1614,6 +1628,11 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
       }
 
   MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
+
+  if(counter>0) {
+    MPI_Allreduce(MPI_IN_PLACE, &lam_transitioned_new, 1, MPI_DOUBLE, MPI_SUM, comm);
+    lam_transitioned += lam_transitioned_new;
+  }
 
   Lambda.RestoreDataPointerAndInsert();
 
@@ -2023,6 +2042,8 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3
   Vec5D***  v   = (Vec5D***) V.GetDataPointer();
   double*** lam = Lambda.GetDataPointer();
 
+  lam_dumped_new = 0.0;
+
   int myidn, myid;
   int counter = 0;
   for(int k=k0; k<kmax; k++)
@@ -2048,6 +2069,12 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3
           // Now, do the actual work: Add lam to internal energy (originally added to enthalpy, see Xuning JCP)
           double rho = v[k][j][i][0];
           double e   = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+
+          double pi = 2.0*acos(0.0);
+          double area = global_mesh.GetDx(i)*global_mesh.GetDy(j);
+          double r = global_mesh.GetY(j);
+          lam_dumped_new += 2.0*pi*r*area*rho*lam[k][j][i];
+
           e += lam[k][j][i]; //Corrected --> add to energy not enthalpy (see Xuning JFM)
           lam[k][j][i] = 0.0;
           // update p to account for the increase of enthalpy (rho is fixed)
@@ -2060,6 +2087,11 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3
       }
 
   MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
+
+  if(counter>0) {
+    MPI_Allreduce(MPI_IN_PLACE, &lam_dumped_new, 1, MPI_DOUBLE, MPI_SUM, comm);
+    lam_dumped += lam_dumped_new;
+  }
 
   IDn.RestoreDataPointerToLocalVector();
   ID.RestoreDataPointerToLocalVector();
@@ -2329,5 +2361,4 @@ MultiPhaseOperator::IsOrphanAcrossEmbeddedSurfaces(int i, int j, int k, double**
 }
 
 //-----------------------------------------------------
-
 
