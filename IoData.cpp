@@ -1601,7 +1601,7 @@ ExactRiemannSolverData::ExactRiemannSolverData()
   maxIts_bracket = 100;
   maxIts_shock = 200;
   numSteps_rarefaction = 200;
-  tol_main = 1.0e-4; //applied to both pressure and velocity
+  tol_main = 1.0e-4; //applied to both pressure and velocity (non-D)
   tol_shock = 1.0e-12; //a density tolerance (non-D)
   tol_rarefaction = 1.0e-8; //a density and velocity tolerance (non-D); 
   min_pressure = -1.0e8;
@@ -2997,7 +2997,8 @@ OutputData::OutputData()
 
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 28+MAXLS+MAXSPECIES, father);
+  //NOTE: Don't forget to increase capacity when you add a new member!
+  ClassAssigner *ca = new ClassAssigner(name, 30+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -3113,6 +3114,7 @@ void OutputData::setup(const char *name, ClassAssigner *father)
 
   materialVolumes.setup("MaterialVolumes", ca);
 
+  //NOTE: Don't forget to increase capacity (see above) when you add a new member!
 }
 
 //------------------------------------------------------------------------------

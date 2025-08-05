@@ -4,7 +4,7 @@
 // -----------------------------------------------------------
 
 PhaseTransitionOutput::PhaseTransitionOutput(MPI_Comm &comm_, OutputData &iod_output_, MultiPhaseOperator &mpo_)
-                     : comm(comm_), iod_output(iod_output_), mpo(mpo_)
+                     : comm(comm_), iod_output(iod_output_), mpo(mpo_), file(NULL)
 {
   assert(strcmp(iod_output.mat_transition.filename, "")); //otherwise, shouldn't construct this object
 
@@ -51,7 +51,7 @@ PhaseTransitionOutput::WriteStatsToFile(double time, double dt, int time_step, b
 
   if(!force_write &&
      (iod_output.mat_transition.skip_no_transition_timesteps == MaterialTransitionOutputData::YES) &&
-     (energy_transitioned_new == 0.0) && (energy_dumped_new = 0.0))
+     (energy_transitioned_new == 0.0) && (energy_dumped_new == 0.0))
     return; //nothing to do
 
   //Now, open file and append a line
