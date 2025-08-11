@@ -57,6 +57,7 @@ public:
 
   void Destroy();
 
+  int GetNumSurfaces() {return numSurfaces;}
   int GetSurfaceID(int i) {assert(i>=0 && i<(int)surface_id.size()); return surface_id[i];}
 
   int GetRulingSurfaceRealID() {return ruling_surface_id<0 ? ruling_surface_id //-1-->inactive
@@ -90,9 +91,7 @@ private:
 
   void FindNewEnclosureBoundary(); //!< fills elem_new_status
 
-  void ModifyIntersectionsAndOccludedNodes(int id, std::vector<bool> elem_drop_status,
-                                           std::set<int> elem_to_drop); //!< modifies intersector[id]
-
+  void ModifyIntersectionsAndOccludedNodes(int id, std::vector<bool> elem_drop_status); //!< modifies intersector[id]
 
 
 };

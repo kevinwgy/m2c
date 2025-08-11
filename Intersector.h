@@ -179,6 +179,7 @@ public:
 
   //! Get scope
   void GetTrianglesInScope1(vector<int> &triangles); //!< ``triangles'' will be filled with element IDs
+  void GetTrianglesInScopeN(vector<int> &triangles, int &nL); //!< also returns nLayer
 
   //! Check if a line segment intersects with any triangles inside scope (default: use tree_n)
   //! If tid_ptr is passed in, it will carry the intersecting element ID (-1 if not intersecting)
@@ -204,7 +205,7 @@ public:
                                     std::vector<MyTriangle> &scope, KDTree<MyTriangle, 3> **tree,
                                     int elem_drop_tag = -1); //!< Requires bounding box
 
-  void BuildLayer1SubdomainScopeAndKDTree();
+  void BuildLayer1SubdomainScopeAndKDTree(int elem_drop_tag = -1);
 
   //! Many functions below assume that bounding boxes, scope, and tree have already been constructed.
 
@@ -254,6 +255,9 @@ public:
 
   //! Check if a color is actually used at any node within physical domain
   bool IsColorActive(int mycolor);
+
+  //! Add an imposed occluded node (should be near the surface, but not exactly occluded by it) -> failsafe feature
+  void AddImposedOccludedNode(Int3 ijk);
 
 private: 
 

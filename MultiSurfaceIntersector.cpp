@@ -279,7 +279,6 @@ MultiSurfaceIntersector::UpdateIntersectors()
     }
     if(!elem_to_drop.empty()) {
       intersector_modified = surface_id[1];
-      ModifyIntersectionsAndOccludedNodes(1, elem_drop_status, elem_to_drop);
       //tag dropped elements
       std::vector<int>& eTag(surface[1]->elemtag);
       eTag.assign(N2, 0); //default tag = 0
@@ -287,6 +286,7 @@ MultiSurfaceIntersector::UpdateIntersectors()
         if(elem_drop_status[i])
           eTag[i] = 1; //!< means dropped
       }
+      ModifyIntersectionsAndOccludedNodes(1, elem_drop_status);
     } 
   }
   else {
@@ -305,7 +305,6 @@ MultiSurfaceIntersector::UpdateIntersectors()
     }
     if(!elem_to_drop.empty()) {
       intersector_modified = surface_id[0];
-      ModifyIntersectionsAndOccludedNodes(0, elem_drop_status, elem_to_drop);
       //tag dropped elements
       std::vector<int>& eTag(surface[0]->elemtag);
       eTag.assign(N1, 0); //default tag = 0
@@ -313,6 +312,7 @@ MultiSurfaceIntersector::UpdateIntersectors()
         if(elem_drop_status[i])
           eTag[i] = 1; //!< means dropped
       }
+      ModifyIntersectionsAndOccludedNodes(0, elem_drop_status);
     }
   }
   
@@ -397,11 +397,7 @@ MultiSurfaceIntersector::FindNewEnclosuresByFloodFill()
   EBDS2->Color_ptr->RestoreDataPointerToLocalVector();
   EBDS_jnt->Color_ptr->RestoreDataPointerToLocalVector();
   
-  
   return new_enclosure_color.size();
-  //SAVE new_enclosure_color, and move back. Then, write function to detect color boundary, delete intersections (re-order), and update occluded nodes;
-  //Re-compute shortest distance
-
 }
 
 //-------------------------------------------------------------------------
@@ -563,15 +559,9 @@ MultiSurfaceIntersector::FindNewEnclosureBoundary()
 //-------------------------------------------------------------------------
 
 void
-MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool> elem_drop_status,
-                                                             [[maybe_unused]] std::set<int> elem_to_drop)
+MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool> elem_drop_status)
 {
-/*
-  print("elem_to_drop: ");
-  for(auto&& e :elem_to_drop)
-    print("%d ", e);
-  print("\n");
-*/  
+  //Note: also modifies scope_1 and tree_1 (used for finding intersections)
 
   assert(id==0 || id==1); //currently assuming at most two surfaces involved
 
@@ -706,6 +696,13 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
   EBDS->OccTriangle_ptr->RestoreDataPointerToLocalVector(); //already taken care of internal ghosts
 
   EBDS->LayerTag_ptr->RestoreDataPointerAndInsert();
+
+
+  // -------------------------------
+  // Step 3: Drop elements from scope_1 & tree_1 (used for finding intersections)
+  // -------------------------------
+  intersector[id]->BuildLayer1SubdomainScopeAndKDTree(1); //elemtag=1 means dropped
+
 }
 
 //-------------------------------------------------------------------------
@@ -768,19 +765,43 @@ MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
 
 
   // ------------------------------------------------------------
-  // Step 2: Merge occluded nodes (in subD) and pass to joint_intersector
-  // ------------------------------------------------------------
-  *EBDS_jnt->occluded_ptr = *EBDS1->occluded_ptr; //copy EBDS1 to EBDS_jnt
-  EBDS_jnt->occluded_ptr->insert(EBDS2->occluded_ptr->begin(), EBDS2->occluded_ptr->end()); //add EBDS2
-
-
-  // ------------------------------------------------------------
-  // Step 3: Merge swept nodes (in subD) and pass to joint_intersector
+  // Step 2: Merge swept nodes (in subD) and pass to joint_intersector
   // ------------------------------------------------------------
   *EBDS_jnt->swept_ptr = *EBDS1->swept_ptr; //copy EBDS1 to EBDS_jnt
   EBDS_jnt->swept_ptr->insert(EBDS2->swept_ptr->begin(), EBDS2->swept_ptr->end()); //add EBDS2
 
 
+  // ------------------------------------------------------------
+  // Step 3: Merge occluded nodes (in subD) and pass to joint_intersector
+  //         Also update Color of jnt intersector so that occluded nodes
+  //         have tag 0, and un-occluded nodes do NOT have tag 0.
+  // ------------------------------------------------------------
+  *EBDS_jnt->occluded_ptr = *EBDS1->occluded_ptr; //copy EBDS1 to EBDS_jnt
+  EBDS_jnt->occluded_ptr->insert(EBDS2->occluded_ptr->begin(), EBDS2->occluded_ptr->end()); //add EBDS2
+  double*** color_jnt = EBDS_jnt->Color_ptr->GetDataPointer();
+  int update_counter = 0;
+  for(auto&& ijk : *EBDS_jnt->swept_ptr) {
+    //note: currently occluded nodes are not in "swept" (but imposed_occluded are in)
+    assert(EBDS_jnt->occluded_ptr->find(ijk) == EBDS_jnt->occluded_ptr->end());
+    if(color_jnt[ijk[2]][ijk[1]][ijk[0]] == 0) {
+      color_jnt[ijk[2]][ijk[1]][ijk[0]] = -99; //garbage, to be updated when calling intersector to "refill"
+      update_counter++;
+      assert(EBDS_jnt->occluded_ptr->find(ijk) == EBDS_jnt->occluded_ptr->end());
+    }
+  }
+  for(auto&& ijk : *EBDS_jnt->occluded_ptr) 
+    if(color_jnt[ijk[2]][ijk[1]][ijk[0]] != 0) {
+      color_jnt[ijk[2]][ijk[1]][ijk[0]] = 0;
+      update_counter++;
+    }
+
+  MPI_Allreduce(MPI_IN_PLACE, &update_counter, 1, MPI_INT, MPI_SUM, comm);
+  if(update_counter>0)
+    EBDS_jnt->Color_ptr->RestoreDataPointerAndInsert();
+  else
+    EBDS_jnt->Color_ptr->RestoreDataPointerToLocalVector();
+  
+ 
   // ------------------------------------------------------------
   // Step 4: Merge firstLayer (in subD) and pass to joint_intersector
   // ------------------------------------------------------------
@@ -792,6 +813,7 @@ MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
   // Step 5: Refill using joint_intersector
   // ------------------------------------------------------------
   bool new_enclosure = joint_intersector->RefillAfterSurfaceUpdate(color4new);
+
 
   // ------------------------------------------------------------
   // Step 6: Update new_enclosure_color

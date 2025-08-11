@@ -500,8 +500,7 @@ int
 MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, SpaceVariable3D &ID,
                                                        vector<SpaceVariable3D*> &Phi,
                                                        unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
-                                                       vector<Intersector*> *intersector,
-                                                       bool incompressible_MAC)
+                                                       vector<Intersector*> *intersector)
 {
 
   // --------------------------------------------------------
@@ -521,10 +520,6 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
       else
         it++;
     }
-/*
-    for(auto&& sw : swept.back())
-      fprintf(stdout,"swept (%d,%d,%d).\n", sw[0], sw[1], sw[2]);
-*/
   }
 
   // Clean up tag
@@ -635,7 +630,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
   // --------------------------------------------------------
   for(auto&& sub : swept)
     for(auto&& ijk : sub) {
-      if(tag[ijk[2]][ijk[1]][ijk[0]]>0)
+      if(tag[ijk[2]][ijk[1]][ijk[0]]>0) //tag is already 1
         fprintf(stdout,"\033[0;35mWarning: Node (%d %d %d) is swept by multiple (>1) embedded surfaces.\n\033[0m",
                 ijk[0], ijk[1], ijk[2]);
 
@@ -706,9 +701,10 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
  
 
     // 6.3: Loop through unresolved swept nodes. 
-    //      Note: One node should not be swept by multiple surfaces!
+    //      Note: If a node is swept by surfaces, it gets populated more than once (I think this is fine) 
     int i,j,k,i2,j2,k2;
-    vector<std::pair<Int3,bool> > neighbors; //useful neighbors, paired w/ connected or not
+    vector<std::pair<Int3,int> > neighbors; //useful neighbors, paired with tag: -1~connected,
+                                            //0,1,...~obstructed by intersector 0,1,...
     for(int surf=0; surf<(int)swept.size(); surf++) {
       for(auto it = swept[surf].begin(); it != swept[surf].end();) {
         i = (*it)[0];
@@ -723,18 +719,17 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
           continue;
         }
 
- 
         // Preparation: Collect useful neighbors and intersection info
         FindNeighborsForUpdatingSweptNode(i,j,k,tag,id,intersector,
                                           *(*EBDS)[surf]->occluded_ptr,
                                           *(*EBDS)[surf]->imposed_occluded_ptr,
                                           neighbors);
  
-          
+
         // Determine its id: Check the ID of "valid" neighbors
         set<int> tmp_id_s;
         for(auto&& nei : neighbors)
-          if(nei.second) //connected
+          if(nei.second == -1) //connected
             tmp_id_s.insert(id[nei.first[2]][nei.first[1]][nei.first[0]]);
 
         int myid(-1);
@@ -746,9 +741,10 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
             continue; //not ready to update this node.
           }
           else { //last resort / fail-safe
+            //it could be that the embedded boundary swept through a fluid-fluid material interface
             vector<int> id_votes(varFcn.size(),0);
             for(auto&& nei : neighbors)
-              if(nei.second) //connected
+              if(nei.second == -1) //connected
                 id_votes[id[nei.first[2]][nei.first[1]][nei.first[0]]]++;
             int myvote = 0;
             for(int s=0; s<(int)id_votes.size(); s++)
@@ -757,9 +753,10 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
                 myvote = id_votes[s];
               }
             if(myid==-1) {
-              fprintf(stdout,"\033[0;31m*** Error: Unable to determine the material ID at (%d,%d,%d).\n\033[0m",
-                      i,j,k);
-              exit(-1);
+              //In this case, somehow all neighbors are either invalid or disconnected.
+              //We label it as an imposed_occluded node (of the current surf)
+              (*intersector)[surf]->AddImposedOccludedNode(*it);
+              myid = INACTIVE_MATERIAL_ID;
             }
           }
         }
@@ -769,7 +766,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
         double weight(0.0);
         Vec5D  vsum(0.0); 
         for(auto&& nei : neighbors) {
-          if(nei.second) {//connected
+          if(nei.second == -1) {//connected
             i2 = nei.first[0];
             j2 = nei.first[1];
             k2 = nei.first[2];
@@ -788,30 +785,45 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
             continue;  //not ready to update this node
           }
           else {
-            fprintf(stdout,"\033[0;31m*** Error: Unable to determine the state at (%d,%d,%d), id:%d.\n\033[0m",
-                    i,j,k, myid);
-            exit(-1);
+            if(myid != INACTIVE_MATERIAL_ID) {
+              fprintf(stdout,"\033[0;31m*** Error: Unable to determine the state at (%d,%d,%d), id:%d.\n\033[0m",
+                      i,j,k, myid);
+              exit(-1);
+            }
+            //else, goes forward to setting id & v
           }
         }
 
         id[k][j][i] = myid;
-        if(incompressible_MAC) {  // velocity is continuous; use values stored at the node
-          v[k][j][i][0]  = vsum[0]/sum_weight;
-          v[k][j][i][4]  = vsum[4]/sum_weight;
-        } else
-          v[k][j][i]  = vsum/sum_weight;
+        if(myid == INACTIVE_MATERIAL_ID) {
 
+          v[k][j][i][0] = iod.eqs.dummy_state.density;
+          v[k][j][i][1] = iod.eqs.dummy_state.velocity_x;
+          v[k][j][i][2] = iod.eqs.dummy_state.velocity_y;
+          v[k][j][i][3] = iod.eqs.dummy_state.velocity_z;
+          v[k][j][i][4] = iod.eqs.dummy_state.pressure;
 
-        // Fix any issues in phi: If the material subdomain corresponding to this ID is tracked by a phi, make sure the phi
-        // value is negative; if it is not tracked by phi, the phi value should be non-negative.
-        for(int ls=0; ls<ls_size; ls++) {
-          if(id[k][j][i] == ls2matid[ls]) {          
-            if(phi[ls][k][j][i]>=0) 
-              phi[ls][k][j][i] = phi_ebm[surf][k][j][i]==0 ? -1.0e-20 : -phi_ebm[surf][k][j][i];
-          }
-          else {
+          // Fix any issues in phi: phi must be non-negative
+          for(int ls=0; ls<ls_size; ls++) {
             if(phi[ls][k][j][i]<0)
               phi[ls][k][j][i] = phi_ebm[surf][k][j][i];
+          }
+
+        } 
+        else {//real material
+          v[k][j][i]  = vsum/sum_weight;
+
+          // Fix any issues in phi: If the material subdomain corresponding to this ID is tracked by a phi,
+          // make sure the phi value is negative; if it is not tracked by phi, the phi value should be non-negative.
+          for(int ls=0; ls<ls_size; ls++) {
+            if(id[k][j][i] == ls2matid[ls]) {          
+              if(phi[ls][k][j][i]>=0) 
+                phi[ls][k][j][i] = phi_ebm[surf][k][j][i]==0 ? -1.0e-20 : -phi_ebm[surf][k][j][i];
+            }
+            else {
+              if(phi[ls][k][j][i]<0)
+                phi[ls][k][j][i] = phi_ebm[surf][k][j][i];
+            }
           }
         }
 
@@ -2271,11 +2283,12 @@ MultiPhaseOperator::UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi
 //-----------------------------------------------------
 
 void
-MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, [[maybe_unused]] double*** id,
+MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, [[maybe_unused]]double*** id,
                                                       vector<Intersector*> *intersector, set<Int3> &occluded,
                                                       set<Int3> &imposed_occluded,
-                                                      vector<std::pair<Int3,bool> > &neighbors)
+                                                      vector<std::pair<Int3,int> > &neighbors)
 {
+  //neighbor pairs the node index (i,j,k) with tag -1: connected, or 0,1,...:disconnected by intersection 0,1,...
   neighbors.clear();
 
   Vec3D X0(global_mesh.GetX(i), global_mesh.GetY(j), global_mesh.GetZ(k)), X1;
@@ -2299,18 +2312,16 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
         if(imposed_occluded.find(ijk2) != imposed_occluded.end())
           continue; //ignore occluded neighbors
 
-        bool connected = true;
+        int obstructor = -1;
         X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
-        int mycounter = 0;
-        for(auto&& xter : *intersector) {
-          mycounter++;
-          if(xter->Intersects(X0,X1,NULL,false,1)) {
-            connected = false;
+        for(int s= 0; s<(int)intersector->size(); s++) {
+          if((*intersector)[s]->Intersects(X0,X1,NULL,false,1)) {
+            obstructor = s;
             break;
           }
         }
 
-        neighbors.push_back(std::make_pair(ijk2, connected));
+        neighbors.push_back(std::make_pair(ijk2, obstructor));
       }
 }
 

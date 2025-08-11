@@ -177,9 +177,9 @@ Intersector::BuildKDTreeAndFindIntersections()
 //-------------------------------------------------------------------------
 
 void
-Intersector::BuildLayer1SubdomainScopeAndKDTree()
+Intersector::BuildLayer1SubdomainScopeAndKDTree(int elem_drop_tag)
 {
-  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1);
+  BuildSubdomainScopeAndKDTree(subD_bbmin_1, subD_bbmax_1, scope_1, &tree_1, elem_drop_tag);
 }
 
 //-------------------------------------------------------------------------
@@ -1296,9 +1296,9 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
       //go over first layer neighbors, find a nonblocked reliable neighbor
       auto valid_neighbor = [&](int ii, int jj, int kk) {
         if(nodes2fill2.find(Int3(ii,jj,kk)) != nodes2fill2.end())
-          return false; //this neighbor needs to be taken care of too.
+          return false; //this neighbor needs to be taken care of too (including imposed_occluded).
         if(color[kk][jj][ii] == 0)
-          return false; //this neighbor is occluded (naturally or "forced").
+          return false; //this neighbor is occluded (physically).
         return true;
       };
 
@@ -1341,7 +1341,6 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
       
     }
 
-
     nodes2fill = nodes2fill2;
 
     Color.RestoreDataPointerAndInsert();
@@ -1364,10 +1363,8 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
         color[(*it)[2]][(*it)[1]][(*it)[0]] = 0; //set it to occluded. BUT NO NEW INTERSECTIONS!
     }
     else {//new enclosure (even if there are separate new enclosureS, they will have the same color)
-      for(auto it = nodes2fill.begin(); it != nodes2fill.end(); it++) {
+      for(auto it = nodes2fill.begin(); it != nodes2fill.end(); it++)
         color[(*it)[2]][(*it)[1]][(*it)[0]] = color4new;
-        fprintf(stdout,"setting color[%d][%d][%d] = %d.\n", (*it)[2], (*it)[1], (*it)[0], color4new);
-      }
       for(int cc=nRegions+1; cc<=-color4new; cc++) //activated only if nRegions<-color4new
         ColorReachesBoundary.push_back(0);
       nRegions = -color4new;
@@ -1475,8 +1472,12 @@ Intersector::FindSweptNodes(std::vector<Vec3D> &X0)
     }
   }
       
+  // Add imposed_occluded to swept ==> they need to be re-examined.
+  for(auto&& ijk : imposed_occluded)
+    swept.insert(ijk);
+
   // Verification
-  if(verbose>=1) {
+  if(verbose>=2) {
     for(auto&& ijk : previously_occluded_but_not_now) {
       if(swept.find(ijk) == swept.end())
         fprintf(stdout,"\033[0;35mWarning: Previous occluded node is not swept (%d %d %d). May be an error.\033[0m\n",
@@ -1626,7 +1627,6 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
   vector<double> &dy_glob(global_mesh.dy_glob);
   vector<double> &dz_glob(global_mesh.dz_glob);
 
-
   // Step 1. Preparation
   vector<Vec3D>&  Xs(surface.X);
   vector<Int3>&   Es(surface.elems);
@@ -1690,7 +1690,7 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
       Vec3D p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0 + disp*Ns[triangle_id];
 
       // locate the node that is closest to p
-      Int3 ijk = global_mesh.FindClosestNodeToPoint(p, false);
+      Int3 ijk = global_mesh.FindClosestNodeToPoint(p, false); //false: only check nodes within domain
 
       // find candidates (nodes with "this_color" for this point)
       vector<Int3> mycands;
@@ -1726,7 +1726,8 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
         for(int tri=0; tri<nFound; tri++) {
           int id = tmp[tri].trId();
           Int3& nodes(Es[id]);
-          if(GeoTools::LineSegmentIntersectsTriangle(p, q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]])) {
+          if(GeoTools::LineSegmentIntersectsTriangle(p, q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]]) ||
+             GeoTools::IsPointInsideTriangle(q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], half_thickness)) {
             intersect = true;
             break;  //intersecting one triangle means intersecting the whole surface 
           } 
@@ -1774,12 +1775,6 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
         j = ijk[1];
         k = ijk[2];
 
-        bool gotyou = false;
-        if(ijk[0]==105 && ijk[1]==0 && ijk[2]==0) {
-          fprintf(stdout,"I got you (%d,%d,%d): color = %d.\n", ijk[0], ijk[1], ijk[2], (int)color[ijk[2]][ijk[1]][ijk[0]]);
-          gotyou = true;
-        }
-
         //self->left
         if(xf[k][j][i][0]>=0) {
           Intersects(coords[k][j][i], coords[k][j][i-1], &tid, true);
@@ -1788,8 +1783,6 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
             positive_side[tid] = 1;
           else //normal points -x
             negative_side[tid] = 1;
-          if(gotyou)
-            fprintf(stdout,"got you L. tid = %d, positive_side = %d, negative_side = %d.\n", tid, positive_side[tid], negative_side[tid]);
         }
 
         //self->right
@@ -1800,8 +1793,6 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
             negative_side[tid] = 1;
           else //normal points -x
             positive_side[tid] = 1;
-          if(gotyou)
-            fprintf(stdout,"got you R. tid = %d, positive_side = %d, negative_side = %d.\n", tid, positive_side[tid], negative_side[tid]);
         }
 
         //self->bottom
@@ -2006,6 +1997,23 @@ Intersector::GetTrianglesInScope1(vector<int> &triangles)
 
 //-------------------------------------------------------------------------
 
+void
+Intersector::GetTrianglesInScopeN(vector<int> &triangles, int &nL)
+{
+  nL = nLayer;
+
+  triangles.resize(scope_n.size());
+  for(int i=0; i<(int)triangles.size(); i++)
+    triangles[i] = scope_n[i].trId();
+}
+
+//-------------------------------------------------------------------------
+
+void
+Intersector::AddImposedOccludedNode(Int3 ijk)
+{
+  imposed_occluded.insert(ijk);
+}
 
 
 //-------------------------------------------------------------------------

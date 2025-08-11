@@ -110,7 +110,7 @@ public:
   int UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, SpaceVariable3D &ID,
                                          vector<SpaceVariable3D*> &Phi,
                                          std::unique_ptr<vector<std::unique_ptr<EmbeddedBoundaryDataSet> > > EBDS,
-                                         vector<Intersector*> *intersector, bool incompressible_MAC = false);
+                                         vector<Intersector*> *intersector);
 
   //! update Phi and ID to resolve any conflicts with embedded boundaries
   int ResolveConflictsWithEmbeddedSurfaces(vector<SpaceVariable3D*> &Phi,
@@ -143,7 +143,7 @@ protected:
   void FindNeighborsForUpdatingSweptNode(int i, int j, int k, double*** tag, double*** id,
                                          vector<Intersector*> *intersector, std::set<Int3> &occlueded,
                                          std::set<Int3> &imposed_occluded,
-                                         vector<std::pair<Int3,bool> > &neighbors);
+                                         vector<std::pair<Int3,int> > &neighbors);
 
   //! internal function called by ResolveConflictsWithEmbeddedSurfaces
   bool IsOrphanAcrossEmbeddedSurfaces(int i, int j, int k, double*** idn, double*** id,

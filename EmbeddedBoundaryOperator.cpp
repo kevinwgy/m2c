@@ -1134,12 +1134,28 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 
   int phi_layers = 3;
   for(int i=0; i<(int)intersector.size(); i++) {
+
+    //avoid unncessary/repetitive work
     if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
-       strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
-      continue; //this surface is fixed...
+       strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0) {
+       //this surface is static
 
+      bool involved = false;
+      for(auto&& multiX : multi_intersector) {
+        for(int surf=0; surf<(int)multiX->GetNumSurfaces(); surf++)
+          if(multiX->GetSurfaceID(surf) == i) {
+            involved = true;
+            break;
+          }
+        if(involved)
+          break;
+      }
+      if(!involved)
+        continue;
+    }
+
+    // actual computations
     surfaces[i].CalculateNormalsAndAreas();
-
     intersector[i]->BuildKDTreeAndFindIntersections();
     intersector[i]->FindSweptNodes(surfaces_prev[i].X);
     intersector[i]->RefillAfterSurfaceUpdate();
@@ -1153,8 +1169,6 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
     if(!multiX->CheckSurfaceIntersections())
       continue;
 
-    print("I am here, already_found = %d.\n", (int)already_found);
-
     //Now, we know these two surfaces intersect.
     //
     int numNew = already_found ? multiX->FindNewEnclosuresAfterSurfaceUpdate() //true->1
@@ -1163,6 +1177,7 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
       if(verbose>=1)
         print("    o Found %d new enclosures due to embedded surface intersections.\n", numNew);
       int xid = multiX->UpdateIntersectors(); // modifies the involved single-surface intersectors
+                                              // NOTE: "color" is NOT updated
       if(xid>=0) //indeed, an interesector was modified
         modified[xid] = true;
 
@@ -1173,14 +1188,13 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
 
   for(int i = 0; i < (int)intersector.size(); i++) {
     if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
-       strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0)
+       strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0 &&
+       modified[i] == false)
       continue;
     double max_dist0 = intersector[i]->ComputeUnsignedDistance(phi_layers, modified[i] ? 1 : -1);
     if(max_dist0>max_dist)
       max_dist = max_dist0;
   }
-
-  
 
 
   //return max_dist; //WARNING: IF ALL SURFACES ARE FIXED, MAX_DIST gets garbage
