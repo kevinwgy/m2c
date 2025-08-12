@@ -1,0 +1,127 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: 44a6fdb+ | Branch: main | Tag: 
+Computation started at: 2025-08-12.11:18:43 EDT
+Using 32 processor cores (including concurrent programs).
+Command: /home/kevinw3/tinkercliffs/zoey7/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+- Activated the Embedded Boundary Method. Detected 2 surface(s) (0 from concurrent program(s)).
+
+- Loaded user-defined dynamics calculator for surface 1 from ./UserDefinedDynamics.so.
+
+- Mesh Statistics:
+  X-Direction: [-6.000000e+00, 3.000000e+01], 1338 nodes/cells, dx_min = 1.000057e-02, dx_max = 1.938090e-01.
+  Y-Direction: [0.000000e+00, 8.000000e+00], 427 nodes/cells, dy_min = 1.002158e-02, dy_max = 9.931731e-02.
+  Z-Direction: [-1.500000e-02, 1.500000e-02], 1 nodes/cells, dz_min = 3.000000e-02, dz_max = 3.000000e-02.
+  Total number of nodes/cells: 571326.
+  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 41054
+  o Number of ghost nodes outside computational domain: 1235554
+
+    o Found 1 new enclosures due to embedded surface intersections.
+
+- Initializing the state variables (V) and material id. (ID).
+  o Found Point[0]: (3.000000e+00 2.000000e-01 0.000000e+00). Mat. ID: 1
+
+- Initializing terminal visualization.
+  o Adjusted the resolution for terminal visualization. dx: 1.797693e+308 -> 9.661256e-02.
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution on a Lagrangian mesh at 0.000000e+00.
+- Wrote solution on a Lagrangian mesh at 0.000000e+00.
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 1: t = 0.000000e+00, dt = 8.783603e-09, cfl = 3.0000e-01. Computation time: 2.7183e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 2: t = 8.783603e-09, dt = 3.994981e-09, cfl = 3.0000e-01. Computation time: 2.9013e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 3: t = 1.277858e-08, dt = 3.594197e-09, cfl = 3.0000e-01. Computation time: 3.0806e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 4: t = 1.637278e-08, dt = 3.426243e-09, cfl = 3.0000e-01. Computation time: 3.2660e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 5: t = 1.979902e-08, dt = 3.387875e-09, cfl = 3.0000e-01. Computation time: 3.4702e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 6: t = 2.318690e-08, dt = 3.321510e-09, cfl = 3.0000e-01. Computation time: 3.6611e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 7: t = 2.650841e-08, dt = 3.324788e-09, cfl = 3.0000e-01. Computation time: 3.8417e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 8: t = 2.983320e-08, dt = 3.282513e-09, cfl = 3.0000e-01. Computation time: 4.0240e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 9: t = 3.311571e-08, dt = 3.277863e-09, cfl = 3.0000e-01. Computation time: 4.2049e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 10: t = 3.639357e-08, dt = 3.235346e-09, cfl = 3.0000e-01. Computation time: 4.3881e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 11: t = 3.962892e-08, dt = 3.254915e-09, cfl = 3.0000e-01. Computation time: 4.5660e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 12: t = 4.288383e-08, dt = 3.247025e-09, cfl = 3.0000e-01. Computation time: 4.7860e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 13: t = 4.613086e-08, dt = 3.266132e-09, cfl = 3.0000e-01. Computation time: 4.9660e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 14: t = 4.939699e-08, dt = 3.136246e-09, cfl = 3.0000e-01. Computation time: 5.1547e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+Step 15: t = 5.253324e-08, dt = 2.987433e-09, cfl = 3.0000e-01. Computation time: 5.3357e+00 s.
+    o Found 1 new enclosures due to embedded surface intersections.
+
+...
+
+Step 2571: t = 4.939273e-06, dt = 1.955140e-09, cfl = 3.0000e-01. Computation time: 5.8636e+02 s.
+Step 2572: t = 4.941228e-06, dt = 1.955619e-09, cfl = 3.0000e-01. Computation time: 5.8654e+02 s.
+Step 2573: t = 4.943184e-06, dt = 1.956358e-09, cfl = 3.0000e-01. Computation time: 5.8670e+02 s.
+Step 2574: t = 4.945140e-06, dt = 1.957369e-09, cfl = 3.0000e-01. Computation time: 5.8689e+02 s.
+Step 2575: t = 4.947098e-06, dt = 1.958663e-09, cfl = 3.0000e-01. Computation time: 5.8707e+02 s.
+Step 2576: t = 4.949056e-06, dt = 1.960244e-09, cfl = 3.0000e-01. Computation time: 5.8726e+02 s.
+Step 2577: t = 4.951017e-06, dt = 1.962130e-09, cfl = 3.0000e-01. Computation time: 5.8743e+02 s.
+Step 2578: t = 4.952979e-06, dt = 1.964338e-09, cfl = 3.0000e-01. Computation time: 5.8760e+02 s.
+Step 2579: t = 4.954943e-06, dt = 1.966910e-09, cfl = 3.0000e-01. Computation time: 5.8777e+02 s.
+Step 2580: t = 4.956910e-06, dt = 1.969887e-09, cfl = 3.0000e-01. Computation time: 5.8796e+02 s.
+Step 2581: t = 4.958880e-06, dt = 1.971583e-09, cfl = 3.0000e-01. Computation time: 5.8814e+02 s.
+Step 2582: t = 4.960852e-06, dt = 1.971970e-09, cfl = 3.0000e-01. Computation time: 5.8832e+02 s.
+Step 2583: t = 4.962824e-06, dt = 1.972618e-09, cfl = 3.0000e-01. Computation time: 5.8849e+02 s.
+Step 2584: t = 4.964796e-06, dt = 1.973543e-09, cfl = 3.0000e-01. Computation time: 5.8867e+02 s.
+Step 2585: t = 4.966770e-06, dt = 1.974753e-09, cfl = 3.0000e-01. Computation time: 5.8884e+02 s.
+Step 2586: t = 4.968744e-06, dt = 1.976256e-09, cfl = 3.0000e-01. Computation time: 5.8901e+02 s.
+Step 2587: t = 4.970721e-06, dt = 1.978060e-09, cfl = 3.0000e-01. Computation time: 5.8919e+02 s.
+Step 2588: t = 4.972699e-06, dt = 1.980179e-09, cfl = 3.0000e-01. Computation time: 5.8938e+02 s.
+Step 2589: t = 4.974679e-06, dt = 1.982661e-09, cfl = 3.0000e-01. Computation time: 5.8956e+02 s.
+Step 2590: t = 4.976662e-06, dt = 1.985554e-09, cfl = 3.0000e-01. Computation time: 5.8974e+02 s.
+Step 2591: t = 4.978647e-06, dt = 1.988033e-09, cfl = 3.0000e-01. Computation time: 5.8992e+02 s.
+Step 2592: t = 4.980635e-06, dt = 1.988353e-09, cfl = 3.0000e-01. Computation time: 5.9010e+02 s.
+Step 2593: t = 4.982624e-06, dt = 1.988932e-09, cfl = 3.0000e-01. Computation time: 5.9028e+02 s.
+Step 2594: t = 4.984612e-06, dt = 1.989787e-09, cfl = 3.0000e-01. Computation time: 5.9047e+02 s.
+Step 2595: t = 4.986602e-06, dt = 1.990928e-09, cfl = 3.0000e-01. Computation time: 5.9064e+02 s.
+Step 2596: t = 4.988593e-06, dt = 1.992364e-09, cfl = 3.0000e-01. Computation time: 5.9083e+02 s.
+Step 2597: t = 4.990586e-06, dt = 1.994098e-09, cfl = 3.0000e-01. Computation time: 5.9101e+02 s.
+Step 2598: t = 4.992580e-06, dt = 1.996151e-09, cfl = 3.0000e-01. Computation time: 5.9118e+02 s.
+Step 2599: t = 4.994576e-06, dt = 1.998562e-09, cfl = 3.0000e-01. Computation time: 5.9136e+02 s.
+Step 2600: t = 4.996574e-06, dt = 2.001379e-09, cfl = 3.0000e-01. Computation time: 5.9156e+02 s.
+Step 2601: t = 4.998576e-06, dt = 1.424287e-09, cfl = 2.1316e-01. Computation time: 5.9174e+02 s.
+- Wrote solution on a Lagrangian mesh at 5.000000e-06.
+- Wrote solution on a Lagrangian mesh at 5.000000e-06.
+- Wrote solution at 5.000000e-06 to solution_0050.vtr.
+
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 5.000000e-06)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 594.153318 sec.
+
