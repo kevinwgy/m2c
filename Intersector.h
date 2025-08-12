@@ -207,6 +207,8 @@ public:
 
   void BuildLayer1SubdomainScopeAndKDTree(int elem_drop_tag = -1);
 
+  void BuildLayerNSubdomainScopeAndKDTree(int nL, int elem_drop_tag = -1);
+
   //! Many functions below assume that bounding boxes, scope, and tree have already been constructed.
 
   //! find nearby triangles for each node based on bounding boxes and KDTree

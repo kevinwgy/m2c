@@ -246,16 +246,23 @@ Intersector::RecomputeFullCourse(vector<Vec3D> &Xprev, int phi_layers)
 
 //-------------------------------------------------------------------------
 
+void
+Intersector::BuildLayerNSubdomainScopeAndKDTree(int nL, int elem_drop_tag)
+{ 
+  if(nLayer != nL) {
+    BuildNodalAndSubdomainBoundingBoxes(nL, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
+    nLayer = nL;
+  }
+  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n, elem_drop_tag);
+}
+
+//-------------------------------------------------------------------------
+
 double
 Intersector::ComputeUnsignedDistance(int phi_layers, int elem_drop_tag)
 {
-  if(nLayer != phi_layers) {
-    BuildNodalAndSubdomainBoundingBoxes(phi_layers, BBmin_n, BBmax_n, subD_bbmin_n, subD_bbmax_n); //n layers
-    nLayer = phi_layers;
-  }
-  BuildSubdomainScopeAndKDTree(subD_bbmin_n, subD_bbmax_n, scope_n, &tree_n, elem_drop_tag);
+  BuildLayerNSubdomainScopeAndKDTree(phi_layers, elem_drop_tag);
   double dist_max = CalculateUnsignedDistanceNearSurface(phi_layers);
-
   return dist_max;
 }
 

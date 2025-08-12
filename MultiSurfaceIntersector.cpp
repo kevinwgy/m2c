@@ -265,6 +265,9 @@ MultiSurfaceIntersector::UpdateIntersectors()
     int N2 = surface[1]->elems.size();
     vector<bool> elem_drop_status(N2, false);
     std::set<int> elem_to_drop;
+    std::vector<int>& eTag(surface[1]->elemtag);
+    eTag.assign(N2, 0); //default tag = 0
+
     for(auto&& status : elem_new_status) {
       assert((int)status.size()-N1 == N2);
       for(int i=N1; i<(int)status.size(); i++) {
@@ -280,8 +283,6 @@ MultiSurfaceIntersector::UpdateIntersectors()
     if(!elem_to_drop.empty()) {
       intersector_modified = surface_id[1];
       //tag dropped elements
-      std::vector<int>& eTag(surface[1]->elemtag);
-      eTag.assign(N2, 0); //default tag = 0
       for(int i=0; i<(int)eTag.size(); i++) {
         if(elem_drop_status[i])
           eTag[i] = 1; //!< means dropped
@@ -294,6 +295,9 @@ MultiSurfaceIntersector::UpdateIntersectors()
     int N1 = surface[0]->elems.size();
     vector<bool> elem_drop_status(N1, false);
     std::set<int> elem_to_drop;
+    std::vector<int>& eTag(surface[0]->elemtag);
+    eTag.assign(N1, 0); //default tag = 0
+
     for(auto&& status : elem_new_status) {
       for(int i=0; i<N1; i++) {
         if(status[i]>0 &&
@@ -306,8 +310,6 @@ MultiSurfaceIntersector::UpdateIntersectors()
     if(!elem_to_drop.empty()) {
       intersector_modified = surface_id[0];
       //tag dropped elements
-      std::vector<int>& eTag(surface[0]->elemtag);
-      eTag.assign(N1, 0); //default tag = 0
       for(int i=0; i<(int)eTag.size(); i++) {
         if(elem_drop_status[i])
           eTag[i] = 1; //!< means dropped

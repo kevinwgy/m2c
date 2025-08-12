@@ -1189,8 +1189,15 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
   for(int i = 0; i < (int)intersector.size(); i++) {
     if(iod_embedded_surfaces[i]->provided_by_another_solver == EmbeddedSurfaceData::NO &&
        strcmp(iod_embedded_surfaces[i]->dynamics_calculator, "") == 0 &&
-       modified[i] == false)
+       modified[i] == false) {
+
+      if(!multi_intersector.empty())
+        //in this case, no need to re-compute distance, but may need to rebuild scopeN
+        intersector[i]->BuildLayerNSubdomainScopeAndKDTree(phi_layers);
+
       continue;
+    }
+    //"ComputeUnsignedDistance": first build scopN and KDTree.
     double max_dist0 = intersector[i]->ComputeUnsignedDistance(phi_layers, modified[i] ? 1 : -1);
     if(max_dist0>max_dist)
       max_dist = max_dist0;
