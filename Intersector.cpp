@@ -1054,14 +1054,18 @@ Intersector::FloodFillColors()
 
 
   // fill ColorReachesBoundary
-  ColorReachesBoundary.assign(nRegions, 0);
+  ColorReachesBoundary.assign(nRegions+1, 0);
   for(auto it = ghost_nodes_outer.begin(); it != ghost_nodes_outer.end(); it++) {
     if(it->type_projection != GhostPoint::FACE)
       continue;
     Int3& ijk(it->image_ijk);
+    if(!Color.IsHere(ijk[0],ijk[1],ijk[2]))
+      continue; //let its owner handle it (also, color hasn't been 'inserted' after imposed_occluded.)
     int mycolor = color[ijk[2]][ijk[1]][ijk[0]];
-    if(mycolor<0) 
+    if(mycolor<0) {
+      assert(-mycolor<(int)ColorReachesBoundary.size());
       ColorReachesBoundary[-mycolor] = 1;
+    }
   }
   MPI_Allreduce(MPI_IN_PLACE, ColorReachesBoundary.data(), ColorReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
  
@@ -1375,6 +1379,7 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
       for(int cc=nRegions+1; cc<=-color4new; cc++) //activated only if nRegions<-color4new
         ColorReachesBoundary.push_back(0);
       nRegions = -color4new;
+      assert((int)ColorReachesBoundary.size() == nRegions+1);
     }
   }
 
@@ -1385,17 +1390,23 @@ Intersector::RefillAfterSurfaceUpdate(int color4new)
       if(it->type_projection != GhostPoint::FACE)
         continue;
       Int3& ijk(it->image_ijk);
+      if(!Color.IsHere(ijk[0],ijk[1],ijk[2]))
+        continue; //let its owner handle it (also, color hasn't been 'inserted' after imposed_occluded.)
       int mycolor = color[ijk[2]][ijk[1]][ijk[0]];
       if(mycolor<0) {
-        assert(mycolor<(int)ColorReachesBoundary.size());
+        assert((-mycolor)<(int)ColorReachesBoundary.size());
         ColorReachesBoundary[-mycolor] = 1;
       }
     }
     MPI_Allreduce(MPI_IN_PLACE, ColorReachesBoundary.data(), ColorReachesBoundary.size(), MPI_INT, MPI_MAX, comm);
   }
 
-  if(color)
-    Color.RestoreDataPointerToLocalVector();
+  if(color) {
+    if(total_remaining_nodes>0) //color was updated while adding imposed_occluded nodes.
+      Color.RestoreDataPointerAndInsert();
+    else
+      Color.RestoreDataPointerToLocalVector();
+  }
   if(xf)
     XForward.RestoreDataPointerToLocalVector();
 

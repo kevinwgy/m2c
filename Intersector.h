@@ -131,7 +131,8 @@ class Intersector {
   
   std::vector<int> ColorReachesBoundary; /**< stores whether each negative colored regions (i.e. enclosrures)  touches \n
                                              the domain boundary. Calculated in FloodFillColors and Refill. Note that \n
-                                             the size of this vector is "nRegions" calculated in FloodFillColors.*/
+                                             the size of this vector is nRegions+1, where "nRegions" is calculated\n
+                                             in FloodFillColors. Index [0] (color 0!) is unused/unfilled.*/
   bool hasInlet, hasInlet2, hasOutlet;
   int nRegions;
                       
