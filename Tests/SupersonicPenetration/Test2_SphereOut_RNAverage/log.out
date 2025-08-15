@@ -1,0 +1,140 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: 4fac402+ | Branch: main | Tag: 
+Computation started at: 2025-08-15.10:44:48 EDT
+Using 32 processor cores (including concurrent programs).
+Command: /home/kevinw3/tinkercliffs/zoey7/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+- Activated the Embedded Boundary Method. Detected 2 surface(s) (0 from concurrent program(s)).
+
+- Loaded user-defined dynamics calculator for surface 1 from ./UserDefinedDynamics.so.
+
+- Mesh Statistics:
+  X-Direction: [-6.000000e+00, 3.000000e+01], 1338 nodes/cells, dx_min = 1.000057e-02, dx_max = 1.938090e-01.
+  Y-Direction: [0.000000e+00, 8.000000e+00], 427 nodes/cells, dy_min = 1.002158e-02, dy_max = 9.931731e-02.
+  Z-Direction: [-1.500000e-02, 1.500000e-02], 1 nodes/cells, dz_min = 3.000000e-02, dz_max = 3.000000e-02.
+  Total number of nodes/cells: 571326.
+  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 41054
+  o Number of ghost nodes outside computational domain: 1235554
+
+
+- Initializing the state variables (V) and material id. (ID).
+  o Found Point[0]: (3.000000e+00 2.000000e-01 0.000000e+00). Mat. ID: 1
+
+- Initializing terminal visualization.
+  o Adjusted the resolution for terminal visualization. dx: 1.797693e+308 -> 9.661256e-02.
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution on a Lagrangian mesh at 0.000000e+00.
+- Wrote solution on a Lagrangian mesh at 0.000000e+00.
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+
+Step 1: t = 0.000000e+00, dt = 8.783603e-09, cfl = 3.0000e-01. Computation time: 2.5130e+00 s.
+Step 2: t = 8.783603e-09, dt = 3.773311e-09, cfl = 3.0000e-01. Computation time: 2.6073e+00 s.
+Step 3: t = 1.255691e-08, dt = 3.471589e-09, cfl = 3.0000e-01. Computation time: 2.7017e+00 s.
+Step 4: t = 1.602850e-08, dt = 3.335749e-09, cfl = 3.0000e-01. Computation time: 2.7968e+00 s.
+Step 5: t = 1.936425e-08, dt = 3.265890e-09, cfl = 3.0000e-01. Computation time: 2.8898e+00 s.
+Step 6: t = 2.263014e-08, dt = 3.226324e-09, cfl = 3.0000e-01. Computation time: 2.9847e+00 s.
+Step 7: t = 2.585647e-08, dt = 3.179958e-09, cfl = 3.0000e-01. Computation time: 3.0781e+00 s.
+Step 8: t = 2.903642e-08, dt = 3.163447e-09, cfl = 3.0000e-01. Computation time: 3.1708e+00 s.
+Step 9: t = 3.219987e-08, dt = 3.140451e-09, cfl = 3.0000e-01. Computation time: 3.2638e+00 s.
+Step 10: t = 3.534032e-08, dt = 3.142184e-09, cfl = 3.0000e-01. Computation time: 3.3557e+00 s.
+Step 11: t = 3.848251e-08, dt = 3.131681e-09, cfl = 3.0000e-01. Computation time: 3.4514e+00 s.
+Step 12: t = 4.161419e-08, dt = 3.107792e-09, cfl = 3.0000e-01. Computation time: 3.5465e+00 s.
+Step 13: t = 4.472198e-08, dt = 3.103839e-09, cfl = 3.0000e-01. Computation time: 3.6329e+00 s.
+Step 14: t = 4.782582e-08, dt = 3.098547e-09, cfl = 3.0000e-01. Computation time: 3.7234e+00 s.
+Step 15: t = 5.092437e-08, dt = 3.098188e-09, cfl = 3.0000e-01. Computation time: 3.8177e+00 s.
+Step 16: t = 5.402255e-08, dt = 3.087435e-09, cfl = 3.0000e-01. Computation time: 3.9140e+00 s.
+Step 17: t = 5.710999e-08, dt = 3.086541e-09, cfl = 3.0000e-01. Computation time: 4.0093e+00 s.
+Step 18: t = 6.019653e-08, dt = 3.074019e-09, cfl = 3.0000e-01. Computation time: 4.1027e+00 s.
+Step 19: t = 6.327055e-08, dt = 3.073756e-09, cfl = 3.0000e-01. Computation time: 4.1973e+00 s.
+Step 20: t = 6.634430e-08, dt = 3.068234e-09, cfl = 3.0000e-01. Computation time: 4.2910e+00 s.
+Step 21: t = 6.941254e-08, dt = 3.063402e-09, cfl = 3.0000e-01. Computation time: 4.3868e+00 s.
+Step 22: t = 7.247594e-08, dt = 3.059244e-09, cfl = 3.0000e-01. Computation time: 4.4805e+00 s.
+Step 23: t = 7.553518e-08, dt = 3.059292e-09, cfl = 3.0000e-01. Computation time: 4.5761e+00 s.
+Step 24: t = 7.859448e-08, dt = 3.048857e-09, cfl = 3.0000e-01. Computation time: 4.6660e+00 s.
+Step 25: t = 8.164333e-08, dt = 3.043274e-09, cfl = 3.0000e-01. Computation time: 4.7627e+00 s.
+Step 26: t = 8.468661e-08, dt = 3.049523e-09, cfl = 3.0000e-01. Computation time: 4.8571e+00 s.
+Step 27: t = 8.773613e-08, dt = 3.044877e-09, cfl = 3.0000e-01. Computation time: 4.9505e+00 s.
+Step 28: t = 9.078101e-08, dt = 3.040191e-09, cfl = 3.0000e-01. Computation time: 5.0454e+00 s.
+Step 29: t = 9.382120e-08, dt = 3.041539e-09, cfl = 3.0000e-01. Computation time: 5.1406e+00 s.
+Step 30: t = 9.686274e-08, dt = 3.038313e-09, cfl = 3.0000e-01. Computation time: 5.2363e+00 s.
+Step 31: t = 9.990105e-08, dt = 3.031981e-09, cfl = 3.0000e-01. Computation time: 5.3332e+00 s.
+- Wrote solution on a Lagrangian mesh at 1.029330e-07.
+- Wrote solution on a Lagrangian mesh at 1.029330e-07.
+- Wrote solution at 1.029330e-07 to solution_0001.vtr.
+Step 32: t = 1.029330e-07, dt = 3.030142e-09, cfl = 3.0000e-01. Computation time: 5.5387e+00 s.
+Step 33: t = 1.059632e-07, dt = 3.032464e-09, cfl = 3.0000e-01. Computation time: 5.6362e+00 s.
+Step 34: t = 1.089956e-07, dt = 3.027238e-09, cfl = 3.0000e-01. Computation time: 5.7298e+00 s.
+Step 35: t = 1.120229e-07, dt = 3.026259e-09, cfl = 3.0000e-01. Computation time: 5.8262e+00 s.
+Step 36: t = 1.150491e-07, dt = 3.032386e-09, cfl = 3.0000e-01. Computation time: 5.9205e+00 s.
+
+...
+
+Step 7052: t = 9.951215e-06, dt = 1.315616e-09, cfl = 3.0000e-01. Computation time: 8.4387e+02 s.
+Step 7053: t = 9.952531e-06, dt = 1.315920e-09, cfl = 3.0000e-01. Computation time: 8.4397e+02 s.
+Step 7054: t = 9.953847e-06, dt = 1.316230e-09, cfl = 3.0000e-01. Computation time: 8.4407e+02 s.
+Step 7055: t = 9.955163e-06, dt = 1.316547e-09, cfl = 3.0000e-01. Computation time: 8.4417e+02 s.
+Step 7056: t = 9.956480e-06, dt = 1.316869e-09, cfl = 3.0000e-01. Computation time: 8.4427e+02 s.
+Step 7057: t = 9.957797e-06, dt = 1.317198e-09, cfl = 3.0000e-01. Computation time: 8.4437e+02 s.
+Step 7058: t = 9.959114e-06, dt = 1.317532e-09, cfl = 3.0000e-01. Computation time: 8.4447e+02 s.
+Step 7059: t = 9.960431e-06, dt = 1.317872e-09, cfl = 3.0000e-01. Computation time: 8.4457e+02 s.
+Step 7060: t = 9.961749e-06, dt = 1.318216e-09, cfl = 3.0000e-01. Computation time: 8.4467e+02 s.
+Step 7061: t = 9.963067e-06, dt = 1.318532e-09, cfl = 3.0000e-01. Computation time: 8.4478e+02 s.
+Step 7062: t = 9.964386e-06, dt = 1.318808e-09, cfl = 3.0000e-01. Computation time: 8.4488e+02 s.
+Step 7063: t = 9.965705e-06, dt = 1.319090e-09, cfl = 3.0000e-01. Computation time: 8.4498e+02 s.
+Step 7064: t = 9.967024e-06, dt = 1.319377e-09, cfl = 3.0000e-01. Computation time: 8.4508e+02 s.
+Step 7065: t = 9.968343e-06, dt = 1.319670e-09, cfl = 3.0000e-01. Computation time: 8.4518e+02 s.
+Step 7066: t = 9.969663e-06, dt = 1.319970e-09, cfl = 3.0000e-01. Computation time: 8.4528e+02 s.
+Step 7067: t = 9.970983e-06, dt = 1.320275e-09, cfl = 3.0000e-01. Computation time: 8.4538e+02 s.
+Step 7068: t = 9.972303e-06, dt = 1.320585e-09, cfl = 3.0000e-01. Computation time: 8.4548e+02 s.
+Step 7069: t = 9.973624e-06, dt = 1.320900e-09, cfl = 3.0000e-01. Computation time: 8.4558e+02 s.
+Step 7070: t = 9.974945e-06, dt = 1.321220e-09, cfl = 3.0000e-01. Computation time: 8.4568e+02 s.
+Step 7071: t = 9.976266e-06, dt = 1.321545e-09, cfl = 3.0000e-01. Computation time: 8.4579e+02 s.
+Step 7072: t = 9.977587e-06, dt = 1.321873e-09, cfl = 3.0000e-01. Computation time: 8.4589e+02 s.
+Step 7073: t = 9.978909e-06, dt = 1.322206e-09, cfl = 3.0000e-01. Computation time: 8.4599e+02 s.
+Step 7074: t = 9.980231e-06, dt = 1.322542e-09, cfl = 3.0000e-01. Computation time: 8.4609e+02 s.
+Step 7075: t = 9.981554e-06, dt = 1.322881e-09, cfl = 3.0000e-01. Computation time: 8.4619e+02 s.
+Step 7076: t = 9.982877e-06, dt = 1.323225e-09, cfl = 3.0000e-01. Computation time: 8.4629e+02 s.
+Step 7077: t = 9.984200e-06, dt = 1.323571e-09, cfl = 3.0000e-01. Computation time: 8.4639e+02 s.
+Step 7078: t = 9.985524e-06, dt = 1.323920e-09, cfl = 3.0000e-01. Computation time: 8.4648e+02 s.
+Step 7079: t = 9.986848e-06, dt = 1.324271e-09, cfl = 3.0000e-01. Computation time: 8.4659e+02 s.
+Step 7080: t = 9.988172e-06, dt = 1.324625e-09, cfl = 3.0000e-01. Computation time: 8.4669e+02 s.
+Step 7081: t = 9.989497e-06, dt = 1.324966e-09, cfl = 3.0000e-01. Computation time: 8.4679e+02 s.
+Step 7082: t = 9.990821e-06, dt = 1.325257e-09, cfl = 3.0000e-01. Computation time: 8.4689e+02 s.
+Step 7083: t = 9.992147e-06, dt = 1.325551e-09, cfl = 3.0000e-01. Computation time: 8.4699e+02 s.
+Step 7084: t = 9.993472e-06, dt = 1.325848e-09, cfl = 3.0000e-01. Computation time: 8.4709e+02 s.
+Step 7085: t = 9.994798e-06, dt = 1.326148e-09, cfl = 3.0000e-01. Computation time: 8.4719e+02 s.
+Step 7086: t = 9.996124e-06, dt = 1.326451e-09, cfl = 3.0000e-01. Computation time: 8.4729e+02 s.
+Step 7087: t = 9.997451e-06, dt = 1.326757e-09, cfl = 3.0000e-01. Computation time: 8.4739e+02 s.
+Step 7088: t = 9.998777e-06, dt = 1.222522e-09, cfl = 2.7637e-01. Computation time: 8.4749e+02 s.
+- Wrote solution on a Lagrangian mesh at 1.000000e-05.
+- Wrote solution on a Lagrangian mesh at 1.000000e-05.
+- Wrote solution at 1.000000e-05 to solution_0100.vtr.
+
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 1.000000e-05)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 849.790987 sec.
+
