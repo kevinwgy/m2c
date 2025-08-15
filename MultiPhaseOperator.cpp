@@ -2314,7 +2314,7 @@ MultiPhaseOperator::FindNeighborsForUpdatingSweptNode(int i, int j, int k, doubl
 
         int obstructor = -1;
         X1 = Vec3D(global_mesh.GetX(i2), global_mesh.GetY(j2), global_mesh.GetZ(k2));
-        for(int s= 0; s<(int)intersector->size(); s++) {
+        for(int s=0; s<(int)intersector->size(); s++) {
           if((*intersector)[s]->Intersects(X0,X1,NULL,false,1)) {
             obstructor = s;
             break;

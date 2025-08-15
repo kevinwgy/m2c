@@ -1109,17 +1109,6 @@ EmbeddedBoundaryOperator::TrackSurfaces(int phi_layers)
     double max_dist0 = intersector[i]->ComputeUnsignedDistance(phi_layers, modified[i] ? 1 : -1);
     if(max_dist0>max_dist)
       max_dist = max_dist0;
-
-/*
-    // debug only
-    unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
-    string filename = "Phi_" + std::to_string(i) + ".vtr";
-    EBDS->Phi_ptr->StoreMeshCoordinates(*coordinates_ptr);
-    EBDS->Phi_ptr->WriteToVTRFile(filename.c_str(), "Phi");
-    filename = "Color_" + std::to_string(i) + ".vtr";
-    EBDS->Color_ptr->StoreMeshCoordinates(*coordinates_ptr);
-    EBDS->Color_ptr->WriteToVTRFile(filename.c_str(), "Color");
-*/
   }
 
   return max_dist;

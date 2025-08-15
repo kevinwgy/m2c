@@ -784,7 +784,6 @@ MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
   int update_counter = 0;
   for(auto&& ijk : *EBDS_jnt->swept_ptr) {
     //note: currently occluded nodes are not in "swept" (but imposed_occluded are in)
-    assert(EBDS_jnt->occluded_ptr->find(ijk) == EBDS_jnt->occluded_ptr->end());
     if(color_jnt[ijk[2]][ijk[1]][ijk[0]] == 0) {
       color_jnt[ijk[2]][ijk[1]][ijk[0]] = -99; //garbage, to be updated when calling intersector to "refill"
       update_counter++;

@@ -1885,9 +1885,12 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
 //-------------------------------------------------------------------------
 
 int
-Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir, double len, MyTriangle* tri, int nTri,
+Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, int dir, double len,
+                                                MyTriangle* tri, int nTri,
                                                 IntersectionPoint &xf, IntersectionPoint &xb)
 {
+  //Checks intersections only (not occlusion)
+  
   vector<Vec3D>&  Xs(surface.X);
   vector<Int3>&   Es(surface.elems);
 
@@ -1898,8 +1901,8 @@ Intersector::FindEdgeIntersectionsWithTriangles(Vec3D &x0, int i, int j, int k, 
   for(int iTri=0; iTri<nTri; iTri++) {
     int id = tri[iTri].trId();
     Int3& nodes(Es[id]);
-    bool found = GeoTools::LineSegmentIntersectsTriangle(x0, dir, len, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
-                                                         &dist, NULL, &xi);
+    bool found = GeoTools::LineSegmentIntersectsTriangle(x0, dir, len, Xs[nodes[0]], Xs[nodes[1]],
+                                                         Xs[nodes[2]], &dist, NULL, &xi);
     if(found) //store the result
       X.push_back(std::make_pair(dist, IntersectionPoint(i,j,k,dir,dist,id,xi)));
   }
@@ -1929,6 +1932,12 @@ bool
 Intersector::Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr, bool use_singleLayer_bb,
                         int ignore_elem_tag)
 {
+  //NOTE THAT this function return true if X0 or X1 is occluded, WHICH IS DIFFERENT FROM
+  //FindEdgeIntersectionsWithTriangles
+
+  //Find the first intersection between X0-->X1 and any triangles (tree_1 or tree_N), including occlusion.
+  //Currently this function only returns true/false and (optionally) the intersecting triangle
+  //ID (tri_ptr). But it can be extended easily to return more info.
 
   if(!use_singleLayer_bb)
     assert(nLayer>=1); //make sure tree_n has been constructed...
@@ -1959,7 +1968,7 @@ Intersector::Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr, bool use_singleLayer
     return false;
 
 
-  // Step 2: Check if X0 or X1 is occluded (-->intersection)
+  // Step 2: Check if X0 is occluded (-->return true)
   int tid;
   if(IsPointOccludedByTriangles(X0, cands.data(), found, half_thickness, tid)) {
     if(ignore_elem_tag>=0 && 
@@ -1972,6 +1981,35 @@ Intersector::Intersects(Vec3D &X0, Vec3D &X1, int* tid_ptr, bool use_singleLayer
 
 SKIP_1:
 
+  // Step 3: Check for intersections
+  vector<pair<double, int> > xpoints; //pairs distance with intersecting triangle id
+  double dist;
+  vector<Vec3D>& Xs(surface.X);
+  vector<Int3>&  Es(surface.elems);
+  for(int i=0; i<found; i++) {
+    if(ignore_elem_tag>=0 &&
+       (int)surface.elemtag.size()>cands[i].trId() &&
+       surface.elemtag[cands[i].trId()] == ignore_elem_tag)
+      continue;
+       
+    Int3 &nodes(Es[cands[i].trId()]);
+    if(GeoTools::LineSegmentIntersectsTriangle(X0, X1, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]],
+                                               &dist, NULL, NULL))
+      xpoints.push_back(std::make_pair(dist, cands[i].trId()));
+  }
+  if(!xpoints.empty()) {//found intersection(s)
+    double mindist = DBL_MAX;
+    for(auto&& xp : xpoints)
+      if(xp.first < mindist) {
+        mindist = xp.first;
+        if(tid_ptr)
+          *tid_ptr = xp.second;
+      }
+    return true;
+  }
+
+
+  // Step 4: Check if X1 is occluded (-->return true)
   if(IsPointOccludedByTriangles(X1, cands.data(), found, half_thickness, tid)) {
     if(ignore_elem_tag>=0 && 
        (int)surface.elemtag.size()>tid && surface.elemtag[tid] == ignore_elem_tag)
@@ -1982,23 +2020,6 @@ SKIP_1:
   }
 
 SKIP_2:
-
-  // Step 3: Check for intersection
-  vector<Vec3D>& Xs(surface.X);
-  vector<Int3>&  Es(surface.elems);
-  for(int i=0; i<found; i++) {
-    if(ignore_elem_tag>=0 &&
-       (int)surface.elemtag.size()>cands[i].trId() &&
-       surface.elemtag[cands[i].trId()] == ignore_elem_tag)
-      continue;
-       
-    Int3 &nodes(Es[cands[i].trId()]);
-    if(GeoTools::LineSegmentIntersectsTriangle(X0, X1, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]])) {
-      if(tid_ptr)
-        *tid_ptr = cands[i].trId();
-      return true;
-    }
-  }
 
   return false;
 }
