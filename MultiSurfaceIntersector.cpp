@@ -600,7 +600,7 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
             if(elem_drop_status[tid_f]) {
               dropped_intersections.push_back(xf[k][j][i][p]);
               intersections[xf[k][j][i][p]].tid = special_tag;
-              xf[k][j][i][p] = -1;
+              xf[k][j][i][p] = (double_intersection && !elem_drop_status[tid_b]) ? xb[k][j][i][p] : -1;
             }
 
             if(elem_drop_status[tid_b]) {
@@ -608,7 +608,7 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
                 dropped_intersections.push_back(xb[k][j][i][p]);
                 intersections[xb[k][j][i][p]].tid = special_tag;
               }
-              xb[k][j][i][p] = -1;
+              xb[k][j][i][p] = (double_intersection && !elem_drop_status[tid_f]) ? xf[k][j][i][p] : -1;
             }
           }
         }
@@ -648,6 +648,10 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
 
         layer[k][j][i] = -1;
 
+        assert((xf[k][j][i][0]>=0)==(xb[k][j][i][0]>=0) &&
+               (xf[k][j][i][1]>=0)==(xb[k][j][i][1]>=0) &&
+               (xf[k][j][i][2]>=0)==(xb[k][j][i][2]>=0));
+
         if(xf[k][j][i][0]>=0) {
           xf[k][j][i][0] = old2new[xf[k][j][i][0]];
           xb[k][j][i][0] = old2new[xb[k][j][i][0]];
@@ -672,6 +676,7 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
             firstLayer.insert(Int3(i,j,k-1));
           firstLayer.insert(Int3(i,j,k));
         }
+
       }
 
   EBDS->XForward_ptr->RestoreDataPointerToLocalVector(); //can NOT sync (because intersections do not sync)
@@ -681,13 +686,14 @@ MultiSurfaceIntersector::ModifyIntersectionsAndOccludedNodes(int id, vector<bool
   // -------------------------------
   // Step 2: Update occluded, firstLayer (and LayerTag)
   // -------------------------------
-  double*** occid  = EBDS->OccTriangle_ptr->GetDataPointer(); 
+  double*** occid = EBDS->OccTriangle_ptr->GetDataPointer();
   std::set<Int3>& occluded(*EBDS->occluded_ptr);
   for(auto it = occluded.begin(); it != occluded.end(); ) { //includes internal ghosts (see Intersector.h)
     int tid = occid[(*it)[2]][(*it)[1]][(*it)[0]];
     assert(tid>=0 && tid<(int)elem_drop_status.size());
     if(elem_drop_status[tid]) {//drop this occluded node
       occid[(*it)[2]][(*it)[1]][(*it)[0]] = -1;
+      EBDS->swept_ptr->insert(*it);  //it now becomes a swept node
       it = occluded.erase(it); //it points to the next element
     } else {
       layer[(*it)[2]][(*it)[1]][(*it)[0]] = 0;
@@ -783,11 +789,11 @@ MultiSurfaceIntersector::FindNewEnclosuresByRefill(int color4new)
   double*** color_jnt = EBDS_jnt->Color_ptr->GetDataPointer();
   int update_counter = 0;
   for(auto&& ijk : *EBDS_jnt->swept_ptr) {
-    //note: currently occluded nodes are not in "swept" (but imposed_occluded are in)
+    //note: for each individual surface, occluded nodes are not in "swept" (but imposed_occluded are in)
+    //      but this may not be true for "jnt". A node can be occluded by one surface & swept by another.
     if(color_jnt[ijk[2]][ijk[1]][ijk[0]] == 0) {
       color_jnt[ijk[2]][ijk[1]][ijk[0]] = -99; //garbage, to be updated when calling intersector to "refill"
       update_counter++;
-      assert(EBDS_jnt->occluded_ptr->find(ijk) == EBDS_jnt->occluded_ptr->end());
     }
   }
   for(auto&& ijk : *EBDS_jnt->occluded_ptr) 

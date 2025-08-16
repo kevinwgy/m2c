@@ -1140,7 +1140,7 @@ EmbeddedBoundaryOperator::TrackUpdatedSurfaces()
           break;
       }
       if(!involved)
-        continue;
+        continue; //skip current intersector/surface
     }
 
     // actual computations
