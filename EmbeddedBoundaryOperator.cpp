@@ -1508,6 +1508,10 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
     if(status[tid]==3)
       continue;
 
+    if(!multi_intersector.empty() && //there can be dropped elements...
+       (int)surfaces[surf].elemtag.size()>tid && surfaces[surf].elemtag[tid] == 1) //"1" means dropped
+      continue;
+
     assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
     Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
 
@@ -1691,11 +1695,16 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
       int nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
       int trial_counter = 0;
       while(nFound<numPoints || nFound>maxCand) {
-        if(trial_counter>10) {
+        if(trial_counter>20) {
           fprintf(stdout,"\033[0;31m*** Error: Cannot find candidates for interpolation "
                          "(ComputeForces, 2D->3D). xg2d: %e %e.\033[0m\n", xg2d[0], xg2d[1]);
           exit(-1);
         }
+        if(trial_counter>10)
+          fprintf(stdout,"\033[0;35mWarning: Havn't found desired number of candidates for "
+                         "interpolation after %d trials (ComputeForces, 2D->3D). xg2d: %e %e. "
+                         "nFound: %d.\033[0m\n", trial_counter, xg2d[0], xg2d[1], nFound);
+
         if(nFound<numPoints) 
           search_radius *= 2.0;
         else //nFound>maxCand
