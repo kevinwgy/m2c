@@ -13,6 +13,9 @@
 #include<deque>
 #include<list>
 #include<utility>
+#include<fstream>
+#include<string>
+#include<iomanip> //std::setw
 #include<memory.h> //unique_ptr
 #include<dlfcn.h> //dlopen, dlclose
 
@@ -392,7 +395,7 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
     if(strcmp(iod_embedded_surfaces[surf]->output.wetting_output_filename,"")) {
 
       char outname[512];
-      sprintf(outname, "%s%s", iod_embedded_surfaces[surf]->output.prefix,
+      snprintf(outname, 512, "%s%s", iod_embedded_surfaces[surf]->output.prefix,
               iod_embedded_surfaces[surf]->output.wetting_output_filename);
 
       std::fstream out(outname, std::fstream::out);

@@ -5,6 +5,7 @@
 
 #include<FloodFill.h>
 #include<Utils.h>
+#include<queue>
 
 using std::vector;
 using std::set;

@@ -515,7 +515,7 @@ M2CTwinMessenger::CommunicateBeforeTimeStepping(SpaceVariable3D &coordinates_, D
     vector<int> overset_boundary(6, 0); //xmin, xmax, ymin, ymax, zmin, zmax, 1 means yes
   
     if(m2c_rank==0) { //receives data from leader proc #0, then broadcast
-      int mysize;
+      int mysize(0);
 
       // x
       MPI_Recv(&mysize, 1, MPI_INT, 0, 0, joint_comm, MPI_STATUS_IGNORE);

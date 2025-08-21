@@ -8,7 +8,8 @@
 #include <petscviewer.h>
 //#include <petscviewerhdf5.h>
 #include <Utils.h>
-#include <bits/stdc++.h> //min_element, max_element
+#include <algorithm> //min_element, max_element
+#include <cfloat>
 using std::vector;
 extern int INACTIVE_MATERIAL_ID;
 
@@ -348,7 +349,7 @@ void SpaceVariable3D::WriteToVTRFile(const char *filename, const char *varname)
   if(varname)
     SetOutputVariableName(varname);
 
-  PetscViewer viewer;
+  PetscViewer viewer(nullptr);
   PetscViewerVTKOpen(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer);
   VecView(globalVec, viewer);
   PetscViewerDestroy(&viewer);
@@ -365,7 +366,7 @@ void SpaceVariable3D::WriteToHDF5File([[maybe_unused]] const char *filename, con
   if(varname)
     SetOutputVariableName(varname);
 
-  PetscViewer viewer;
+  PetscViewer viewer(nullptr);
   //PetscViewerHDF5Open(PetscObjectComm((PetscObject)*dm), filename, FILE_MODE_WRITE, &viewer); //NOT AVAILABLE?
   VecView(globalVec, viewer);
   PetscViewerDestroy(&viewer);
@@ -382,7 +383,7 @@ void SpaceVariable3D::WriteToCGNSFile(const char *filename, const char *varname)
   if(varname)
     SetOutputVariableName(varname);
 
-  PetscViewer viewer;
+  PetscViewer viewer(nullptr);
   PetscViewerCreate(*comm, &viewer);
   //PetscViewerSetType(viewer, PETSCVIEWERCGNS); //NOT AVAILABLE?
   PetscViewerFileSetMode(viewer, FILE_MODE_WRITE);

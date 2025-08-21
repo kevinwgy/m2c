@@ -18,8 +18,8 @@
 #include <UserDefinedSolution.h>
 
 class EmbeddedBoundaryDataSet;
-class TriangulatedSurface;
-class IntersectionPoint;
+struct TriangulatedSurface;
+struct IntersectionPoint;
 
 /*******************************************
  * class SpaceOperator drives computations

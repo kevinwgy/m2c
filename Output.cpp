@@ -31,7 +31,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
   last_snapshot_time = -1.0;
 
   char f1[256];
-  sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
+  snprintf(f1, 256, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
 
   pvdfile  = fopen(f1,"w");
   if(!pvdfile) {
@@ -222,27 +222,27 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
   char full_fname[256];
   char fname[256];
   if(iFrame<10) {
-    sprintf(fname, "%s_000%d.vtr", 
+    snprintf(fname, 256, "%s_000%d.vtr", 
             iod.output.solution_filename_base, iFrame);
-    sprintf(full_fname, "%s%s_000%d.vtr", iod.output.prefix,
+    snprintf(full_fname, 256, "%s%s_000%d.vtr", iod.output.prefix,
             iod.output.solution_filename_base, iFrame); 
   }
   else if(iFrame<100){
-    sprintf(fname, "%s_00%d.vtr", 
+    snprintf(fname, 256, "%s_00%d.vtr", 
             iod.output.solution_filename_base, iFrame);
-    sprintf(full_fname, "%s%s_00%d.vtr", iod.output.prefix,
+    snprintf(full_fname, 256, "%s%s_00%d.vtr", iod.output.prefix,
             iod.output.solution_filename_base, iFrame); 
   }
   else if(iFrame<1000){
-    sprintf(fname, "%s_0%d.vtr", 
+    snprintf(fname, 256, "%s_0%d.vtr", 
             iod.output.solution_filename_base, iFrame);
-    sprintf(full_fname, "%s%s_0%d.vtr", iod.output.prefix,
+    snprintf(full_fname, 256, "%s%s_0%d.vtr", iod.output.prefix,
             iod.output.solution_filename_base, iFrame); 
   }
   else {
-    sprintf(fname, "%s_%d.vtr", 
+    snprintf(fname, 256, "%s_%d.vtr", 
             iod.output.solution_filename_base, iFrame);
-    sprintf(full_fname, "%s%s_%d.vtr", iod.output.prefix,
+    snprintf(full_fname, 256, "%s%s_%d.vtr", iod.output.prefix,
             iod.output.solution_filename_base, iFrame); 
   }
 
@@ -314,7 +314,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
 
       SpaceVariable3D* AlphaR = it->second;
       char word[40];
-      sprintf(word, "molar_fractions_%d", j); 
+      snprintf(word, 40, "molar_fractions_%d", j); 
       PetscObjectSetName((PetscObject)(AlphaR->GetRefToGlobalVec()), word);
       VecView(AlphaR->GetRefToGlobalVec(), viewer);
     } 
@@ -382,18 +382,18 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     }
     if(iod.output.levelset[it->first]==OutputData::ON) {
       char word[12];
-      sprintf(word, "levelset%d", it->first);
+      snprintf(word, 12, "levelset%d", it->first);
       PetscObjectSetName((PetscObject)(Phi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to Phi[i].
       VecView(Phi[it->first]->GetRefToGlobalVec(), viewer);
       numSol++;
 
       if (iod.exact_riemann.surface_tension == ExactRiemannSolverData::YES) {                                                                                                    
-	sprintf(word, "NPhi%d", it->first);
+	snprintf(word, 12, "NPhi%d", it->first);
 	PetscObjectSetName((PetscObject)(NPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to NPhi[i].
 	VecView(NPhi[it->first]->GetRefToGlobalVec(), viewer);
         numSol++;
 
-	sprintf(word, "KappaPhi%d", it->first);
+	snprintf(word, 12, "KappaPhi%d", it->first);
 	PetscObjectSetName((PetscObject)(KappaPhi[it->first]->GetRefToGlobalVec()), word); //adding the name directly to KappaPhi[i].
 	VecView(KappaPhi[it->first]->GetRefToGlobalVec(), viewer);
         numSol++;
@@ -529,7 +529,7 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
 
   // Add a line to the pvd file to record the new solutio snapshot
   char f1[256];
-  sprintf(f1, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
+  snprintf(f1, 256, "%s%s.pvd", iod.output.prefix, iod.output.solution_filename_base);
   pvdfile  = fopen(f1,"r+");
   if(!pvdfile) {
     print_error("*** Error: Cannot open file '%s%s.pvd' for output.\n",
@@ -559,7 +559,7 @@ Output::OutputMeshInformation(SpaceVariable3D& coordinates)
     return; //nothing to do
 
   char fname[256];
-  sprintf(fname, "%s%s", iod.output.prefix, iod.output.mesh_filename);
+  snprintf(fname, 256, "%s%s", iod.output.prefix, iod.output.mesh_filename);
   FILE* file = fopen(fname, "w");
 
   int ii0, jj0, kk0, iimax, jjmax, kkmax;
@@ -633,7 +633,7 @@ Output::OutputMeshPartition()
     return; //nothing to do
 
   char fname[256];
-  sprintf(fname, "%s%s.vtr", iod.output.prefix, iod.output.mesh_partition);
+  snprintf(fname, 256, "%s%s.vtr", iod.output.prefix, iod.output.mesh_partition);
 
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);

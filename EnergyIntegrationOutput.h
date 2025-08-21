@@ -20,7 +20,7 @@ class EnergyIntegrationOutput
 
   MeshData& iod_mesh;
 
-  EquationsData& iod_eqs;
+  [[maybe_unused]] EquationsData& iod_eqs;
 
   LaserAbsorptionSolver* laser;
 

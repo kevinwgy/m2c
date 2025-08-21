@@ -23,7 +23,8 @@ MaterialVolumeOutput::MaterialVolumeOutput(MPI_Comm &comm_, IoData &iod,
   int spn = strlen(iod.output.prefix) + 1;
   if(iod.output.materialVolumes.filename[0] != 0) {
     char *full_fname = new char[spn + strlen(iod.output.materialVolumes.filename)];
-    sprintf(full_fname, "%s%s", iod.output.prefix, iod.output.materialVolumes.filename);
+    snprintf(full_fname, spn + strlen(iod.output.materialVolumes.filename),
+             "%s%s", iod.output.prefix, iod.output.materialVolumes.filename);
     file = fopen(full_fname, "w");
 
     if(!file) {

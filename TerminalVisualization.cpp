@@ -6,7 +6,6 @@
 #include<TerminalVisualization.h>
 #include<string.h>
 #include<Vector5D.h>
-#include<bits/stdc++.h>
 #include<unistd.h> //sleep
 
 using std::vector;

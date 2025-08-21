@@ -7,7 +7,6 @@
 #include <GradientCalculatorFD3.h>
 #include <Vector5D.h>
 #include <Utils.h>
-#include <bits/stdc++.h>
 using std::unique_ptr;
 
 extern int verbose;

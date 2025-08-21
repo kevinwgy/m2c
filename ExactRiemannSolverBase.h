@@ -79,7 +79,7 @@ protected: //internal functions
 
     private:
     VarFcnBase* vf;
-    double rho, p, e, ps, es, pavg, one_over_rho;
+    [[maybe_unused]] double rho, p, e, ps, es, pavg, one_over_rho; //silence clang compiler warning
   };
 
   virtual bool FindInitialInterval(double rhol, double ul, double pl, double el, double cl, int idl,

@@ -73,7 +73,8 @@ protected:
     }
 
     private:
-    double p, e, omegae, A1, A2, R1rho0, R2rho0, omega_over_R1rho0, omega_over_R2rho0;
+    double p, omegae, A1, A2, R1rho0, R2rho0, omega_over_R1rho0, omega_over_R2rho0;
+    [[maybe_unused]]double e; //silence clang compiler warning
   };
 
 };

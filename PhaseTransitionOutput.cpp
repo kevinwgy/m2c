@@ -11,7 +11,8 @@ PhaseTransitionOutput::PhaseTransitionOutput(MPI_Comm &comm_, OutputData &iod_ou
   last_snapshot_time = -1.0;
 
   char* filename = new char[strlen(iod_output.prefix)+strlen(iod_output.mat_transition.filename)+1];
-  sprintf(filename,"%s%s", iod_output.prefix, iod_output.mat_transition.filename);
+  snprintf(filename, strlen(iod_output.prefix)+strlen(iod_output.mat_transition.filename)+1,
+           "%s%s", iod_output.prefix, iod_output.mat_transition.filename);
 
   //print header
   file = fopen(filename, "w");

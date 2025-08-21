@@ -19,7 +19,7 @@
 
 class SymmetryOperator
 {
-  MPI_Comm& comm;
+  [[maybe_unused]] MPI_Comm& comm;
 
   MeshData& iod_mesh;
 
@@ -27,7 +27,7 @@ class SymmetryOperator
 
   //! Mesh info.
   SpaceVariable3D &coordinates;
-  SpaceVariable3D &delta_xyz;
+  [[maybe_unused]] SpaceVariable3D &delta_xyz; //silence clang compiler warning
   SpaceVariable3D &volume;
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain

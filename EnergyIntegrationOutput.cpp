@@ -32,56 +32,64 @@ EnergyIntegrationOutput::EnergyIntegrationOutput(MPI_Comm &comm_, IoData &iod, O
 
    if (iod_output.energy_integration.volume[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.volume)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.volume);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.volume),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.volume);
     file[EnergyIntegrationData::VOLUME] = fopen(filename, "w");
     delete [] filename;
    }
 
    if (iod_output.energy_integration.mass[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.mass)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.mass);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.mass),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.mass);
     file[EnergyIntegrationData::MASS] = fopen(filename, "w");
     delete [] filename;
    }
 
    if (iod_output.energy_integration.total_energy[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.total_energy)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.total_energy);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.total_energy),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.total_energy);
     file[EnergyIntegrationData::TOTAL_ENERGY] = fopen(filename, "w");
     delete [] filename;
    }
 
    if (iod_output.energy_integration.total_enthalpy[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.total_enthalpy)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.total_enthalpy);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.total_enthalpy),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.total_enthalpy);
     file[EnergyIntegrationData::TOTAL_ENTHALPY] = fopen(filename, "w");
     delete [] filename;
    }
 
    if (iod_output.energy_integration.kinetic_energy[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.kinetic_energy)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.kinetic_energy);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.kinetic_energy),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.kinetic_energy);
     file[EnergyIntegrationData::KINETIC_ENERGY] = fopen(filename, "w");
     delete [] filename;
    }
 
    if (iod_output.energy_integration.internal_energy[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.internal_energy)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.internal_energy);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.internal_energy),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.internal_energy);
     file[EnergyIntegrationData::INTERNAL_ENERGY] = fopen(filename, "w");
     delete [] filename;
    }
   
    if (iod_output.energy_integration.potential_energy[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.potential_energy)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.potential_energy);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.potential_energy),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.potential_energy);
     file[EnergyIntegrationData::POTENTIAL_ENERGY] = fopen(filename, "w");
     delete [] filename;
    }
 
    if (iod_output.energy_integration.laser_radiation[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.energy_integration.laser_radiation)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.energy_integration.laser_radiation);
+    snprintf(filename, spn + strlen(iod_output.energy_integration.laser_radiation),
+             "%s%s", iod_output.prefix, iod_output.energy_integration.laser_radiation);
     file[EnergyIntegrationData::LASER_RADIATION] = fopen(filename, "w");
     delete [] filename;
    }

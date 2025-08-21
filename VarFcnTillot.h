@@ -272,7 +272,7 @@ private:
                            : (e + vf->GetPressure(rho,e)/rho - enthalpy)/fabs(enthalpy);}
     
   private:
-    double rho, T;
+    [[maybe_unused]] double rho, T; //silence clang compiler warning
     VarFcnTillot *vf;
   };
 

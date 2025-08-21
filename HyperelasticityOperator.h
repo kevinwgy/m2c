@@ -8,9 +8,10 @@
 #include<ReferenceMapOperator.h>
 #include<HyperelasticityFcn2DCyl.h>
 #include<Interpolator.h>
+#include <memory>
 
 class EmbeddedBoundaryDataSet;
-class Vec5D;
+struct Vec5D;
 
 /*********************************************************
  * class HyperelasticityOperator is responsible for
@@ -51,7 +52,7 @@ class HyperelasticityOperator
   GradientCalculatorBase &grad;
 
   //! Interpolator
-  InterpolatorBase &interpolator;
+  [[maybe_unused]] InterpolatorBase &interpolator;
 
   //! Deformation gradient (dim = 9, i.e. 3x3 matrix)
   SpaceVariable3D F;

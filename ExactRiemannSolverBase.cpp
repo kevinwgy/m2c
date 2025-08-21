@@ -6,7 +6,7 @@
 #include<ExactRiemannSolverBase.h>
 #include<array>
 #include<utility> //std::pair
-#include<bits/stdc++.h> //std::swap
+#include<algorithm> //std::swap
 #include<iostream>
 
 //#include <chrono> // for timing

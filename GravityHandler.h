@@ -10,6 +10,7 @@
 #include <SpaceVariable.h>
 #include <GlobalMeshInfo.h>
 #include <GhostPoint.h>
+#include <memory>
 
 class EmbeddedBoundaryDataSet;
 class LevelSetOperator;
@@ -28,8 +29,8 @@ class GravityHandler
 
   SpaceVariable3D& coordinates;
 
-  vector<GhostPoint>& ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
-  vector<GhostPoint>& ghost_nodes_outer; //!< ghost nodes outside the physical domain
+  std::vector<GhostPoint>& ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  std::vector<GhostPoint>& ghost_nodes_outer; //!< ghost nodes outside the physical domain
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain

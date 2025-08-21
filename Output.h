@@ -32,7 +32,7 @@ class Output
   GlobalMeshInfo &global_mesh;
 
   //! external ghosts
-  std::vector<GhostPoint>& ghost_nodes_outer;
+  [[maybe_unused]] std::vector<GhostPoint>& ghost_nodes_outer;
 
   //! Ionization solver (Currently, a post-processer)
   IonizationOperator* ion;
@@ -41,7 +41,7 @@ class Output
   PhaseTransitionOutput* pto;
 
   //! Laser absorption solver
-  LaserAbsorptionSolver* laser;
+  [[maybe_unused]] LaserAbsorptionSolver* laser;
 
   //! Hyperelasticity solver (Used here optionally, as a post-processor)
   HyperelasticityOperator *heo;

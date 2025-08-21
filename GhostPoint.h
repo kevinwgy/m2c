@@ -6,7 +6,7 @@
 #ifndef _GHOST_POINT_H
 #define _GHOST_POINT_H
 #include <Vector3D.h>
-#include <bits/stdc++.h> //INT_MAX
+#include <climits> //INT_MAX
 #include <cfloat> //DBL_MAX
 
 /** This class is responsible for storing information outside each subdomain.

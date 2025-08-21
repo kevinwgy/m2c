@@ -10,6 +10,7 @@
 #include <FluxFcnBase.h>
 #include <GhostPoint.h>
 #include <EmbeddedBoundaryDataSet.h>
+#include <memory> //unique_ptr
 using std::min;
 using std::max;
 

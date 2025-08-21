@@ -29,7 +29,7 @@ class ReferenceMapOperator
   GlobalMeshInfo& global_mesh;
 
   //! ghost nodes
-  vector<GhostPoint>& ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  [[maybe_unused]]vector<GhostPoint>& ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   vector<GhostPoint>& ghost_nodes_outer; //!< ghost nodes outside the physical domain
   vector<int>         ghost_nodes_outer_tag; //!< -1: corner (not used) 0: slip wall/symm, 1: stick, 2: open
 

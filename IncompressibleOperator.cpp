@@ -215,7 +215,7 @@ IncompressibleOperator::CheckInputs(IoData &iod)
   // -----------------------------
   // Check boundary conditions
   // -----------------------------
-  int bc_error = 0;
+  [[maybe_unused]] int bc_error = 0; //silence clang compiler warning...
   if(iod.bc.inlet.density != default_density)       bc_error++;
   if(iod.bc.inlet.pressure != 0.0)                  bc_error++;
   if(iod.bc.inlet.internal_energy_per_mass != 0.0)  bc_error++;

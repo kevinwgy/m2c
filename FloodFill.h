@@ -9,6 +9,7 @@
 #include<Vector3D.h>
 #include<SpaceVariable.h>
 #include<GhostPoint.h>
+#include<set>
 
 /*******************************************************************
  * Class FloodFill is a utility class that fills continuous regions

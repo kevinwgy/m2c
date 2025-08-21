@@ -6,8 +6,10 @@
 #include<ExactRiemannSolverInterfaceJump.h>
 #include<array>
 #include<utility> //std::pair
-#include<bits/stdc++.h> //std::swap
+#include<algorithm> //std::swap
+#include<cfloat> //DBL_MIN
 #include<iostream>
+#include<iomanip> //std::setprecision
 
 using std::pair;
 using std::cout;

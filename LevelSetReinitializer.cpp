@@ -6,6 +6,7 @@
 #include <LevelSetReinitializer.h>
 #include <GradientCalculatorCentral.h>
 #include <cfloat> //DBL_MAX
+#include <set>
 
 extern int verbose;
 extern double domain_diagonal;

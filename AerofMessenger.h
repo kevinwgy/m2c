@@ -19,14 +19,14 @@
 
 class AerofMessenger {
 
-  IoData &iod;
+  [[maybe_unused]] IoData &iod;
 
-  MPI_Comm &m2c_comm; //!< This is the M2C communicator
-  MPI_Comm &joint_comm; //!< This is the joint communicator of M2C and AERO-F
+  [[maybe_unused]] MPI_Comm &m2c_comm; //!< This is the M2C communicator
+  [[maybe_unused]] MPI_Comm &joint_comm; //!< This is the joint communicator of M2C and AERO-F
 
-  int m2c_rank, m2c_size; 
+  [[maybe_unused]] int m2c_rank, m2c_size; 
 
-  std::vector<double> temp_buffer;
+  [[maybe_unused]] std::vector<double> temp_buffer;
 
 public:
 

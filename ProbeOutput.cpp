@@ -51,7 +51,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.density[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.density)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.density);
+    snprintf(filename, spn + strlen(iod_output.probes.density), //avoid writing out-of-range
+             "%s%s", iod_output.prefix, iod_output.probes.density);
     file[Probes::DENSITY] = fopen(filename, "w");
 
     if(!file[Probes::DENSITY]) {
@@ -64,7 +65,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.velocity_x[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.velocity_x)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.velocity_x);
+    snprintf(filename, spn + strlen(iod_output.probes.velocity_x),
+             "%s%s", iod_output.prefix, iod_output.probes.velocity_x);
     file[Probes::VELOCITY_X] = fopen(filename, "w");
 
     if(!file[Probes::VELOCITY_X]) {
@@ -77,7 +79,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.velocity_y[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.velocity_y)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.velocity_y);
+    snprintf(filename, spn + strlen(iod_output.probes.velocity_y),
+             "%s%s", iod_output.prefix, iod_output.probes.velocity_y);
     file[Probes::VELOCITY_Y] = fopen(filename, "w");
 
     if(!file[Probes::VELOCITY_Y]) {
@@ -90,7 +93,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.velocity_z[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.velocity_z)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.velocity_z);
+    snprintf(filename, spn + strlen(iod_output.probes.velocity_z),
+             "%s%s", iod_output.prefix, iod_output.probes.velocity_z);
     file[Probes::VELOCITY_Z] = fopen(filename, "w");
 
     if(!file[Probes::VELOCITY_Z]) {
@@ -103,7 +107,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.pressure[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.pressure)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.pressure);
+    snprintf(filename, spn + strlen(iod_output.probes.pressure),
+             "%s%s", iod_output.prefix, iod_output.probes.pressure);
     file[Probes::PRESSURE] = fopen(filename, "w");
 
     if(!file[Probes::PRESSURE]) {
@@ -116,7 +121,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.temperature[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.temperature)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.temperature);
+    snprintf(filename, spn + strlen(iod_output.probes.temperature),
+             "%s%s", iod_output.prefix, iod_output.probes.temperature);
     file[Probes::TEMPERATURE] = fopen(filename, "w");
 
     if(!file[Probes::TEMPERATURE]) {
@@ -129,7 +135,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.delta_temperature[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.delta_temperature)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.delta_temperature);
+    snprintf(filename, spn + strlen(iod_output.probes.delta_temperature),
+             "%s%s", iod_output.prefix, iod_output.probes.delta_temperature);
     file[Probes::DELTA_TEMPERATURE] = fopen(filename, "w");
 
     if(!file[Probes::DELTA_TEMPERATURE]) {
@@ -142,7 +149,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.materialid[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.materialid)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.materialid);
+    snprintf(filename, spn + strlen(iod_output.probes.materialid),
+             "%s%s", iod_output.prefix, iod_output.probes.materialid);
     file[Probes::MATERIALID] = fopen(filename, "w");
 
     if(!file[Probes::MATERIALID]) {
@@ -155,7 +163,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.laser_radiance[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.laser_radiance)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.laser_radiance);
+    snprintf(filename, spn + strlen(iod_output.probes.laser_radiance),
+             "%s%s", iod_output.prefix, iod_output.probes.laser_radiance);
     file[Probes::LASERRADIANCE] = fopen(filename, "w");
 
     if(!file[Probes::LASERRADIANCE]) {
@@ -168,7 +177,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.levelset0[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.levelset0)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset0);
+    snprintf(filename, spn + strlen(iod_output.probes.levelset0),
+             "%s%s", iod_output.prefix, iod_output.probes.levelset0);
     file[Probes::LEVELSET0] = fopen(filename, "w");
 
     if(!file[Probes::LEVELSET0]) {
@@ -181,7 +191,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.levelset1[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.levelset1)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset1);
+    snprintf(filename, spn + strlen(iod_output.probes.levelset1),
+             "%s%s", iod_output.prefix, iod_output.probes.levelset1);
     file[Probes::LEVELSET1] = fopen(filename, "w");
 
     if(!file[Probes::LEVELSET1]) {
@@ -194,7 +205,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.levelset2[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.levelset2)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset2);
+    snprintf(filename, spn + strlen(iod_output.probes.levelset2),
+             "%s%s", iod_output.prefix, iod_output.probes.levelset2);
     file[Probes::LEVELSET2] = fopen(filename, "w");
 
     if(!file[Probes::LEVELSET2]) {
@@ -207,7 +219,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.levelset3[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.levelset3)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset3);
+    snprintf(filename, spn + strlen(iod_output.probes.levelset3),
+             "%s%s", iod_output.prefix, iod_output.probes.levelset3);
     file[Probes::LEVELSET3] = fopen(filename, "w");
 
     if(!file[Probes::LEVELSET3]) {
@@ -220,7 +233,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.levelset4[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.levelset4)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.levelset4);
+    snprintf(filename, spn + strlen(iod_output.probes.levelset4),
+             "%s%s", iod_output.prefix, iod_output.probes.levelset4);
     file[Probes::LEVELSET4] = fopen(filename, "w");
 
     if(!file[Probes::LEVELSET4]) {
@@ -237,7 +251,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
       exit_mpi();
     }
     char *filename = new char[spn + strlen(iod_output.probes.ionization_result)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.ionization_result);
+    snprintf(filename, spn + strlen(iod_output.probes.ionization_result),
+             "%s%s", iod_output.prefix, iod_output.probes.ionization_result);
     file[Probes::IONIZATION] = fopen(filename, "w");
 
     if(!file[Probes::IONIZATION]) {
@@ -250,7 +265,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
 
   if (iod_output.probes.reference_map[0] != 0) {
     char *filename = new char[spn + strlen(iod_output.probes.reference_map)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.reference_map);
+    snprintf(filename, spn + strlen(iod_output.probes.reference_map),
+             "%s%s", iod_output.prefix, iod_output.probes.reference_map);
     file[Probes::REFERENCE_MAP] = fopen(filename, "w");
 
     if(!file[Probes::REFERENCE_MAP]) {
@@ -267,7 +283,8 @@ ProbeOutput::ProbeOutput(MPI_Comm &comm_, OutputData &iod_output_, std::vector<V
       exit_mpi();
     }
     char *filename = new char[spn + strlen(iod_output.probes.principal_elastic_stresses)];
-    sprintf(filename, "%s%s", iod_output.prefix, iod_output.probes.principal_elastic_stresses);
+    snprintf(filename, spn + strlen(iod_output.probes.principal_elastic_stresses),
+             "%s%s", iod_output.prefix, iod_output.probes.principal_elastic_stresses);
     file[Probes::PRINCIPAL_ELASTIC_STRESSES] = fopen(filename, "w");
 
     if(!file[Probes::PRINCIPAL_ELASTIC_STRESSES]) {
@@ -483,13 +500,13 @@ ProbeOutput::WriteAllSolutionsAlongLine(double time, double dt, int time_step, S
 
   char full_fname[256];
   if(iFrame<10) 
-    sprintf(full_fname, "%s%s_000%d.txt", iod_output.prefix, line->filename_base, iFrame);
+    snprintf(full_fname, 256, "%s%s_000%d.txt", iod_output.prefix, line->filename_base, iFrame);
   else if(iFrame<100)
-    sprintf(full_fname, "%s%s_00%d.txt", iod_output.prefix, line->filename_base, iFrame);
+    snprintf(full_fname, 256, "%s%s_00%d.txt", iod_output.prefix, line->filename_base, iFrame);
   else if(iFrame<1000)
-    sprintf(full_fname, "%s%s_0%d.txt", iod_output.prefix, line->filename_base, iFrame);
+    snprintf(full_fname, 256, "%s%s_0%d.txt", iod_output.prefix, line->filename_base, iFrame);
   else
-    sprintf(full_fname, "%s%s_%d.txt", iod_output.prefix, line->filename_base, iFrame);
+    snprintf(full_fname, 256, "%s%s_%d.txt", iod_output.prefix, line->filename_base, iFrame);
 
   //open file & write the header
   FILE *file = fopen(full_fname, "w");

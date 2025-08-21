@@ -10,7 +10,7 @@
 #include<RiemannSolutions.h>
 #include<Intersector.h>
 #include<algorithm>//find
-#include<set>
+#include<list>
 using std::cout;
 using std::endl;
 using std::set;

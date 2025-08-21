@@ -17,7 +17,6 @@
 #include <climits>
 #include <cmath>
 #include <unistd.h>
-#include <bits/stdc++.h> //INT_MAX
 //#include <dlfcn.h>
 using namespace std;
 
@@ -2124,7 +2123,7 @@ void IcData::readUserSpecifiedIC()
     readUserSpecifiedIC_GeneralCylindrical(input);
   } 
   else {
-    print_error("*** Error: Unknown initial condition type %s.\n", word);
+    print_error("*** Error: Unknown initial condition type %s.\n", word.c_str());
     exit_mpi();
   }
 

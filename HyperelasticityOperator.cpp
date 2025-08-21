@@ -8,6 +8,7 @@
 #include<linear_algebra.h>
 #include<trilinear_interpolation.h>
 #include<Vector5D.h>
+#include<array>
 
 extern int INACTIVE_MATERIAL_ID;
 

@@ -9,6 +9,8 @@
 #include<algorithm> //std::sort
 #include<numeric> //std::iota
 #include<map>
+#include<fstream>
+#include<string>
 
 //#include<chrono> //for timing only
 //using namespace std::chrono;
@@ -481,7 +483,8 @@ LaserAbsorptionSolver::ReadUserSpecifiedPowerFile(const char *source_power_timeh
 {
   std::fstream input;
   char *filename = new char[strlen(source_power_timehistory_file) + 5];
-  sprintf(filename, "%s", iod.laser.source_power_timehistory_file);
+  snprintf(filename, strlen(source_power_timehistory_file) + 5,
+           "%s", source_power_timehistory_file);
   input.open(filename, std::fstream::in);
   if(!input.is_open()) {
     print_error(comm,"*** Error: Could not open user-specified laser power file %s.\n", filename);

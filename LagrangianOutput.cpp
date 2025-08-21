@@ -45,7 +45,7 @@ LagrangianOutput::OutputTriangulatedMesh(vector<Vec3D>& X0, vector<Int3>& elems)
   if(mpi_rank == 0) {
 
     char outname[512];
-    sprintf(outname, "%s%s", iod_lag.prefix, iod_lag.orig_config);
+    snprintf(outname, 512, "%s%s", iod_lag.prefix, iod_lag.orig_config);
 
     std::fstream out;
     out.open(outname, std::fstream::out);
@@ -110,7 +110,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
     assert(X0.size() == X.size());
 
     char outname[512];
-    sprintf(outname, "%s%s", iod_lag.prefix, iod_lag.disp);
+    snprintf(outname, 512, "%s%s", iod_lag.prefix, iod_lag.disp);
 
     if(disp_file == NULL) { //create new file and write header
       disp_file = fopen(outname, "w");
@@ -140,7 +140,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
   if(strcmp(iod_lag.sol,"")) {
 
     char outname[512];
-    sprintf(outname, "%s%s", iod_lag.prefix, iod_lag.sol);
+    snprintf(outname, 512, "%s%s", iod_lag.prefix, iod_lag.sol);
 
     if(sol_file == NULL) { //create new file and write header
       sol_file = fopen(outname, "w");

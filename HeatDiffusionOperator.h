@@ -44,7 +44,7 @@ class HeatDiffusionOperator
   int ii0, jj0, kk0, iimax, jjmax, kkmax; //!< corners of the ghosted subdomain
 
   //! interpolator
-  InterpolatorBase &interpolator;
+  [[maybe_unused]] InterpolatorBase &interpolator;
 
   //! gradient calculator
   GradientCalculatorBase &grad;

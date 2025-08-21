@@ -11,7 +11,7 @@
 
 class PhaseTransitionOutput
 {
-  MPI_Comm &comm;
+  [[maybe_unused]] MPI_Comm &comm;
   OutputData &iod_output;
 
   MultiPhaseOperator &mpo;

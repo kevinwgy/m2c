@@ -11,8 +11,9 @@
 #include<GlobalMeshInfo.h>
 #include<tuple>
 #include<memory>
+#include<set>
 
-class Vec5D;
+struct Vec5D;
 class SpaceOperator;
 class LevelSetOperator;
 class RiemannSolutions;
