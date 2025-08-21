@@ -215,7 +215,7 @@ IncompressibleOperator::CheckInputs(IoData &iod)
   // -----------------------------
   // Check boundary conditions
   // -----------------------------
-  [[maybe_unused]] int bc_error = 0; //silence clang compiler warning...
+  int bc_error = 0; //silence clang compiler warning...
   if(iod.bc.inlet.density != default_density)       bc_error++;
   if(iod.bc.inlet.pressure != 0.0)                  bc_error++;
   if(iod.bc.inlet.internal_energy_per_mass != 0.0)  bc_error++;
@@ -234,7 +234,7 @@ IncompressibleOperator::CheckInputs(IoData &iod)
     if(obj.second->state.internal_energy_per_mass != 0.0)  bc_error++; 
   }
 
-  if(ic_error>0) {
+  if(bc_error>0) {
     print_error("*** Error: The incompressible flow solver does not accept boundary values for "
                 "density, pressure, or internal energy. Detected %d violations.\n", ic_error);
     exit_mpi();

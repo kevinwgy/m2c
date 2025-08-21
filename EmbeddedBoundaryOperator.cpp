@@ -785,11 +785,7 @@ EmbeddedBoundaryOperator::ReadMeshFileInOBJFormat(const char *filename, vector<V
 
   std::set<string> ignored_keywords;
 
-  int line_number = 0;
-
   while(getline(input, line)) {
-
-    line_number++;
 
     auto first_nonspace_id = line.find_first_not_of(" ");
     if((unsigned)first_nonspace_id<line.size() && line[first_nonspace_id] == '#')

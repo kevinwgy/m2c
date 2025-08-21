@@ -71,7 +71,7 @@ class Intersector {
   //! Mesh info
   SpaceVariable3D& coordinates;
 
-  std::vector<GhostPoint> &ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
+  [[maybe_unused]] std::vector<GhostPoint> &ghost_nodes_inner; //!< ghost nodes inside the physical domain (shared with other subd)
   std::vector<GhostPoint> &ghost_nodes_outer; //!< ghost nodes outside the physical domain
 
   int i0, j0, k0, imax, jmax, kmax; //!< corners of the real subdomain
