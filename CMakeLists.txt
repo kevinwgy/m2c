@@ -32,7 +32,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 #--------------------------------------------------------
 # find packages 
 if(NOT DEFINED ENV{PETSC_DIR})
-  message(FATAL_ERROR "ERROR: Could not find Petsc. Environment variable PETSC_DIR needs to be set.")
+  message(FATAL_ERROR "ERROR: Could not find Petsc. Linux environment variable PETSC_DIR needs to be set. Try 'export PETSC_IDR=[path-to-petsc-build-directory]'.")
 endif()
 
 find_package(PETSc REQUIRED)

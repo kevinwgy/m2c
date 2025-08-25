@@ -1348,6 +1348,9 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
 
     int tid = *it; //triangle id
 
+    if(status[tid]==3)
+      continue; //both sides facing interactive regions (interior of solid body)
+
     if(!multi_intersector.empty() && //there can be dropped elements...
        (int)surfaces[surf].elemtag.size()>tid && surfaces[surf].elemtag[tid] == 1) //"1" means dropped
       continue;
@@ -1413,7 +1416,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
           continue;
 
         // Calculate traction at Gauss point on this "side"
-        if(status[tid]==3 || status[tid]==side+1) //this side faces the interior of a solid body 
+        if(status[tid]==side+1) //this side faces the interior of a solid body 
           tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
         else 
           tg[p] += CalculateTractionAtPoint(xg, normal, v, id); 
@@ -1455,13 +1458,13 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
 }
 
 //------------------------------------------------------------------------------------------------
-// Similar to ComputeForcesOnSurfaceDirectly. However, here we let each processor evaluate the
-// traction. Only proc. 0 calculates force.
+// Similar to ComputeForcesOnSurfaceDirectly. Project each Gauss point onto x-y plane.
 void
 EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id,
                                                        vector<Vec3D> &Fs, vector<Vec3D> &FAs)
 {
 
+  assert(global_mesh_ptr->two_dimensional_xy);
   assert(twoD_to_threeD[surf]);
 
   Fs.assign(surfaces[surf].X.size(), 0.0);
@@ -1475,7 +1478,6 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   int mpi_rank;
   MPI_Comm_rank(comm, &mpi_rank);
 
-
   // Collect info about the surface and intersection results
   vector<Vec3D>&  Xs(surfaces[surf].X);
   vector<Int3>&   Es(surfaces[surf].elems);
@@ -1488,68 +1490,88 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   MathTools::GaussQuadraturesTriangle::GetParameters(np, gweight.data(), gbary.data());
  
   vector<Vec3D> xgs(np, 0.0); //internal var.
-  vector<Vec3D> tgs(np, 0.0); //internal var.
-  vector<int> special_tag(np, 0); //internal var.  
 
+  int worker_proc = 0; //mpi_rank 0 collects the data and send it to the structural solver 
+  set<int> my_indices_to_send;
+   
 
   // -----------------------------------------------------------
-  // Step 1: Loop through subdomain scope & collect "my_data"
-  //         Note that different subdomain scopes overlap. We need to avoid repetition!
+  // Step 1: Each processor loops through all embedded boundary elements.
+  //         Find equiv point on x-y plane & compute traction there.
   // -----------------------------------------------------------
-  vector<int> scope;
-  intersector[surf]->GetElementsInScope1(scope);
-  vector<double> my_data; //(xcoords, rcoords, tg_x, tg_r)
-  vector<double> my_shared_data; //(xcoords, rcoords)
-  my_data.reserve(10*scope.size());
+  double z0 = global_mesh_ptr->GetZ(0); //It is assumed that the mesh is on x-y plane
+  for(unsigned tid=0; tid<Es.size(); tid++) {
 
-  for(auto it = scope.begin(); it != scope.end(); it++) {
-    int tid = *it; //triangle id
     if(status[tid]==3)
-      continue;
+      continue; //both sides facing interactive regions (interior of solid body)
 
     if(!multi_intersector.empty() && //there can be dropped elements...
-       (int)surfaces[surf].elemtag.size()>tid && surfaces[surf].elemtag[tid] == 1) //"1" means dropped
+       surfaces[surf].elemtag.size()>tid && surfaces[surf].elemtag[tid] == 1) //"1" means dropped
       continue;
 
+    // Get element normal and convert it to x-y plane
     assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
-    Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
+    Vec3D normal = Ns[tid];
+    Vec3D normal_xy(0.0); //all three components are 0
+    if(cylindrical_symmetry) {
+      normal_xy[0] = normal[0];
+      normal_xy[1] = sqrt(normal[1]*normal[1] + normal[2]*normal[2]);
+    } else {//truly 2D, normal[2] should be 0 or extremely small.
+      double denom = sqrt(normal[0]*normal[0] + normal[1]*normal[1]);
+      normal_xy[0] = normal[0]/denom;
+      normal_xy[1] = normal[1]/denom;
+    }
+
+    Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]); //the 3 nodes of the triangle
 
     // Get Gauss points (before lofting)
-    for(int p=0; p<np; p++) {
+    for(int p=0; p<np; p++)
       xgs[p] = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
-      tgs[p] = 0.0;
-      special_tag[p] = 0;
-    }
+
+    // traction at each Gauss point, (-pI + tau)n --> a Vec3D
+    vector<Vec3D> tg(np, 0.0);
+
+    // whether the fraction of area "controlled" by this Gauss point should be calculated by this cpu core.
+    // Only affects An and FAs, not Fs
+    vector<bool> calculate_An(np, false);
 
     for(int side=0; side<2; side++) { //loop through the two sides
 
-      Vec3D normal = Ns[tid];
-      if(side==1)
-        normal *= -1.0;
+      if(side==1) { //directly modify 'normal' and 'normal_xy'!
+        normal    *= -1.0;
+        normal_xy *= -1.0;
+      }
 
       for(int p=0; p<np; p++) { //loop through Gauss points
-        Vec3D xg = xgs[p]; //has to be a new var because it will be lofted
+
+        Vec3D xg = xgs[p];
+        if(cylindrical_symmetry)
+          xg[1] = sqrt(xg[1]*xg[1]+xg[2]*xg[2]);
+        xg[2] = z0; //xg should be within the fluid mesh
 
         Int3 ijk0;
         if(!global_mesh_ptr->FindCellCoveringPoint(xg, ijk0, false))
-          continue; //before lofting, we need to make sure the original Gauss point is in the domain.
-                    //otherwise, there can be complexities.
+            continue; //before lofting, we need to make sure the un-lofted Gauss point is in the domain.
+                      //otherwise, no force calculated at this Gauss point
 
-        // Lofting (Multiple processors may process the same point (xg). Make sure they produce the same result
-        double loft = CalculateLoftingHeight(xg, iod_embedded_surfaces[surf]->gauss_points_lofting);
-        xg += loft*normal;
-          
-        // Check if this Gauss point is in this subdomain.
+        if(coordinates_ptr->IsHere(ijk0[0],ijk0[1],ijk0[2],false))
+          calculate_An[p] = true;  //this is to avoid double-counting area
+
+        // Lofting (Multiple processors may process the same point. They must produce the same result)
+        double loft = iod_embedded_surfaces[surf]->gauss_points_lofting * global_mesh_ptr->GetMinDXYZ(ijk0);
+        xg += loft*normal_xy;
+
+        // Check if this lofted Gauss point is in current subdomain.
         Int3 ijk;
         bool foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
         if(!foundit) { //pull it back to the domain (not necessarily the current subdomain)
-          Vec3D xg0 = xg - loft*normal; 
+          Vec3D xg0 = xg - loft*normal_xy; //backup
           double pull_back = 0.5*loft;
           for(int step=0; step<5; step++) {
-            xg -= pull_back*normal;
+            xg -= pull_back*normal_xy;
             foundit = global_mesh_ptr->FindCellCoveringPoint(xg, ijk, false);
             if(foundit)
-              break; 
+              break;
             pull_back /= 2.0;
           }
           if(!foundit) {
@@ -1563,237 +1585,77 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
           continue;
 
 
-        if(status[tid]==side+1) //this side faces the interior of a solid body 
-          tgs[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
-        else 
-          tgs[p] += CalculateTractionAtPoint(xg, normal, v, id); 
-
-        //fprintf(stdout,"tid = %d tgs[%d] = %e %e %e (%e).\n", tid,p,tgs[p][0],tgs[p][1],tgs[p][2],tgs[p].norm());
-
-        special_tag[p]++;
-      }
-    }
-
-    if(cylindrical_symmetry) {
-      for(int p=0; p<np; p++) {
-        if(special_tag[p]==0)
-          continue;
-
-        Vec2D xcut(xgs[p][1],xgs[p][2]), tcut(tgs[p][1],tgs[p][2]);
-        double radial_dist = xcut.norm();
-        my_data.push_back(xgs[p][0]);
-        my_data.push_back(radial_dist);
-        my_data.push_back(atan(xgs[p][2]/xgs[p][1])); //needed! 2 pts in 3D can be the same when projected to 2D.
-        my_data.push_back(tgs[p][0]);
-        my_data.push_back(radial_dist==0 ? 0.0 : tcut*xcut/radial_dist);
-
-        if(special_tag[p]==1) {//only one side of this ghost point belongs to this subdomain
-          my_shared_data.push_back(xgs[p][0]);
-          my_shared_data.push_back(radial_dist);
-          my_shared_data.push_back(atan(xgs[p][2]/xgs[p][1])); //atan is well-defined for +inf and -inf
-        }
-      }
-    } 
-    else { //truly 2D
-      for(int p=0; p<np; p++) {
-        if(special_tag[p]==0)
-          continue;
-
-        my_data.push_back(xgs[p][0]);
-        my_data.push_back(xgs[p][1]);
-        my_data.push_back(xgs[p][2]); //needed! 2 pts in 3D can be the same when projected to 2D.
-        my_data.push_back(tgs[p][0]);
-        my_data.push_back(tgs[p][1]); //dropping tgs[p][2]
-
-        if(special_tag[p]==1) {//only one side of this ghost point belongs to this subdomain
-          my_shared_data.push_back(xgs[p][0]);
-          my_shared_data.push_back(xgs[p][1]);
-          my_shared_data.push_back(xgs[p][2]);
-        }
-      }
-    }
-  }
-
-
-  // -----------------------------------------------------------
-  // Step 2: Proc 0 gets all the data
-  // -----------------------------------------------------------
-  int worker = 0;
-  vector<double> all_data, all_shared_data;
-  CommunicationTools::GatherVector<double>(comm, worker, my_data, &all_data);
-  CommunicationTools::GatherVector<double>(comm, worker, my_shared_data, &all_shared_data);
- 
-
-  // ---------------------------------
-  if(mpi_rank != worker) {
-    MPI_Barrier(comm); //not necessary
-    return;
-  }
-  // ---------------------------------
-
-
-  //Proc 0 deals with duplicates. (In the case of lofting, it is possible that the
-  //two sides of a Gauss point are computed by two different processors!)
-  if(!all_shared_data.empty()) {
-    int nCombined = CombineSharedGaussPointData(all_data, all_shared_data);  
-    if(verbose>=2)
-      fprintf(stdout,"  o Combined %d shared Gauss points in 2D->3D force calculation.\n", nCombined);
-  }
-
-
-
-  // -----------------------------------------------------------
-  // Step 3: Proc 0 builds a KDTree (K=2) and performs
-  //         interpolation
-  // -----------------------------------------------------------
-
-  assert(all_data.size()%5==0);
-  int Nsamples = all_data.size()/5;
-  if(Nsamples==0) {
-    fprintf(stdout,"\033[0;31m*** Error: No Gauss points are located inside the fluid domain.\033[0m\n");
-    exit(-1);
-  } else if(Nsamples<std::min(20.0, Es.size()/200.0)) {
-    fprintf(stdout,"\033[0;35mWarning: Only %d Gauss points are inside the fluid domain. "
-                   "Load may be inaccurate.\033[0m\n", Nsamples);
-  }
-
-
-  vector<PointIn2D> samples;
-  samples.reserve(Nsamples);
-  for(int i=0; i<Nsamples; i++)
-    samples.push_back(PointIn2D(i, Vec2D(all_data[5*i], all_data[5*i+1])));
-
-  KDTree<PointIn2D, 2> tree(Nsamples, samples.data());
-
-  int numPoints = 3; //number of points for interpolation
-  int maxCand = numPoints*25;
-  PointIn2D candidates[maxCand];
-
-
-//  for(int sam=0; sam<Nsamples; sam++)
-//    fprintf(stdout,"%d: tg = %e %e, norm = %e.\n", sam, all_data[5*sam+3], all_data[5*sam+4],
-//            sqrt(all_data[5*sam+3]*all_data[5*sam+3] + all_data[5*sam+4]*all_data[5*sam+4]));
-
-   
-  // for each triangle, calculates traction vector tg
-  for(int tid=0; tid<(int)Es.size(); tid++) {
-
-    if(status[tid]==3)
-      continue;
-
-    Int3& n(Es[tid]); 
-
-    for(int p=0; p<np; p++) {
-
-      Vec3D xg = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
-
-      Vec2D xg2d(xg[0], cylindrical_symmetry ? sqrt(xg[1]*xg[1]+xg[2]*xg[2]) : xg[1]); 
-
-      // gets candidates from tree         
-      double search_radius = sqrt(As[tid])*2.0;
-      int nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
-      int trial_counter = 0;
-      while(nFound<numPoints || nFound>maxCand) {
-        if(trial_counter>20) {
-          fprintf(stdout,"\033[0;31m*** Error: Cannot find candidates for interpolation "
-                         "(ComputeForces, 2D->3D). xg2d: %e %e.\033[0m\n", xg2d[0], xg2d[1]);
-          exit(-1);
-        }
-        if(trial_counter>10)
-          fprintf(stdout,"\033[0;35mWarning: Havn't found desired number of candidates for "
-                         "interpolation after %d trials (ComputeForces, 2D->3D). xg2d: %e %e. "
-                         "nFound: %d.\033[0m\n", trial_counter, xg2d[0], xg2d[1], nFound);
-
-        if(nFound<numPoints) 
-          search_radius *= 2.0;
-        else //nFound>maxCand
-          search_radius /= 1.8;
-        nFound = tree.findCandidatesWithin(xg2d, candidates, maxCand, search_radius);
-        trial_counter++;
-      }
-
-      // figure out the actual points for interpolation (numPoints);
-      vector<std::pair<double,int> > dist2xg;
-      for(int i=0; i<nFound; i++)
-        dist2xg.push_back(std::make_pair((candidates[i].x-xg2d).norm(), candidates[i].id));
-      std::sort(dist2xg.begin(), dist2xg.end());
-      if(nFound>numPoints)
-        dist2xg.resize(numPoints); 
-
-
-      // populate tgs[p][0], tgs[p][1] from closest sample point(s)
-
-      if(iod_embedded_surfaces[surf]->twoD_to_threeD==EmbeddedSurfaceData::NEAREST_NEIGHBOR) {
-        //if user requested nearest-neighbor, skip interpolation
-        tgs[p][0] = all_data[5*dist2xg[0].second + 3];
-        tgs[p][1] = all_data[5*dist2xg[0].second + 4];
-        tgs[p][2] = 0.0;
-      }
-      else {
-        //prepare to interpolate 
-        double xd[2*numPoints];
-        for(int i=0; i<numPoints; i++) {
-          xd[2*i]   = all_data[5*dist2xg[i].second];
-          xd[2*i+1] = all_data[5*dist2xg[i].second + 1];
-        }
-        double r0; //smaller than maximum separation, larger than typical separation
-        r0 = 5.0*(dist2xg.front().first + dist2xg.back().first);
-        double fd[numPoints];
-        double *rbf_weight = new double[numPoints];
-	double *interp = new double[numPoints];
-
-        // interpolation (inverse multiquadric function)
-        tgs[p] = 0.0;
-        for(int comp=0; comp<2; comp++) {
-
-          for(int i=0; i<numPoints; i++)
-            fd[i] = all_data[5*dist2xg[i].second+3+comp];
-
-          MathTools::rbf_weight(2, numPoints, xd, r0, MathTools::phi2, fd, rbf_weight);
-          MathTools::rbf_interp(2, numPoints, xd, r0, MathTools::phi2, rbf_weight, 1, xg2d, interp);
-          tgs[p][comp] = interp[0];
-
-        } 
-        delete [] rbf_weight;
-        delete [] interp;
-      }
-
-
-      // go from 2D->3D
-
-      if(cylindrical_symmetry) { //update tgs[p][1] and tgs[p][2] to account for dir.
-        double xcut_norm = sqrt(xg[1]*xg[1]+xg[2]*xg[2]);
-        if(xcut_norm==0) 
-          tgs[p][1] = tgs[p][2] = 0.0;
+        if(status[tid]==side+1) //this side faces the interior of a solid body
+          tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
         else {
-          tgs[p][2] = tgs[p][1]*xg[2]/xcut_norm; //here, tgs[p][1] was directly obtained from the interpolation
-          tgs[p][1] = tgs[p][1]*xg[1]/xcut_norm;
+          Vec3D tg_xy = CalculateTractionAtPoint(xg, normal_xy, v, id);
+          tg[p][0] = tg_xy[0];
+          if(cylindrical_symmetry) {
+            double norm_yz = sqrt(normal[1]*normal[1] + normal[2]*normal[2]);
+            if(norm_yz != 0.0) {
+              tg[p][1] = tg_xy[1]*normal[1]/norm_yz;
+              tg[p][2] = tg_xy[1]*normal[2]/norm_yz;
+            } else
+              tg[p][1] = tg[p][2] = 0.0; 
+          } else { //truly 2D
+            tg[p][1] = tg_xy[1];
+            tg[p][2] = 0.0;
+          }
         }
       }
-      else 
-        tgs[p][2] = 0.0;
-          
-//      fprintf(stdout,"Tri %d: tg = %e %e %e, norm = %e.\n", tid, tgs[p][0], tgs[p][1], tgs[p][2],
-//              tgs[p].norm());
     }
+
+    // Now, tg carries traction from both sides of the triangle
 
     // Integrate (See KW's notes for the formula)
     for(int p=0; p<np; p++) {
-      tgs[p] *= As[tid];
+      tg[p] *= As[tid];
       // each node of the triangle gets some load from this Gauss point
       for(int node=0; node<3; node++) {
         double coeff = gweight[p]*gbary[p][node];
-        Fs[n[node]] += coeff*tgs[p];
-        An[n[node]] += coeff*As[tid];
-      }
+        Fs[n[node]] += coeff*tg[p];
+        if(calculate_An[p])
+          An[n[node]] += coeff*As[tid];
+        my_indices_to_send.insert(n[node]); //avoid duplication (set)
+      } 
     }
   }
 
-  for(int i=0; i<(int)Fs.size(); i++)
-    FAs[i] = An[i]==0.0 ? 0.0 : Fs[i]/An[i];
- 
-  MPI_Barrier(comm);
+  // Prepare data to gather
+  vector<Vec3D> my_loads; //non-workers send there loads and indices to worker_proc
+  vector<double> my_areas;
+  vector<int> my_indices;
+  if(mpi_rank!=worker_proc) { //worker_proc should NOT send!
+    for(auto&& node : my_indices_to_send) {
+      my_indices.push_back(node);
+      my_areas.push_back(An[node]); //could be 0 if calculate_An is false --- ok.
+      my_loads.push_back(Fs[node]);
+    }
+  }
 
+  // Processor 0 gets data from others and add them to Fs and An
+  vector<Vec3D> other_loads;
+  vector<double> other_areas;
+  vector<int> other_indices;
+  CommunicationTools::GatherVector<Vec3D>(comm, worker_proc, my_loads, &other_loads);
+  CommunicationTools::GatherVector<double>(comm, worker_proc, my_areas, &other_areas);
+  CommunicationTools::GatherVector<int>(comm, worker_proc, my_indices, &other_indices);
+
+  if(mpi_rank==worker_proc) {
+    assert(other_loads.size() == other_areas.size() &&
+           other_loads.size() == other_indices.size());
+    int node;
+    for(unsigned i=0; i<other_loads.size(); i++) {
+      node = other_indices[i];
+      Fs[node] += other_loads[i];
+      An[node] += other_areas[i];
+    } 
+    for(unsigned i=0; i<Fs.size(); i++)
+      FAs[i] = An[i]==0.0 ? 0.0 : Fs[i]/An[i];
+  }
+
+
+  MPI_Barrier(comm);
 }
 
 //------------------------------------------------------------------------------------------------

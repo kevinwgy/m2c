@@ -70,8 +70,20 @@ SpaceOperator::SpaceOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &i
 
   rec.Setup(&ghost_nodes_inner, &ghost_nodes_outer); //this function requires mesh info (dxyz)
   
-  if(iod.mesh.type == MeshData::SPHERICAL || iod.mesh.type == MeshData::CYLINDRICAL)
+  if(iod.mesh.type == MeshData::SPHERICAL || iod.mesh.type == MeshData::CYLINDRICAL) {
+    if(iod.mesh.type == MeshData::SPHERICAL &&
+       (!global_mesh.one_dimensional_x || global_mesh.GetX(0)<0.0)) {
+      print_error("*** Error: Spherical symmetry requires 1D mesh on x-axis, with x0>=0.0.\n");
+      exit_mpi();
+    }
+    if(iod.mesh.type == MeshData::CYLINDRICAL &&
+       (!global_mesh.two_dimensional_xy || global_mesh.GetY(0)<0.0)) {
+      print_error("*** Error: Cylindrical symmetry requires 2D mesh on x-y plane, with y0>=0.0.\n");
+      exit_mpi();
+    }
+
     symm = new SymmetryOperator(comm, dm_all, iod.mesh, varFcn, coordinates, delta_xyz, volume);
+  }
 
   if(iod.schemes.ns.smooth.type != SmoothingData::NONE)
     smooth = new SmoothingOperator(comm, dm_all, iod.schemes.ns.smooth, coordinates, delta_xyz, volume);
