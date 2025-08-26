@@ -1,0 +1,8 @@
+## Just a test...
+## Planar 
+## 0 0 0
+## 1 0 0 
+## Coordinate  Pressure
+0.0      1.0e6
+300.0    1.0e5
+330.0    1.0e5

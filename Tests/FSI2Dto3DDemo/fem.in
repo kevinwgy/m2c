@@ -1,0 +1,97 @@
+************************************** 
+* Units: mm, s, g, Pa, ...
+************************************** 
+CONTROL
+CapsuleFSIM2C
+1
+"nodeset"
+"elemset"
+************************************** 
+DYNAM
+newmark
+mech 0.0 0.5
+time 0.0 1.0e-8 1e-7
+*stable 0
+************************************** 
+CONSTRAINTS
+penalty 1e12
+************************************** 
+NONLINEAR
+*
+************************************** 
+AERO
+C0 0.5 0.375
+EMBEDDED 4
+************************************** 
+*DECOMPOSE
+*NSUBS 8
+************************************** 
+OUTPUT
+gdisplac "results/disp"      400 
+stressvm "results/vmstress"  400  
+strainvm "results/vmstrain"  400  
+effpstrn "results/epstrain"  400  
+*dissipat "results/dissipat"  400  A  1
+************************************** 
+GROUPS
+A  1  3  1
+************************************** 
+MASS "results/mass.out"
+************************************** 
+*RESTART
+*"restart/rst_fem" 10000
+**"restart/rst_fem" ".restart"
+************************************** 
+* Nodes, topology, surfaces
+include "StructModel/mesh.include"
+************************************** 
+DISP
+1  2  0.0
+1  3  0.0
+2  2  0.0
+2  3  0.0
+7  2  0.0
+7  3  0.0
+8  2  0.0
+8  3  0.0
+SURFACE 1 1 0.0
+SURFACE 2 3 0.0
+include "StructModel/lmpc.include"
+************************************** 
+ATTR
+*core
+1, 12178  1
+*ifs
+12179, 13735  2
+*ofs
+13736, 15652  3
+************************************** 
+MATERIAL
+* Aluminum 6061 T4 alloy -- foam -- Reyes et. al. Table 1
+1   0.0       0.0    0.317  0.34e-3  0.0  0.0    0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+* P355: DynaSafe report.
+2   0.0   2.10e+11   0.3   7.9e-3  0.0  0.0    2.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+3   0.0   2.10e+11   0.3   7.9e-3  0.0  0.0    1.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+************************************** 
+MATUSAGE
+*core
+1, 12178  1
+*ifs
+12179, 13735  2
+*ofs
+13736, 15652  3
+************************************** 
+MATLAW
+* Aluminum 6061 T4 alloy -- foam -- Reyes et. al. Table 1
+1 BilinearPlastic 7.9e-3  2.10e+11  0.3  6.193e+7  3.55e+8  1.0  
+*1 CrushableFoam 0.34e-3 1.516e+09 0.0  5.76e+06  6.02e+07  3.92e+06  4.39  2.07
+2 PlaneStressBilinearPlastic 7.9e-3  2.10e+11  0.3  6.193e+7  3.55e+8  1.0  0.0  0.0  2.0
+3 PlaneStressBilinearPlastic 7.9e-3  2.10e+11  0.3  6.193e+7  3.55e+8  1.0  0.0  0.0  1.0
+**************************************
+*PRESSURE
+*SURFACE 4 1e5 On
+**************************************
+*CONWEP
+*0.0  0.0  0.0  250.0  0.0  1  5
+**************************************
+END

@@ -1,0 +1,101 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: 9754de8+ | Branch: main | Tag: 
+Computation started at: 2025-08-25.21:43:38 EDT
+Using 32 processor cores (including concurrent programs).
+Command: /home/kevinw3/tinkercliffs/zoey7/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+ ... Changeset ID                   ...
+ ... AeroElasticity Flag   = 20     ...
+ ... Nonlinear Dynamics/Quasistatics... 
+- Reading user-specified initial condition file: PlanarWave.txt.
+- Activated the Embedded Boundary Method. Detected 1 surface(s) (1 from concurrent program(s)).
+
+ **************************************
+ CONDITIONALLY STABLE NEWMARK ALGORITHM
+ --------------------------------------
+ Specified time step      = 1.0000e-08
+ Stability max. time step = 4.3344e-08
+ Element with min. time step =    9164
+ **************************************
+ Specified time step is selected
+ **************************************
+- Embedded Surface from Aero-S: Number of Nodes/Elements: 837/1557, Element Type = 3, Fracture = 0.
+- Received nodes and elements of embedded surface from Aero-S.
+- Coupled with Aero-S (running on 1 processors) using the C0 algorithm.
+
+- Mesh Statistics:
+  X-Direction: [0.000000e+00, 1.200000e+03], 155 nodes/cells, dx_min = 5.020889e+00, dx_max = 3.901332e+01.
+  Y-Direction: [0.000000e+00, 1.200000e+03], 155 nodes/cells, dy_min = 5.020889e+00, dy_max = 3.901332e+01.
+  Z-Direction: [-2.500000e+00, 2.500000e+00], 1 nodes/cells, dz_min = 5.000000e+00, dz_max = 5.000000e+00.
+  Total number of nodes/cells: 24025.
+  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 9300
+  o Number of ghost nodes outside computational domain: 68882
+
+- Detected embedded surface(s) in 3D, while M2C domain is in 2D.
+  o Activated 2D->3D mapping in load calculation.
+
+- Initializing the state variables (V) and material id. (ID).
+  o Applying the initial condition specified in PlanarWave.txt (planar).
+
+  o Found Point[0]: (1.000000e+01 1.000000e+01 0.000000e+00). Mat. ID: 0
+- Warning (Outputing wetted surface): Out-of-domain elements may not have the correct status.
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution on a Lagrangian mesh at 0.000000e+00.
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+ ... Exp. Central Difference Method ...
+ ... i.e. β = 0, γ = ½, αf = αm = 0 ...
+Step 1: t = 0.000000e+00, dt = 5.000000e-09, cfl = 1.0820e-03. Computation time: 8.7117e-01 s.
+- Wrote solution on a Lagrangian mesh at 5.000000e-09.
+- Wrote solution at 5.000000e-09 to solution_0001.vtr.
+Step 2: t = 5.000000e-09, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 1.1889e+00 s.
+- Wrote solution on a Lagrangian mesh at 1.500000e-08.
+- Wrote solution at 1.500000e-08 to solution_0002.vtr.
+Step 3: t = 1.500000e-08, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 1.3032e+00 s.
+- Wrote solution on a Lagrangian mesh at 2.500000e-08.
+- Wrote solution at 2.500000e-08 to solution_0003.vtr.
+Step 4: t = 2.500000e-08, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 1.4530e+00 s.
+- Wrote solution on a Lagrangian mesh at 3.500000e-08.
+- Wrote solution at 3.500000e-08 to solution_0004.vtr.
+Step 5: t = 3.500000e-08, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 1.6027e+00 s.
+- Wrote solution on a Lagrangian mesh at 4.500000e-08.
+- Wrote solution at 4.500000e-08 to solution_0005.vtr.
+Step 6: t = 4.500000e-08, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 1.8062e+00 s.
+- Wrote solution on a Lagrangian mesh at 5.500000e-08.
+- Wrote solution at 5.500000e-08 to solution_0006.vtr.
+Step 7: t = 5.500000e-08, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 1.9640e+00 s.
+- Wrote solution on a Lagrangian mesh at 6.500000e-08.
+- Wrote solution at 6.500000e-08 to solution_0007.vtr.
+Step 8: t = 6.500000e-08, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 2.1467e+00 s.
+- Wrote solution on a Lagrangian mesh at 7.500000e-08.
+- Wrote solution at 7.500000e-08 to solution_0008.vtr.
+Step 9: t = 7.500000e-08, dt = 1.000000e-08, cfl = 2.1640e-03. Computation time: 2.3327e+00 s.
+- Wrote solution on a Lagrangian mesh at 8.500000e-08.
+- Wrote solution at 8.500000e-08 to solution_0009.vtr.
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 8.500000e-08)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 2.551061 sec.
+

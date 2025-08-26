@@ -1509,24 +1509,28 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
        surfaces[surf].elemtag.size()>tid && surfaces[surf].elemtag[tid] == 1) //"1" means dropped
       continue;
 
+    // Get the three vertices of the triangle
+    Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]);
+
+    // Get Gauss points (before lofting)
+    for(int p=0; p<np; p++)
+      xgs[p] = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
+
     // Get element normal and convert it to x-y plane
     assert(fabs(Ns[tid].norm()-1.0)<1.0e-12); //normal must be valid!
     Vec3D normal = Ns[tid];
     Vec3D normal_xy(0.0); //all three components are 0
     if(cylindrical_symmetry) {
       normal_xy[0] = normal[0];
-      normal_xy[1] = sqrt(normal[1]*normal[1] + normal[2]*normal[2]);
+      if(xgs[0][1]*normal[1]+xgs[0][2]*normal[2]>=0) //any point on the triangle is fine
+        normal_xy[1] =  sqrt(normal[1]*normal[1] + normal[2]*normal[2]);
+      else
+        normal_xy[1] = -sqrt(normal[1]*normal[1] + normal[2]*normal[2]);
     } else {//truly 2D, normal[2] should be 0 or extremely small.
       double denom = sqrt(normal[0]*normal[0] + normal[1]*normal[1]);
       normal_xy[0] = normal[0]/denom;
       normal_xy[1] = normal[1]/denom;
     }
-
-    Int3 n(Es[tid][0], Es[tid][1], Es[tid][2]); //the 3 nodes of the triangle
-
-    // Get Gauss points (before lofting)
-    for(int p=0; p<np; p++)
-      xgs[p] = gbary[p][0]*Xs[n[0]] + gbary[p][1]*Xs[n[1]] + gbary[p][2]*Xs[n[2]];
 
     // traction at each Gauss point, (-pI + tau)n --> a Vec3D
     vector<Vec3D> tg(np, 0.0);
@@ -1589,17 +1593,17 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
           tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
         else {
           Vec3D tg_xy = CalculateTractionAtPoint(xg, normal_xy, v, id);
-          tg[p][0] = tg_xy[0];
+          tg[p][0] += tg_xy[0];
           if(cylindrical_symmetry) {
-            double norm_yz = sqrt(normal[1]*normal[1] + normal[2]*normal[2]);
+            double norm_yz = sqrt(xgs[p][1]*xgs[p][1] + xgs[p][2]*xgs[p][2]);
             if(norm_yz != 0.0) {
-              tg[p][1] = tg_xy[1]*normal[1]/norm_yz;
-              tg[p][2] = tg_xy[1]*normal[2]/norm_yz;
+              tg[p][1] += tg_xy[1]*xgs[p][1]/norm_yz;
+              tg[p][2] += tg_xy[1]*xgs[p][2]/norm_yz;
             } else
-              tg[p][1] = tg[p][2] = 0.0; 
+              tg[p][1] += tg[p][2] = 0.0; 
           } else { //truly 2D
-            tg[p][1] = tg_xy[1];
-            tg[p][2] = 0.0;
+            tg[p][1] += tg_xy[1];
+            tg[p][2] += 0.0;
           }
         }
       }

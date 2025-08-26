@@ -1,0 +1,3 @@
+g++ -o SolidMesh -I/home/anarkhede/tinkercliffs/gmsh-4.9.5-source/build/install/include struct.cpp -L/home/anarkhede/tinkercliffs/gmsh-4.9.5-source/build/install/lib64 -lgmsh
+
+ldd ./SolidMesh
