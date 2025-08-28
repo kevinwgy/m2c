@@ -257,7 +257,7 @@ EmbeddedBoundaryOperator::SetCommAndMeshInfo(DataManagers3D &dms_, SpaceVariable
         exit_mpi();
       }
       else
-        print("  o Activated 2D->3D mapping in load calculation.\n");
+        print("  o Activated 2D->3D mapping in load calculation. Lofting may be increased internally.\n");
     }
   }
 
@@ -323,10 +323,8 @@ void
 EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> > &id2closure)
 {
 
-  //TODO: "id" may be pointing to joint intersector! Not accounted for right now.
-
   // Part 1: Find inactive colors. Warning: When multiple surfaces have inactive regions that are close
-  //         to each other or overlapping, the information collected here is invalid.
+  //         to each other or overlapping, the information collected here is invalid. (TODO)
   inactive_colors.clear();
   for(int i=0; i<(int)surfaces.size(); i++) {
     unique_ptr<EmbeddedBoundaryDataSet> EBDS = GetPointerToEmbeddedBoundaryData(i);
@@ -358,7 +356,11 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
     vector<int> &status(inactive_elem_status[surf]);
     if(touched[surf]) { //be careful! Create a new vector for FindColorBoundary, then merge w/ existing one
       vector<int> tmp;
-      intersector[surf]->FindColorBoundary(this_color, tmp);
+      if(twoD_to_threeD[surf])
+        intersector[surf]->FindColorBoundary3Dto2D(this_color, cylindrical_symmetry, tmp);
+      else
+        intersector[surf]->FindColorBoundary(this_color, tmp);
+
       assert(tmp.size() == status.size());
       for(int i=0; i<(int)tmp.size(); i++) {
         if(tmp[i]==1) {
@@ -378,7 +380,10 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
       }
     }
     else {
-      intersector[surf]->FindColorBoundary(this_color, status);
+      if(twoD_to_threeD[surf])
+        intersector[surf]->FindColorBoundary3Dto2D(this_color, cylindrical_symmetry, status);
+      else
+        intersector[surf]->FindColorBoundary(this_color, status);
       touched[surf] = true;
     }
   }
@@ -403,10 +408,6 @@ EmbeddedBoundaryOperator::FindSolidBodies(std::multimap<int, std::pair<int,int> 
         fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", outname);
         exit(-1);
       }
-
-      if(twoD_to_threeD[surf])
-        fprintf(stdout,"- Warning (Outputing wetted surface): Out-of-domain elements may not have "
-                "the correct status.\n");
 
       vector<Vec3D>&  Xs(surfaces[surf].X);
       vector<Int3>&   Es(surfaces[surf].elems);
@@ -1459,6 +1460,9 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurfaceDirectly(int surf, int np, Vec5D
 
 //------------------------------------------------------------------------------------------------
 // Similar to ComputeForcesOnSurfaceDirectly. Project each Gauss point onto x-y plane.
+// Note: For robustness, larger lofting (relative to triangle size) is imposed, regardless of
+//       user input. Otherwise, it could happen that after converting to x-y plane, the point lands
+//       on the wrong (i.e., opposite) side of the embedded surface.
 void
 EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D*** v, double*** id,
                                                        vector<Vec3D> &Fs, vector<Vec3D> &FAs)
@@ -1539,6 +1543,9 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
     // Only affects An and FAs, not Fs
     vector<bool> calculate_An(np, false);
 
+    double circumradius = (Xs[n[0]]-Xs[n[1]]).norm()*(Xs[n[1]]-Xs[n[2]]).norm()*(Xs[n[2]]-Xs[n[0]]).norm()
+                        / (4.0*As[tid]);  //a*b*c/(4*area)
+    bool in_subdomain = false; //at least one side/Gauss point in subdomain ==> needs to be assembled
     for(int side=0; side<2; side++) { //loop through the two sides
 
       if(side==1) { //directly modify 'normal' and 'normal_xy'!
@@ -1563,6 +1570,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
 
         // Lofting (Multiple processors may process the same point. They must produce the same result)
         double loft = iod_embedded_surfaces[surf]->gauss_points_lofting * global_mesh_ptr->GetMinDXYZ(ijk0);
+        loft = std::max(loft, 0.2*circumradius); //NOTE: avoid landing on wrong side when converted to 2D
         xg += loft*normal_xy;
 
         // Check if this lofted Gauss point is in current subdomain.
@@ -1588,6 +1596,8 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         if(!coordinates_ptr->IsHere(ijk[0],ijk[1],ijk[2],false))
           continue;
 
+        if(!in_subdomain)
+          in_subdomain = true;
 
         if(status[tid]==side+1) //this side faces the interior of a solid body
           tg[p] += -1.0*iod_embedded_surfaces[surf]->internal_pressure*normal;
@@ -1608,6 +1618,9 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
         }
       }
     }
+
+    if(!in_subdomain)
+      continue;
 
     // Now, tg carries traction from both sides of the triangle
 
@@ -1786,9 +1799,9 @@ EmbeddedBoundaryOperator::CalculateTractionAtPoint(Vec3D &p, Vec3D &normal, Vec5
 
   double avg_pressure;
   if(n_pressure==0) {
-//    fprintf(stdout,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
-//                   "Gauss point (%e, %e, %e). Try adjusting surface thickness.\033[0m\n",
-//                   p[0], p[1], p[2]);
+    fprintf(stdout,"\033[0;35mWarning: No valid active nodes for interpolating pressure at "
+                   "Gauss point (%e, %e, %e). Try increasing lofting height.\033[0m\n",
+                   p[0], p[1], p[2]);
     avg_pressure = 0.0;
   } else
     avg_pressure = total_pressure/n_pressure;

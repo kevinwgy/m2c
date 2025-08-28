@@ -242,6 +242,10 @@ public:
   //! Note: This function assumes colors "i.e. Color" have been calculated
   void FindColorBoundary(int color, std::vector<int> &status, bool double_check = false);
 
+  //! A variant of FindColorBoundary, handling 2D (or 2D cylindrical) fluid mesh - 3D structure
+  void FindColorBoundary3Dto2D(int this_color, bool cylindrical_symmetry,
+                               std::vector<int> &status, bool double_check = false);
+
   //! Get pointers to all the results
   std::unique_ptr<EmbeddedBoundaryDataSet> GetPointerToResults();
 

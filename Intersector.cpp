@@ -851,9 +851,14 @@ Intersector::FindCandidatesInBox(KDTree<MyTriangle, 3>* mytree, Vec3D bbmin, Vec
 {
   int found = mytree->findCandidatesInBox(bbmin, bbmax, tmp.data(), maxCand);
   if(found>maxCand) {
-    maxCand = found; 
-    tmp.resize(maxCand);
-    found = mytree->findCandidatesInBox(bbmin, bbmax, tmp.data(), maxCand);
+    //increase maxCand. Still not enough==>too many cands in box. Return what we can store.
+    for(int iter=0; iter<10; iter++) {
+      maxCand = std::max(maxCand*2, found);
+      tmp.resize(maxCand);
+      found = mytree->findCandidatesInBox(bbmin, bbmax, tmp.data(), maxCand);
+      if(found<=maxCand)
+        break;
+    }
   }
   return found;
 }
@@ -1866,6 +1871,435 @@ Intersector::FindColorBoundary(int this_color, std::vector<int> &status, bool do
   // Step 5. Finalize output
   status.assign(Es.size(), 0);
   for(int i=0; i<(int)Es.size(); i++) {
+    if(positive_side[i]>0) {
+      if(negative_side[i]>0)
+        status[i] = 3;
+      else
+        status[i] = 1;
+    } else if(negative_side[i]>0)
+      status[i] = 2;
+  }
+  
+
+  // Clean-up
+  coordinates.RestoreDataPointerToLocalVector();
+  Color.RestoreDataPointerToLocalVector();
+ 
+}
+
+//-------------------------------------------------------------------------
+// This is a variant of function above, for 2D or 2D-cylindrical fluid mesh (x-y plane)
+// and 3D structural model.
+// cylindrical_symmetry == true --> cylindrical symmetry; false --> truly 2D
+void
+Intersector::FindColorBoundary3Dto2D(int this_color, bool cylindrical_symmetry,
+                                     std::vector<int> &status, bool double_check)
+{
+  assert(global_mesh.two_dimensional_xy);
+  
+  // Step 0. Check if the domain (not just this subdomain) has the input color
+  if((this_color==1 && !hasInlet) || (this_color==2 && !hasInlet2) || 
+     (this_color==3 && !hasOutlet)|| this_color>3 || this_color==0 ||
+     this_color<-nRegions) {
+    print_error("*** Error: (FindColorBoundary) Unable to find the boundary of an invalid color %d.\n",
+                this_color);
+    exit_mpi();
+  }
+
+  vector<double> &x_glob(global_mesh.x_glob);
+  vector<double> &y_glob(global_mesh.y_glob);
+  vector<double> &z_glob(global_mesh.z_glob);
+  vector<double> &dx_glob(global_mesh.dx_glob);
+  vector<double> &dy_glob(global_mesh.dy_glob);
+  vector<double> &dz_glob(global_mesh.dz_glob);
+
+  // Step 1. Preparation
+  vector<Vec3D>&  Xs(surface.X);
+  vector<Int3>&   Es(surface.elems);
+  vector<Vec3D>&  Ns(surface.elemNorm);
+
+  vector<int> positive_side(Es.size(), -1); //-1: undetermined, 0 means NOT facing "this_color"
+  vector<int> negative_side(Es.size(), -1);
+
+
+  //Step 2. Build a small (layer=0) local scope. No need to create tree.
+  //        Also build a global scope and tree that contain all the triangles
+  Vec3D subDmin(0.0), subDmax(0.0);
+  subDmin[0] = x_glob[i0] - 0.5*dx_glob[i0] - 2.0*half_thickness;
+  subDmin[1] = y_glob[j0] - 0.5*dy_glob[j0] - 2.0*half_thickness;
+  subDmin[2] = z_glob[k0] - 0.5*dz_glob[k0] - 2.0*half_thickness;
+  subDmax[0] = x_glob[imax-1] + 0.5*dx_glob[imax-1] + 2.0*half_thickness;
+  subDmax[1] = y_glob[jmax-1] + 0.5*dy_glob[jmax-1] + 2.0*half_thickness;
+  subDmax[2] = z_glob[kmax-1] + 0.5*dz_glob[kmax-1] + 2.0*half_thickness;
+
+  vector<int> local_scope;
+  vector<MyTriangle> global_scope;
+  global_scope.reserve(Es.size());
+
+  for(int e=0; e<(int)Es.size(); e++) {
+    MyTriangle tri(e, Xs[Es[e][0]], Xs[Es[e][1]], Xs[Es[e][2]]);
+    global_scope.push_back(tri);
+
+    bool inside = true;
+    for(int i=0; i<3; i++) {
+      if(tri.val(i) > subDmax[i] || tri.val(i) + tri.width(i) < subDmin[i]) {
+        inside = false;
+        break;
+      }
+    }
+    if(inside)
+      local_scope.push_back(e);
+  }
+
+  KDTree<MyTriangle,3> global_tree(global_scope.size(), global_scope.data());
+ 
+
+  // Step 3. Check both sides 
+  Vec3D*** coords  = (Vec3D***) coordinates.GetDataPointer();
+  double*** color  = Color.GetDataPointer();
+
+  int bandwidth = 2;
+  int nMaxCand = 1000;
+  vector<MyTriangle> tmp(nMaxCand);
+
+  for(int side=0; side<2; side++) {
+
+    double disp = 1.5*half_thickness;
+    if(side==1) disp *= -1;
+
+    // loop through triangles within the "local scope"
+    for(int i=0; i<(int)local_scope.size(); i++) {
+
+      // find point "p" with lofting
+      int triangle_id = local_scope[i];
+      Int3 &nod(Es[triangle_id]);
+      Vec3D p = (Xs[nod[0]]+Xs[nod[1]]+Xs[nod[2]])/3.0 + disp*Ns[triangle_id];
+
+      // locate the node that is closest to p
+      Int3 ijk = global_mesh.FindClosestNodeToPoint(p, false); //false: only check nodes within domain
+
+      // find candidates (nodes with "this_color" for this point)
+      vector<Int3> mycands;
+      Int3 ijk1;
+      for(int dk=-bandwidth; dk<=bandwidth; dk++) {
+        ijk1[2] = ijk[2] + dk;
+        for(int dj=-bandwidth; dj<=bandwidth; dj++) {
+          ijk1[1] = ijk[1] + dj;
+          for(int di=-bandwidth; di<=bandwidth; di++) {
+            ijk1[0] = ijk[0] + di; 
+            if(coordinates.IsHereOrInternalGhost(ijk1[0], ijk1[1], ijk1[2]) &&
+               color[ijk1[2]][ijk1[1]][ijk1[0]] == this_color)
+              mycands.push_back(ijk1);
+          }
+        }
+      }
+      std::sort(mycands.begin(), mycands.end(), 
+                [&](Int3 a, Int3 b) {
+                   return (coords[a[2]][a[1]][a[0]] - p).norm() < (coords[b[2]][b[1]][b[0]] - p).norm();} );
+
+      // find intersections using the global tree (i.e. all the triangles)
+      vector<Int3>::iterator it; 
+      for(it = mycands.begin(); it != mycands.end(); it++) {
+       
+        Vec3D &q(coords[(*it)[2]][(*it)[1]][(*it)[0]]);
+
+        Vec3D bmin(0.0), bmax(0.0);
+        for(int s=0; s<3; s++) {
+          bmin[s] = std::min(q[s], p[s]) - half_thickness;
+          bmax[s] = std::max(q[s], p[s]) + half_thickness;
+        } 
+        int nFound = FindCandidatesInBox(&global_tree, bmin, bmax, tmp, nMaxCand);
+        bool intersect = false; //if nFound = 0 (unlikely), this should be "false"
+        for(int tri=0; tri<nFound; tri++) {
+          int id = tmp[tri].trId();
+          Int3& nodes(Es[id]);
+          if(GeoTools::LineSegmentIntersectsTriangle(p, q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]]) ||
+             GeoTools::IsPointInsideTriangle(q, Xs[nodes[0]], Xs[nodes[1]], Xs[nodes[2]], half_thickness)) {
+            intersect = true;
+            break;  //intersecting one triangle means intersecting the whole surface 
+          } 
+        }  
+        if(!intersect) { //if one <p,q> does not intersect the interface, it means they are on the same "side"
+          if(side==0) 
+            positive_side[triangle_id] = 1;
+          else
+            negative_side[triangle_id] = 1;
+
+          break;
+        }
+      }
+      if(it==mycands.end()) {
+        if(side==0)
+          positive_side[triangle_id] = 0; //not facing this color
+        else
+          negative_side[triangle_id] = 0; //not facing this color
+      } 
+    }
+
+  }
+
+
+
+  // ----------------------------------------------
+  // Step 4. Double check. Go over firstLayer nodes, make sure the 
+  //         triangles blocking them are properly marked (with status).
+  //         This can be important when an enclosure is relatively small
+  //         compared with embedded triangles' size
+  // NOTE: This double-check is currently only used by MultiSurfaceIntersector.
+  //       In this case, XF only stores -1 (no X) or 0 (X). XB not filled.
+  //       'intersections' not filled either. This is why we use the intersector
+  //       to find intersections.
+  // ----------------------------------------------
+  if(double_check) {
+    vector<Int3> nodes2check;
+    for(auto&& ijk : firstLayer) {
+      if(color[ijk[2]][ijk[1]][ijk[0]] == this_color) //check it
+        nodes2check.push_back(ijk);
+    }
+    int total_num = nodes2check.size();
+    MPI_Allreduce(MPI_IN_PLACE, &total_num, 1, MPI_INT, MPI_SUM, comm);
+    if(total_num>0) { //have nodes to check
+
+      Vec3D*** xf = (Vec3D***) XForward.GetDataPointer();
+      int i,j,k,tid;
+      for(auto&& ijk : nodes2check) {
+        i = ijk[0];
+        j = ijk[1];
+        k = ijk[2];
+
+        //self->left
+        if(xf[k][j][i][0]>=0) {
+          Intersects(coords[k][j][i], coords[k][j][i-1], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][0]>=0.0) //normal points +x
+            positive_side[tid] = 1;
+          else //normal points -x
+            negative_side[tid] = 1;
+        }
+
+        //self->right
+        if(i+1<iimax_in && xf[k][j][i+1][0]>=0) {
+          Intersects(coords[k][j][i], coords[k][j][i+1], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][0]>=0.0) //normal points +x
+            negative_side[tid] = 1;
+          else //normal points -x
+            positive_side[tid] = 1;
+        }
+
+        //self->bottom
+        if(xf[k][j][i][1]>=0) {
+          Intersects(coords[k][j][i], coords[k][j-1][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][1]>=0.0) //normal points +y
+            positive_side[tid] = 1;
+          else //normal points -y
+            negative_side[tid] = 1;
+        }
+
+        //self->top
+        if(j+1<jjmax_in && xf[k][j+1][i][1]>=0) {
+          Intersects(coords[k][j][i], coords[k][j+1][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][1]>=0.0) //normal points +y
+            negative_side[tid] = 1;
+          else //normal points -y
+            positive_side[tid] = 1;
+        }
+
+        //self->back
+        if(xf[k][j][i][2]>=0) {
+          Intersects(coords[k][j][i], coords[k-1][j][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][2]>=0.0) //normal points +z
+            positive_side[tid] = 1;
+          else //normal points -z
+            negative_side[tid] = 1;
+        }
+
+        //self->top
+        if(k+1<kkmax_in && xf[k+1][j][i][2]>=0) {
+          Intersects(coords[k][j][i], coords[k+1][j][i], &tid, true);
+          assert(tid>=0);
+          if(Ns[tid][2]>=0.0) //normal points +z
+            negative_side[tid] = 1;
+          else //normal points -z
+            positive_side[tid] = 1;
+        }
+      }
+      XForward.RestoreDataPointerToLocalVector();
+    }
+  }
+
+  
+
+  // assemble data
+  MPI_Allreduce(MPI_IN_PLACE, positive_side.data(), positive_side.size(), MPI_INT, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, negative_side.data(), negative_side.size(), MPI_INT, MPI_MAX, comm);
+
+
+  // Step 5. Resolve the undetermined triangles --- these are outside the 2D fluid domain
+  vector<pair<int, int> > pos_tmp, neg_tmp; //update postive_side & negative_side at the end
+  for(unsigned i=0; i<Es.size(); i++) {
+
+    if(positive_side[i]>=0 && negative_side[i]>=0)
+      continue; //already taken care of
+
+    Int3 &n(Es[i]); //three vertices of the triangle
+    Vec3D xc = (Xs[n[0]] + Xs[n[1]] + Xs[n[2]])/3.0; //centroid of triangle
+    Vec3D xc2(xc[0], cylindrical_symmetry? sqrt(xc[1]*xc[1]+xc[2]*xc[2]) : xc[1],
+              global_mesh.GetZ(0));
+
+    Int3 ijk = global_mesh.FindClosestNodeToPoint(xc2, false); //false: only check nodes within domain
+    if(!coordinates.IsHere(ijk[0],ijk[1],ijk[2]))
+      continue; //let its owner handle it
+
+    //if this element is entirely outside 2D domain, set pos and neg to 0
+    if(ijk[0]<=0 || ijk[0]>=NX-1 || ijk[1]<=0 || ijk[1]>=NY-1) {//may be entirely outside domain
+      double xmin(DBL_MAX), xmax(-DBL_MAX);
+      double ymin(DBL_MAX), ymax(-DBL_MAX); //convert vertices onto x-y plane, find min & max
+      for(int j=0; j<3; j++) { //go over three vertices
+        xmin = std::min(xmin, Xs[n[j]][0]);
+        xmax = std::max(xmax, Xs[n[j]][0]);
+        if(cylindrical_symmetry) {
+          double radial = sqrt(Xs[n[j]][1]*Xs[n[j]][1] + Xs[n[j]][2]*Xs[n[j]][2]);
+          ymin = std::min(ymin, radial);
+          ymax = std::max(ymax, radial);
+        } else {//truly 2D
+          ymin = std::min(ymin, Xs[n[j]][1]);
+          ymax = std::max(ymax, Xs[n[j]][1]);
+        }
+      }
+ 
+      if(xmax < global_mesh.GetXmin()-2.0*half_thickness || xmin>global_mesh.GetXmax()+2.0*half_thickness ||
+         ymax < global_mesh.GetYmin()-2.0*half_thickness || ymin>global_mesh.GetYmax()+2.0*half_thickness) {
+        if(positive_side[i]<0)
+          pos_tmp.push_back(std::make_pair(i, 0));
+        if(negative_side[i]<0)
+          neg_tmp.push_back(std::make_pair(i, 0));
+        continue;
+      }
+    }
+
+    // now, the 2D-version of the triangle is within or very close to current subdomain
+
+    // convert the normal to x-y plane
+    Vec2D normal2;
+    if(cylindrical_symmetry) {
+      normal2[0] = Ns[i][0];
+      if(xc[1]*Ns[i][1]+xc[2]*Ns[i][2]>=0) //any point on the triangle is fine
+        normal2[1] =  sqrt(Ns[i][1]*Ns[i][1]+Ns[i][2]*Ns[i][2]);
+      else 
+        normal2[1] = -sqrt(Ns[i][1]*Ns[i][1]+Ns[i][2]*Ns[i][2]);
+    }
+    else {//truly 2D
+      double denom = sqrt(Ns[i][0]*Ns[i][0]+Ns[i][1]*Ns[i][1]);
+      normal2[0] = Ns[i][0]/denom;
+      normal2[1] = Ns[i][1]/denom;
+    }
+
+    //find nearby triangles that has already been determined.
+    double cutoff = (Xs[n[0]]-Xs[n[1]]).norm()+(Xs[n[1]]-Xs[n[2]]).norm()+(Xs[n[2]]-Xs[n[0]]).norm();
+    int maxCand = 2000; //more than enough
+    vector<MyTriangle> candidates(maxCand);
+
+    bool done_pos(positive_side[i]>=0), done_neg(negative_side[i]>=0);
+    for(int iter=0; iter<10; iter++) { //in most cases, 1 iteration should be enough
+      int nFound = global_tree.findCandidatesWithin(xc2, candidates.data(), maxCand, cutoff);
+      if(nFound>maxCand) {
+        cutoff /= 2.0;
+        continue;
+      }
+      // collect & sort useful cands (those that have valid status on at least one side)
+      vector<std::tuple<double,int,Vec3D> > dist2me; //<dist, tid, centroid coords>
+      for(int ican=0; ican<nFound; ican++) {
+        int tid = candidates[ican].trId();
+        if(positive_side[tid]<0 && negative_side[tid]<0)
+          continue;
+        Vec3D centroid = (Xs[Es[tid][0]]+Xs[Es[tid][1]]+Xs[Es[tid][2]])/3.0;
+        dist2me.push_back(std::make_tuple((xc2-centroid).norm(), tid, centroid));
+      }
+      std::sort(dist2me.begin(), dist2me.end(),
+                [](std::tuple<double,int,Vec3D> a, std::tuple<double,int,Vec3D> b)
+                {return std::get<0>(a) < std::get<0>(b);}); //uses first element of tuple.
+
+      for(auto&& cand : dist2me) {
+        int tid = std::get<1>(cand);
+        Vec3D xcand = std::get<2>(cand);
+        Vec2D normal_cand2;
+        if(cylindrical_symmetry) {
+          normal_cand2[0] = Ns[tid][0];
+          if(xcand[1]*Ns[tid][1]+xcand[2]*Ns[tid][2]>=0) //any point on the triangle is fine
+            normal_cand2[1] =  sqrt(Ns[tid][1]*Ns[tid][1]+Ns[tid][2]*Ns[tid][2]);
+          else 
+            normal_cand2[1] = -sqrt(Ns[tid][1]*Ns[tid][1]+Ns[tid][2]*Ns[tid][2]);
+        }
+        else {//truly 2D
+          double denom = sqrt(Ns[tid][0]*Ns[tid][0]+Ns[tid][1]*Ns[tid][1]);
+          normal_cand2[0] = Ns[tid][0]/denom;
+          normal_cand2[1] = Ns[tid][1]/denom;
+        }
+ 
+        // try to determine positive_side[i] and negative_side[i]
+        double inner_prod = normal2*normal_cand2; //this is arccos of the angle in between.
+        if(!done_pos) {
+          if(inner_prod>0.85 && positive_side[tid]>=0) {  //less than ~30 degrees
+            pos_tmp.push_back(std::make_pair(i, positive_side[tid]));
+            done_pos = true;
+          }
+          else if(inner_prod<-0.85 && negative_side[tid]>=0) {
+            pos_tmp.push_back(std::make_pair(i, negative_side[tid]));
+            done_pos = true;
+          }
+        }
+
+        if(!done_neg) {
+          if(inner_prod>0.85 && negative_side[tid]>=0) {
+            neg_tmp.push_back(std::make_pair(i, negative_side[tid]));
+            done_neg = true;
+          }
+          else if(inner_prod<-0.85 && positive_side[tid]>=0) {
+            neg_tmp.push_back(std::make_pair(i, positive_side[tid]));
+            done_neg = true;
+          }
+        }
+
+        if(done_pos && done_neg)
+          break;
+      }
+
+      if(done_pos && done_neg)
+        break; //done with triangle i
+      else
+        cutoff *= 1.8;
+    }
+
+    if(!done_pos || !done_neg) {
+      fprintf(stdout,"\033[0;35mWarning: Cannot determine if embedded boundary element %d (of %d) "
+              "bounds color %d (%d|%d). Assuming not.\033[0m\n",
+              i+1, (int)Es.size(), this_color, positive_side[i], negative_side[i]);
+      if(!done_pos)
+        pos_tmp.push_back(std::make_pair(i, 0));
+      if(!done_neg)
+        neg_tmp.push_back(std::make_pair(i, 0));
+    }
+
+  }
+  //apply tags
+  for(auto&& tag : pos_tmp)
+    positive_side[tag.first] = tag.second;
+  for(auto&& tag : neg_tmp)
+    negative_side[tag.first] = tag.second;
+
+  // assemble data
+  MPI_Allreduce(MPI_IN_PLACE, positive_side.data(), positive_side.size(), MPI_INT, MPI_MAX, comm);
+  MPI_Allreduce(MPI_IN_PLACE, negative_side.data(), negative_side.size(), MPI_INT, MPI_MAX, comm);
+
+
+  // Step 6. Finalize output
+  status.assign(Es.size(), 0);
+  for(int i=0; i<(int)Es.size(); i++) {
+    assert(positive_side[i]>=0 && negative_side[i]>=0);
     if(positive_side[i]>0) {
       if(negative_side[i]>0)
         status[i] = 3;

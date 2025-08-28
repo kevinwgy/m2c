@@ -554,6 +554,7 @@ MultiSurfaceIntersector::FindNewEnclosureBoundary()
   for(auto&& cnew : new_enclosure_color) { //repeat the same for each new enclosure (TODO: can be more efficient)
     elem_new_status.push_back(vector<int>());
     joint_intersector->FindColorBoundary(cnew, elem_new_status.back(), true); //true->captures initial enclosure
+    //TODO: Be careful. May need to call FindColorBoundary3Dto2D if we want to properly handle 3D-2D conversion
   }
 
 }
