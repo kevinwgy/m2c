@@ -51,6 +51,21 @@ void MeshGenerator::ComputeMeshCoordinatesAndDeltas(MeshData &iod_mesh,
   sort(xpoints.begin(), xpoints.end());
   sort(ypoints.begin(), ypoints.end());
   sort(zpoints.begin(), zpoints.end());
+  for(int i=0; i<(int)xpoints.size()-1; i++)
+    if(xpoints[i].first==xpoints[i+1].first) {
+      print_error("*** Error: Detected duplicate mesh control point (x-dir).\n");
+      exit_mpi();
+    }
+  for(int i=0; i<(int)ypoints.size()-1; i++)
+    if(ypoints[i].first==ypoints[i+1].first) {
+      print_error("*** Error: Detected duplicate mesh control point (y-dir).\n");
+      exit_mpi();
+    }
+  for(int i=0; i<(int)zpoints.size()-1; i++)
+    if(zpoints[i].first==zpoints[i+1].first) {
+      print_error("*** Error: Detected duplicate mesh control point (z-dir).\n");
+      exit_mpi();
+    }
 
   // insert min and max
   if(xpoints.size() != 0) {

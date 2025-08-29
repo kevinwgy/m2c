@@ -480,6 +480,7 @@ void
 EmbeddedBoundaryOperator::ReadMeshFile(const char *filename, vector<Vec3D> &Xs, vector<Int3> &Es)
 {
   string fname(filename);
+  assert(fname.size()>0);
   auto loc = fname.find_last_of(".");
   if(loc>=fname.size()-1) {//assume the default format (top) if file extension not detected
     ReadMeshFileInTopFormat(filename, Xs, Es); 
@@ -1504,7 +1505,7 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
   //         Find equiv point on x-y plane & compute traction there.
   // -----------------------------------------------------------
   double z0 = global_mesh_ptr->GetZ(0); //It is assumed that the mesh is on x-y plane
-  for(unsigned tid=0; tid<Es.size(); tid++) {
+  for(size_t tid=0; tid<Es.size(); tid++) {
 
     if(status[tid]==3)
       continue; //both sides facing interactive regions (interior of solid body)
@@ -1662,12 +1663,12 @@ EmbeddedBoundaryOperator::ComputeForcesOnSurface2DTo3D(int surf, int np, Vec5D**
     assert(other_loads.size() == other_areas.size() &&
            other_loads.size() == other_indices.size());
     int node;
-    for(unsigned i=0; i<other_loads.size(); i++) {
+    for(size_t i=0; i<other_loads.size(); i++) {
       node = other_indices[i];
       Fs[node] += other_loads[i];
       An[node] += other_areas[i];
     } 
-    for(unsigned i=0; i<Fs.size(); i++)
+    for(size_t i=0; i<Fs.size(); i++)
       FAs[i] = An[i]==0.0 ? 0.0 : Fs[i]/An[i];
   }
 

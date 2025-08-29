@@ -2140,7 +2140,7 @@ Intersector::FindColorBoundary3Dto2D(int this_color, bool cylindrical_symmetry,
 
   // Step 5. Resolve the undetermined triangles --- these are outside the 2D fluid domain
   vector<pair<int, int> > pos_tmp, neg_tmp; //update postive_side & negative_side at the end
-  for(unsigned i=0; i<Es.size(); i++) {
+  for(size_t i=0; i<Es.size(); i++) {
 
     if(positive_side[i]>=0 && negative_side[i]>=0)
       continue; //already taken care of

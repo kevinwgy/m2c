@@ -535,6 +535,7 @@ ExactRiemannSolverBase::FinalizeSolution(double *dir, double *Vm, double *Vp,
 #if PRINT_RIEMANN_SOLUTION == 1
   std::sort(sol1d.begin(), sol1d.end(), 
       [](vector<double> v1, vector<double> v2){return v1[0]<v2[0];});
+  assert(sol1d.size()>0);
   int last = sol1d.size()-1;
   double xi_span = sol1d[last][0] - sol1d[0][0];
   sol1d.insert(sol1d.begin(), vector<double>{sol1d[0][0]-xi_span, sol1d[0][1], sol1d[0][2], sol1d[0][3], sol1d[0][4]});
