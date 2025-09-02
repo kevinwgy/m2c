@@ -2277,7 +2277,7 @@ Intersector::FindColorBoundary3Dto2D(int this_color, bool cylindrical_symmetry,
     if(!done_pos || !done_neg) {
       fprintf(stdout,"\033[0;35mWarning: Cannot determine if embedded boundary element %d (of %d) "
               "bounds color %d (%d|%d). Assuming not.\033[0m\n",
-              i+1, (int)Es.size(), this_color, positive_side[i], negative_side[i]);
+              (int)i+1, (int)Es.size(), this_color, positive_side[i], negative_side[i]);
       if(!done_pos)
         pos_tmp.push_back(std::make_pair(i, 0));
       if(!done_neg)

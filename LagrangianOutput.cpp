@@ -178,7 +178,7 @@ LagrangianOutput::OutputResults(double t, double dt, int time_step, std::vector<
           fprintf(stdout,"\033[0;31m*** Error: Cannot write file %s.\n\033[0m", f2_name.c_str());
           exit(-1);
         }
-        fprintf(sol2_file, "Vector SOLUTION2 under NLDynamic for MyNodes\n");
+        fprintf(sol2_file, "Vector SOLUTIONAVG under NLDynamic for MyNodes\n");
         fprintf(sol2_file, "%d\n", (int)F2_ptr->size());
         fclose(sol2_file);
       }

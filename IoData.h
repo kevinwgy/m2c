@@ -1695,6 +1695,8 @@ struct AerosCouplingData {
 
   enum FSICouplingAlgorithm {NONE = 0, BY_AEROS = 1, C0 = 2, A6 = 3} fsi_algo;
 
+  enum CouplingMethod {TWO_WAY = 0, ONE_WAY_F2S = 1, ONE_WAY_S2F = 2} coupling;
+
   AerosCouplingData();
   ~AerosCouplingData() {}
 

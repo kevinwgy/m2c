@@ -568,11 +568,14 @@ AerosMessenger::SendForce()
     //
 
     // prepare package
-    for(int i=0; i<(int)pack2local.size(); i++) {
-      for(int j=0; j<3; j++)
-        temp_buffer[3*i+j] = F[pack2local[i]][j];
-    //  fprintf(stdout,"temp_buffer[%d] = %e %e %e.\n", i, temp_buffer[3*i], temp_buffer[3*i+1], temp_buffer[3*i+2]);
-    }
+    if(iod_aeros.coupling == AerosCouplingData::ONE_WAY_S2F) {//m2c should not send force
+      for(int i=0; i<(int)pack2local.size(); i++)
+        for(int j=0; j<3; j++)
+          temp_buffer[3*i+j] = 0.0;
+    } else
+      for(int i=0; i<(int)pack2local.size(); i++)
+        for(int j=0; j<3; j++)
+          temp_buffer[3*i+j] = F[pack2local[i]][j];
 
     vector<MPI_Request> send_requests;
 
@@ -611,6 +614,9 @@ AerosMessenger::GetDisplacementAndVelocity()
       }
     }
 
+    if(iod_aeros.coupling == AerosCouplingData::ONE_WAY_F2S)
+      return; //m2c should not update X or Udot
+
     // apply disp and velo to surface and Udot
     for(int i=0; i<nNodes; i++) {
       int id = local2pack[i];
@@ -625,6 +631,8 @@ AerosMessenger::GetDisplacementAndVelocity()
     }
   }
 
+  if(iod_aeros.coupling == AerosCouplingData::ONE_WAY_F2S)
+    return; //m2c should not update X or Udot
   
   //broadcast surface and Udot
   MPI_Bcast((double*)surface.X.data(), 3*nNodes, MPI_DOUBLE, 0, m2c_comm);

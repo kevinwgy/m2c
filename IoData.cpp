@@ -3520,17 +3520,22 @@ void EmbeddedBoundaryMethodData::setup(const char *name, ClassAssigner *father)
 AerosCouplingData::AerosCouplingData()
 {
   fsi_algo = NONE;
+  coupling = TWO_WAY;
 }
 
 //------------------------------------------------------------------------------
 
 void AerosCouplingData::setup(const char *name, ClassAssigner *father)
 {
-  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+  ClassAssigner *ca = new ClassAssigner(name, 2, father);
 
   new ClassToken<AerosCouplingData> (ca, "FSIAlgorithm", this,
      reinterpret_cast<int AerosCouplingData::*>(&AerosCouplingData::fsi_algo), 4,
      "None", 0, "ByAeroS", 1, "C0", 2, "A6", 3);
+
+  new ClassToken<AerosCouplingData> (ca, "Coupling", this,
+     reinterpret_cast<int AerosCouplingData::*>(&AerosCouplingData::coupling), 3,
+     "TwoWay", 0, "FluidToStructure", 1, "StructureToFluid", 2);
 }
 
 //------------------------------------------------------------------------------
