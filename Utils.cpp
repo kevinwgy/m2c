@@ -59,6 +59,7 @@ void print_error(const char format[],...)
   if(!rank) {
 
     char format_colored[strlen(format)+40];
+    format_colored[0] = '\0'; //make sure it is an empty string
     strcat(format_colored, "\033[0;31m");
     strcat(format_colored, format);
     strcat(format_colored, "\033[0m");
@@ -82,6 +83,7 @@ void print_error(MPI_Comm& comm, const char format[],...)
   if(!rank) {
 
     char format_colored[strlen(format)+40];
+    format_colored[0] = '\0'; //make sure it is an empty string
     strcat(format_colored, "\033[0;31m");
     strcat(format_colored, format);
     strcat(format_colored, "\033[0m");
@@ -105,6 +107,7 @@ void print_warning(const char format[],...)
   if(!rank) {
 
     char format_colored[strlen(format)+40];
+    format_colored[0] = '\0'; //make sure it is an empty string
     strcat(format_colored, "\033[0;35m");
     strcat(format_colored, format);
     strcat(format_colored, "\033[0m");
@@ -128,6 +131,7 @@ void print_warning(MPI_Comm& comm, const char format[],...)
   if(!rank) {
 
     char format_colored[strlen(format)+40];
+    format_colored[0] = '\0'; //make sure it is an empty string
     strcat(format_colored, "\033[0;35m");
     strcat(format_colored, format);
     strcat(format_colored, "\033[0m");
