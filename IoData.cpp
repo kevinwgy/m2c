@@ -2997,7 +2997,7 @@ OutputData::OutputData()
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
   //NOTE: Don't forget to increase capacity when you add a new member!
-  ClassAssigner *ca = new ClassAssigner(name, 30+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 31+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -3104,6 +3104,8 @@ void OutputData::setup(const char *name, ClassAssigner *father)
   probes.setup("Probes", ca);
 
   energy_integration.setup("EnergyIntegration", ca);
+
+  integrations.setup("Integration", ca);
 
   mat_transition.setup("MaterialTransition", ca);
 
@@ -3247,6 +3249,57 @@ void EnergyIntegrationData::setup(const char *name, ClassAssigner *father)
   new ClassDouble<EnergyIntegrationData>(ca, "Zmin", this, &EnergyIntegrationData::z_min);
   new ClassDouble<EnergyIntegrationData>(ca, "Zmax", this, &EnergyIntegrationData::z_max);
 
+}
+
+//------------------------------------------------------------------------------
+
+IntegrationData::IntegrationData()
+{
+  frequency = -100;
+  frequency_dt = -1;
+
+  volume = "";
+  mass = "";
+  total_energy = "";
+  total_enthalpy = "";
+  kinetic_energy = "";
+  internal_energy = "";
+  potential_energy = "";
+  laser_radiation = "";
+  momentum = "";
+}
+
+//------------------------------------------------------------------------------
+
+Assigner* IntegrationData::getAssigner()
+{
+  ClassAssigner *ca = new ClassAssigner("normal", 18, nullAssigner);
+
+  new ClassInt<IntegrationData>(ca, "Frequency", this, &IntegrationData::frequency);
+  new ClassDouble<IntegrationData>(ca, "TimeInterval", this, &IntegrationData::frequency_dt);
+  new ClassStr<IntegrationData>(ca, "Volume", this, &IntegrationData::volume);
+  new ClassStr<IntegrationData>(ca, "Mass", this, &IntegrationData::mass);
+  new ClassStr<IntegrationData>(ca, "TotalEnergy", this, &IntegrationData::total_energy);
+  new ClassStr<IntegrationData>(ca, "TotalEnthalpy", this, &IntegrationData::total_enthalpy);
+                //total_enthalpy = kinetic + internal + potential
+  new ClassStr<IntegrationData>(ca, "KineticEnergy", this, &IntegrationData::kinetic_energy);
+  new ClassStr<IntegrationData>(ca, "InternalEnergy", this, &IntegrationData::internal_energy);
+  new ClassStr<IntegrationData>(ca, "PotentialEnergy", this, &IntegrationData::potential_energy);
+                //pressure potential
+  new ClassStr<IntegrationData>(ca, "LaserRadiation", this, &IntegrationData::laser_radiation);
+                // integration of eta*L
+  new ClassStr<IntegrationData>(ca, "Momentum", this, &IntegrationData::laser_radiation);
+                // integration of eta*L
+                
+  pointMap.setup("Point", ca);
+  planeMap.setup("Plane", ca);
+  sphereMap.setup("Sphere", ca);
+  parallelepipedMap.setup("Parallelepiped", ca);
+  spheroidMap.setup("Spheroid", ca);
+  cylinderconeMap.setup("CylinderAndCone", ca);
+  cylindersphereMap.setup("CylinderWithSphericalCaps", ca);
+
+  return ca;
 }
 
 //------------------------------------------------------------------------------

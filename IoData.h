@@ -1385,7 +1385,7 @@ struct PlanePlot {
 
 //------------------------------------------------------------------------------
 
-
+// Try to use IntegrationData instead
 struct MaterialVolumes {
 
   const char *filename;
@@ -1431,6 +1431,7 @@ struct TerminalVisualizationData {
 };
 
 //------------------------------------------------------------------------------
+
 struct EnergyIntegrationData {
 
   int frequency;
@@ -1460,6 +1461,42 @@ struct EnergyIntegrationData {
 
   void setup(const char *, ClassAssigner * = 0);
  
+};
+
+//------------------------------------------------------------------------------
+// This is a generalization of EnergyIntegrationData (and MaterialVolumes)
+struct IntegrationData {
+
+  int frequency;
+  double frequency_dt;
+
+  enum Vars  {VOLUME = 0, MASS = 1, TOTAL_ENERGY = 2, TOTAL_ENTHALPY = 3, KINETIC_ENERGY = 4,
+              INTERNAL_ENERGY = 5, POTENTIAL_ENERGY = 6, LASER_RADIATION = 7,
+              MOMENTUM = 8, SIZE = 9};
+
+  const char *volume;
+  const char *mass;
+  const char *total_energy;
+  const char *total_enthalpy;
+  const char *kinetic_energy;
+  const char *internal_energy;
+  const char *potential_energy;
+  const char *laser_radiation;
+  const char *momentum;
+
+  // specify the region
+  ObjectMap<PointData>          pointMap;
+  ObjectMap<PlaneData>          planeMap;
+  ObjectMap<SphereData>         sphereMap;
+  ObjectMap<ParallelepipedData> parallelepipedMap;
+  ObjectMap<SpheroidData>       spheroidMap;
+  ObjectMap<CylinderConeData>   cylinderconeMap;
+  ObjectMap<CylinderSphereData> cylindersphereMap;
+
+  IntegrationData();
+  ~IntegrationData() {}
+
+  Assigner *getAssigner();
 };
 
 //------------------------------------------------------------------------------
@@ -1547,6 +1584,7 @@ struct OutputData {
   Probes probes;
 
   EnergyIntegrationData energy_integration;
+  ObjectMap<IntegrationData> integrations; //!< a generalized version of energy_integration
 
   MaterialTransitionOutputData mat_transition;
 
