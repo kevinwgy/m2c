@@ -7,6 +7,7 @@
 #define _OUTPUT_H_
 #include <ProbeOutput.h>
 #include <EnergyIntegrationOutput.h>
+#include <IntegrationOutput.h>
 #include <LaserAbsorptionSolver.h>
 #include <PlaneOutput.h>
 #include <MaterialVolumeOutput.h>
@@ -64,6 +65,8 @@ class Output
   std::vector<ProbeOutput*> line_outputs;
 
   EnergyIntegrationOutput energy_output;
+  IntegrationOutput integration_output; //generalization of the one above
+
   std::vector<PlaneOutput*> plane_outputs;
 
   MaterialVolumeOutput matvol_output;

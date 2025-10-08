@@ -3273,7 +3273,7 @@ IntegrationData::IntegrationData()
 
 Assigner* IntegrationData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 18, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 17, nullAssigner);
 
   new ClassInt<IntegrationData>(ca, "Frequency", this, &IntegrationData::frequency);
   new ClassDouble<IntegrationData>(ca, "TimeInterval", this, &IntegrationData::frequency_dt);
@@ -3291,7 +3291,6 @@ Assigner* IntegrationData::getAssigner()
   new ClassStr<IntegrationData>(ca, "Momentum", this, &IntegrationData::laser_radiation);
                 // integration of eta*L
                 
-  pointMap.setup("Point", ca);
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);
   parallelepipedMap.setup("Parallelepiped", ca);

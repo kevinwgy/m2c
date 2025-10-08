@@ -1,3 +1,8 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
+
 #include <EnergyIntegrationOutput.h>
 
 using namespace std;
@@ -455,14 +460,14 @@ void EnergyIntegrationOutput::IntegrateTotalEnthalpy(SpaceVariable3D &V, SpaceVa
                double e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
                if(iod_mesh.type == MeshData::SPHERICAL){
                  double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i]*scalar;
+                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+v[k][j][i][4])*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
                  double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i]*scalar;
+                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+v[k][j][i][4])*cell[k][j][i]*scalar;
                }
                else
-                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+abs(v[k][j][i][4]))*cell[k][j][i];
+                 H[myid] += (v[k][j][i][0]*(0.5*vsquare+e)+v[k][j][i][4])*cell[k][j][i];
             }
       }
     }
@@ -635,14 +640,14 @@ void EnergyIntegrationOutput::IntegratePotentialEnergy(SpaceVariable3D &V, Space
                coords[k][j][i][2] <= iod_output.energy_integration.z_max){
                if(iod_mesh.type == MeshData::SPHERICAL){
                  double scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
-                 potential[myid] += abs(v[k][j][i][4])*cell[k][j][i]*scalar;
+                 potential[myid] += v[k][j][i][4]*cell[k][j][i]*scalar;
                }
                else if(iod_mesh.type == MeshData::CYLINDRICAL){
                  double scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
-                 potential[myid] += abs(v[k][j][i][4])*cell[k][j][i]*scalar;
+                 potential[myid] += v[k][j][i][4]*cell[k][j][i]*scalar;
                }
                else
-                 potential[myid] += abs(v[k][j][i][4])*cell[k][j][i];
+                 potential[myid] += v[k][j][i][4]*cell[k][j][i];
             }
       }
     }

@@ -334,7 +334,7 @@ SpaceInitializer::InitializeVandID(SpaceVariable3D &V, SpaceVariable3D &ID,
   for(auto&& obj : order) {
     //-------------------------------------
     // Internal Geometry ID:
-    // 0: Plane: 0,
+    // 0: Plane
     // 1: CylinderCone
     // 2: CylinderSphere
     // 3: Sphere
@@ -1394,7 +1394,7 @@ SpaceInitializer::InitializePhiByDistance(vector<pair<int,int> > &order,
   for(auto&& obj : order) {
     //-------------------------------------
     // Internal Geometry ID:
-    // 0: Plane: 0,
+    // 0: Plane
     // 1: CylinderCone
     // 2: CylinderSphere
     // 3: Sphere

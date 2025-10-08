@@ -21,7 +21,8 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     vector3(comm_, &(dms.ghosted1_3dof)),
     vector5(comm_, &(dms.ghosted1_5dof)),
     probe_output(comm_, iod_.output, vf_, ion_, heo_),
-    energy_output(comm_,iod_, iod_.output, iod_.mesh, iod_.eqs, laser_, vf_, coordinates, delta_xyz, cell_volume),
+    energy_output(comm_, iod_, iod_.output, iod_.mesh, iod_.eqs, laser_, vf_, coordinates, delta_xyz, cell_volume),
+    integration_output(comm_, iod_, laser_, vf_, coordinates, delta_xyz, cell_volume),
     matvol_output(comm_, iod_, cell_volume),
     ion(ion_), heo(heo_), inco(inco_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
@@ -167,8 +168,9 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
   //write solutions at probes
   probe_output.WriteSolutionAtProbes(time, dt, time_step, *Vout, ID, Phi, L, Xi, force_write);
 
-  //write solutions for integrated energy in the specified region
+  //write solutions for integrated energy (and other quantities) in the specified region
   energy_output.WriteSolutionOfIntegrationEnergy(time, dt, time_step, V, ID, L, force_write);
+  integration_output.WriteIntegrationResults(time, dt, time_step, V, ID, L, force_write);
 
   //write solutions along lines
 

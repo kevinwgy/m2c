@@ -1485,7 +1485,6 @@ struct IntegrationData {
   const char *momentum;
 
   // specify the region
-  ObjectMap<PointData>          pointMap;
   ObjectMap<PlaneData>          planeMap;
   ObjectMap<SphereData>         sphereMap;
   ObjectMap<ParallelepipedData> parallelepipedMap;

@@ -1,3 +1,7 @@
+/************************************************************************
+ * Copyright © 2020 The Multiphysics Modeling and Computation (M2C) Lab
+ * <kevin.wgy@gmail.com> <kevinw3@vt.edu>
+ ************************************************************************/
 #ifndef _ENERGY_INTEGRATION_OUTPUT_H_
 #define _ENERGY_INTEGRATION_OUTPUT_H_
 
@@ -8,7 +12,7 @@
 #include<Vector5D.h>
 
 /*********************************************************
- * class EnergyIntegrationOperator integrates the energy 
+ * class EnergyIntegrationOutput integrates the energy 
  * required by user within the specified region
  * ********************************************************/
 
