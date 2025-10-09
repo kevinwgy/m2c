@@ -7,7 +7,7 @@
 
 namespace MathTools {
 
-//! Get the k-th binary digit (0 or 1) of integer n
+//! Get the k-th binary digit (0 or 1) of integer n (k begins at 0)
 inline bool GetBit(int n, int k) {
   return (n >> k) & 1;
 }

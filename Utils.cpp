@@ -202,6 +202,19 @@ void print(FILE* fd, const char format[],...)
 
 //--------------------------------------------------
 
+void print_flush(FILE* fd)
+{
+  int rank;
+  MPI_Comm_rank(m2c_comm,&rank);
+
+  if(!rank)
+    fflush(fd);
+
+  return;
+}
+
+//--------------------------------------------------
+
 void mpi_barrier()
 {
   MPI_Barrier(m2c_comm);
@@ -229,6 +242,19 @@ void print(MPI_Comm& comm, FILE* fd, const char format[],...)
   }
 
   //MPI_Barrier(comm); (This slows down the code)
+  return;
+}
+
+//--------------------------------------------------
+
+void print_flush(MPI_Comm& comm, FILE* fd)
+{
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+
+  if(!rank) 
+    fflush(fd);
+
   return;
 }
 

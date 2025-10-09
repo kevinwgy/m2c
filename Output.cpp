@@ -22,7 +22,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     vector5(comm_, &(dms.ghosted1_5dof)),
     probe_output(comm_, iod_.output, vf_, ion_, heo_),
     energy_output(comm_, iod_, iod_.output, iod_.mesh, iod_.eqs, laser_, vf_, coordinates, delta_xyz, cell_volume),
-    integration_output(comm_, iod_, laser_, vf_, coordinates, delta_xyz, cell_volume),
+    integration_output(comm_, dms, iod_, laser_, vf_, coordinates, delta_xyz, cell_volume),
     matvol_output(comm_, iod_, cell_volume),
     ion(ion_), heo(heo_), inco(inco_),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)

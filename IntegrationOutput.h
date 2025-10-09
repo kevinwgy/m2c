@@ -49,7 +49,7 @@ class IntegrationOutput
 
 public:
 
-  IntegrationOutput(MPI_Comm &comm_, IoData &iod, LaserAbsorptionSolver* laser_,
+  IntegrationOutput(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod, LaserAbsorptionSolver* laser_,
                     std::vector<VarFcnBase*> &vf_, SpaceVariable3D& coordinates_,
                     SpaceVariable3D& delta_xyz_, SpaceVariable3D& cell_volume_);
 

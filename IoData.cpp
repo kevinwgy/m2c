@@ -3288,8 +3288,7 @@ Assigner* IntegrationData::getAssigner()
                 //pressure potential
   new ClassStr<IntegrationData>(ca, "LaserRadiation", this, &IntegrationData::laser_radiation);
                 // integration of eta*L
-  new ClassStr<IntegrationData>(ca, "Momentum", this, &IntegrationData::laser_radiation);
-                // integration of eta*L
+  new ClassStr<IntegrationData>(ca, "Momentum", this, &IntegrationData::momentum);
                 
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);

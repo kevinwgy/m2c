@@ -15,11 +15,13 @@ using std::pair;
 
 //-----------------------------------------------------------------------------------------------------
 
-IntegrationOutput::IntegrationOutput(MPI_Comm &comm_, IoData &iod, LaserAbsorptionSolver* laser_,
-                                                 std::vector<VarFcnBase*> &vf_, SpaceVariable3D& coordinates_,
-                                                 SpaceVariable3D& delta_xyz_, SpaceVariable3D& cell_volume_)
+IntegrationOutput::IntegrationOutput(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod,
+                                     LaserAbsorptionSolver* laser_,
+                                     std::vector<VarFcnBase*> &vf_, SpaceVariable3D& coordinates_,
+                                     SpaceVariable3D& delta_xyz_, SpaceVariable3D& cell_volume_)
                         :comm(comm_), iod_output(iod.output), laser(laser_), vf(vf_), coordinates(coordinates_),
-                         delta_xyz(delta_xyz_), cell_volume(cell_volume_), mesh_type(iod.mesh.type)
+                         delta_xyz(delta_xyz_), cell_volume(cell_volume_), mesh_type(iod.mesh.type),
+                         Tag(comm_, &(dm_all_.ghosted1_1dof))
 {
 
   numMaterials = iod.eqs.materials.dataMap.size() + 1; //an extra one for "ghost/inactive"
@@ -146,7 +148,8 @@ IntegrationOutput::IntegrationOutput(MPI_Comm &comm_, IoData &iod, LaserAbsorpti
         for(int j=0; j<numMaterials; j++)
           print(file[i], "|  Solution (Mat. %d)  ", j);
         print(file[i],"   |  Sum (including ghost/inactive)\n");
-        fflush(file[i]);
+        mpi_barrier();
+        print_flush(file[i]);
       }
 
     used_indices.insert(index);
@@ -176,7 +179,7 @@ void
 IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationData &integral)
 {
 
-  print("- Setting up integration domain %d.\n", index);
+  print("\n- Setting up integration domain %d.\n", index);
 
   vector<pair<int,int> > order;  //<geom type, geom dataMap index>
   int nGeom = OrderUserSpecifiedGeometries(integral, order);
@@ -193,6 +196,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
+  int my_order = 0;
   for(auto&& obj : order) {
     //-------------------------------------
     // Internal Geometry ID:
@@ -220,7 +224,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
             if(distCal.Calculate(coords[k][j][i])>0) {
-              if(!set_intersection) 
+              if(!set_intersection || my_order==0)
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -252,7 +256,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection) 
+              if(!set_intersection || my_order==0) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -288,7 +292,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection) 
+              if(!set_intersection || my_order==0) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -319,7 +323,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection) 
+              if(!set_intersection || my_order==0) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -358,7 +362,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection) 
+              if(!set_intersection || my_order==0) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -390,7 +394,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection) 
+              if(!set_intersection || my_order==0) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -402,6 +406,8 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
       print_error("*** Error: Found unrecognized object id (%d).\n", obj.first);
       exit_mpi();
     }
+
+    my_order++;
   }
 
   coordinates.RestoreDataPointerToLocalVector();
@@ -537,7 +543,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += volume[i];
       } 
       print(file[IntegrationData::VOLUME], "%16.8e\n", sum);
-      fflush(file[IntegrationData::VOLUME]);
+      print_flush(file[IntegrationData::VOLUME]);
     }
 
     if(file[IntegrationData::MASS]) {
@@ -550,7 +556,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += mass[i];
       }
       print(file[IntegrationData::MASS], "%16.8e\n", sum);
-      fflush(file[IntegrationData::MASS]);
+      print_flush(file[IntegrationData::MASS]);
     } 
 
     if(file[IntegrationData::MOMENTUM]) {
@@ -564,7 +570,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += momentum[i];
       }
       print(file[IntegrationData::MOMENTUM], "%16.8e  %16.8e  %16.8e\n", sum[0], sum[1], sum[2]);
-      fflush(file[IntegrationData::MOMENTUM]);
+      print_flush(file[IntegrationData::MOMENTUM]);
     } 
 
     if(file[IntegrationData::TOTAL_ENERGY]) {
@@ -577,7 +583,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += E[i];
       }
       print(file[IntegrationData::TOTAL_ENERGY], "%16.8e\n", sum);
-      fflush(file[IntegrationData::TOTAL_ENERGY]);
+      print_flush(file[IntegrationData::TOTAL_ENERGY]);
     }
 
     if(file[IntegrationData::TOTAL_ENTHALPY]) {
@@ -590,7 +596,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += H[i];
       }
       print(file[IntegrationData::TOTAL_ENTHALPY], "%16.8e\n", sum);
-      fflush(file[IntegrationData::TOTAL_ENTHALPY]);
+      print_flush(file[IntegrationData::TOTAL_ENTHALPY]);
     }
 
     if(file[IntegrationData::KINETIC_ENERGY]) {
@@ -603,7 +609,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += kinetic[i];
       }
       print(file[IntegrationData::KINETIC_ENERGY], "%16.8e\n", sum);
-      fflush(file[IntegrationData::KINETIC_ENERGY]);
+      print_flush(file[IntegrationData::KINETIC_ENERGY]);
     }
 
     if(file[IntegrationData::INTERNAL_ENERGY]) {
@@ -616,7 +622,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += internal[i];
       }
       print(file[IntegrationData::INTERNAL_ENERGY], "%16.8e\n", sum);
-      fflush(file[IntegrationData::INTERNAL_ENERGY]);
+      print_flush(file[IntegrationData::INTERNAL_ENERGY]);
     }
 
     if(file[IntegrationData::POTENTIAL_ENERGY]) {
@@ -629,7 +635,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += potential[i];
       }
       print(file[IntegrationData::POTENTIAL_ENERGY], "%16.8e\n", sum);
-      fflush(file[IntegrationData::POTENTIAL_ENERGY]);
+      print_flush(file[IntegrationData::POTENTIAL_ENERGY]);
     }
 
     if(file[IntegrationData::LASER_RADIATION]) {
@@ -643,7 +649,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         sum += radiation[i];
       }
       print(file[IntegrationData::LASER_RADIATION], "%16.8e\n", sum);
-      fflush(file[IntegrationData::LASER_RADIATION]);
+      print_flush(file[IntegrationData::LASER_RADIATION]);
     }
 
     last_snapshot_time[index] = time;
@@ -683,7 +689,7 @@ IntegrationOutput::IntegrateVolume(int index, double*** tag, Vec3D*** coords, Ve
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           if(mesh_type == MeshData::SPHERICAL){
             scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
             volume[myid] += cell[k][j][i]*scalar;
@@ -722,7 +728,7 @@ IntegrationOutput::IntegrateMass(int index, double*** tag, Vec3D*** coords, Vec3
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           if(mesh_type == MeshData::SPHERICAL){
             scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
             mass[myid] += v[k][j][i][0]*cell[k][j][i]*scalar;
@@ -761,7 +767,7 @@ IntegrationOutput::IntegrateMomentum(int index, double*** tag, Vec3D*** coords, 
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           velocity = Vec3D(v[k][j][i][1],v[k][j][i][2],v[k][j][i][3]);
           if(mesh_type == MeshData::SPHERICAL){
             scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
@@ -802,7 +808,7 @@ IntegrationOutput::IntegrateTotalEnergy(int index, double*** tag, Vec3D*** coord
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           double vsquare = v[k][j][i][1]*v[k][j][i][1] + v[k][j][i][2]*v[k][j][i][2]
                          + v[k][j][i][3]*v[k][j][i][3];
           double e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
@@ -845,7 +851,7 @@ IntegrationOutput::IntegrateTotalEnthalpy(int index, double*** tag, Vec3D*** coo
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           double vsquare = v[k][j][i][1]*v[k][j][i][1] + v[k][j][i][2]*v[k][j][i][2]
                          + v[k][j][i][3]*v[k][j][i][3];
           double e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
@@ -888,7 +894,7 @@ IntegrationOutput::IntegrateKineticEnergy(int index, double*** tag, Vec3D*** coo
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           double vsquare = v[k][j][i][1]*v[k][j][i][1] + v[k][j][i][2]*v[k][j][i][2]
                          + v[k][j][i][3]*v[k][j][i][3];
           if(mesh_type == MeshData::SPHERICAL){
@@ -930,7 +936,7 @@ IntegrationOutput::IntegrateInternalEnergy(int index, double*** tag, Vec3D*** co
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           double e = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
           if(mesh_type == MeshData::SPHERICAL){
             scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
@@ -971,7 +977,7 @@ IntegrationOutput::IntegratePotentialEnergy(int index, double*** tag, Vec3D*** c
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           if(mesh_type == MeshData::SPHERICAL){
             scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
             potential[myid] += v[k][j][i][4]*cell[k][j][i]*scalar;
@@ -1014,7 +1020,7 @@ IntegrationOutput::IntegrateLaserRadiation(int index, double*** tag, Vec3D*** co
                   myid);
           exit(-1);
         }
-        if(MathTools::GetBit(index, (int)tag[k][j][i])) {
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
           e   = vf[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
           myT = vf[myid]->GetTemperature(v[k][j][i][0], e);
           eta = laser->GetAbsorptionCoefficient(myT, myid);

@@ -39,6 +39,8 @@ void print(MPI_Comm& comm, int i, const char format[],...);
 //! MPI Rank 0 will print to a file
 void print(FILE* fd, const char format[],...);
 void print(MPI_Comm& comm, FILE* fd, const char format[],...);
+void print_flush(FILE* fd);
+void print_flush(MPI_Comm& comm, FILE* fd);
 //--------------------------------------------------
 void mpi_barrier();
 double walltime(); //returns wall-clock time on that process (not the same as CPU-time given by "clock()"!)
