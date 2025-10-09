@@ -186,17 +186,17 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
 
   int mask = 1 << index; //only the index-th bit is 1; 0 eleswhere
 
-  if(nGeom == 0) { //no `region' specified; set entire domain to be integrated
-    for(int k=k0; k<kmax; k++)
-      for(int j=j0; j<jmax; j++)
-        for(int i=i0; i<imax; i++) 
-          tag[k][j][i] = (int)tag[k][j][i] | mask; //set the index-th bit to 1
+  // start with setting the entire domain to be integrated
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) 
+        tag[k][j][i] = (int)tag[k][j][i] | mask; //set the index-th bit to 1
+
+  if(nGeom==0)
     return;
-  }
 
   Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
 
-  int my_order = 0;
   for(auto&& obj : order) {
     //-------------------------------------
     // Internal Geometry ID:
@@ -212,6 +212,10 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
       assert(it != integral.planeMap.dataMap.end());
 
       bool set_intersection = (it->second->inclusion == PlaneData::INTERSECTION);
+      if(it->second->inclusion == PlaneData::OVERRIDE) {
+        print_warning("  o Warning: 'Override' is not supported. Treating it as 'Intersection'.\n");
+        set_intersection = true;
+      }
 
       Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
       Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
@@ -224,7 +228,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
         for(int j=j0; j<jmax; j++)
           for(int i=i0; i<imax; i++) {
             if(distCal.Calculate(coords[k][j][i])>0) {
-              if(!set_intersection || my_order==0)
+              if(!set_intersection)
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -238,6 +242,10 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
 
       bool interior = (it->second->side == CylinderConeData::INTERIOR);
       bool set_intersection = (it->second->inclusion == CylinderConeData::INTERSECTION);
+      if(it->second->inclusion == CylinderConeData::OVERRIDE) {
+        print_warning("  o Warning: 'Override' is not supported. Treating it as 'Intersection'.\n");
+        set_intersection = true;
+      }
 
       Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
       Vec3D dir(it->second->nx, it->second->ny, it->second->nz);
@@ -256,7 +264,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection || my_order==0) 
+              if(!set_intersection) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -270,10 +278,9 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
 
       bool interior = (it->second->side == CylinderSphereData::INTERIOR);
       bool set_intersection = (it->second->inclusion == CylinderSphereData::INTERSECTION);
-
-      if(it->second->inclusion != CylinderSphereData::OVERRIDE) {
-        print_error("*** Error: (Integration) Initialization only supports Inclusion = Override at the moment.\n");
-        exit_mpi();
+      if(it->second->inclusion == CylinderSphereData::OVERRIDE) {
+        print_warning("  o Warning: 'Override' is not supported. Treating it as 'Intersection'.\n");
+        set_intersection = true;
       }
 
       Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z); //center of base
@@ -292,7 +299,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection || my_order==0) 
+              if(!set_intersection) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -306,10 +313,9 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
 
       bool interior = (it->second->side == SphereData::INTERIOR);
       bool set_intersection = (it->second->inclusion == SphereData::INTERSECTION);
-
-      if(it->second->inclusion != SphereData::OVERRIDE) {
-        print_error("*** Error: (Integraiton) Initialization only supports Inclusion = Override at the moment.\n");
-        exit_mpi();
+      if(it->second->inclusion == SphereData::OVERRIDE) {
+        print_warning("  o Warning: 'Override' is not supported. Treating it as 'Intersection'.\n");
+        set_intersection = true;
       }
 
       Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
@@ -323,7 +329,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection || my_order==0) 
+              if(!set_intersection) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -337,10 +343,9 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
 
       bool interior = (it->second->side == ParallelepipedData::INTERIOR);
       bool set_intersection = (it->second->inclusion == ParallelepipedData::INTERSECTION);
-
-      if(it->second->inclusion != ParallelepipedData::OVERRIDE) {
-        print_error("*** Error: (Integration) Initialization only supports Inclusion = Override at the moment.\n");
-        exit_mpi();
+      if(it->second->inclusion == ParallelepipedData::OVERRIDE) {
+        print_warning("  o Warning: 'Override' is not supported. Treating it as 'Intersection'.\n");
+        set_intersection = true;
       }
 
       Vec3D x0(it->second->x0, it->second->y0, it->second->z0);
@@ -362,7 +367,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection || my_order==0) 
+              if(!set_intersection) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -376,10 +381,9 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
 
       bool interior = (it->second->side == SpheroidData::INTERIOR);
       bool set_intersection = (it->second->inclusion == SpheroidData::INTERSECTION);
-
-      if(it->second->inclusion != SpheroidData::OVERRIDE) {
-        print_error("*** Error: (Integration) Initialization only supports Inclusion = Override at the moment.\n");
-        exit_mpi();
+      if(it->second->inclusion == SpheroidData::OVERRIDE) {
+        print_warning("  o Warning: 'Override' is not supported. Treating it as 'Intersection'.\n");
+        set_intersection = true;
       }
 
       Vec3D x0(it->second->cen_x, it->second->cen_y, it->second->cen_z);
@@ -394,7 +398,7 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
           for(int i=i0; i<imax; i++) {
             if((interior  && distCal.Calculate(coords[k][j][i])<0) ||
                (!interior && distCal.Calculate(coords[k][j][i])>0)) {
-              if(!set_intersection || my_order==0) 
+              if(!set_intersection) 
                 tag[k][j][i] = (int)tag[k][j][i] | mask;
             } else {
               if(set_intersection)
@@ -407,7 +411,6 @@ IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationD
       exit_mpi();
     }
 
-    my_order++;
   }
 
   coordinates.RestoreDataPointerToLocalVector();
