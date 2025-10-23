@@ -143,6 +143,21 @@ protected: //internal functions
                                 double *Vs, int &id, double *Vsm /*outputs*/);
 
 
+  //! Fast solvers for Nobel-Abel stiffened gas
+//  virtual int ComputeRiemannSolutionNASG(double *dir/*unit normal*/, double *Vm, int idm /*"left" state*/, 
+//                                         double *Vp, int idp /*"right" state*/,
+//                                         double *Vs, int &id /*solution at xi = 0 (i.e. x=0) */,
+//                                         double *Vsm /*left 'star' solution*/,
+//                                         double *Vsp /*right 'star' solution*/,
+//                                         double curvature = 0.0);
+
+//  virtual int ComputeOneSidedRiemannSolutionNASG(double *dir/*unit normal towards interface/wall*/, 
+//                                                 double *Vm, int idm /*left state*/,
+//                                                 double *Ustar, /*interface/wall velocity (3D)*/
+//                                                 double *Vs, int &id, /*solution at xi = 0 (i.e. x=0), id = -1 if invalid*/
+//                                                 double *Vsm /*left 'star' solution*/);
+
+
 };
 
 

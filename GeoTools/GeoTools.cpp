@@ -399,7 +399,7 @@ bool ContinuousRayTriangleCollision(Vec3D& x0, Vec3D& x, Vec3D& A0, Vec3D& B0, V
     areaABC0 = GetNormalAndAreaOfTriangle(A0, B0, C0, mydir0);
 
   if(IsPointInsideTriangle(x0,A0,B0,C0,half_thickness,&areaABC0,&mydir0)) {
-    if(*time) *time = 0;
+    if(time) *time = 0;
     return true;
   }
 
@@ -413,7 +413,7 @@ bool ContinuousRayTriangleCollision(Vec3D& x0, Vec3D& x, Vec3D& A0, Vec3D& B0, V
     areaABC = GetNormalAndAreaOfTriangle(A, B, C, mydir);
 
   if(IsPointInsideTriangle(x,A,B,C,half_thickness,&areaABC,&mydir)) {
-    if(*time) *time = 1.0;
+    if(time) *time = 1.0;
     return true;
   }
 
@@ -451,7 +451,7 @@ bool ContinuousRayTriangleCollision(Vec3D& x0, Vec3D& x, Vec3D& A0, Vec3D& B0, V
     Vec3D Bt = B0+t[i]*DB;
     Vec3D Ct = C0+t[i]*DC;
     if(IsPointInsideTriangle(xt, At, Bt, Ct, half_thickness)) {
-      if(*time) *time = t[i];
+      if(time) *time = t[i];
       return true;
     }
   }

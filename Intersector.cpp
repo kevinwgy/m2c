@@ -288,7 +288,7 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin,
   double delta;
   for(int k=kk0_in; k<kkmax_in; k++)
     for(int j=jj0_in; j<jjmax_in; j++)
-      for(int i=ii0_in; i<iimax; i++) {
+      for(int i=ii0_in; i<iimax_in; i++) {
 
         delta = tol*dx_glob[i] + thicker;
         bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - delta;
