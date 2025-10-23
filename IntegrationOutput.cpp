@@ -176,6 +176,14 @@ IntegrationOutput::~IntegrationOutput()
 //------------------------------------------------------------------------------------------------------
 
 void
+IntegrationOutput::Destroy()
+{
+  Tag.Destroy();
+}
+
+//------------------------------------------------------------------------------------------------------
+
+void
 IntegrationOutput::SetupIntegrationDomain(double*** tag, int index, IntegrationData &integral)
 {
 

@@ -54,6 +54,7 @@ public:
                     SpaceVariable3D& delta_xyz_, SpaceVariable3D& cell_volume_);
 
   ~IntegrationOutput();
+  void Destroy();
 
   void WriteIntegrationResults(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
                                SpaceVariable3D* L, bool force_write);

@@ -665,6 +665,8 @@ Output::FinalizeOutput()
   scalar.Destroy();
   vector3.Destroy(); 
   vector5.Destroy();
+
+  integration_output.Destroy();
 }
 
 //--------------------------------------------------------------------------
