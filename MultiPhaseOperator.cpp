@@ -648,7 +648,7 @@ MultiPhaseOperator::UpdateCellsSweptByEmbeddedSurfaces(SpaceVariable3D &V, Space
     if(g.type_projection != GhostPoint::FACE)
       continue;
     int im_i(g.image_ijk[0]), im_j(g.image_ijk[1]), im_k(g.image_ijk[2]);
-    if(tag[im_k][im_j][im_i] > 0)
+    if(tag[im_k][im_j][im_i] != 0) //account for occluded and swept nodes
       ghosts.push_back(i);
   }
 

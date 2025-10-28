@@ -284,6 +284,8 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin,
   vector<double> &dx_glob(global_mesh.dx_glob);
   vector<double> &dy_glob(global_mesh.dy_glob);
   vector<double> &dz_glob(global_mesh.dz_glob);
+  Vec3D &xyz_min(global_mesh.xyz_min);
+  Vec3D &xyz_max(global_mesh.xyz_max);
 
   double delta;
   for(int k=kk0_in; k<kkmax_in; k++)
@@ -291,16 +293,16 @@ Intersector::BuildNodalAndSubdomainBoundingBoxes(int nL, SpaceVariable3D &BBmin,
       for(int i=ii0_in; i<iimax_in; i++) {
 
         delta = tol*dx_glob[i] + thicker;
-        bbmin[k][j][i][0] = x_glob[std::max(   0, i-nL)] - delta;
-        bbmax[k][j][i][0] = x_glob[std::min(NX-1, i+nL)] + delta;
-
+        bbmin[k][j][i][0] = i-nL<0   ? xyz_min[0] - delta : x_glob[i-nL] - delta;
+        bbmax[k][j][i][0] = i+nL>=NX ? xyz_max[0] + delta : x_glob[i+nL] + delta;
+ 
         delta = tol*dy_glob[j] + thicker;
-        bbmin[k][j][i][1] = y_glob[std::max(   0, j-nL)] - delta;
-        bbmax[k][j][i][1] = y_glob[std::min(NY-1, j+nL)] + delta;
+        bbmin[k][j][i][1] = j-nL<0   ? xyz_min[1] - delta : y_glob[j-nL] - delta;
+        bbmax[k][j][i][1] = j+nL>=NY ? xyz_max[1] + delta : y_glob[j+nL] + delta;
 
         delta = tol*dz_glob[k] + thicker;
-        bbmin[k][j][i][2] = z_glob[std::max(   0, k-nL)] - delta;
-        bbmax[k][j][i][2] = z_glob[std::min(NZ-1, k+nL)] + delta;
+        bbmin[k][j][i][2] = k-nL<0   ? xyz_min[2] - delta : z_glob[k-nL] - delta;
+        bbmax[k][j][i][2] = k+nL>=NZ ? xyz_max[2] + delta : z_glob[k+nL] + delta;
       }
 
   //subD_bb includes the ghost boundary
