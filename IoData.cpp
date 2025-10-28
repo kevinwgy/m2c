@@ -3440,7 +3440,7 @@ EmbeddedSurfaceData::EmbeddedSurfaceData()
 Assigner *EmbeddedSurfaceData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 15, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 16, nullAssigner);
 
   new ClassToken<EmbeddedSurfaceData> (ca, "SurfaceProvidedByAnotherSolver", this,
      reinterpret_cast<int EmbeddedSurfaceData::*>(&EmbeddedSurfaceData::provided_by_another_solver), 2,
