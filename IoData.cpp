@@ -1171,6 +1171,22 @@ void HeatDiffusionModelData::setup(const char *name, ClassAssigner *father) {
 
 //------------------------------------------------------------------------------
 
+MatTranConstantKineticsData::MatTranConstantKineticsData()
+{
+  duration = 0.0;
+}
+
+//------------------------------------------------------------------------------
+
+void MatTranConstantKineticsData::setup(const char *name, ClassAssigner *father)
+{
+  ClassAssigner *ca = new ClassAssigner(name, 1, father);
+
+  new ClassDouble<MatTranConstantKineticsData>(ca, "Duration", this, &MatTranConstantKineticsData::duration);
+}
+
+//------------------------------------------------------------------------------
+
 MaterialTransitionData::MaterialTransitionData()
 {
   from_id = -1;
@@ -1181,6 +1197,8 @@ MaterialTransitionData::MaterialTransitionData()
   pressure_upperbound = DBL_MAX;
 
   latent_heat = 0.0;
+
+  kinetics = NONE;
 }
 
 //------------------------------------------------------------------------------
@@ -1188,7 +1206,7 @@ MaterialTransitionData::MaterialTransitionData()
 Assigner *MaterialTransitionData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 7, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
 
   new ClassInt<MaterialTransitionData>(ca, "FromMaterialID", this, 
           &MaterialTransitionData::from_id);
@@ -1210,6 +1228,13 @@ Assigner *MaterialTransitionData::getAssigner()
 
   new ClassDouble<MaterialTransitionData>(ca, "LatentHeat", this, 
           &MaterialTransitionData::latent_heat);
+
+  new ClassToken<MaterialTransitionData>(ca, "KineticsModel", this,
+          reinterpret_cast<int MaterialTransitionData::*>(&MaterialTransitionData::kinetics), 2,
+          "None", MaterialTransitionData::NONE, 
+          "Constant", MaterialTransitionData::CONSTANT);
+
+  constant_model.setup("ConstantKineticsModel", ca);
 
   return ca;
 

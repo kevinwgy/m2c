@@ -38,7 +38,6 @@ public:
   inline double GetInternalEnergyPerUnitMassFromEnthalpy([[maybe_unused]] double rho, [[maybe_unused]] double h) {return e0;}
   inline bool   CheckState([[maybe_unused]] double rho, [[maybe_unused]] double p, [[maybe_unused]] bool silence = false) {return false;}
   inline bool   CheckState([[maybe_unused]] double *V, [[maybe_unused]] bool silence = false) {return false;}
-  inline bool   CheckPhaseTransition([[maybe_unused]] int id/*id of the other phase*/) {return false;}
 
   //! Overwrite the calculations done in the base class
   inline void   ConservativeToPrimitive([[maybe_unused]] double *U, double *V) {

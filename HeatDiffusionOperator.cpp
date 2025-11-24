@@ -15,11 +15,12 @@ extern int INACTIVE_MATERIAL_ID;
 
 HeatDiffusionOperator::HeatDiffusionOperator(MPI_Comm &comm_, DataManagers3D &dm_all_, MeshData &iod_mesh_, 
                                              EquationsData &iod_eqs_, vector<VarFcnBase*>& varFcn_,
-                                             SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
-                                             InterpolatorBase &interpolator, GradientCalculatorBase &grad_)
+                                             SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_,
+                                             SpaceVariable3D &volume_, InterpolatorBase &interpolator_,
+                                             GradientCalculatorBase &grad_)
                      : iod_mesh(iod_mesh_), iod_eqs(iod_eqs_), coordinates(coordinates_), 
                        delta_xyz(delta_xyz_), volume(volume_),
-                       varFcn(varFcn_), interpolator(interpolator), grad(grad_),
+                       varFcn(varFcn_), interpolator(interpolator_), grad(grad_),
                        T(comm_, &(dm_all_.ghosted1_1dof)),
                        dTdx_i_minus_half(comm_, &(dm_all_.ghosted1_1dof)),
                        dTdy_j_minus_half(comm_, &(dm_all_.ghosted1_1dof)),

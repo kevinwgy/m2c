@@ -92,8 +92,6 @@ public:
     return CheckState(V[0], V[4], silence);
   }
 
-  inline bool CheckPhaseTransition([[maybe_unused]] int id/*id of the other phase*/) {return false;}
-
   //! Overwrite the calculations done in the base class
   inline void ConservativeToPrimitive([[maybe_unused]] double *U, [[maybe_unused]] double *V) {
     fprintf(stdout,"\033[0;31m*** Error: ConservativeToPrimitive undefined for"

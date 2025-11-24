@@ -150,11 +150,6 @@ public:
     return CheckState(V[0], V[4], silence); 
   }
  
-  //check for phase transitions
-  virtual bool CheckPhaseTransition([[maybe_unused]] int id/*id of the other phase*/) {
-    return false; //by default, phase transition is not allowed/considered
-  }
-
   //----- Transformation Operators -----//
   virtual void ConservativeToPrimitive(double *U, double *V); 
   virtual void PrimitiveToConservative(double *V, double *U);

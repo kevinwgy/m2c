@@ -587,6 +587,19 @@ struct MaterialModelData {
 
 //------------------------------------------------------------------------------
 
+struct MatTranConstantKineticsData {
+
+  double duration;
+
+  MatTranConstantKineticsData();
+  ~MatTranConstantKineticsData() {}
+
+  void setup(const char *, ClassAssigner * = 0);
+
+};
+
+//------------------------------------------------------------------------------
+
 struct MaterialTransitionData {
 
   int from_id, to_id;
@@ -597,6 +610,9 @@ struct MaterialTransitionData {
   double pressure_upperbound;
 
   double latent_heat;
+
+  enum KineticsModel {NONE = 0, CONSTANT = 1} kinetics;
+  MatTranConstantKineticsData constant_model;
 
   MaterialTransitionData();
   ~MaterialTransitionData() {}

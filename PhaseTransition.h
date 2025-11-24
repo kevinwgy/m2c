@@ -12,10 +12,7 @@
 
 /****************************************************************************
  * Classes defined in this file are responsible for determining whether 
- * phase/material transition should occur for a given state. It is NOT 
- * responsible for changing/updating the state variable when phase/material 
- * transition occurs. It is also not responsible for updating the level set 
- * function (phi). 
+ * phase/material transition should occur for a given state. 
  * One instantiation should be created for each pair of phases/materials 
  * (fromID, toID). References to their VarFcns are stored in this class.
  ***************************************************************************/
