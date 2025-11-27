@@ -4,6 +4,7 @@
  ************************************************************************/
 
 #include<MultiPhaseOperator.h>
+#include<PhaseTransitionConstRate.h>
 #include<SpaceOperator.h>
 #include<LevelSetOperator.h>
 #include<Vector5D.h>
@@ -46,6 +47,7 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
     // start with creating an empty vector for each material ID
     int numMaterials = varFcn.size();
     trans.resize(numMaterials);
+    trans_reverse.assign(numMaterials, -1);
 
     // fill in the user-specified transitions
     for(auto it = iod.eqs.transitions.dataMap.begin(); it != iod.eqs.transitions.dataMap.end(); it++) {
@@ -56,12 +58,17 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
                     i, j); 
         exit_mpi();
       }
-      if(true) //no other choices at the moment
+
+      if(it->second->kinetics == MaterialTransitionData::CONSTANT)
+        trans[i].push_back(new PhaseTransitionConstRate(*it->second, *varFcn[i], *varFcn[j]));
+      else
         trans[i].push_back(new PhaseTransitionBase(*it->second, *varFcn[i], *varFcn[j]));
-      else {
-        print_error("*** Error: Unknown phase transition type (%d).\n");
+
+      if(trans_reverse[j] != -1) {
+        print_error("*** Error: Cannot handle multiple materials converting to the same material.\n");
         exit_mpi();
       }
+      trans_reverse[j] = i;
     }
 
     // make sure the needed level set functions are available
@@ -1503,7 +1510,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 // nodes undergoing phase transitions. If it is non-zero, all the level set
 // functions should be reinitialized (done outside of MultiPhaseOperator)
 int 
-MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
+MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID, 
                                            SpaceVariable3D &V, vector<int> &phi_updated, 
                                            vector<Int3> *new_useful_nodes)
 {
@@ -1527,33 +1534,6 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
 
   set<int> affected_ids;
 
-  //DEBUG!!
-/*
-  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
-  for(int k=k0; k<kmax; k++)
-    for(int j=j0; j<jmax; j++)
-      for(int i=i0; i<imax; i++) {
-        if(coords[k][j][i].norm()<0.05) {
-          //v[k][j][i][0] = 8.9e-4;
-          //v[k][j][i][4] = 1.2e10;
-          int myid = id[k][j][i]; 
-          double p0 = v[k][j][i][4];
-          double e0 = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], p0);
-          double T0 = varFcn[myid]->GetTemperature(v[k][j][i][0], e0);
-          double T  = T0 + 0.4;
-          double e  = varFcn[myid]->GetInternalEnergyPerUnitMassFromTemperature(v[k][j][i][0], T);
-          double p  = varFcn[myid]->GetPressure(v[k][j][i][0], e);
-          v[k][j][i][4] = p;
-          if(coords[k][j][i].norm()<0.015)
-            fprintf(stdout,"Changing state at (%d,%d,%d) p: %e->%e, T: %e->%e, h: %e->%e\n", i,j,k, 
-                    p0, p, T0, T, e0 + p0/v[k][j][i][0], e + p/v[k][j][i][0]);
-        }
-      }
-  coordinates.RestoreDataPointerToLocalVector();
-  V.RestoreDataPointerAndInsert();
-  v = (Vec5D***) V.GetDataPointer();
-*/
-
   lam_transitioned_new = 0.0;
 
   int myid;
@@ -1566,6 +1546,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
           continue;
 
         myid = (int)id[k][j][i];
+        bool transition = false;
 
         for(auto it = trans[myid].begin(); it != trans[myid].end(); it++) {
 
@@ -1575,38 +1556,38 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
           double e0 = varFcn[myid]->GetInternalEnergyPerUnitMass(rho0, p0);
           double T0 = varFcn[myid]->GetTemperature(rho0, e0);
 
-          if((*it)->Transition(v[k][j][i], lam[k][j][i])) { //NOTE: v[k][j][i][4] (p) and lam may be modified even if the 
-                                                            //      return value is FALSE
+          double delta_lam = 0.0;
+
+          //NOTE: v[k][j][i][4] (p) and lam may be modified even if the return value is FALSE
+          if((*it)->Transition(v[k][j][i], lam[k][j][i], dt, &delta_lam)) {
+
             // detected phase transition
+            transition = true;
 
             //--------------------------------
-            if(coordinates.IsHere(i,j,k)) {
-              double pi = 2.0*acos(0.0);
-              double area = global_mesh.GetDx(i)*global_mesh.GetDy(j);
-              double r = global_mesh.GetY(j);
-              lam_transitioned_new += 2.0*pi*r*area*rho0*(*it)->latent_heat;
-            }
+            if(coordinates.IsHere(i,j,k))
+              lam_transitioned_new += global_mesh.GetCellVolume(i,j,k,true)*rho0*delta_lam;
             //--------------------------------
             
             // register the node
-            changed.push_back(std::make_tuple(Int3(i,j,k), myid, (*it)->toID));
+            changed.push_back(std::make_tuple(Int3(i,j,k), myid, (*it)->ToID()));
 
             // register the involved material ids
             affected_ids.insert(myid);
-            affected_ids.insert((*it)->toID);
+            affected_ids.insert((*it)->ToID());
 
             // update id
-            id[k][j][i] = (*it)->toID;
+            id[k][j][i] = (*it)->ToID();
 
             // ------------------------------------------------------------------------
             // print to screen (for debug only)
             double rho1 = v[k][j][i][0];
             double p1 = v[k][j][i][4];
-            double e1 = varFcn[(*it)->toID]->GetInternalEnergyPerUnitMass(rho1, p1);
-            double T1 = varFcn[(*it)->toID]->GetTemperature(rho1, e1);
+            double e1 = varFcn[(*it)->ToID()]->GetInternalEnergyPerUnitMass(rho1, p1);
+            double T1 = varFcn[(*it)->ToID()]->GetTemperature(rho1, e1);
             fprintf(stdout,"  + Detected phase transition at (%d,%d,%d)(%d->%d). "
                     "rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
-                    i,j,k, myid, (*it)->toID, rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
+                    i,j,k, myid, (*it)->ToID(), rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
             // ------------------------------------------------------------------------
 
 
@@ -1636,6 +1617,20 @@ MultiPhaseOperator::UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceV
             counter++;
             break;
           }
+        }
+
+        if(!transition && trans_reverse[myid]>=0 && lam[k][j][i]>0.0) { //need to convert latent heat
+          //note: if transition == true, it has been taken care of in the above section
+          int orig_id = trans_reverse[myid];
+          double delta_lam = 0.0;
+          for(auto it = trans[orig_id].begin(); it != trans[orig_id].end(); it++) {
+            if((*it)->ToID() == myid) {
+              (*it)->DepositDeltaLambdaAfterTransition(v[k][j][i], lam[k][j][i], dt, &delta_lam);
+               break; //should only have one trans from orig_id to myid...
+            }
+          }
+          if(coordinates.IsHere(i,j,k))
+            lam_transitioned_new += global_mesh.GetCellVolume(i,j,k,true)*v[k][j][i][0]*delta_lam;
         }
       }
 
@@ -2042,11 +2037,12 @@ MultiPhaseOperator::UpdateLevelSetsInUnresolvedCells(vector<SpaceVariable3D*> &P
 //-------------------------------------------------------------------------
 
 void
-MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, 
-                                                            SpaceVariable3D &V)
+MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(double dt,
+                                                                  SpaceVariable3D &IDn, SpaceVariable3D &ID, 
+                                                                  SpaceVariable3D &V)
 {
 
-  if(trans.size()==0 || iod.multiphase.latent_heat_transfer!=MultiPhaseData::On)
+  if(trans.size()==0)
     return; //nothing to do
 
   double*** idn = IDn.GetDataPointer();
@@ -2077,21 +2073,18 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3
           if((*it)->ToID() != myid)
             continue;
 
+          if(iod.multiphase.latent_heat_transfer!=MultiPhaseData::On) {//should reset lam to 0
+            lam[k][j][i] = 0.0;
+            continue;
+          }
+
           //---------------------------------------------------------------------
-          // Now, do the actual work: Add lam to internal energy (originally added to enthalpy, see Xuning JCP)
+          // Now, do the actual work: Add delta lam to internal energy
+          double delta_lam = 0.0;
+          (*it)->DepositDeltaLambdaAfterTransition(v[k][j][i], lam[k][j][i], dt, &delta_lam);
+
           double rho = v[k][j][i][0];
-          double e   = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-
-          double pi = 2.0*acos(0.0);
-          double area = global_mesh.GetDx(i)*global_mesh.GetDy(j);
-          double r = global_mesh.GetY(j);
-          lam_dumped_new += 2.0*pi*r*area*rho*lam[k][j][i];
-
-          e += lam[k][j][i]; //Corrected --> add to energy not enthalpy (see Xuning JFM)
-          lam[k][j][i] = 0.0;
-          // update p to account for the increase of enthalpy (rho is fixed)
-          v[k][j][i][4] = varFcn[myid]->GetPressure(rho, e);
-
+          lam_dumped_new += global_mesh.GetCellVolume(i,j,k,true)*rho*delta_lam;
           counter++;
           //---------------------------------------------------------------------
           
@@ -2373,3 +2366,4 @@ MultiPhaseOperator::IsOrphanAcrossEmbeddedSurfaces(int i, int j, int k, double**
 
 //-----------------------------------------------------
 
+//-----------------------------------------------------

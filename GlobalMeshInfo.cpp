@@ -10,12 +10,15 @@
 
 //------------------------------------------------------------------
 
-GlobalMeshInfo::GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_,
+GlobalMeshInfo::GlobalMeshInfo(MeshData::Type &type_, std::vector<double> &x_glob_, std::vector<double> &y_glob_,
                                std::vector<double> &z_glob_, std::vector<double> &dx_glob_,
                                std::vector<double> &dy_glob_, std::vector<double> &dz_glob_,
                                bool is_staggered)
               : staggered_grid(is_staggered)
 {
+  pi = 2.0*acos(0.0);
+  domain_symmetry = type_;
+
   x_glob = x_glob_;   y_glob = y_glob_;   z_glob = z_glob_;
   dx_glob = dx_glob_; dy_glob = dy_glob_; dz_glob = dz_glob_;
   assert(x_glob.size() == dx_glob.size());
@@ -716,6 +719,25 @@ GlobalMeshInfo::GetSubdomainBox(int sub, int layer, double dist, Vec3D& xyz_min,
 
 //------------------------------------------------------------------
 
+double
+GlobalMeshInfo::GetCellVolume(int i, int j, int k, bool account_for_symmetry)
+{
+  if(!account_for_symmetry)
+    return GetDx(i)*GetDy(j)*GetDz(k);
+
+  if(domain_symmetry == MeshData::SPHERICAL) {
+    double r = GetX(i);
+    return 4.0*pi*r*r*GetDx(i);
+  }
+
+  if(domain_symmetry == MeshData::CYLINDRICAL) {
+    double r    = GetY(j);
+    return 2.0*pi*r*GetDx(i)*GetDy(j);
+  }
+
+  //domain_symmetry == MeshData::THREEDIMENSIONAL
+  return GetDx(i)*GetDy(j)*GetDz(k);
+}
 
 //------------------------------------------------------------------
 

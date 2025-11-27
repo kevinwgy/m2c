@@ -1701,7 +1701,7 @@ MultiPhaseData::MultiPhaseData()
 
   riemann_normal = MESH;
 
-  latent_heat_transfer = Off;
+  latent_heat_transfer = On;
 
   levelset_correction_frequency = -1;
 

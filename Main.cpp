@@ -209,7 +209,7 @@ int main(int argc, char* argv[])
                          pow(iod.mesh.zmax - iod.mesh.z0, 2));
   
   //! Setup global mesh info
-  GlobalMeshInfo global_mesh(xcoords, ycoords, zcoords, dx, dy, dz, incompressible);
+  GlobalMeshInfo global_mesh(iod.mesh.type, xcoords, ycoords, zcoords, dx, dy, dz, incompressible);
 
   //! Initialize PETSc
   PETSC_COMM_WORLD = comm;

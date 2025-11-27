@@ -9,6 +9,7 @@
 #include<vector>
 #include<cassert>
 #include<Vector3D.h>
+#include<IoData.h>
 #include<mpi.h>
 
 class DataManagers3D;
@@ -43,6 +44,10 @@ private:
 
   bool staggered_grid; //!< true for incompressible flow solver (if true, global_mesh is the one for rho, p, etc.)
 
+  MeshData::Type domain_symmetry;
+
+  double pi;
+
 public:
 
   std::vector<double> x_glob, y_glob, z_glob;
@@ -68,7 +73,8 @@ public:
 public:
 
   GlobalMeshInfo() : staggered_grid(false) {} //needed by M2CTwinMessenger (and maybe others)
-  GlobalMeshInfo(std::vector<double> &x_glob_, std::vector<double> &y_glob_, std::vector<double> &z_glob_,
+  GlobalMeshInfo(MeshData::Type &type_, std::vector<double> &x_glob_, std::vector<double> &y_glob_,
+                 std::vector<double> &z_glob_,
                  std::vector<double> &dx_glob_, std::vector<double> &dy_glob_, std::vector<double> &dz_glob_,
                  bool is_staggered = false);
 
@@ -176,6 +182,9 @@ public:
 
   //! Get subdomain box with offset (+/- layer and/or +/- dist) 
   void GetSubdomainBox(int sub, int layer, double dist, Vec3D& xyz_min, Vec3D& xyz_max);
+
+  //! Compute volume of a cell, accounting for domain symmetry
+  double GetCellVolume(int i, int j, int k, bool account_for_symmetry = false);
 
 };
 

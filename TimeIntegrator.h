@@ -93,8 +93,8 @@ public:
   void UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVariable3D &ID,
                                        vector<SpaceVariable3D*> &Phi,
                                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
-                                       SpaceVariable3D *L,
-                                       double time, int time_step, int subcycle, double dts);
+                                       SpaceVariable3D *L, double time, double dt, int time_step,
+                                       int subcycle, double dts);
                                         
   //! Functions pertaining to steady-state computation
   bool Converged() {return sso ? sso->Converged() : false;} //only for steady-state simulations

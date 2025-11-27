@@ -189,9 +189,6 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   unique_ptr<vector<unique_ptr<EmbeddedBoundaryDataSet> > > EBDS 
     = embed ? embed->GetPointerToEmbeddedBoundaryData() : nullptr;
 
-   //de_file << std::setw(8) << std::scientific << time << "    " << std::setw(8) << std::scientific << dt  << "       "  << std::setw(8);
-   //residual_file << std::setw(8) << std::scientific << time << "    " << std::setw(8) << std::scientific << dt  << "       "  << std::setw(8);
-
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
@@ -249,7 +246,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // -------------------------------------------------------------------------------
   // End-of-step tasks
   // -------------------------------------------------------------------------------
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, dt, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -454,7 +451,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, dt, time_step, subcycle, dts);
 }
 
 
@@ -714,7 +711,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
 
   // End-of-step tasks
-  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, time_step, subcycle, dts);
+  UpdateSolutionAfterTimeStepping(V, ID, Phi, EBDS.get(), L, time, dt, time_step, subcycle, dts);
 }
 
 //----------------------------------------------------------------------------
@@ -724,7 +721,8 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
                                                     vector<SpaceVariable3D*> &Phi,
                                                     vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS,
                                                     SpaceVariable3D *L,
-                                                    double time, int time_step, int subcycle, double dts)
+                                                    double time, double dt, int time_step,
+                                                    int subcycle, double dts)
 {
   // Assumes Phi_tmp carries the previous values of Phi (before time-stepping)
    
@@ -761,6 +759,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
       ls_correction_bucket = 0; //empty bucket
       for(int i=0; i<(int)Phi.size(); i++) 
         lso[i]->Reinitialize(time, dts, time_step, *Phi[i], 0/*no-special-maxIts*/, true/*"must_do"*/);
+        //Note: pass in dts (instead of dt) -- reinitialization frequency should be determined based on dts
     } else {
       if(subcycle==0) { //frequency specified by user
         for(int i=0; i<(int)Phi.size(); i++) 
@@ -798,7 +797,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
     }
 
     // add stored latent heat (Lambda) to cells that changed phase due to interface motion
-    mpo.AddLambdaToInternalEnergyAfterInterfaceMotion(IDn, ID, V);
+    mpo.AddLambdaToInternalEnergyAfterInterfaceMotion(dt, IDn, ID, V);
 
     spo.ClipDensityAndPressure(V, ID);
     spo.ApplyBoundaryConditions(V);
@@ -810,7 +809,7 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
   if(lso.size()) {
     vector<int> phi_updated(lso.size(), 0); //0 or 1
     vector<Int3> new_useful_nodes[lso.size()];
-    if(mpo.UpdatePhaseTransitions(Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
+    if(mpo.UpdatePhaseTransitions(dt, Phi, ID, V, phi_updated, new_useful_nodes)>0) {//detected phase transitions
       for(int i=0; i<(int)Phi.size(); i++) {
         if(phi_updated[i] != 0)
           lso[i]->ReinitializeAfterPhaseTransition(*Phi[i], new_useful_nodes[i]);

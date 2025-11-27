@@ -6,7 +6,7 @@
 #ifndef _MULTIPHASE_OPERATOR_H_
 #define _MULTIPHASE_OPERATOR_H_
 #include<SpaceVariable.h>
-#include<PhaseTransition.h>
+#include<PhaseTransitionBase.h>
 #include<GhostPoint.h>
 #include<GlobalMeshInfo.h>
 #include<tuple>
@@ -54,6 +54,7 @@ class MultiPhaseOperator
 
   //! phase transition 
   vector<vector<PhaseTransitionBase*> > trans;  //!< trans[i] contains all possible destinations of phase i
+  vector<int> trans_reverse; //!< trans_reverse[i] contains the origin MatID (cannot have >1 origins for now!)
   double lam_transitioned, lam_dumped; //!< output only (can be improved to distinguish different transitions)
   double lam_transitioned_new, lam_dumped_new;
 
@@ -88,11 +89,12 @@ public:
                          bool apply_failsafe_density); 
 
   //! detect phase transitions and update Phi, ID, and V
-  int UpdatePhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,
+  int UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,
                              SpaceVariable3D &V, vector<int> &phi_updated, vector<Int3> *new_useful_nodes);
 
-  //! add stored latent heat (Lambda) to cells that changed phase due to interface motion
-  void AddLambdaToInternalEnergyAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V);
+  //! add latent heat (delta lambda) to cells that changed phase due to interface motion
+  void AddLambdaToInternalEnergyAfterInterfaceMotion(double dt, SpaceVariable3D &IDn, SpaceVariable3D &ID,
+                                                     SpaceVariable3D &V);
 
   //! if the boundaries of multiple material subdomains meet, ensure that the phi's are consistent
   int ResolveConflictsInLevelSets(int time_step, vector<SpaceVariable3D*> &Phi);
