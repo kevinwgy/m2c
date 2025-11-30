@@ -731,11 +731,11 @@ GlobalMeshInfo::GetCellVolume(int i, int j, int k, bool account_for_symmetry)
   }
 
   if(domain_symmetry == MeshData::CYLINDRICAL) {
-    double r    = GetY(j);
+    double r = GetY(j);
     return 2.0*pi*r*GetDx(i)*GetDy(j);
   }
 
-  //domain_symmetry == MeshData::THREEDIMENSIONAL
+  //Now, domain_symmetry == MeshData::THREEDIMENSIONAL
   return GetDx(i)*GetDy(j)*GetDz(k);
 }
 

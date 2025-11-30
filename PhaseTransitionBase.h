@@ -73,9 +73,11 @@ public:
   }
      
   //-----------------------------------------------------------------------------
-  // This function transfers energy between e and lambda, and checks for phase
-  // transition. If detected, it transfers lambda (possibly part of it) to e based
-  // on the kinetics method and time period dt.
+  // Handles energy exchange between e and lambda, and checks for a phase
+  // transition. If a transition is detected, computes the amount of lambda
+  // converted to e (delta_lam) based on the kinetics model and timestep dt.
+  // When no transition occurs, delta_lam (if provided) is set to zero.
+  // Returns true if a phase transition is detected; false otherwise.
   //-----------------------------------------------------------------------------
   virtual bool Transition(double *v, double &lambda, double dt, double *delta_lam = NULL);
 
@@ -90,6 +92,9 @@ PhaseTransitionBase::Transition(double *v, double &lambda, double dt, double *de
   // check temperature
   double e = vf1.GetInternalEnergyPerUnitMass(v[0], v[4]);
   double T = vf1.GetTemperature(v[0], e);
+
+  if(delta_lam)
+    *delta_lam = 0.0; //reset
 
   if(T<=Tmax) { //no phase transition, but if lambda (latent heat reservoir) is non-zero, should pour it 
                 //back to raise temperature

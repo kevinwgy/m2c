@@ -59,13 +59,17 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
         exit_mpi();
       }
 
-      if(it->second->kinetics == MaterialTransitionData::CONSTANT)
+      if(it->second->kinetics == MaterialTransitionData::CONSTANT) {
         trans[i].push_back(new PhaseTransitionConstRate(*it->second, *varFcn[i], *varFcn[j]));
-      else
+//        print("ooo creating constant trans[%d].\n", i);
+      }
+      else {
         trans[i].push_back(new PhaseTransitionBase(*it->second, *varFcn[i], *varFcn[j]));
+//        print("ooo creating none trans[%d].\n", i);
+      }
 
       if(trans_reverse[j] != -1) {
-        print_error("*** Error: Cannot handle multiple materials converting to the same material.\n");
+        print_error("*** Error: Cannot handle multiple materials transferring to the same material.\n");
         exit_mpi();
       }
       trans_reverse[j] = i;
@@ -105,8 +109,18 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
       }
     }
 
-  } else
+  } else {
     trans.resize(0);
+    trans_reverse.resize(0);
+  }
+
+
+  //double check --- print an error if a phase has two possible destinations (not supported at present)
+  for(auto&& tran : trans)
+    if(tran.size()>1) {
+      print_error("*** Error: Cannot handle one phase transferring to multiple other phases at this moment.\n");
+      exit_mpi();
+    }
 
   //Debug only
   lam_transitioned = lam_transitioned_new = 0.0;
@@ -1529,7 +1543,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &
   Vec5D***  v   = (Vec5D***) V.GetDataPointer();
   double*** lam = Lambda.GetDataPointer();
 
-  int counter = 0;
+  int counter[2] = {0,0}; //[0]: new phase transition; [1]: previous ones still undergoing energy transfer
   vector<tuple<Int3,int,int> >  changed; //(i,j,k), old id, new id -- incl. ghosts inside physical domain
 
   set<int> affected_ids;
@@ -1586,12 +1600,13 @@ MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &
             double e1 = varFcn[(*it)->ToID()]->GetInternalEnergyPerUnitMass(rho1, p1);
             double T1 = varFcn[(*it)->ToID()]->GetTemperature(rho1, e1);
             fprintf(stdout,"  + Detected phase transition at (%d,%d,%d)(%d->%d). "
-                    "rho: %e->%e, p: %e->%e, T: %e->%e, h: %e->%e.\n", 
-                    i,j,k, myid, (*it)->ToID(), rho0, rho1, p0, p1, T0, T1, e0+p0/rho0, e1+p1/rho1);
+                    "delta lam: %e, rho: %e->%e, p: %e->%e, T: %e->%e, e: %e->%e.\n", 
+                    i,j,k, myid, (*it)->ToID(), delta_lam, rho0, rho1, p0, p1, T0, T1, e0, e1);
             // ------------------------------------------------------------------------
 
 
-            // if node is next to a symmetry or wall boundary, update the ID of the ghost node (V will be updated by spo)
+            // if node is next to a symmetry or wall boundary, update the ID of the ghost node
+            // (V will be updated by spo)
             if(i==0 && (iod.mesh.bc_x0==MeshData::SLIPWALL || iod.mesh.bc_x0==MeshData::STICKWALL ||
                         iod.mesh.bc_x0==MeshData::SYMMETRY))  
               id[k][j][i-1] = id[k][j][i];
@@ -1614,19 +1629,19 @@ MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &
               id[k+1][j][i] = id[k][j][i];
          
 
-            counter++;
+            counter[0]++;
             break;
           }
         }
 
+        //note: if transition == true, it has been taken care of in the above section
         if(!transition && trans_reverse[myid]>=0 && lam[k][j][i]>0.0) { //need to convert latent heat
-          //note: if transition == true, it has been taken care of in the above section
           int orig_id = trans_reverse[myid];
           double delta_lam = 0.0;
           for(auto it = trans[orig_id].begin(); it != trans[orig_id].end(); it++) {
             if((*it)->ToID() == myid) {
-              (*it)->DepositDeltaLambdaAfterTransition(v[k][j][i], lam[k][j][i], dt, &delta_lam);
-               break; //should only have one trans from orig_id to myid...
+              (*it)->DepositDeltaLambdaAfterTransition(v[k][j][i], lam[k][j][i], dt, &delta_lam); 
+              counter[1]++;
             }
           }
           if(coordinates.IsHere(i,j,k))
@@ -1634,21 +1649,26 @@ MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &
         }
       }
 
-  MPI_Allreduce(MPI_IN_PLACE, &counter, 1, MPI_INT, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &counter, 2, MPI_INT, MPI_SUM, comm);
 
-  if(counter>0) {
+  if(counter[0]>0 || counter[1]>0) {
     MPI_Allreduce(MPI_IN_PLACE, &lam_transitioned_new, 1, MPI_DOUBLE, MPI_SUM, comm);
     lam_transitioned += lam_transitioned_new;
   }
 
   Lambda.RestoreDataPointerAndInsert();
 
-  if(counter>0) {
-    ID.RestoreDataPointerAndInsert();
+  // restore V and ID
+  if(counter[0]>0) {
     V.RestoreDataPointerAndInsert();
-  } else {
+    ID.RestoreDataPointerAndInsert();
+  } else if(counter[1]>0) {
+    V.RestoreDataPointerAndInsert();
     ID.RestoreDataPointerToLocalVector();
+    return counter[1]; //no new phase transitions, no need to worry about phi
+  } else {
     V.RestoreDataPointerToLocalVector();
+    ID.RestoreDataPointerToLocalVector();
     return 0;
   }
 
@@ -1668,10 +1688,13 @@ MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &
   UpdatePhiAfterPhaseTransitions(Phi, ID, changed, phi_updated, new_useful_nodes);
 
 
-  if(verbose>=1)
-    print("- Detected phase/material transitions at %d node(s).\n", counter);
+  if(verbose==1)
+    print("- Detected phase/material transitions at %d new node(s).\n", counter[0]);
+  else if(verbose==2)
+    print("- Detected phase/material transitions at %d new node(s), %d previous ones undergoing energy transfer.\n",
+          counter[1]);
 
-  return counter;
+  return counter[0]+counter[1];
 
 }
 
@@ -2075,7 +2098,7 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(double dt,
 
           if(iod.multiphase.latent_heat_transfer!=MultiPhaseData::On) {//should reset lam to 0
             lam[k][j][i] = 0.0;
-            continue;
+            break;
           }
 
           //---------------------------------------------------------------------
