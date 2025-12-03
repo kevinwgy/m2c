@@ -97,7 +97,7 @@ under Equations {
       SpecificHeatAtConstantVolume = 1.2e+9;
 
       DensityCutOff  = 1.0e-13;
-      PressureCutOff = 1.0e-13;
+      PressureCutOff = 1.0e-13;  //KW(12/2025): Try to avoid this cutoff or make it negative
     }
 
     under HeatDiffusionModel {

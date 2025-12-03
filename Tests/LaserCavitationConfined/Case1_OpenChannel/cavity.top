@@ -1,0 +1,8 @@
+Nodes ProbeNodes
+1 -10.0   0.75     -0.00125
+2 -10.0   0.75      0.00125
+3   2.0   0.75     -0.00125
+4   2.0   0.75      0.00125
+Elements Probe using ProbeNodes
+1  4  1  2  3
+2  4  2  3  4

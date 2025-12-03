@@ -1,0 +1,323 @@
+
+[0;36m                                      _..._      [0m
+[0;36m                      .-''-.       .-'_..._''.   [0m
+[0;36m   __  __   ___     .' .-.  )    .' .'      '.\  [0m
+[0;36m  |  |/  `.'   `.  / .'  / /    / .'             [0m
+[0;36m  |   .-.  .-.   '(_/   / /    . '               [0m
+[0;36m  |  |  |  |  |  |     / /     | |               [0m
+[0;36m  |  |  |  |  |  |    / /      | |               [0m
+[0;36m  |  |  |  |  |  |   . '       . '               [0m
+[0;36m  |  |  |  |  |  |  / /    _.-')\ '.          .  [0m
+[0;36m  |__|  |__|  |__|.' '  _.'.-''  '. `._____.-'/  [0m
+[0;36m                 /  /.-'_.'        `-.______ /   [0m
+[0;36m                /    _.'                    `    [0m
+[0;36m               ( _.-'                            [0m
+
+Revision: ab06ad9 | Branch: main | Tag: 
+Computation started at: 2025-12-02.10:22:18 EDT
+Using 96 processor cores (including concurrent programs).
+Command: /home/kevinw3/owl/zoey7/m2c input.st
+
+[0;32m==========================================[0m
+[0;32m                 START                    [0m
+[0;32m==========================================[0m
+
+- Activated the Embedded Boundary Method. Detected 2 surface(s) (0 from concurrent program(s)).
+
+
+- Mesh Statistics:
+  X-Direction: [-4.000000e+00, 4.000000e+00], 938 nodes/cells, dx_min = 3.001383e-03, dx_max = 5.943110e-02.
+  Y-Direction: [0.000000e+00, 2.000000e+00], 281 nodes/cells, dy_min = 3.008971e-03, dy_max = 2.980233e-02.
+  Z-Direction: [-1.000000e-03, 1.000000e-03], 1 nodes/cells, dz_min = 2.000000e-03, dz_max = 2.000000e-03.
+  Total number of nodes/cells: 263578.
+  Imposing cylindrical symmetry: x ~ axial coordinate, y ~ radial coordinate.
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 31250
+  o Number of ghost nodes outside computational domain: 597222
+
+
+- Initializing the state variables (V) and material id. (ID).
+
+- Initializing Phi[0] for tracking the boundary of material 1.
+- Initializing the laser radiation solver on a re-partitioned sub-mesh.
+- Laser radiation solver activated. Focusing angle: -7.535000 degrees; Source radius: 0.182500; Range: 1.950000
+- Laser domain (cell centers): X:[-7.111442e-03, 1.984298e+00], Y:[1.504485e-03, 4.579176e-01], Z:[0.000000e+00, 0.000000e+00].
+  o Number of ghost nodes inside computational domain (overlapping between subdomains): 14336
+  o Number of ghost nodes outside computational domain: 190288
+
+- Loaded user-specified laser power file laser_power.txt, final time: 2.000017e-04.
+- Creating a customized communicator for the laser radiation solver.
+
+----------------------------
+--       Main Loop        --
+----------------------------
+- Wrote solution at 0.000000e+00 to solution_0000.vtr.
+Step 1: t = 0.000000e+00, dt = 8.107097e-10, cfl = 4.0000e-01. Computation time: 1.4228e+00 s.
+Step 2: t = 8.107097e-10, dt = 8.106998e-10, cfl = 4.0000e-01. Computation time: 1.4639e+00 s.
+Step 3: t = 1.621409e-09, dt = 8.106896e-10, cfl = 4.0000e-01. Computation time: 1.5048e+00 s.
+Step 4: t = 2.432099e-09, dt = 8.106790e-10, cfl = 4.0000e-01. Computation time: 1.5460e+00 s.
+Step 5: t = 3.242778e-09, dt = 8.106683e-10, cfl = 4.0000e-01. Computation time: 1.5879e+00 s.
+Step 6: t = 4.053446e-09, dt = 8.106576e-10, cfl = 4.0000e-01. Computation time: 1.6306e+00 s.
+Step 7: t = 4.864104e-09, dt = 8.106465e-10, cfl = 4.0000e-01. Computation time: 1.6734e+00 s.
+Step 8: t = 5.674750e-09, dt = 8.106348e-10, cfl = 4.0000e-01. Computation time: 1.7160e+00 s.
+Step 9: t = 6.485385e-09, dt = 8.106230e-10, cfl = 4.0000e-01. Computation time: 1.7591e+00 s.
+Step 10: t = 7.296008e-09, dt = 8.106113e-10, cfl = 4.0000e-01. Computation time: 1.8025e+00 s.
+Step 11: t = 8.106620e-09, dt = 8.105997e-10, cfl = 4.0000e-01. Computation time: 1.8463e+00 s.
+Step 12: t = 8.917219e-09, dt = 8.105881e-10, cfl = 4.0000e-01. Computation time: 1.8901e+00 s.
+Step 13: t = 9.727807e-09, dt = 8.105766e-10, cfl = 4.0000e-01. Computation time: 1.9343e+00 s.
+Step 14: t = 1.053838e-08, dt = 8.105652e-10, cfl = 4.0000e-01. Computation time: 1.9784e+00 s.
+Step 15: t = 1.134895e-08, dt = 8.105539e-10, cfl = 4.0000e-01. Computation time: 2.0229e+00 s.
+Step 16: t = 1.215950e-08, dt = 8.105426e-10, cfl = 4.0000e-01. Computation time: 2.0672e+00 s.
+Step 17: t = 1.297005e-08, dt = 8.105313e-10, cfl = 4.0000e-01. Computation time: 2.1118e+00 s.
+Step 18: t = 1.378058e-08, dt = 8.105201e-10, cfl = 4.0000e-01. Computation time: 2.1565e+00 s.
+Step 19: t = 1.459110e-08, dt = 8.105090e-10, cfl = 4.0000e-01. Computation time: 2.2012e+00 s.
+Step 20: t = 1.540161e-08, dt = 8.104978e-10, cfl = 4.0000e-01. Computation time: 2.2459e+00 s.
+Step 21: t = 1.621210e-08, dt = 8.104865e-10, cfl = 4.0000e-01. Computation time: 2.2911e+00 s.
+Step 22: t = 1.702259e-08, dt = 8.104753e-10, cfl = 4.0000e-01. Computation time: 2.3359e+00 s.
+Step 23: t = 1.783307e-08, dt = 8.104642e-10, cfl = 4.0000e-01. Computation time: 2.3811e+00 s.
+Step 24: t = 1.864353e-08, dt = 8.104532e-10, cfl = 4.0000e-01. Computation time: 2.4261e+00 s.
+Step 25: t = 1.945398e-08, dt = 8.104422e-10, cfl = 4.0000e-01. Computation time: 2.4716e+00 s.
+Step 26: t = 2.026443e-08, dt = 8.104314e-10, cfl = 4.0000e-01. Computation time: 2.5170e+00 s.
+Step 27: t = 2.107486e-08, dt = 8.104206e-10, cfl = 4.0000e-01. Computation time: 2.5626e+00 s.
+Step 28: t = 2.188528e-08, dt = 8.104099e-10, cfl = 4.0000e-01. Computation time: 2.6081e+00 s.
+Step 29: t = 2.269569e-08, dt = 8.103994e-10, cfl = 4.0000e-01. Computation time: 2.6539e+00 s.
+Step 30: t = 2.350609e-08, dt = 8.103889e-10, cfl = 4.0000e-01. Computation time: 2.6996e+00 s.
+Step 31: t = 2.431648e-08, dt = 8.103785e-10, cfl = 4.0000e-01. Computation time: 2.7456e+00 s.
+Step 32: t = 2.512685e-08, dt = 8.103682e-10, cfl = 4.0000e-01. Computation time: 2.7937e+00 s.
+
+
+...
+
+
+Step 24552: t = 1.813311e-05, dt = 7.175317e-10, cfl = 4.0000e-01. Computation time: 1.5424e+03 s.
+Step 24553: t = 1.813382e-05, dt = 7.175317e-10, cfl = 4.0000e-01. Computation time: 1.5425e+03 s.
+Step 24554: t = 1.813454e-05, dt = 7.175317e-10, cfl = 4.0000e-01. Computation time: 1.5425e+03 s.
+Step 24555: t = 1.813526e-05, dt = 7.175318e-10, cfl = 4.0000e-01. Computation time: 1.5426e+03 s.
+Step 24556: t = 1.813598e-05, dt = 7.175318e-10, cfl = 4.0000e-01. Computation time: 1.5427e+03 s.
+Step 24557: t = 1.813669e-05, dt = 7.175318e-10, cfl = 4.0000e-01. Computation time: 1.5427e+03 s.
+Step 24558: t = 1.813741e-05, dt = 7.175319e-10, cfl = 4.0000e-01. Computation time: 1.5428e+03 s.
+Step 24559: t = 1.813813e-05, dt = 7.175319e-10, cfl = 4.0000e-01. Computation time: 1.5428e+03 s.
+Step 24560: t = 1.813885e-05, dt = 7.175319e-10, cfl = 4.0000e-01. Computation time: 1.5429e+03 s.
+Step 24561: t = 1.813956e-05, dt = 7.175320e-10, cfl = 4.0000e-01. Computation time: 1.5430e+03 s.
+Step 24562: t = 1.814028e-05, dt = 7.175320e-10, cfl = 4.0000e-01. Computation time: 1.5430e+03 s.
+Step 24563: t = 1.814100e-05, dt = 7.175320e-10, cfl = 4.0000e-01. Computation time: 1.5431e+03 s.
+Step 24564: t = 1.814172e-05, dt = 7.175321e-10, cfl = 4.0000e-01. Computation time: 1.5431e+03 s.
+Step 24565: t = 1.814243e-05, dt = 7.175321e-10, cfl = 4.0000e-01. Computation time: 1.5432e+03 s.
+Step 24566: t = 1.814315e-05, dt = 7.175322e-10, cfl = 4.0000e-01. Computation time: 1.5433e+03 s.
+Step 24567: t = 1.814387e-05, dt = 7.175322e-10, cfl = 4.0000e-01. Computation time: 1.5433e+03 s.
+Step 24568: t = 1.814459e-05, dt = 7.175322e-10, cfl = 4.0000e-01. Computation time: 1.5434e+03 s.
+Step 24569: t = 1.814530e-05, dt = 7.175323e-10, cfl = 4.0000e-01. Computation time: 1.5434e+03 s.
+Step 24570: t = 1.814602e-05, dt = 7.175323e-10, cfl = 4.0000e-01. Computation time: 1.5435e+03 s.
+Step 24571: t = 1.814674e-05, dt = 7.175323e-10, cfl = 4.0000e-01. Computation time: 1.5436e+03 s.
+Step 24572: t = 1.814746e-05, dt = 7.175324e-10, cfl = 4.0000e-01. Computation time: 1.5436e+03 s.
+Step 24573: t = 1.814817e-05, dt = 7.175324e-10, cfl = 4.0000e-01. Computation time: 1.5437e+03 s.
+Step 24574: t = 1.814889e-05, dt = 7.175325e-10, cfl = 4.0000e-01. Computation time: 1.5437e+03 s.
+Step 24575: t = 1.814961e-05, dt = 7.175325e-10, cfl = 4.0000e-01. Computation time: 1.5438e+03 s.
+Step 24576: t = 1.815033e-05, dt = 7.175325e-10, cfl = 4.0000e-01. Computation time: 1.5439e+03 s.
+Step 24577: t = 1.815104e-05, dt = 7.175326e-10, cfl = 4.0000e-01. Computation time: 1.5439e+03 s.
+Step 24578: t = 1.815176e-05, dt = 7.175326e-10, cfl = 4.0000e-01. Computation time: 1.5440e+03 s.
+Step 24579: t = 1.815248e-05, dt = 7.175326e-10, cfl = 4.0000e-01. Computation time: 1.5440e+03 s.
+Step 24580: t = 1.815320e-05, dt = 7.175327e-10, cfl = 4.0000e-01. Computation time: 1.5441e+03 s.
+Step 24581: t = 1.815391e-05, dt = 7.175327e-10, cfl = 4.0000e-01. Computation time: 1.5442e+03 s.
+Step 24582: t = 1.815463e-05, dt = 7.175328e-10, cfl = 4.0000e-01. Computation time: 1.5442e+03 s.
+Step 24583: t = 1.815535e-05, dt = 7.175328e-10, cfl = 4.0000e-01. Computation time: 1.5443e+03 s.
+Step 24584: t = 1.815607e-05, dt = 7.175328e-10, cfl = 4.0000e-01. Computation time: 1.5443e+03 s.
+  + Detected phase transition at (296,0,0)(0->1). delta lam: 8.095206e+09, rho: 7.836954e-04->7.836954e-04, p: 2.364290e+05->-3.419549e+08, T: 3.731969e+02->-1.111968e+03, e: 6.527043e+11->6.606378e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24585: t = 1.815678e-05, dt = 7.175329e-10, cfl = 4.0000e-01. Computation time: 1.5444e+03 s.
+Step 24586: t = 1.815750e-05, dt = 7.175329e-10, cfl = 4.0000e-01. Computation time: 1.5445e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (296,1,0)(0->1). delta lam: 8.095206e+09, rho: 7.838336e-04->7.838336e-04, p: 6.463976e+05->-3.420766e+08, T: 3.732746e+02->-1.112168e+03, e: 6.527324e+11->6.603980e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24587: t = 1.815822e-05, dt = 7.174345e-10, cfl = 4.0000e-01. Computation time: 1.5446e+03 s.
+Step 24588: t = 1.815894e-05, dt = 7.170804e-10, cfl = 4.0000e-01. Computation time: 1.5446e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (295,0,0)(0->1). delta lam: 8.090101e+09, rho: 7.847443e-04->7.847443e-04, p: 2.528328e+06->-3.428804e+08, T: 3.734992e+02->-1.113488e+03, e: 6.519291e+11->6.588147e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24589: t = 1.815965e-05, dt = 7.165773e-10, cfl = 4.0000e-01. Computation time: 1.5447e+03 s.
+Step 24590: t = 1.816037e-05, dt = 7.159479e-10, cfl = 4.0000e-01. Computation time: 1.5448e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (295,1,0)(0->1). delta lam: 8.077324e+09, rho: 7.848768e-04->7.848768e-04, p: 2.767459e+06->-3.430004e+08, T: 3.735197e+02->-1.113690e+03, e: 6.517704e+11->6.585726e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24591: t = 1.816109e-05, dt = 7.152254e-10, cfl = 4.0000e-01. Computation time: 1.5457e+03 s.
+Step 24592: t = 1.816180e-05, dt = 7.144321e-10, cfl = 4.0000e-01. Computation time: 1.5458e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24593: t = 1.816252e-05, dt = 7.135854e-10, cfl = 4.0000e-01. Computation time: 1.5459e+03 s.
+Step 24594: t = 1.816323e-05, dt = 7.127010e-10, cfl = 4.0000e-01. Computation time: 1.5459e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (297,0,0)(0->1). delta lam: 8.040693e+09, rho: 7.890102e-04->7.890102e-04, p: 9.052713e+06->-3.466519e+08, T: 3.737481e+02->-1.119649e+03, e: 6.454429e+11->6.514209e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24595: t = 1.816394e-05, dt = 7.134663e-10, cfl = 4.0000e-01. Computation time: 1.5460e+03 s.
+  + Detected phase transition at (296,2,0)(0->1). delta lam: 8.049327e+09, rho: 7.870834e-04->7.870834e-04, p: 6.172583e+06->-3.449519e+08, T: 3.736593e+02->-1.116886e+03, e: 6.484441e+11->6.547370e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24596: t = 1.816466e-05, dt = 7.127923e-10, cfl = 4.0000e-01. Computation time: 1.5461e+03 s.
+[0;35mWarning: Riemann solver failed to find a bracketing interval or to converge on 2 edge(s).
+[0m- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24597: t = 1.816537e-05, dt = 7.121977e-10, cfl = 4.0000e-01. Computation time: 1.5462e+03 s.
+  + Detected phase transition at (297,1,0)(0->1). delta lam: 8.035015e+09, rho: 7.888456e-04->7.888456e-04, p: 8.953582e+06->-3.465083e+08, T: 3.737916e+02->-1.119419e+03, e: 6.458750e+11->6.516971e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24598: t = 1.816608e-05, dt = 7.118871e-10, cfl = 4.0000e-01. Computation time: 1.5463e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24599: t = 1.816679e-05, dt = 7.108107e-10, cfl = 4.0000e-01. Computation time: 1.5463e+03 s.
+Step 24600: t = 1.816750e-05, dt = 7.097154e-10, cfl = 4.0000e-01. Computation time: 1.5464e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (295,2,0)(0->1). delta lam: 8.007009e+09, rho: 7.889085e-04->7.889085e-04, p: 9.065540e+06->-3.465710e+08, T: 3.738007e+02->-1.119532e+03, e: 6.457986e+11->6.515613e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24601: t = 1.816821e-05, dt = 7.086025e-10, cfl = 4.0000e-01. Computation time: 1.5465e+03 s.
+Step 24602: t = 1.816892e-05, dt = 7.074705e-10, cfl = 4.0000e-01. Computation time: 1.5465e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (294,0,0)(0->1). delta lam: 7.981683e+09, rho: 7.928872e-04->7.928872e-04, p: 1.420336e+07->-3.500835e+08, T: 3.737024e+02->-1.125204e+03, e: 6.386791e+11->6.447555e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24603: t = 1.816963e-05, dt = 7.090512e-10, cfl = 4.0000e-01. Computation time: 1.5466e+03 s.
+Step 24604: t = 1.817034e-05, dt = 7.082727e-10, cfl = 4.0000e-01. Computation time: 1.5467e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24605: t = 1.817105e-05, dt = 7.073869e-10, cfl = 4.0000e-01. Computation time: 1.5468e+03 s.
+Step 24606: t = 1.817175e-05, dt = 7.064095e-10, cfl = 4.0000e-01. Computation time: 1.5468e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (294,1,0)(0->1). delta lam: 7.969711e+09, rho: 7.930358e-04->7.930358e-04, p: 1.522076e+07->-3.502174e+08, T: 3.739843e+02->-1.125424e+03, e: 6.393997e+11->6.444917e+11.
+  + Detected phase transition at (296,3,0)(0->1). delta lam: 7.969711e+09, rho: 7.902132e-04->7.902132e-04, p: 1.092713e+07->-3.477302e+08, T: 3.738298e+02->-1.121422e+03, e: 6.436680e+11->6.492932e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24607: t = 1.817246e-05, dt = 7.059311e-10, cfl = 4.0000e-01. Computation time: 1.5469e+03 s.
+  + Detected phase transition at (297,2,0)(0->1). delta lam: 7.964314e+09, rho: 7.932362e-04->7.932362e-04, p: 1.554767e+07->-3.503955e+08, T: 3.740029e+02->-1.125711e+03, e: 6.391239e+11->6.441466e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24608: t = 1.817317e-05, dt = 7.046398e-10, cfl = 4.0000e-01. Computation time: 1.5470e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24609: t = 1.817387e-05, dt = 7.033541e-10, cfl = 4.0000e-01. Computation time: 1.5471e+03 s.
+  + Detected phase transition at (298,0,0)(0->1). delta lam: 7.935241e+09, rho: 7.960105e-04->7.960105e-04, p: 1.884480e+07->-3.528476e+08, T: 3.738356e+02->-1.129638e+03, e: 6.338633e+11->6.394339e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24610: t = 1.817457e-05, dt = 7.053591e-10, cfl = 4.0000e-01. Computation time: 1.5472e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24611: t = 1.817528e-05, dt = 7.045381e-10, cfl = 4.0000e-01. Computation time: 1.5472e+03 s.
+  + Detected phase transition at (295,3,0)(0->1). delta lam: 7.948599e+09, rho: 7.914649e-04->7.914649e-04, p: 1.289250e+07->-3.488387e+08, T: 3.739197e+02->-1.123218e+03, e: 6.418445e+11->6.471385e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24612: t = 1.817598e-05, dt = 7.035817e-10, cfl = 4.0000e-01. Computation time: 1.5473e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24613: t = 1.817669e-05, dt = 7.025127e-10, cfl = 4.0000e-01. Computation time: 1.5474e+03 s.
+Step 24614: t = 1.817739e-05, dt = 7.013881e-10, cfl = 4.0000e-01. Computation time: 1.5474e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (298,1,0)(0->1). delta lam: 7.913061e+09, rho: 7.964153e-04->7.964153e-04, p: 2.021925e+07->-3.532102e+08, T: 3.741189e+02->-1.130224e+03, e: 6.341598e+11->6.387310e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24615: t = 1.817809e-05, dt = 7.027010e-10, cfl = 4.0000e-01. Computation time: 1.5475e+03 s.
+Step 24616: t = 1.817879e-05, dt = 7.012708e-10, cfl = 4.0000e-01. Computation time: 1.5476e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (294,2,0)(0->1). delta lam: 7.911737e+09, rho: 7.974163e-04->7.974163e-04, p: 2.193526e+07->-3.540926e+08, T: 3.742396e+02->-1.131625e+03, e: 6.328959e+11->6.370495e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24617: t = 1.817950e-05, dt = 6.998602e-10, cfl = 4.0000e-01. Computation time: 1.5477e+03 s.
+Step 24618: t = 1.818020e-05, dt = 6.984733e-10, cfl = 4.0000e-01. Computation time: 1.5478e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (297,3,0)(0->1). delta lam: 7.880176e+09, rho: 7.963536e-04->7.963536e-04, p: 2.032706e+07->-3.531644e+08, T: 3.741851e+02->-1.130165e+03, e: 6.344916e+11->6.388018e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24619: t = 1.818089e-05, dt = 6.971528e-10, cfl = 4.0000e-01. Computation time: 1.5479e+03 s.
+Step 24620: t = 1.818159e-05, dt = 6.958618e-10, cfl = 4.0000e-01. Computation time: 1.5479e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (296,4,0)(0->1). delta lam: 7.850713e+09, rho: 7.944800e-04->7.944800e-04, p: 1.671769e+07->-3.515210e+08, T: 3.738213e+02->-1.127559e+03, e: 6.363939e+11->6.419292e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24621: t = 1.818229e-05, dt = 6.945708e-10, cfl = 4.0000e-01. Computation time: 1.5480e+03 s.
+[0;35mWarning: Riemann solver failed to find a bracketing interval or to converge on 1 edge(s).
+[0mStep 24622: t = 1.818298e-05, dt = 6.932684e-10, cfl = 4.0000e-01. Computation time: 1.5481e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24623: t = 1.818368e-05, dt = 6.919599e-10, cfl = 4.0000e-01. Computation time: 1.5481e+03 s.
+  + Detected phase transition at (298,2,0)(0->1). delta lam: 7.806691e+09, rho: 7.999683e-04->7.999683e-04, p: 2.568612e+07->-3.563688e+08, T: 3.743319e+02->-1.135267e+03, e: 6.289495e+11->6.326798e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24624: t = 1.818437e-05, dt = 6.906624e-10, cfl = 4.0000e-01. Computation time: 1.5482e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24625: t = 1.818506e-05, dt = 6.893965e-10, cfl = 4.0000e-01. Computation time: 1.5483e+03 s.
+Step 24626: t = 1.818575e-05, dt = 6.881813e-10, cfl = 4.0000e-01. Computation time: 1.5484e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (295,4,0)(0->1). delta lam: 7.764062e+09, rho: 7.965428e-04->7.965428e-04, p: 2.003497e+07->-3.533613e+08, T: 3.739956e+02->-1.130527e+03, e: 6.335202e+11->6.383677e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24627: t = 1.818644e-05, dt = 6.870363e-10, cfl = 4.0000e-01. Computation time: 1.5485e+03 s.
+Step 24628: t = 1.818712e-05, dt = 6.859705e-10, cfl = 4.0000e-01. Computation time: 1.5485e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (294,3,0)(0->1). delta lam: 7.739119e+09, rho: 8.024675e-04->8.024675e-04, p: 2.908369e+07->-3.585890e+08, T: 3.743274e+02->-1.138782e+03, e: 6.247839e+11->6.284621e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24629: t = 1.818781e-05, dt = 6.849883e-10, cfl = 4.0000e-01. Computation time: 1.5486e+03 s.
+Step 24630: t = 1.818849e-05, dt = 6.840893e-10, cfl = 4.0000e-01. Computation time: 1.5487e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24631: t = 1.818918e-05, dt = 6.832743e-10, cfl = 4.0000e-01. Computation time: 1.5488e+03 s.
+Step 24632: t = 1.818986e-05, dt = 6.825484e-10, cfl = 4.0000e-01. Computation time: 1.5488e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+  + Detected phase transition at (297,4,0)(0->1). delta lam: 7.700511e+09, rho: 8.011078e-04->8.011078e-04, p: 2.689770e+07->-3.574008e+08, T: 3.742143e+02->-1.136935e+03, e: 6.266483e+11->6.306782e+11.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 24633: t = 1.819054e-05, dt = 6.818828e-10, cfl = 4.0000e-01. Computation time: 1.5489e+03 s.
+Step 24634: t = 1.819123e-05, dt = 6.813288e-10, cfl = 4.0000e-01. Computation time: 1.5490e+03 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+
+
+...
+
+
+Step 95645: t = 6.072878e-05, dt = 1.278482e-11, cfl = 4.0000e-01. Computation time: 1.1550e+04 s.
+Step 95646: t = 6.072880e-05, dt = 1.279303e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95647: t = 6.072881e-05, dt = 1.280129e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+Step 95648: t = 6.072882e-05, dt = 1.280962e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95649: t = 6.072883e-05, dt = 1.281800e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+Step 95650: t = 6.072885e-05, dt = 1.282595e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95651: t = 6.072886e-05, dt = 1.283396e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+Step 95652: t = 6.072887e-05, dt = 1.284203e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95653: t = 6.072889e-05, dt = 1.285015e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+Step 95654: t = 6.072890e-05, dt = 1.285834e-11, cfl = 4.0000e-01. Computation time: 1.1551e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95655: t = 6.072891e-05, dt = 1.286659e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+Step 95656: t = 6.072892e-05, dt = 1.287491e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95657: t = 6.072894e-05, dt = 1.288330e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+Step 95658: t = 6.072895e-05, dt = 1.289176e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95659: t = 6.072896e-05, dt = 1.290029e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+Step 95660: t = 6.072898e-05, dt = 1.290888e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95661: t = 6.072899e-05, dt = 1.291755e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+Step 95662: t = 6.072900e-05, dt = 1.292630e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95663: t = 6.072901e-05, dt = 1.293511e-11, cfl = 4.0000e-01. Computation time: 1.1552e+04 s.
+Step 95664: t = 6.072903e-05, dt = 1.294362e-11, cfl = 4.0000e-01. Computation time: 1.1553e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 95665: t = 6.072904e-05, dt = 1.295202e-11, cfl = 4.0000e-01. Computation time: 1.1553e+04 s.
+Step 95666: t = 6.072905e-05, dt = 1.296048e-11, cfl = 4.0000e-01. Computation time: 1.1553e+04 s.
+
+
+...
+
+
+
+Step 897799: t = 5.999862e-04, dt = 7.182857e-10, cfl = 4.0000e-01. Computation time: 4.9819e+04 s.
+Step 897800: t = 5.999869e-04, dt = 7.182857e-10, cfl = 4.0000e-01. Computation time: 4.9819e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897801: t = 5.999876e-04, dt = 7.182858e-10, cfl = 4.0000e-01. Computation time: 4.9819e+04 s.
+Step 897802: t = 5.999883e-04, dt = 7.182858e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897803: t = 5.999891e-04, dt = 7.182858e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897804: t = 5.999898e-04, dt = 7.182858e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897805: t = 5.999905e-04, dt = 7.182858e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897806: t = 5.999912e-04, dt = 7.182858e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897807: t = 5.999919e-04, dt = 7.182859e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897808: t = 5.999927e-04, dt = 7.182859e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897809: t = 5.999934e-04, dt = 7.182859e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897810: t = 5.999941e-04, dt = 7.182859e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897811: t = 5.999948e-04, dt = 7.182859e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897812: t = 5.999955e-04, dt = 7.182859e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897813: t = 5.999962e-04, dt = 7.182860e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897814: t = 5.999970e-04, dt = 7.182860e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897815: t = 5.999977e-04, dt = 7.182860e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897816: t = 5.999984e-04, dt = 7.182860e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+Step 897817: t = 5.999991e-04, dt = 7.182860e-10, cfl = 4.0000e-01. Computation time: 4.9820e+04 s.
+Step 897818: t = 5.999998e-04, dt = 1.636412e-10, cfl = 9.1129e-02. Computation time: 4.9820e+04 s.
+- Reinitializing the level set function (material id: 1), bandwidth = 6.
+- Wrote solution at 6.000000e-04 to solution_1200.vtr.
+
+[0;32m==========================================[0m
+[0;32m   NORMAL TERMINATION (t = 6.000000e-04)  [0m
+[0;32m==========================================[0m
+Total Computation Time: 49820.175212 sec.
+
