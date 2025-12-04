@@ -40,6 +40,7 @@ class Output
 
   //! Multiphase/multi-material operator
   PhaseTransitionOutput* pto;
+  SpaceVariable3D *Lambda_ptr; //!< pointer to latent heat (for output only)
 
   //! Laser absorption solver
   [[maybe_unused]] LaserAbsorptionSolver* laser;

@@ -24,7 +24,7 @@ Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInf
     energy_output(comm_, iod_, iod_.output, iod_.mesh, iod_.eqs, laser_, vf_, coordinates, delta_xyz, cell_volume),
     integration_output(comm_, dms, iod_, laser_, vf_, coordinates, delta_xyz, cell_volume),
     matvol_output(comm_, iod_, cell_volume),
-    ion(ion_), heo(heo_), inco(inco_),
+    ion(ion_), heo(heo_), inco(inco_), Lambda_ptr(mpo_.GetPointerToLambda()),
     terminal(comm_, iod_.terminal_visualization, global_mesh_, vf_, ion_)
 {
   iFrame = 0;
@@ -447,6 +447,15 @@ Output::WriteSolutionSnapshot(double time, [[maybe_unused]] int time_step, Space
     numSol++;
   }
 
+  if(iod.output.latent_heat==OutputData::ON) {
+    if(Lambda_ptr == NULL) {
+      print_error("*** Error: Cannot output latent heat of phase transition. Variable is not activated.\n");
+      exit_mpi();
+    }
+    PetscObjectSetName((PetscObject)(Lambda_ptr->GetRefToGlobalVec()), "latent_heat");
+    VecView(Lambda_ptr->GetRefToGlobalVec(), viewer);
+    numSol++;
+  }
 
   if(iod.output.mean_charge==OutputData::ON) {
     SpaceVariable3D& Zav(ion->GetReferenceToZav());

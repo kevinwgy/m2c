@@ -2984,6 +2984,7 @@ OutputData::OutputData()
   laser_radiance = OFF;
   reference_map = OFF;
   principal_elastic_stresses = OFF;
+  latent_heat = OFF;
 
   levelset0 = OFF;
   levelset1 = OFF;
@@ -3022,7 +3023,7 @@ OutputData::OutputData()
 void OutputData::setup(const char *name, ClassAssigner *father)
 {
   //NOTE: Don't forget to increase capacity when you add a new member!
-  ClassAssigner *ca = new ClassAssigner(name, 31+MAXLS+MAXSPECIES, father);
+  ClassAssigner *ca = new ClassAssigner(name, 32+MAXLS+MAXSPECIES, father);
 
   new ClassStr<OutputData>(ca, "Prefix", this, &OutputData::prefix);
   new ClassStr<OutputData>(ca, "Solution", this, &OutputData::solution_filename_base);
@@ -3066,6 +3067,9 @@ void OutputData::setup(const char *name, ClassAssigner *father)
                              "Off", 0, "On", 1);
   new ClassToken<OutputData>(ca, "PrincipalElasticStresses", this,
                              reinterpret_cast<int OutputData::*>(&OutputData::principal_elastic_stresses), 2,
+                             "Off", 0, "On", 1);
+  new ClassToken<OutputData>(ca, "LatentHeatOfPhaseTransition", this,
+                             reinterpret_cast<int OutputData::*>(&OutputData::latent_heat), 2,
                              "Off", 0, "On", 1);
 
   new ClassToken<OutputData>(ca, "LevelSet0", this,
