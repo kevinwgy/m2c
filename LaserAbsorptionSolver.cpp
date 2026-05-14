@@ -2520,8 +2520,15 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &
     ComputeTemperatureInLaserDomain(v, id, T);
   //otherwise, use stored temeprature
 
+  int starting_lvl = 1;
   auto it = sortedNodes.begin() + queueCounter[0];
-  for(int lvl = 1; lvl<(int)queueCounter.size(); lvl++) {
+
+  if(queueCounter.size()==1) { //may occur in 1D or 2D tests where laser is perpendicular to domain
+    starting_lvl = 0; 
+    it = sortedNodes.begin();
+  }
+
+  for(int lvl = starting_lvl; lvl<(int)queueCounter.size(); lvl++) {
     for(int n = 0; n < queueCounter[lvl]; n++) { //sortedNodes on lvl
       int i(it->i), j(it->j), k(it->k);
       double eta = GetAbsorptionCoefficient(T[k][j][i], id[k][j][i]); //absorption coeff.
