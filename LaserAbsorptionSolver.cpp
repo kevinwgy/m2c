@@ -2523,7 +2523,7 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &
   int starting_lvl = 1;
   auto it = sortedNodes.begin() + queueCounter[0];
 
-  if(queueCounter.size()==1) { //may occur in 1D or 2D tests where laser is perpendicular to domain
+  if(queueCounter.size()<=2) { //may occur in 1D or 2D tests where laser is perpendicular to domain
     starting_lvl = 0; 
     it = sortedNodes.begin();
   }
