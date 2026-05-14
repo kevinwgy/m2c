@@ -57,7 +57,7 @@ public:
   void Destroy();
 
   void WriteIntegrationResults(double time, double dt, int time_step, SpaceVariable3D &V, SpaceVariable3D &ID,
-                               SpaceVariable3D* L, bool force_write);
+                               SpaceVariable3D* L, SpaceVariable3D* Lambda, bool force_write);
 
 private:
 
@@ -85,6 +85,8 @@ private:
                                 double*** id, double* potential);
   void IntegrateLaserRadiation(int index, double*** tag, Vec3D*** coords, Vec3D*** dxyz, double*** cell, Vec5D*** v,
                                double*** id, double*** l, double* radiation);
+  void IntegrateLatentHeat(int index, double*** tag, Vec3D*** coords, Vec3D*** dxyz, double*** cell, 
+                           double*** id, double*** lam, double* E);
 
 };
 

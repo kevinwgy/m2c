@@ -1495,7 +1495,7 @@ struct IntegrationData {
 
   enum Vars  {VOLUME = 0, MASS = 1, TOTAL_ENERGY = 2, TOTAL_ENTHALPY = 3, KINETIC_ENERGY = 4,
               INTERNAL_ENERGY = 5, POTENTIAL_ENERGY = 6, LASER_RADIATION = 7,
-              MOMENTUM = 8, SIZE = 9};
+              MOMENTUM = 8, LATENT_HEAT = 9, SIZE = 10};
 
   const char *volume;
   const char *mass;
@@ -1506,6 +1506,7 @@ struct IntegrationData {
   const char *potential_energy;
   const char *laser_radiation;
   const char *momentum;
+  const char *latent_heat;
 
   // specify the region
   ObjectMap<PlaneData>          planeMap;

@@ -170,7 +170,7 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
 
   //write solutions for integrated energy (and other quantities) in the specified region
   energy_output.WriteSolutionOfIntegrationEnergy(time, dt, time_step, V, ID, L, force_write);
-  integration_output.WriteIntegrationResults(time, dt, time_step, V, ID, L, force_write);
+  integration_output.WriteIntegrationResults(time, dt, time_step, V, ID,  L, Lambda_ptr, force_write);
 
   //write solutions along lines
 

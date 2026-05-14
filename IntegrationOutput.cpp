@@ -139,6 +139,14 @@ IntegrationOutput::IntegrationOutput(MPI_Comm &comm_, DataManagers3D &dm_all_, I
       file[IntegrationData::LASER_RADIATION] = fopen(filename, "w");
       delete [] filename;
     }
+
+    if(integral.second->latent_heat[0] != 0) {
+      char *filename = new char[spn + strlen(integral.second->latent_heat)];
+      snprintf(filename, spn + strlen(integral.second->latent_heat), "%s%s",
+               iod_output.prefix, integral.second->latent_heat);
+      file[IntegrationData::LATENT_HEAT] = fopen(filename, "w");
+      delete [] filename;
+    }
   
     for(int i=0; i<IntegrationData::SIZE; i++)
       if(file[i]) { //write header
@@ -509,7 +517,8 @@ IntegrationOutput::AddGeomToVector(int o, int type, int ind, string name, vector
 
 void
 IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step, SpaceVariable3D &V,
-                                           SpaceVariable3D &ID, SpaceVariable3D* L, bool force_write)
+                                           SpaceVariable3D &ID, SpaceVariable3D* L, SpaceVariable3D* Lambda,
+                                           bool force_write)
 {
   if(files.empty()) //nothing to write
     return;
@@ -534,6 +543,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
   Vec3D*** coords = NULL;
   Vec3D***   dxyz = NULL;
   double***     l = NULL;
+  double***   lam = NULL;
 
   if(mesh_type == MeshData::SPHERICAL || mesh_type == MeshData::CYLINDRICAL) {
     coords = (Vec3D***)coordinates.GetDataPointer();
@@ -546,6 +556,17 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
         exit_mpi();
       }
       l = L->GetDataPointer();
+      break;
+    }
+  }
+  for(auto&& file : files) {
+    if(file[IntegrationData::LATENT_HEAT]) {
+      if(!Lambda) {
+        print_error("*** Error: Requested latent heat integration, but latent heat "
+                    "is not specified or calculated.\n");
+        exit_mpi();
+      }
+      lam = Lambda->GetDataPointer();
       break;
     }
   }
@@ -677,6 +698,20 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
       print_flush(file[IntegrationData::LASER_RADIATION]);
     }
 
+    if(file[IntegrationData::LATENT_HEAT]) {
+      print(file[IntegrationData::LATENT_HEAT], "%10d    %16.14e    ", time_step, time);
+      assert(lam);
+      double lambdaE[numMaterials];
+      double sum = 0.0;
+      IntegrateLatentHeat(index, tag, coords, dxyz, cell, id, lam, lambdaE);
+      for(int i=0; i<numMaterials; i++) {
+        print(file[IntegrationData::LATENT_HEAT], "%16.14e  ", lambdaE[i]);
+        sum += lambdaE[i];
+      }
+      print(file[IntegrationData::LATENT_HEAT], "%16.14e\n", sum);
+      print_flush(file[IntegrationData::LATENT_HEAT]);
+    }
+
     last_snapshot_time[index] = time;
 
     index++;
@@ -689,6 +724,7 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
   if(coords) coordinates.RestoreDataPointerToLocalVector();
   if(dxyz) delta_xyz.RestoreDataPointerToLocalVector();
   if(l) L->RestoreDataPointerToLocalVector();
+  if(lam) Lambda->RestoreDataPointerToLocalVector();
 }   
     
 //--------------------------------------------------------------------------------------------------------------
@@ -852,6 +888,45 @@ IntegrationOutput::IntegrateTotalEnergy(int index, double*** tag, Vec3D*** coord
 
   MPI_Allreduce(MPI_IN_PLACE, E, numMaterials, MPI_DOUBLE, MPI_SUM, comm);
 
+}
+
+//-----------------------------------------------------------------------------------------------------------------
+
+void
+IntegrationOutput::IntegrateLatentHeat(int index, double*** tag, Vec3D*** coords, Vec3D*** dxyz,
+                                       double*** cell, double*** id, double*** lam, double* E)
+{
+  for(int i=0; i<numMaterials; i++)
+    E[i] = 0.0;
+
+  double PI = acos(0.0)*2.0;
+  [[maybe_unused]] double scalar;
+  int myid;
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+        myid = id[k][j][i];
+        if(myid<0 || myid>=numMaterials) {
+          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n", myid);
+          exit(-1);
+        }
+
+        if(MathTools::GetBit((int)tag[k][j][i], index)) {
+          if(mesh_type == MeshData::SPHERICAL) {
+            scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+            E[myid] += lam[k][j][i] * cell[k][j][i] * scalar;
+          }
+          else if(mesh_type == MeshData::CYLINDRICAL) {
+            scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+            E[myid] += lam[k][j][i] * cell[k][j][i] * scalar;
+          }
+          else {
+            E[myid] += lam[k][j][i] * cell[k][j][i];
+          }
+        }
+      }
+
+  MPI_Allreduce(MPI_IN_PLACE, E, numMaterials, MPI_DOUBLE, MPI_SUM, comm);
 }
 
 //-----------------------------------------------------------------------------------------------------------------

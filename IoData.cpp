@@ -3304,13 +3304,14 @@ IntegrationData::IntegrationData()
   potential_energy = "";
   laser_radiation = "";
   momentum = "";
+  latent_heat = "";
 }
 
 //------------------------------------------------------------------------------
 
 Assigner* IntegrationData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 17, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 18, nullAssigner);
 
   new ClassInt<IntegrationData>(ca, "Frequency", this, &IntegrationData::frequency);
   new ClassDouble<IntegrationData>(ca, "TimeInterval", this, &IntegrationData::frequency_dt);
@@ -3326,6 +3327,7 @@ Assigner* IntegrationData::getAssigner()
   new ClassStr<IntegrationData>(ca, "LaserRadiation", this, &IntegrationData::laser_radiation);
                 // integration of eta*L
   new ClassStr<IntegrationData>(ca, "Momentum", this, &IntegrationData::momentum);
+  new ClassStr<IntegrationData>(ca, "LatentHeat", this, &IntegrationData::latent_heat);
                 
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);

@@ -1031,8 +1031,8 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         //-------------------------------------------------------------------------------------
         if(lam && lam[k][j][i]>0.0) {
           double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]) {
-            e = e0 + lam[k][j][i]; //replenish
+          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
             v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
           }
           lam[k][j][i] = 0.0;
@@ -1299,8 +1299,8 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
             v[k][j][i] = vsum/sum_weight; 
 
             double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-            if(e < e0 + lam[k][j][i]) {
-              e = e0 + lam[k][j][i]; //replenish
+            if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+              e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
               v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
             }
 
@@ -1474,8 +1474,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
         if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
           e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]) {
-            e = e0 + lam[k][j][i]; //replenish
+          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
             v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
           }
 
@@ -1497,8 +1497,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
       if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
         e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-        if(e < e0 + lam[k][j][i]) {
-          e = e0 + lam[k][j][i]; //replenish
+        if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+          e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
           v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
         }
 
@@ -1575,8 +1575,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
         if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
           e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]) {
-            e = e0 + lam[k][j][i]; //replenish
+          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
             v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
           }
 
@@ -1611,8 +1611,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
         if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
           e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]) {
-            e = e0 + lam[k][j][i]; //replenish
+          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
             v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
           }
 
@@ -1719,7 +1719,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &
 
             //--------------------------------
             if(coordinates.IsHere(i,j,k))
-              lam_transitioned_new += global_mesh.GetCellVolume(i,j,k,true)*rho0*delta_lam;
+              lam_transitioned_new += global_mesh.GetCellVolume(i,j,k,true)*delta_lam;
             //--------------------------------
             
             // register the node
@@ -1784,7 +1784,7 @@ MultiPhaseOperator::UpdatePhaseTransitions(double dt, vector<SpaceVariable3D*> &
             }
           }
           if(coordinates.IsHere(i,j,k))
-            lam_transitioned_new += global_mesh.GetCellVolume(i,j,k,true)*v[k][j][i][0]*delta_lam;
+            lam_transitioned_new += global_mesh.GetCellVolume(i,j,k,true)*delta_lam;
         }
       }
 
@@ -2246,9 +2246,7 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(double dt,
           // Now, do the actual work: Add delta lam to internal energy
           double delta_lam = 0.0;
           (*it)->DepositDeltaLambdaAfterTransition(v[k][j][i], lam[k][j][i], dt, &delta_lam);
-
-          double rho = v[k][j][i][0];
-          lam_dumped_new += global_mesh.GetCellVolume(i,j,k,true)*rho*delta_lam;
+          lam_dumped_new += global_mesh.GetCellVolume(i,j,k,true)*delta_lam;
           counter++;
           //---------------------------------------------------------------------
           

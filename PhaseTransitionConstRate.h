@@ -32,10 +32,10 @@ public:
 
   ~PhaseTransitionConstRate() {}
 
-  double GetDeltaLambda(double lambda, double dt) {
+  double GetDeltaLambda(double rho, double lambda, double dt) {
     if(lambda<=0.0)
       return 0.0;
-    return std::min(lambda, energy_transfer_rate*dt);
+    return std::min(lambda, energy_transfer_rate*rho*dt);
   }
 
 };

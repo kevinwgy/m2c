@@ -53,7 +53,7 @@ public:
   //-----------------------------------------------------------------------------
   // Get the amount of latent heat (lambda) that should be deposited over time dt
   //-----------------------------------------------------------------------------
-  virtual double GetDeltaLambda(double lambda, [[maybe_unused]] double dt) {
+  virtual double GetDeltaLambda([[maybe_unused]] double rho, double lambda, [[maybe_unused]] double dt) {
     return std::max(0.0, lambda);
   }
 
@@ -62,9 +62,10 @@ public:
   //-----------------------------------------------------------------------------
   virtual void DepositDeltaLambdaAfterTransition(double *v, double &lambda, double dt,
                                                  double *delta_lam = NULL) {
-    double e    = vf2.GetInternalEnergyPerUnitMass(v[0], v[4]);
-    double dlam = GetDeltaLambda(lambda, dt);
-    e      += dlam;
+    double rho  = v[0];
+    double e    = vf2.GetInternalEnergyPerUnitMass(rho, v[4]);
+    double dlam = GetDeltaLambda(rho, lambda, dt);
+    e      += dlam/rho;
     lambda -= dlam;
     v[4] = vf2.GetPressure(v[0], e);
 
@@ -99,13 +100,14 @@ PhaseTransitionBase::Transition(double *v, double &lambda, double dt, double *de
   if(T<=Tmax) { //no phase transition, but if lambda (latent heat reservoir) is non-zero, should pour it 
                 //back to raise temperature
     if(lambda>0) {
-      double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax); 
+      double rho = v[0];
+      double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(rho, Tmax); 
       double de = e_vap - e;
 
-      double dlam = std::min(de, lambda);
+      double dlam = std::min(rho*de, lambda);
 
       lambda -= dlam;
-      e      += dlam;
+      e      += dlam/rho;
 
       v[4] = vf1.GetPressure(v[0], e);
     }
@@ -114,15 +116,16 @@ PhaseTransitionBase::Transition(double *v, double &lambda, double dt, double *de
 
   } else { // excessive heat should go to lambda. Then, check if latent heat is reached
 
-    double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax);
+    double rho = v[0];
+    double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(rho, Tmax);
     double de = e - e_vap;
 
-    lambda += de;
+    lambda += rho*de;
     e      -= de; //= e_vap
 
-    if(lambda >= latent_heat) {//DETECTED PHASE TRANSITION
-      double dlam = GetDeltaLambda(lambda, dt);
-      e      += dlam;
+    if(lambda >= rho*latent_heat) {//DETECTED PHASE TRANSITION
+      double dlam = GetDeltaLambda(rho, lambda, dt);
+      e      += dlam/rho;
       lambda -= dlam;
       v[4] = vf2.GetPressure(v[0], e);
       if(delta_lam)
