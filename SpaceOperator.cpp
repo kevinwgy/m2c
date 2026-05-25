@@ -1431,15 +1431,21 @@ SpaceOperator::ComputeLocalTimeStepSizes(SpaceVariable3D &V, SpaceVariable3D &ID
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
+                                           std::unordered_map<Int3, Vec5D, Int3Hash>& Floss,
+                                           std::unordered_map<Int3, Vec5D, Int3Hash>& Gloss,
+                                           std::unordered_map<Int3, Vec5D, Int3Hash>& Hloss,
                                            RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                            vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
                                            vector<unique_ptr<EmbeddedBoundaryDataSet> > *EBDS)
 {
   //------------------------------------
-  // Preparation: Delete previous riemann_solutions
+  // Preparation: Delete previous riemann_solutions & interfacial mismatch
   //------------------------------------
   if(riemann_solutions)
     riemann_solutions->Clear();
+  Floss.clear();
+  Gloss.clear();
+  Hloss.clear();
 
   //------------------------------------
   // Reconstruction w/ slope limiters.
@@ -1705,6 +1711,19 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           f[k][j][i-1] += localflux1*area;
           f[k][j][i]   -= localflux2*area;
 
+          // track interfacial mismatch
+          if(localflux1 != localflux2) {
+            Vec5D loss = (localflux2 - localflux1)*area;
+            fprintf(stdout,"(%d-1/2,%d,%d): dflux = %e %e %e, area = %e, loss = %e %e %e.\n",
+                    i, j, k, (localflux2 - localflux1)[0], (localflux2 - localflux1)[1], (localflux2 - localflux1)[4],
+                    area, loss[0], loss[1], loss[4]);
+            auto it = Floss.find(Int3(i,j,k));
+            if(it != Floss.end())
+              it->second += loss;
+            else
+              Floss.insert({Int3(i,j,k), loss});
+          }
+
         }
 
 
@@ -1864,6 +1883,18 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           area = dxyz[k][j][i][0]*dxyz[k][j][i][2];
           f[k][j-1][i] += localflux1*area;
           f[k][j][i]   -= localflux2*area;
+
+          // track interfacial mismatch
+          if(localflux1 != localflux2) {
+            Vec5D loss = (localflux2 - localflux1)*area;
+            fprintf(stdout,"SHOULD NOT BE HERE (G).\n");
+            auto it = Gloss.find(Int3(i,j,k));
+            if(it != Gloss.end())
+              it->second += loss;
+            else
+              Gloss.insert({Int3(i,j,k), loss});
+          }
+ 
         }
 
 
@@ -2023,6 +2054,18 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           area = dxyz[k][j][i][0]*dxyz[k][j][i][1];
           f[k-1][j][i] += localflux1*area;
           f[k][j][i]   -= localflux2*area;
+
+          // track interfacial mismatch
+          if(localflux1 != localflux2) {
+            Vec5D loss = (localflux2 - localflux1)*area;
+            fprintf(stdout,"SHOULD NOT BE HERE (H). localflux2 - localflux1 = %e\n", (localflux2 - localflux1).norm());
+            auto it = Hloss.find(Int3(i,j,k));
+            if(it != Hloss.end())
+              it->second += loss;
+            else
+              Hloss.insert({Int3(i,j,k), loss});
+          }
+ 
         }
       }
     }
@@ -2572,6 +2615,9 @@ SpaceOperator::CheckReconstructedStates(SpaceVariable3D &V,
 //-----------------------------------------------------
 
 void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
+                                    std::unordered_map<Int3, Vec5D, Int3Hash>& Floss,
+                                    std::unordered_map<Int3, Vec5D, Int3Hash>& Gloss,
+                                    std::unordered_map<Int3, Vec5D, Int3Hash>& Hloss,
                                     [[maybe_unused]] double time,
                                     RiemannSolutions *riemann_solutions, vector<int> *ls_mat_id, 
                                     vector<SpaceVariable3D*> *Phi, vector<SpaceVariable3D*> *KappaPhi,
@@ -2589,7 +2635,8 @@ void SpaceOperator::ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, Spa
   // -------------------------------------------------
   // calculate fluxes on the left hand side of the equation   
   // -------------------------------------------------
-  ComputeAdvectionFluxes(V, ID, R, riemann_solutions, ls_mat_id, Phi, KappaPhi, EBDS);
+  ComputeAdvectionFluxes(V, ID, R, Floss, Gloss, Hloss, riemann_solutions,
+                         ls_mat_id, Phi, KappaPhi, EBDS);
 
   if(visco)
     visco->AddDiffusionFluxes(V, ID, EBDS, R); //including extra terms from cylindrical symmetry

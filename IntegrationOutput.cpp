@@ -148,14 +148,29 @@ IntegrationOutput::IntegrationOutput(MPI_Comm &comm_, DataManagers3D &dm_all_, I
       delete [] filename;
     }
   
+    if(integral.second->interfacial_loss[0] != 0) {
+      char *filename = new char[spn + strlen(integral.second->interfacial_loss)];
+      snprintf(filename, spn + strlen(integral.second->interfacial_loss), "%s%s",
+               iod_output.prefix, integral.second->interfacial_loss);
+      file[IntegrationData::INTERFACIAL_LOSS] = fopen(filename, "w");
+      delete [] filename;
+    }
+
     for(int i=0; i<IntegrationData::SIZE; i++)
       if(file[i]) { //write header
-        print(file[i], "## Number of materials: %d (0 - %d); ID for ghost/inactive cells: %d.\n",
-              numMaterials-1, numMaterials-2, numMaterials-1);
-        print(file[i], "## Time step  |  Time  ");
-        for(int j=0; j<numMaterials; j++)
-          print(file[i], "|  Solution (Mat. %d)  ", j);
-        print(file[i],"   |  Sum (including ghost/inactive)\n");
+        if(i != (int)IntegrationData::INTERFACIAL_LOSS) {
+          print(file[i], "## Number of materials: %d (0 - %d); ID for ghost/inactive cells: %d.\n",
+                numMaterials-1, numMaterials-2, numMaterials-1);
+          print(file[i], "## Time step  |  Time  ");
+          for(int j=0; j<numMaterials; j++)
+            print(file[i], "|  Solution (Mat. %d)  ", j);
+          print(file[i],"   |  Sum (including ghost/inactive)\n");
+        }
+        else { //for interfacial loss, only print the sum (not one within each material subdomain)
+          print(file[i], "## Solution (accumulated over time) accounting for all materials.\n");
+          print(file[i], "## Time step  |  Time  |  Solution (Accumulated)\n");
+        }
+
         mpi_barrier();
         print_flush(file[i]);
       }
@@ -517,9 +532,14 @@ IntegrationOutput::AddGeomToVector(int o, int type, int ind, string name, vector
 
 void
 IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step, SpaceVariable3D &V,
-                                           SpaceVariable3D &ID, SpaceVariable3D* L, SpaceVariable3D* Lambda,
+                                           SpaceVariable3D &ID,
+                                           const std::unordered_map<Int3, Vec5D, Int3Hash>& Uloss_x,
+                                           const std::unordered_map<Int3, Vec5D, Int3Hash>& Uloss_y,
+                                           const std::unordered_map<Int3, Vec5D, Int3Hash>& Uloss_z,
+                                           SpaceVariable3D* L, SpaceVariable3D* Lambda,
                                            bool force_write)
 {
+
   if(files.empty()) //nothing to write
     return;
 
@@ -712,6 +732,15 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
       print_flush(file[IntegrationData::LATENT_HEAT]);
     }
 
+    if(file[IntegrationData::INTERFACIAL_LOSS]) {
+      print(file[IntegrationData::INTERFACIAL_LOSS], "%10d    %16.14e    ", time_step, time);
+      Vec5D sum = 0.0;
+      IntegrateInterfacialLoss(index, tag, coords, dxyz, Uloss_x, Uloss_y, Uloss_z, sum);
+      print(file[IntegrationData::INTERFACIAL_LOSS], "%16.14e  %16.14e  %16.14e  %16.14e  %16.14e\n",
+            sum[0], sum[1], sum[2], sum[3], sum[4]);
+      print_flush(file[IntegrationData::INTERFACIAL_LOSS]);
+    }
+
     last_snapshot_time[index] = time;
 
     index++;
@@ -746,7 +775,7 @@ IntegrationOutput::IntegrateVolume(int index, double*** tag, Vec3D*** coords, Ve
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -785,7 +814,7 @@ IntegrationOutput::IntegrateMass(int index, double*** tag, Vec3D*** coords, Vec3
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -824,7 +853,7 @@ IntegrationOutput::IntegrateMomentum(int index, double*** tag, Vec3D*** coords, 
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -865,7 +894,7 @@ IntegrationOutput::IntegrateTotalEnergy(int index, double*** tag, Vec3D*** coord
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -907,7 +936,7 @@ IntegrationOutput::IntegrateLatentHeat(int index, double*** tag, Vec3D*** coords
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n", myid);
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n", myid);
           exit(-1);
         }
 
@@ -932,6 +961,87 @@ IntegrationOutput::IntegrateLatentHeat(int index, double*** tag, Vec3D*** coords
 //-----------------------------------------------------------------------------------------------------------------
 
 void
+IntegrationOutput::IntegrateInterfacialLoss(int index, double*** tag, Vec3D*** coords, Vec3D*** dxyz,
+                                            const std::unordered_map<Int3, Vec5D, Int3Hash>& Uloss_x,
+                                            const std::unordered_map<Int3, Vec5D, Int3Hash>& Uloss_y,
+                                            const std::unordered_map<Int3, Vec5D, Int3Hash>& Uloss_z,
+                                            Vec5D& sum)
+{
+  sum = 0.0; 
+
+  double PI = acos(0.0)*2.0;
+  [[maybe_unused]] double scalar;
+  int i, j, k;
+
+  for(auto&& [ijk, uloss] : Uloss_x) {
+    i = ijk[0];
+    j = ijk[1];
+    k = ijk[2];
+    if(!Tag.IsHere(i,j,k,false))
+      continue; //skip internal ghosts (they should be handled by their owners)
+
+    if(MathTools::GetBit((int)tag[k][j][i], index)) {
+      if(mesh_type == MeshData::SPHERICAL){
+        scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+        sum += scalar*uloss;
+      }
+      else if(mesh_type == MeshData::CYLINDRICAL){
+        scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+        sum += scalar*uloss;
+      }
+      else
+        sum += uloss;
+    }
+  }
+
+  for(auto&& [ijk, uloss] : Uloss_y) {
+    i = ijk[0];
+    j = ijk[1];
+    k = ijk[2];
+    if(!Tag.IsHere(i,j,k,false))
+      continue; //skip internal ghosts (they should be handled by their owners)
+
+    if(MathTools::GetBit((int)tag[k][j][i], index)) {
+      if(mesh_type == MeshData::SPHERICAL){
+        scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+        sum += scalar*uloss;
+      }
+      else if(mesh_type == MeshData::CYLINDRICAL){
+        scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+        sum += scalar*uloss;
+      }
+      else
+        sum += uloss;
+    }
+  }
+
+  for(auto&& [ijk, uloss] : Uloss_z) {
+    i = ijk[0];
+    j = ijk[1];
+    k = ijk[2];
+    if(!Tag.IsHere(i,j,k,false))
+      continue; //skip internal ghosts (they should be handled by their owners)
+
+    if(MathTools::GetBit((int)tag[k][j][i], index)) {
+      if(mesh_type == MeshData::SPHERICAL){
+        scalar = PI*4.0*coords[k][j][i][0]*coords[k][j][i][0]/dxyz[k][j][i][2]/dxyz[k][j][i][1];
+        sum += scalar*uloss;
+      }
+      else if(mesh_type == MeshData::CYLINDRICAL){
+        scalar = PI*2.0*coords[k][j][i][1]/dxyz[k][j][i][2];
+        sum += scalar*uloss;
+      }
+      else
+        sum += uloss;
+    }
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, (double*)sum, 5, MPI_DOUBLE, MPI_SUM, comm);
+}
+
+//-----------------------------------------------------------------------------------------------------------------
+
+void
 IntegrationOutput::IntegrateTotalEnthalpy(int index, double*** tag, Vec3D*** coords, Vec3D*** dxyz,
                                           double*** cell, Vec5D*** v, double*** id, double* H)
 {
@@ -947,7 +1057,7 @@ IntegrationOutput::IntegrateTotalEnthalpy(int index, double*** tag, Vec3D*** coo
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -990,7 +1100,7 @@ IntegrationOutput::IntegrateKineticEnergy(int index, double*** tag, Vec3D*** coo
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -1032,7 +1142,7 @@ IntegrationOutput::IntegrateInternalEnergy(int index, double*** tag, Vec3D*** co
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -1073,7 +1183,7 @@ IntegrationOutput::IntegratePotentialEnergy(int index, double*** tag, Vec3D*** c
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -1116,7 +1226,7 @@ IntegrationOutput::IntegrateLaserRadiation(int index, double*** tag, Vec3D*** co
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }

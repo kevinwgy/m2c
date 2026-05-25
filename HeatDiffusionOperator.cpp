@@ -310,31 +310,20 @@ HeatDiffusionOperator::AddCylindricalSymmetryDiffusionTerms(SpaceVariable3D &V, 
   double coeff;
   double myk = 0.0;
   
-  //fprintf(stderr,"i0-imax: %d->%d, j0-jmax: %d->%d, k0-kmax: %d->%d", i0, imax, j0, jmax, k0, kmax);
-  //fprintf(stderr,"ii0-iimax: %d->%d, jj0-jjmax: %d->%d, kk0-kkmax: %d->%d", ii0, iimax, jj0, jjmax, kk0, kkmax);
-
   
   for(int k=k0; k<kmax; k++)
     for(int j=j0; j<jmax; j++)
       for(int i=i0; i<imax; i++) {
-
         
         radial = coords[k][j][i][1];
         assert(radial>0);
         
         coeff = vol[k][j][i]/radial;
 
-        //fprintf(stderr,"Check at (%d,%d,%d) coeff = %e\n", i,j,k,coeff);
-
         myid = id[k][j][i];
         myk = heatdiffFcn[myid]->GetConductivity();
 
         r[k][j][i][4] -= coeff*myk*dTdy[k][j][i]; // vol*(2*k*partialT)/(r*partialr)
-        //fprintf(stderr,"Check at (%d,%d,%d) R[4] = %e\n", i,j,k,r[k][j][i][4]);
-        
-
-//        if((imax-i == 1 && jmax-jmax==1)&& (kmax-k == 1))
-//          fprintf(stderr,"Get the end point of subdomain!\n");
       }
 
   //Restore data

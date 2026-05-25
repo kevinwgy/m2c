@@ -16,6 +16,7 @@
 #include <Reconstructor.h>
 #include <RiemannSolutions.h>
 #include <UserDefinedSolution.h>
+#include <unordered_map>
 
 class EmbeddedBoundaryDataSet;
 struct TriangulatedSurface;
@@ -80,7 +81,7 @@ class SpaceOperator
   //! Reconstructed primitive state variables at cell boundaries
   SpaceVariable3D Vl, Vr, Vb, Vt, Vk, Vf;
 
-  //! For temporary variable (5D)
+  //! For temporary use (5D)
   SpaceVariable3D Utmp;
 
   //! internal variable for temporary use (1D)
@@ -141,8 +142,11 @@ public:
   double ComputeTimeStepSizeSurfaceTension(SpaceVariable3D &V, SpaceVariable3D &ID);
 
   //! Compute the RHS of the ODE system (Only for cells inside the physical domain)
-  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R, double time,
-                       RiemannSolutions *riemann_solutions = NULL,
+  void ComputeResidual(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &R,
+                       std::unordered_map<Int3, Vec5D, Int3Hash>& Floss,
+                       std::unordered_map<Int3, Vec5D, Int3Hash>& Gloss,
+                       std::unordered_map<Int3, Vec5D, Int3Hash>& Hloss,
+                       double time, RiemannSolutions *riemann_solutions = NULL,
                        vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
                        vector<SpaceVariable3D*> *KappaPhi = NULL,
                        vector<std::unique_ptr<EmbeddedBoundaryDataSet> > *EBDS = nullptr,
@@ -184,6 +188,9 @@ private:
                                 SpaceVariable3D &ID);
 
   void ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &ID, SpaceVariable3D &F,
+                              std::unordered_map<Int3, Vec5D, Int3Hash>& Floss,
+                              std::unordered_map<Int3, Vec5D, Int3Hash>& Gloss,
+                              std::unordered_map<Int3, Vec5D, Int3Hash>& Hloss,
                               RiemannSolutions *riemann_solutions = NULL,
                               vector<int> *ls_mat_id = NULL, vector<SpaceVariable3D*> *Phi = NULL,
                               vector<SpaceVariable3D*> *KappaPhi = NULL,

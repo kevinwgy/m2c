@@ -64,6 +64,10 @@ protected:
   //! Solutions of exact Riemann problems
   RiemannSolutions riemann_solutions;
 
+  //! Mismatch of interfacial fluxes (FIVER) x area x dt, accumulated over time
+  //! Index: x(i,j,k) means the mismatch acrss (i-1/2,j,k); Uloss_y(i,j,k) --> (i,j-1/2,k)
+  std::unordered_map<Int3, Vec5D, Int3Hash> Uloss_x, Uloss_y, Uloss_z;
+
   //! Variables for steady-state analysis
   SteadyStateOperator *sso;
   bool local_time_stepping;
@@ -105,11 +109,19 @@ public:
   double GetRelativeResidual2Norm() {assert(sso); return sso->GetRelativeResidual2Norm();} //function L2 norm
   double GetRelativeResidualInfNorm() {assert(sso); return sso->GetRelativeResidualInfNorm();}
 
+  const std::unordered_map<Int3, Vec5D, Int3Hash>& GetInterfacialLossX() {return Uloss_x;}
+  const std::unordered_map<Int3, Vec5D, Int3Hash>& GetInterfacialLossY() {return Uloss_y;}
+  const std::unordered_map<Int3, Vec5D, Int3Hash>& GetInterfacialLossZ() {return Uloss_z;}
+
 protected:
 
   //! compute U += a*dt*R, where dt can be different for different cells (for steady-state computation)
   void AddFluxWithLocalTimeStep(SpaceVariable3D &U, double a, SpaceVariable3D *Dt, SpaceVariable3D &R);
 
+  //! accumulate the lost/gained mass, momentum, and energy across material interfaces
+  void AccumulateInterfacialMismatch(std::unordered_map<Int3, Vec5D, Int3Hash>& Floss,
+                                     std::unordered_map<Int3, Vec5D, Int3Hash>& Gloss,
+                                     std::unordered_map<Int3, Vec5D, Int3Hash>& Hloss, double dt);
 };
 
 /********************************************************************

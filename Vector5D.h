@@ -41,6 +41,17 @@ struct Vec5D {
 
   operator double*() { return v; }  //convert Vec5D to double*
 
+  bool operator==(const Vec5D& v2) const {
+    if     (v[0] != v2.v[0])   return false;
+    else if(v[1] != v2.v[1])   return false;
+    else if(v[2] != v2.v[2])   return false;
+    else if(v[3] != v2.v[3])   return false;
+    else if(v[4] != v2.v[4])   return false;
+    else                       return true;
+  }
+
+  bool operator!=(const Vec5D& v2) const {return !(*this==v2);}
+
   double &operator[](int i) { return v[i]; }
   double operator[](int i) const { return v[i]; }
 

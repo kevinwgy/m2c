@@ -464,13 +464,6 @@ int main(int argc, char* argv[])
   exit_mpi();
 */
 
-  //! Initialize output
-  Output out(comm, dms, iod, global_mesh, spo.GetPointerToOuterGhostNodes(), vf, laser, spo.GetMeshCoordinates(),
-             spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), mpo, ion, heo, inco); 
-  out.InitializeOutput(spo.GetMeshCoordinates());
-  mpi_barrier();
-
-
   //! Initialize time integrator
   TimeIntegratorBase *integrator = NULL;
   if(!incompressible) { //compressible
@@ -508,6 +501,12 @@ int main(int argc, char* argv[])
       exit_mpi();
     }
   }
+
+  //! Initialize output
+  Output out(comm, dms, iod, global_mesh, spo.GetPointerToOuterGhostNodes(), vf, laser, spo.GetMeshCoordinates(),
+             spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(), *integrator, mpo, ion, heo, inco); 
+  out.InitializeOutput(spo.GetMeshCoordinates());
+  mpi_barrier();
 
 
   //! Setup for steady-state computations

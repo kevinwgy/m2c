@@ -107,6 +107,39 @@ TimeIntegratorBase::AddFluxWithLocalTimeStep(SpaceVariable3D &U, double alpha,
 
 //----------------------------------------------------------------------------
 
+void
+TimeIntegratorBase::AccumulateInterfacialMismatch(std::unordered_map<Int3, Vec5D, Int3Hash>& Floss,
+                                                  std::unordered_map<Int3, Vec5D, Int3Hash>& Gloss,
+                                                  std::unordered_map<Int3, Vec5D, Int3Hash>& Hloss, double dt)
+{
+  for(auto&& [ijk, loss] : Floss) {
+    auto it = Uloss_x.find(ijk);
+    if(it != Uloss_x.end())
+      it->second += dt*loss;
+    else
+      Uloss_x.insert({ijk, dt*loss});
+  }
+
+  for(auto&& [ijk, loss] : Gloss) {
+    auto it = Uloss_y.find(ijk);
+    if(it != Uloss_y.end())
+      it->second += dt*loss;
+    else
+      Uloss_y.insert({ijk, dt*loss});
+  }
+
+  for(auto&& [ijk, loss] : Hloss) {
+    auto it = Uloss_z.find(ijk);
+    if(it != Uloss_z.end())
+      it->second += dt*loss;
+    else
+      Uloss_z.insert({ijk, dt*loss});
+  }
+
+}
+
+//----------------------------------------------------------------------------
+
 
 
 //----------------------------------------------------------------------------
@@ -192,8 +225,9 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   // -------------------------------------------------------------------------------
   // Forward Euler step for the N-S equations: U(n+1) = U(n) + dt*R(V(n))
   // -------------------------------------------------------------------------------
-  spo.ComputeResidual(V, ID, Rn, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(),
-                      Xi); //compute Rn
+  std::unordered_map<Int3, Vec5D, Int3Hash> Floss, Gloss, Hloss; //storing mismatched interfacial flux x area
+  spo.ComputeResidual(V, ID, Rn, Floss, Gloss, Hloss, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi,
+                      EBDS.get(), Xi); //compute Rn
   if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
 
   spo.PrimitiveToConservative(V, ID, Un); // get Un
@@ -201,6 +235,9 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     AddFluxWithLocalTimeStep(Un, 1.0, Dt, Rn);
   else
     Un.AXPlusBY(1.0, dt, Rn);
+
+  AccumulateInterfacialMismatch(Floss, Gloss, Hloss, dt);
+
   spo.ConservativeToPrimitive(Un, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
@@ -347,8 +384,9 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step for the N-S equations: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(),
-                      Xi/*, run_heat*/); //->R(V(n))
+  std::unordered_map<Int3, Vec5D, Int3Hash> Floss, Gloss, Hloss; //storing mismatched interfacial flux x area
+  spo.ComputeResidual(V, ID, R, Floss, Gloss, Hloss, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi,
+                      EBDS.get(), Xi/*, run_heat*/); //->R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -358,6 +396,8 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     AddFluxWithLocalTimeStep(U1, 1.0, Dt, R);
   else
     U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
+
+  AccumulateInterfacialMismatch(Floss, Gloss, Hloss, 0.5*dt);
 
   // Check & clip the intermediate state (U1/V1)
   spo.ConservativeToPrimitive(U1, ID, V1); //get V1
@@ -395,12 +435,15 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
   //***************************************************
 
-
+  Floss.clear();
+  Gloss.clear();
+  Hloss.clear();
 
   //****************** STEP 2 FOR NS ******************
   // Step 2: U(n+1) = 0.5*U(n) + 0.5*U1 + 0.5*dt*R(V1)
   //compute R(V1) using prev.Phi, "loose coupling"
-  spo.ComputeResidual(V1, ID, R, time, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1/*, run_heat*/);
+  spo.ComputeResidual(V1, ID, R, Floss, Gloss, Hloss, time, NULL, &ls_mat_id, &Phi, &KappaPhi,
+                      EBDS.get(), Xi1/*, run_heat*/);
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time,time_step);
@@ -412,6 +455,8 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   else
     U1.AXPlusBY(1.0, 0.5*dt, R); //U(n+1) = U(n+1) + 0.5*dt*R(V1)
   
+  AccumulateInterfacialMismatch(Floss, Gloss, Hloss, 0.5*dt);
+
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
   spo.ApplyBoundaryConditions(V);
@@ -553,8 +598,9 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   //****************** STEP 1 FOR NS ******************
   // Forward Euler step: U1 = U(n) + dt*R(V(n))
-  spo.ComputeResidual(V, ID, R, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(),
-                      Xi); //->R(V(n))
+  std::unordered_map<Int3, Vec5D, Int3Hash> Floss, Gloss, Hloss; //storing mismatched interfacial flux x area
+  spo.ComputeResidual(V, ID, R, Floss, Gloss, Hloss, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi,
+                      EBDS.get(), Xi); //->R(V(n))
 
   if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
 
@@ -564,6 +610,8 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     AddFluxWithLocalTimeStep(U1, 1.0, Dt, R);
   else
     U1.AXPlusBY(1.0, dt, R); //U1 = U1 + dt*R(V(n))
+
+  AccumulateInterfacialMismatch(Floss, Gloss, Hloss, dt/6.0);
 
   // Check & clip the intermediate state (U1/V1)
   spo.ConservativeToPrimitive(U1, ID, V1); //get V1
@@ -601,17 +649,22 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
   //***************************************************
 
-
+  Floss.clear();
+  Gloss.clear();
+  Hloss.clear();
 
   //****************** STEP 2 FOR NS ******************
   // Step 2: U2 = 0.75*U(n) + 0.25*U1 + 0.25*dt*R(V1))
   //compute R(V1) using prev.Phi, "loose coupling"
-  spo.ComputeResidual(V1, ID, R, time, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
+  spo.ComputeResidual(V1, ID, R, Floss, Gloss, Hloss, time, NULL, &ls_mat_id, &Phi, &KappaPhi,
+                      EBDS.get(), Xi1);
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time,time_step);
     laser->AddHeatToNavierStokesResidual(R, *L, ID);
   }
+
+  AccumulateInterfacialMismatch(Floss, Gloss, Hloss, dt/6.0);
 
   U1.AXPlusBY(0.25, 0.75, Un); //U2 = 0.75*U(n) + 0.25*U1;
   if(local_time_stepping)
@@ -655,12 +708,15 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   }
   //***************************************************
 
-
+  Floss.clear();
+  Gloss.clear();
+  Hloss.clear();
 
   //****************** STEP 3 FOR NS ******************
   // Step 3: U(n+1) = 1/3*U(n) + 2/3*U2 + 2/3*dt*R(V2)
   //compute R(V2) using prev.Phi,"loose coupling"
-  spo.ComputeResidual(V2, ID, R, time-0.5*dt, NULL, &ls_mat_id, &Phi, &KappaPhi, EBDS.get(), Xi1);
+  spo.ComputeResidual(V2, ID, R, Floss, Gloss, Hloss, time-0.5*dt, NULL, &ls_mat_id, &Phi, &KappaPhi,
+                      EBDS.get(), Xi1);
 
   if(laser) {
     laser->ComputeLaserRadiance(V2,ID,*L,time-0.5*dt,time_step);
@@ -671,6 +727,8 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
     AddFluxWithLocalTimeStep(U1, 2.0/3.0, Dt, R);
   else
     U1.AXPlusBY(1.0, 2.0/3.0*dt, R); //U2 = U2 + 2/3*dt*R(V2)
+
+  AccumulateInterfacialMismatch(Floss, Gloss, Hloss, 2.0/3.0*dt);
 
   spo.ConservativeToPrimitive(U1, ID, V); //updates V = V(n+1)
   spo.ClipDensityAndPressure(V, ID);
@@ -828,6 +886,34 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
   // Solve laser radiation equation
   if(laser)
     laser->ComputeLaserRadiance(V,ID,*L,time,time_step);
+    
+/*
+  int i0, j0, k0, imax, jmax, kmax;
+  V.GetCornerIndices(&i0, &j0, &k0, &imax, &jmax, &kmax);
+  GlobalMeshInfo &global_mesh(spo.GetGlobalMeshInfo());
+
+  if(time>4.088e-6 && time<4.1e-6) {
+    Vec5D*** v = (Vec5D***)V.GetDataPointer();
+    double*** id = ID.GetDataPointer();
+    double*** phi = Phi[0]->GetDataPointer();
+    double internal_e;
+
+    for(int k=k0; k<kmax; k++)
+      for(int j=j0; j<jmax; j++)
+        for(int i=i0; i<imax; i++) {
+          if(global_mesh.GetX(i)>0.0 && global_mesh.GetX(i)<0.045) {      
+            internal_e = spo.GetVarFcn(id[k][j][i])->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+            fprintf(stdout,"%d (%e) %e %e %e | %e | %d | %e\n",
+                    i, global_mesh.GetX(i), v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], 
+                    internal_e, (int)id[k][j][i], phi[k][j][i]);
+          }
+        }
+
+    V.RestoreDataPointerToLocalVector();
+    ID.RestoreDataPointerToLocalVector();
+    Phi[0]->RestoreDataPointerToLocalVector();
+  }
+*/
 
   // Prescribe velocity (if specified by user)
   if(pmo) {

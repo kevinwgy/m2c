@@ -44,6 +44,14 @@ struct Int3 {
   bool operator!=(const Int3& v2) const {return !(*this==v2);}
 };
 
+// hashing function for Int3
+struct Int3Hash {
+  std::size_t operator()(const Int3& key) const {
+    return static_cast<std::size_t>(key[0]) ^ (static_cast<std::size_t>(key[1]) << 1) 
+        ^ (static_cast<std::size_t>(key[2]) << 2);
+  }
+};
+
 //------------------------------------------------------------------------------
 // real number 
 struct Vec3D {
@@ -76,6 +84,15 @@ struct Vec3D {
   double operator*(const Vec3D &) const;
 
   operator double*() { return v; } //convert Vec3D to double*
+
+  bool operator==(const Vec3D& v2) const {
+    if     (v[0] != v2.v[0])   return false;
+    else if(v[1] != v2.v[1])   return false;
+    else if(v[2] != v2.v[2])   return false;
+    else                       return true;
+  }
+
+  bool operator!=(const Vec3D& v2) const {return !(*this==v2);}
 
   double &operator[](int i) { return v[i]; }
   double operator[](int i) const { return v[i]; }

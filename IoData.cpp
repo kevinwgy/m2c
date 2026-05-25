@@ -3305,13 +3305,14 @@ IntegrationData::IntegrationData()
   laser_radiation = "";
   momentum = "";
   latent_heat = "";
+  interfacial_loss = "";
 }
 
 //------------------------------------------------------------------------------
 
 Assigner* IntegrationData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 18, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 19, nullAssigner);
 
   new ClassInt<IntegrationData>(ca, "Frequency", this, &IntegrationData::frequency);
   new ClassDouble<IntegrationData>(ca, "TimeInterval", this, &IntegrationData::frequency_dt);
@@ -3328,7 +3329,9 @@ Assigner* IntegrationData::getAssigner()
                 // integration of eta*L
   new ClassStr<IntegrationData>(ca, "Momentum", this, &IntegrationData::momentum);
   new ClassStr<IntegrationData>(ca, "LatentHeat", this, &IntegrationData::latent_heat);
-                
+  new ClassStr<IntegrationData>(ca, "AccumulatedInterfacialLoss", this, &IntegrationData::interfacial_loss);
+                // loss of mass, momentum, and total energy due to implicit interface tracking & treatment
+
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);
   parallelepipedMap.setup("Parallelepiped", ca);

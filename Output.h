@@ -8,13 +8,12 @@
 #include <ProbeOutput.h>
 #include <EnergyIntegrationOutput.h>
 #include <IntegrationOutput.h>
-#include <LaserAbsorptionSolver.h>
 #include <PlaneOutput.h>
 #include <MaterialVolumeOutput.h>
 #include <TerminalVisualization.h>
-#include <HyperelasticityOperator.h>
 #include <IncompressibleOperator.h>
 #include <PhaseTransitionOutput.h>
+#include <TimeIntegrator.h>
 #include <stdio.h>
 
 class MultiPhaseOperator;
@@ -32,6 +31,9 @@ class Output
   //! Global mesh
   GlobalMeshInfo &global_mesh;
 
+  //! Integrator (some internal variables that can be outputted)
+  TimeIntegratorBase &integrator;
+ 
   //! external ghosts
   [[maybe_unused]] std::vector<GhostPoint>& ghost_nodes_outer;
 
@@ -79,6 +81,7 @@ public:
   Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
          std::vector<GhostPoint>* ghost_nodes_outer_, vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_,
          SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
+         TimeIntegratorBase &integrator_,
          MultiPhaseOperator& mpo_, IonizationOperator* ion_ = NULL, HyperelasticityOperator* heo_ = NULL,
          IncompressibleOperator* inco_ = NULL);
 

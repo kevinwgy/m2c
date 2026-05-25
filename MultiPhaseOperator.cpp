@@ -1294,14 +1294,21 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
         else {
           if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
             double e0 = idn[k][j][i]==INACTIVE_MATERIAL_ID ? 0.0 :
-                varFcn[idn[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+                        varFcn[idn[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+
+//            fprintf(stdout,"i=%d: (before) idn(%d) %e %e %e %e | lam = %e\n",
+//                    i, (int)idn[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e0, lam[k][j][i]);
 
             v[k][j][i] = vsum/sum_weight; 
 
             double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+//            fprintf(stdout,"i=%d: (after) id(%d) %e %e %e %e\n",
+//                    i, (int)id[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e);
+
             if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
               e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
               v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
+//              fprintf(stdout,"i=%d: (replenished) %e %e\n", i, v[k][j][j][4], e);
             }
 
             lam[k][j][i] = 0.0;
@@ -2245,7 +2252,11 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(double dt,
           //---------------------------------------------------------------------
           // Now, do the actual work: Add delta lam to internal energy
           double delta_lam = 0.0;
+          double internal_e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+	  fprintf(stdout,"%d - [before]: %e %e %e | %e | lam = %e\n", i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], internal_e, lam[k][j][i]);
           (*it)->DepositDeltaLambdaAfterTransition(v[k][j][i], lam[k][j][i], dt, &delta_lam);
+          internal_e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+	  fprintf(stdout,"%d - [after]: %e %e %e | %e | lam = %e\n", i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], internal_e, lam[k][j][i]);
           lam_dumped_new += global_mesh.GetCellVolume(i,j,k,true)*delta_lam;
           counter++;
           //---------------------------------------------------------------------

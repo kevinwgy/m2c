@@ -13,10 +13,12 @@
 Output::Output(MPI_Comm &comm_, DataManagers3D &dms, IoData &iod_, GlobalMeshInfo &global_mesh_,
                std::vector<GhostPoint>* ghost_nodes_outer_, vector<VarFcnBase*> &vf_, LaserAbsorptionSolver* laser_,
                SpaceVariable3D &coordinates, SpaceVariable3D &delta_xyz, SpaceVariable3D &cell_volume,
+               TimeIntegratorBase &integrator_,
                MultiPhaseOperator &mpo_, IonizationOperator* ion_, HyperelasticityOperator* heo_,
                IncompressibleOperator* inco_) : 
     comm(comm_), 
     iod(iod_), global_mesh(global_mesh_), ghost_nodes_outer(*ghost_nodes_outer_), vf(vf_), laser(laser_),
+    integrator(integrator_),
     scalar(comm_, &(dms.ghosted1_1dof)),
     vector3(comm_, &(dms.ghosted1_3dof)),
     vector5(comm_, &(dms.ghosted1_5dof)),
@@ -170,7 +172,11 @@ Output::OutputSolutions(double time, double dt, int time_step, SpaceVariable3D &
 
   //write solutions for integrated energy (and other quantities) in the specified region
   energy_output.WriteSolutionOfIntegrationEnergy(time, dt, time_step, V, ID, L, force_write);
-  integration_output.WriteIntegrationResults(time, dt, time_step, V, ID,  L, Lambda_ptr, force_write);
+  integration_output.WriteIntegrationResults(time, dt, time_step, V, ID, 
+                                             integrator.GetInterfacialLossX(),
+                                             integrator.GetInterfacialLossY(),
+                                             integrator.GetInterfacialLossZ(),
+                                             L, Lambda_ptr, force_write);
 
   //write solutions along lines
 

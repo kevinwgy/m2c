@@ -197,7 +197,7 @@ NeighborCommunicator::Request(SpaceVariable3D &V, vector<Int3> &Request, vector<
     nei = std::find(neighbors_ptr->begin(), neighbors_ptr->end(), owner)
         - neighbors_ptr->begin();
     if(nei == Nneigh) {
-      fprintf(stderr,"\033[0;31mNeighborCommunicator[%d]: Subdomain %d is not a neighbor.\033[0m\n",
+      fprintf(stdout,"\033[0;31mNeighborCommunicator[%d]: Subdomain %d is not a neighbor.\033[0m\n",
               rank, owner);
       exit(-1);
     }
@@ -347,7 +347,7 @@ NeighborCommunicator::Request(double*** v, int dof,
     nei = std::find(neighbors_ptr->begin(), neighbors_ptr->end(), owner)
         - neighbors_ptr->begin();
     if(nei == Nneigh) {
-      fprintf(stderr,"\033[0;31mNeighborCommunicator[%d]: Subdomain %d is not a neighbor.\033[0m\n",
+      fprintf(stdout,"\033[0;31mNeighborCommunicator[%d]: Subdomain %d is not a neighbor.\033[0m\n",
               rank, owner);
       exit(-1);
     }

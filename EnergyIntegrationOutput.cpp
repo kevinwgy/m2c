@@ -266,7 +266,7 @@ void EnergyIntegrationOutput::IntegrateVolume(SpaceVariable3D &ID, double* vol)
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -325,7 +325,7 @@ void EnergyIntegrationOutput::IntegrateMass(SpaceVariable3D &V, SpaceVariable3D 
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -383,7 +383,7 @@ void EnergyIntegrationOutput::IntegrateTotalEnergy(SpaceVariable3D &V, SpaceVari
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -445,7 +445,7 @@ void EnergyIntegrationOutput::IntegrateTotalEnthalpy(SpaceVariable3D &V, SpaceVa
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -507,7 +507,7 @@ void EnergyIntegrationOutput::IntegrateKineticEnergy(SpaceVariable3D &V, SpaceVa
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -568,7 +568,7 @@ void EnergyIntegrationOutput::IntegrateInternalEnergy(SpaceVariable3D &V, SpaceV
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -628,7 +628,7 @@ void EnergyIntegrationOutput::IntegratePotentialEnergy(SpaceVariable3D &V, Space
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
@@ -688,7 +688,7 @@ void EnergyIntegrationOutput::IntegrateLaserRadiation(SpaceVariable3D &V, SpaceV
       for(int i=i0; i<imax; i++) {
         myid = id[k][j][i];
         if(myid<0 || myid>=numMaterials) {
-          fprintf(stderr,"*** Error: Detected an unrecognized material id (%d)\n",
+          fprintf(stdout,"*** Error: Detected an unrecognized material id (%d)\n",
                   myid);
           exit(-1);
         }
