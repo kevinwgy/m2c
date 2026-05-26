@@ -149,7 +149,7 @@ under Output {
 
   VerboseScreenOutput = Medium;
 
-  under MaterialVolumes { //NOTE: does not account for spherical symmetry!
+  under MaterialVolumes { //NOTE: does not account for cylindrical or spherical symmetry
     FileName = "volumes";
     TimeInterval = 1.0e-7;
   }

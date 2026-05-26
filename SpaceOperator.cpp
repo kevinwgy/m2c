@@ -1713,9 +1713,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           // track interfacial mismatch
           if(localflux1 != localflux2) {
-            Vec5D loss = (localflux2 - localflux1)*area;
+            Vec5D loss = (localflux1 - localflux2)*area; //Note: currently fluxes are on the left-hand side
             fprintf(stdout,"(%d-1/2,%d,%d): dflux = %e %e %e, area = %e, loss = %e %e %e.\n",
-                    i, j, k, (localflux2 - localflux1)[0], (localflux2 - localflux1)[1], (localflux2 - localflux1)[4],
+                    i, j, k, (localflux1 - localflux2)[0], (localflux1 - localflux2)[1], (localflux1 - localflux2)[4],
                     area, loss[0], loss[1], loss[4]);
             auto it = Floss.find(Int3(i,j,k));
             if(it != Floss.end())
@@ -1886,8 +1886,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           // track interfacial mismatch
           if(localflux1 != localflux2) {
-            Vec5D loss = (localflux2 - localflux1)*area;
-            fprintf(stdout,"SHOULD NOT BE HERE (G).\n");
+            Vec5D loss = (localflux1 - localflux2)*area;
             auto it = Gloss.find(Int3(i,j,k));
             if(it != Gloss.end())
               it->second += loss;
@@ -2057,8 +2056,7 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
 
           // track interfacial mismatch
           if(localflux1 != localflux2) {
-            Vec5D loss = (localflux2 - localflux1)*area;
-            fprintf(stdout,"SHOULD NOT BE HERE (H). localflux2 - localflux1 = %e\n", (localflux2 - localflux1).norm());
+            Vec5D loss = (localflux1 - localflux2)*area;
             auto it = Hloss.find(Int3(i,j,k));
             if(it != Hloss.end())
               it->second += loss;
