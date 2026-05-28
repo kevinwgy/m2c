@@ -9,6 +9,7 @@
 #include<PhaseTransitionBase.h>
 #include<GhostPoint.h>
 #include<GlobalMeshInfo.h>
+#include<unordered_map>
 #include<tuple>
 #include<memory>
 #include<set>
@@ -83,8 +84,11 @@ public:
                                   vector<Intersector*> *intersector, SpaceVariable3D &ID);
 
   //! update V due to interface motion
-  int UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID,
-                                               SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
+  int UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V,
+                                               std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                                               std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                                               std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                                               RiemannSolutions &riemann_solutions,
                                                vector<Intersector*> *intersector, vector<Int3> &unresolved);
 
   int FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D &IDn, SpaceVariable3D &ID,
@@ -136,9 +140,30 @@ protected:
   int UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V,
                                           vector<Intersector*> *intersector, vector<Int3> &unresolved);
 
+  int UpdateStateVariablesByConservation(SpaceVariable3D &IDn, SpaceVariable3D &ID, SpaceVariable3D &V,
+                                         std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                                         std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                                         std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                                         vector<Intersector*> *intersector, vector<Int3> &unresolved);
+
   int LocalUpdateByRiemannSolutions(int i, int j, int k, int id, Vec5D &vl, Vec5D &vr, Vec5D &vb, Vec5D &vt,
                                     Vec5D &vk, Vec5D &vf, RiemannSolutions &riemann_solutions, Vec5D &v,
                                     bool upwind = true);
+
+  bool LocalUpdateByConservation(int i, int j, int k, int idn, int id,
+                                 std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                                 std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                                 std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                                 Vec5D &v, std::vector<Int3> &cleared_x,
+                                 std::vector<Int3> &cleared_y, std::vector<Int3> &cleared_z);
+                                 //cleared_{x,y,z} are used to remove the 'twin' copy stored in
+                                 //another subdomain --- for internal ghost nodes
+
+  void UpdateUlossAcrossSubdomains(std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                                   std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                                   std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                                   vector<Int3> &cleared_x, vector<Int3> &cleared_y,
+                                   vector<Int3> &cleared_z);
 
   //! internal function called by UpdatePhaseTransitions
   void UpdatePhiAfterPhaseTransitions(vector<SpaceVariable3D*> &Phi, SpaceVariable3D &ID,

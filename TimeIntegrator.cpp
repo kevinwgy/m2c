@@ -827,7 +827,8 @@ TimeIntegratorBase::UpdateSolutionAfterTimeStepping(SpaceVariable3D &V, SpaceVar
 
 
     vector<Int3> unresolved;
-    int nUnresolved = mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, riemann_solutions,
+    int nUnresolved = mpo.UpdateStateVariablesAfterInterfaceMotion(IDn, ID, V, Uloss_x, Uloss_y,
+                              Uloss_z, riemann_solutions,
                               embed ? embed->GetPointerToIntersectors() : nullptr, unresolved); //update V
     if(nUnresolved) {//note that "unresolved" is not combined over all the subdomains, could be empty for some
 

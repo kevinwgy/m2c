@@ -9,6 +9,7 @@
 #include<LevelSetOperator.h>
 #include<Vector5D.h>
 #include<RiemannSolutions.h>
+#include<CommunicationTools.h>
 #include<Intersector.h>
 #include<algorithm>//find
 #include<list>
@@ -945,7 +946,11 @@ MultiPhaseOperator::UpdateMaterialIDAtGhostNodes(SpaceVariable3D &ID)
 // Section 4.2.4 of Arthur Rallu's thesis
 int 
 MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &IDn, 
-                        SpaceVariable3D &ID, SpaceVariable3D &V, RiemannSolutions &riemann_solutions,
+                        SpaceVariable3D &ID, SpaceVariable3D &V,
+                        std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                        std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                        std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                        RiemannSolutions &riemann_solutions,
                         vector<Intersector*> *intersector, vector<Int3> &unresolved)
 {
 
@@ -963,6 +968,11 @@ MultiPhaseOperator::UpdateStateVariablesAfterInterfaceMotion(SpaceVariable3D &ID
 
     case MultiPhaseData::EXTRAPOLATION :
       unresolved_cells = UpdateStateVariablesByExtrapolation(IDn, ID, V, intersector, unresolved);
+      break;
+
+    case MultiPhaseData::CONSERVATION :
+      unresolved_cells = UpdateStateVariablesByConservation(IDn, ID, V, Uloss_x, Uloss_y, Uloss_z,
+                                                            intersector, unresolved);
       break;
 
     default :
@@ -1343,6 +1353,336 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
 
   return nStillUnresolved;
 
+}
+
+//-----------------------------------------------------
+
+int
+MultiPhaseOperator::UpdateStateVariablesByConservation(SpaceVariable3D &IDn, 
+                        SpaceVariable3D &ID, SpaceVariable3D &V,
+                        std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                        std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                        std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                        vector<Intersector*> *intersector, vector<Int3> &still_unresolved)
+{
+  // extract info
+  double*** idn = (double***)IDn.GetDataPointer();
+  double*** id  = (double***)ID.GetDataPointer();
+  Vec5D***  v   = (Vec5D***) V.GetDataPointer();
+
+  Vec3D*** coords = (Vec3D***)coordinates.GetDataPointer();
+
+  // extract latent heat (if relevant)
+  double*** lam = (trans.size()>0 && iod.multiphase.latent_heat_transfer==MultiPhaseData::REPLENISH)
+                ? Lambda.GetDataPointer() : nullptr;
+  int lambda_updated = 0; //if not updated by the end, no need to sync data across subdomains
+
+  double weight, sum_weight;
+  Vec5D vsum;
+  Vec3D v1, x1x0;
+  double v1norm;
+
+  // create vectors that store cleared interfacial losses that are stored in another subdomain
+  vector<Int3> cleared_x, cleared_y, cleared_z;
+
+  // create a vector that temporarily stores unresolved nodes (which will be resolved separately)
+  vector<Int3> unresolved;
+
+  // work inside the real domain
+  for(int k=k0; k<kmax; k++)
+    for(int j=j0; j<jmax; j++)
+      for(int i=i0; i<imax; i++) {
+
+        if(id[k][j][i] == idn[k][j][i]) //id remains the same. Skip
+          continue;
+
+        if(id[k][j][i] == INACTIVE_MATERIAL_ID)
+          continue;
+
+        double e0 = idn[k][j][i]==INACTIVE_MATERIAL_ID ? 0.0 :
+                     varFcn[idn[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+
+        bool updated = LocalUpdateByConservation(i,j,k, idn[k][j][i], id[k][j][i], Uloss_x,
+                                                 Uloss_y, Uloss_z, v[k][j][i],
+                                                 cleared_x, cleared_y, cleared_z);
+        if(updated) {
+
+          if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
+
+//            fprintf(stdout,"i=%d: (before) idn(%d) %e %e %e %e | lam = %e\n",
+//                    i, (int)idn[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e0, lam[k][j][i]);
+
+            double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+//            fprintf(stdout,"i=%d: (after) id(%d) %e %e %e %e\n",
+//                    i, (int)id[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e);
+
+            if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+              e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
+              v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
+//              fprintf(stdout,"i=%d: (replenished) %e %e\n", i, v[k][j][j][4], e);
+            }
+
+            lam[k][j][i] = 0.0;
+            lambda_updated = 1; //i.e., true
+          }
+
+          continue; //done :)
+        }
+ 
+
+
+        //Otherwise, go back to extrapolation
+        
+        // coordinates of this node
+        Vec3D& x0(coords[k][j][i]);
+
+        sum_weight = 0.0;
+        vsum       = 0.0;
+
+        //go over the neighboring nodes 
+        for(int neighk = k-1; neighk <= k+1; neighk++)         
+          for(int neighj = j-1; neighj <= j+1; neighj++)
+            for(int neighi = i-1; neighi <= i+1; neighi++) {
+
+              if(id[neighk][neighj][neighi] != id[k][j][i])
+                continue; //this neighbor has a different ID. Skip it.
+
+              if(id[neighk][neighj][neighi] != idn[neighk][neighj][neighi])
+                continue; //this neighbor also changed ID. Skip it. (Also skipping node [k][j][i])
+
+              if(ID.OutsidePhysicalDomain(neighi, neighj, neighk))
+                continue; //this neighbor is outside the physical domain. Skip.
+
+              // coordinates of this neighbor
+              Vec3D& x1(coords[neighk][neighj][neighi]);
+
+              if(intersector) {
+                bool connected = true;
+                for(auto&& xter : *intersector) {
+                  if(xter->Intersects(x0,x1,NULL,false,1)) {
+                    connected = false;
+                    break; //this neighbor is blocked to current node by an embedded surface
+                  }
+                }
+                if(!connected)
+                  continue;
+              }
+
+              if(iod.multiphase.phasechange_dir == MultiPhaseData::ALL) 
+                weight = 1.0/((x0-x1).norm());
+              else {//Upwind
+                // velocity at the neighbor node
+                v1[0] = v[neighk][neighj][neighi][1];
+                v1[1] = v[neighk][neighj][neighi][2];
+                v1[2] = v[neighk][neighj][neighi][3];
+                // compute weight
+                v1norm = v1.norm();
+                if(v1norm != 0)
+                  v1 /= v1norm;
+                x1x0 = x0 - x1; 
+                x1x0 /= x1x0.norm();
+
+                weight = max(0.0, x1x0*v1);
+              }
+
+              // add weighted s.v. at neighbor node
+              if(weight>0) {
+                sum_weight += weight;
+                vsum       += weight*v[neighk][neighj][neighi];
+              }
+            }
+
+        if(sum_weight==0) {
+          if(verbose>1) {
+            if(iod.multiphase.phasechange_dir == MultiPhaseData::ALL) 
+              fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+                      "by extrapolation.\n\033[0m", i,j,k, x0[0],x0[1],x0[2]);
+            else
+              fprintf(stdout,"\033[0;35mWarning: Unable to update phase change at (%d,%d,%d)(%e,%e,%e) "
+                      "by extrapolation w/ upwinding.\n\033[0m", i,j,k, x0[0],x0[1],x0[2]);
+          }
+          unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
+        }
+        else {
+          if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
+
+//            fprintf(stdout,"i=%d: (before) idn(%d) %e %e %e %e | lam = %e\n",
+//                    i, (int)idn[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e0, lam[k][j][i]);
+
+            v[k][j][i] = vsum/sum_weight; 
+
+            double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+//            fprintf(stdout,"i=%d: (after) id(%d) %e %e %e %e\n",
+//                    i, (int)id[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e);
+
+            if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
+              e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
+              v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
+//              fprintf(stdout,"i=%d: (replenished) %e %e\n", i, v[k][j][j][4], e);
+            }
+
+            lam[k][j][i] = 0.0;
+            lambda_updated = 1; //i.e., true
+          }
+          else
+            v[k][j][i] = vsum/sum_weight; 
+        }
+      }
+
+  V.RestoreDataPointerAndInsert(); //insert data & communicate with neighbor subd's
+  ID.RestoreDataPointerToLocalVector();
+  IDn.RestoreDataPointerToLocalVector();
+  coordinates.RestoreDataPointerToLocalVector();
+
+  UpdateUlossAcrossSubdomains(Uloss_x, Uloss_y, Uloss_z, cleared_x, cleared_y, cleared_z);
+
+
+  if(lam) {
+    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_MAX, comm);
+    if(lambda_updated>0)
+      Lambda.RestoreDataPointerAndInsert();
+    else
+      Lambda.RestoreDataPointerToLocalVector();
+  }
+
+
+  // Fix the unresolved nodes (if any)
+  int nUnresolved = unresolved.size();
+  int nStillUnresolved = 0;
+  MPI_Allreduce(MPI_IN_PLACE, &nUnresolved, 1, MPI_INT, MPI_SUM, comm);
+  if(nUnresolved) //some of the subdomains have unresolved nodes
+    nStillUnresolved = FixUnresolvedNodes(unresolved, IDn, ID, V, intersector, still_unresolved,
+                                          iod.multiphase.apply_failsafe_density==MultiPhaseData::On); 
+
+  return nStillUnresolved;
+
+}
+
+//-----------------------------------------------------
+
+bool
+MultiPhaseOperator::LocalUpdateByConservation(int i, int j, int k, int idn, int id,
+                                              std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                                              std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                                              std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                                              Vec5D &v, vector<Int3> &cleared_x,
+                                              vector<Int3> &cleared_y, vector<Int3> &cleared_z)
+{
+  if(idn == INACTIVE_MATERIAL_ID)
+    return false; //current algorithm is invalid for nodes turning from inactive
+
+  Vec5D dU(0.0);
+
+  // TODO: THIS SHOULD BE IMPROVED FOR GENERAL CASES (e.g., accounting for upwind & multiple nodes)
+  auto it = Uloss_x.find(Int3(i,j,k));
+  if(it != Uloss_x.end()) {
+    dU += it->second;
+    Uloss_x.erase(it);
+    if(i==i0 && i>0)
+      cleared_x.push_back(Int3(i,j,k));
+  }
+
+  it = Uloss_x.find(Int3(i+1,j,k));
+  if(it != Uloss_x.end()) {
+    dU += it->second;
+    Uloss_x.erase(it);
+    if(i==imax-1 && imax<global_mesh.NX)
+      cleared_x.push_back(Int3(i+1,j,k));
+  }
+
+  it = Uloss_y.find(Int3(i,j,k));
+  if(it != Uloss_y.end()) {
+    dU += it->second;
+    Uloss_y.erase(it);
+    if(j==j0 && j>0)
+      cleared_y.push_back(Int3(i,j,k));
+  }
+
+  it = Uloss_y.find(Int3(i,j+1,k));
+  if(it != Uloss_y.end()) {
+    dU += it->second;
+    Uloss_y.erase(it);
+    if(j==jmax-1 && jmax<global_mesh.NY)
+      cleared_y.push_back(Int3(i,j+1,k));
+  }
+
+  it = Uloss_z.find(Int3(i,j,k));
+  if(it != Uloss_z.end()) {
+    dU += it->second;
+    Uloss_z.erase(it);
+    if(k==k0 && k>0)
+      cleared_z.push_back(Int3(i,j,k));
+  }
+
+  it = Uloss_z.find(Int3(i,j,k+1));
+  if(it != Uloss_z.end()) {
+    dU += it->second;
+    Uloss_z.erase(it);
+    if(k==kmax-1 && kmax<global_mesh.NZ)
+      cleared_z.push_back(Int3(i,j,k+1));
+  }
+
+  if(dU==Vec5D(0.0))
+    return false;
+
+  
+  double vol = global_mesh.GetCellVolume(i,j,k,true); //accounts for domain symmetry
+  double rho0 = v[0];
+  Vec3D velo0 = Vec3D(v[1],v[2],v[3]);
+  double   p0 = v[4];
+  double   e0 = varFcn[idn]->GetInternalEnergyPerUnitMass(rho0, p0);
+
+  // mass: vol*rho1 = vol*rho0 + dU[0]
+  double rho1 = rho0 + dU[0]/vol; //add lost mass
+  if(rho1<=0.0) {
+    fprintf(stdout,"Warning: CheckState failed for updated state. Discarded.\n");
+    return false;
+  }
+
+  // momentum: vol*rho1*velo1 = vol*rho0*velo0 + dU[1,2,3]
+  Vec3D velo1 = rho0/rho1*velo0 + 1.0/(rho1*vol)*Vec3D(dU[1],dU[2],dU[3]); //add lost momentum
+
+  // energy: vol*rho1*(e1 + 0.5*|velo1|^2) = vol*rho0*(e0 + 0.5*|velo0|^2) + dU[4]
+  double   e1 = rho0/rho1*(e0 + 0.5*velo0*velo0) + dU[4]/(vol*rho1) - 0.5*velo1*velo1;
+  double   p1 = varFcn[id]->GetPressure(rho1, e1);
+
+  Vec5D v1 = Vec5D(rho1, velo1[0], velo1[1], velo1[2], p1); 
+  if(varFcn[id]->CheckState(v1, true)) {
+    fprintf(stdout,"Warning: CheckState failed for updated state. Discarded.\n");
+    return false;
+  }
+ 
+  // update
+  v = v1;
+
+  return true;
+}
+
+//-----------------------------------------------------
+
+void
+MultiPhaseOperator::UpdateUlossAcrossSubdomains(std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_x,
+                                                std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_y,
+                                                std::unordered_map<Int3, Vec5D, Int3Hash> &Uloss_z,
+                                                vector<Int3> &cleared_x, vector<Int3> &cleared_y,
+                                                vector<Int3> &cleared_z)
+{
+  int counts[3] = {static_cast<int>(cleared_x.size()), static_cast<int>(cleared_y.size()),
+                   static_cast<int>(cleared_z.size())};
+  MPI_Allreduce(MPI_IN_PLACE, counts, 3, MPI_INT, MPI_SUM, comm);
+
+  auto clear = [&](std::unordered_map<Int3, Vec5D, Int3Hash>& Uloss, vector<Int3>& cleared, int n){
+    if(n > 0) {
+      vector<Int3> cleared_all = cleared;
+      CommunicationTools::AllGatherVector(comm, cleared_all);
+      for(const auto& ijk : cleared_all)
+        Uloss.erase(ijk); // erase if found
+    }
+  };
+
+  clear(Uloss_x, cleared_x, counts[0]);
+  clear(Uloss_y, cleared_y, counts[1]);
+  clear(Uloss_z, cleared_z, counts[2]);
 }
 
 //-----------------------------------------------------

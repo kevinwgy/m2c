@@ -897,7 +897,7 @@ struct MultiPhaseData {
 
   double conRec_depth; //!< depth (fabs(phi)) where constant reconstruction is applied (default: 0)
 
-  enum PhaseChangeType {RIEMANN_SOLUTION = 0, EXTRAPOLATION = 1} phasechange_type;
+  enum PhaseChangeType {RIEMANN_SOLUTION = 0, EXTRAPOLATION = 1, CONSERVATION = 2} phasechange_type;
 
   enum PhaseChangeDirection {ALL = 0, UPWIND = 1} phasechange_dir;
 

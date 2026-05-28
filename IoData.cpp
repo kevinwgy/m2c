@@ -1739,8 +1739,8 @@ void MultiPhaseData::setup(const char *name, ClassAssigner *father)
 
   new ClassToken<MultiPhaseData>
     (ca, "PhaseChange", this,
-     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_type), 2,
-     "RiemannSolution", 0, "Extrapolation", 1);
+     reinterpret_cast<int MultiPhaseData::*>(&MultiPhaseData::phasechange_type), 3,
+     "RiemannSolution", 0, "Extrapolation", 1, "Conservation", 2);
 
   new ClassToken<MultiPhaseData>
     (ca, "PhaseChangeDirection", this,
