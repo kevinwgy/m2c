@@ -2498,6 +2498,7 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceV
           total_absorbed_energy += dt*val*global_mesh_NS.GetCellVolume(i,j,k,true); //accounts for symmetries
         } 
    
+    MPI_Allreduce(MPI_IN_PLACE, &total_absorbed_energy, 1, MPI_DOUBLE, MPI_SUM, comm);
 
     TemperatureNS.RestoreDataPointerToLocalVector();
     if(V_) V_->RestoreDataPointerToLocalVector();
@@ -2546,6 +2547,8 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &
     }
     // No need of data exchange on r
   }
+
+  MPI_Allreduce(MPI_IN_PLACE, &total_absorbed_energy, 1, MPI_DOUBLE, MPI_SUM, comm);
 
   Temperature.RestoreDataPointerToLocalVector();
   if(V_) V_->RestoreDataPointerToLocalVector();
