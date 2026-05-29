@@ -120,6 +120,7 @@ class LaserAbsorptionSolver {
 
   //! Internal variable on the NS mesh
   SpaceVariable3D TemperatureNS;
+  GlobalMeshInfo& global_mesh_NS;
 
   //! Internal variables (on the Laser mesh)
   SpaceVariable3D Temperature;
@@ -153,14 +154,19 @@ class LaserAbsorptionSolver {
   double mfm_alpha;
   double sor_relax;
 
+  //! Total absorbed laser energy (accumulated from t = 0, across all material subdomains)
+  double total_absorbed_energy;
+
 public:
 
   LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, std::vector<VarFcnBase*> &varFcn_,
+                        GlobalMeshInfo &global_mesh_,
                         SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
                         std::vector<GhostPoint> &ghost_nodes_inner_, std::vector<GhostPoint> &ghost_nodes_outer_);
 
   //! This constructor is used when load balancing is requested (i.e. a sub-mesh is constructed/partitioned for the laser domain)
   LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, std::vector<VarFcnBase*> &varFcn_,
+                        GlobalMeshInfo &global_mesh_,
                         SpaceVariable3D &coordinates_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_, 
                         vector<double> &x, vector<double> &y, vector<double> &z,
                         vector<double> &dx, vector<double> &dy, vector<double> &dz);
@@ -175,7 +181,10 @@ public:
 
   //! Compute eta*L and add to the 5th entry of R. (Not multiplying cell volume)
   void AddHeatToNavierStokesResidual(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID, 
-                                     SpaceVariable3D *V = NULL); //if NULL, use stored temperature
+                                     SpaceVariable3D *V = NULL,//if NULL, use stored temperature
+                                     double dt = 0.0); //multiplied to 'power', for outputing absorbed energy ONLY
+
+  double GetTotalAbsorbedEnergy() {return total_absorbed_energy;}
 
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin
     return id<(int)absorption.size() ?
@@ -255,7 +264,8 @@ private:
   //-------------------------------------------------------------
 
   void AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &R, SpaceVariable3D &L, SpaceVariable3D &ID, 
-                                               SpaceVariable3D *V = NULL); //if NULL, use stored temperature
+                                               SpaceVariable3D *V = NULL,  //if NULL, use stored temperature
+                                               double dt = 0.0);
   
 /*
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin

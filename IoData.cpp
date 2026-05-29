@@ -3306,13 +3306,14 @@ IntegrationData::IntegrationData()
   momentum = "";
   latent_heat = "";
   interfacial_loss = "";
+  laser_energy_absorption = "";
 }
 
 //------------------------------------------------------------------------------
 
 Assigner* IntegrationData::getAssigner()
 {
-  ClassAssigner *ca = new ClassAssigner("normal", 19, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 20, nullAssigner);
 
   new ClassInt<IntegrationData>(ca, "Frequency", this, &IntegrationData::frequency);
   new ClassDouble<IntegrationData>(ca, "TimeInterval", this, &IntegrationData::frequency_dt);
@@ -3331,6 +3332,7 @@ Assigner* IntegrationData::getAssigner()
   new ClassStr<IntegrationData>(ca, "LatentHeat", this, &IntegrationData::latent_heat);
   new ClassStr<IntegrationData>(ca, "AccumulatedInterfacialLoss", this, &IntegrationData::interfacial_loss);
                 // loss of mass, momentum, and total energy due to implicit interface tracking & treatment
+  new ClassStr<IntegrationData>(ca, "LaserEnergyAbsorption", this, &IntegrationData::laser_energy_absorption);
 
   planeMap.setup("Plane", ca);
   sphereMap.setup("Sphere", ca);

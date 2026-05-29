@@ -1495,7 +1495,9 @@ struct IntegrationData {
 
   enum Vars  {VOLUME = 0, MASS = 1, TOTAL_ENERGY = 2, TOTAL_ENTHALPY = 3, KINETIC_ENERGY = 4,
               INTERNAL_ENERGY = 5, POTENTIAL_ENERGY = 6, LASER_RADIATION = 7,
-              MOMENTUM = 8, LATENT_HEAT = 9, INTERFACIAL_LOSS = 10, SIZE = 11};
+              MOMENTUM = 8, LATENT_HEAT = 9, INTERFACIAL_LOSS = 10, 
+              LASER_ENERGY_ABSORPTION = 11, SIZE = 12};
+  //LASER_RADIATION outputs the power of laser absorption; LASER_ENERGY_ABSORPTION gives energy
 
   const char *volume;
   const char *mass;
@@ -1505,6 +1507,7 @@ struct IntegrationData {
   const char *internal_energy;
   const char *potential_energy;
   const char *laser_radiation;
+  const char *laser_energy_absorption;
   const char *momentum;
   const char *latent_heat;
   const char *interfacial_loss;

@@ -394,11 +394,11 @@ int main(int argc, char* argv[])
 
     if(iod.laser.parallel == LaserData::BALANCED) {//re-balance the load
       print("- Initializing the laser radiation solver on a re-partitioned sub-mesh.\n");
-      laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
+      laser = new LaserAbsorptionSolver(comm, dms, iod, vf, global_mesh, spo.GetMeshCoordinates(), 
                                         //the following inputs are used for creating a new dms/spo
                                         *ff, *riemann, xcoords, ycoords, zcoords, dx, dy, dz);
     } else
-      laser = new LaserAbsorptionSolver(comm, dms, iod, vf, spo.GetMeshCoordinates(), 
+      laser = new LaserAbsorptionSolver(comm, dms, iod, vf, global_mesh, spo.GetMeshCoordinates(), 
                                         spo.GetMeshDeltaXYZ(), spo.GetMeshCellVolumes(),
                                         *(spo.GetPointerToInnerGhostNodes()),
                                         *(spo.GetPointerToOuterGhostNodes()));

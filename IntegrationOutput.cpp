@@ -140,6 +140,18 @@ IntegrationOutput::IntegrationOutput(MPI_Comm &comm_, DataManagers3D &dm_all_, I
       delete [] filename;
     }
 
+    if(integral.second->laser_energy_absorption[0] != 0) {
+      if(!laser) {
+        print_error("*** Error: Laser absorption integration requested without specifying laser source.\n");
+        exit_mpi();
+      }
+      char *filename = new char[spn + strlen(integral.second->laser_energy_absorption)];
+      snprintf(filename, spn + strlen(integral.second->laser_energy_absorption), "%s%s",
+               iod_output.prefix, integral.second->laser_energy_absorption);
+      file[IntegrationData::LASER_ENERGY_ABSORPTION] = fopen(filename, "w");
+      delete [] filename;
+    }
+
     if(integral.second->latent_heat[0] != 0) {
       char *filename = new char[spn + strlen(integral.second->latent_heat)];
       snprintf(filename, spn + strlen(integral.second->latent_heat), "%s%s",
@@ -716,6 +728,15 @@ IntegrationOutput::WriteIntegrationResults(double time, double dt, int time_step
       }
       print(file[IntegrationData::LASER_RADIATION], "%16.14e\n", sum);
       print_flush(file[IntegrationData::LASER_RADIATION]);
+    }
+
+    if(file[IntegrationData::LASER_ENERGY_ABSORPTION]) {
+      print(file[IntegrationData::LASER_ENERGY_ABSORPTION], "%10d    %16.14e    ", time_step, time);
+      assert(laser);
+      for(int i=0; i<numMaterials; i++)
+        print(file[IntegrationData::LASER_ENERGY_ABSORPTION], "-1.0  ");
+      print(file[IntegrationData::LASER_ENERGY_ABSORPTION], "%16.14e\n", laser->GetTotalAbsorbedEnergy());
+      print_flush(file[IntegrationData::LASER_ENERGY_ABSORPTION]);
     }
 
     if(file[IntegrationData::LATENT_HEAT]) {

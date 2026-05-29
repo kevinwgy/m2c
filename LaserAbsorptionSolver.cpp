@@ -23,11 +23,10 @@ extern int verbose;
 //--------------------------------------------------------------------------
 
 LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, 
-                         vector<VarFcnBase*> &varFcn_, SpaceVariable3D &coordinates_, 
-                         SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
-                         vector<GhostPoint> &ghost_nodes_inner_, 
-                         vector<GhostPoint> &ghost_nodes_outer_)
-                     : comm(comm_), nscomm(comm_), active_core(true),
+                         vector<VarFcnBase*> &varFcn_, GlobalMeshInfo &global_mesh_,
+                         SpaceVariable3D &coordinates_, SpaceVariable3D &delta_xyz_, SpaceVariable3D &volume_,
+                         vector<GhostPoint> &ghost_nodes_inner_, vector<GhostPoint> &ghost_nodes_outer_)
+                     : comm(comm_), nscomm(comm_), global_mesh_NS(global_mesh_), active_core(true),
                        iod(iod_), varFcn(varFcn_), coordinates(&coordinates_), delta_xyz(&delta_xyz_),
                        volume(&volume_), ghost_nodes_inner(&ghost_nodes_inner_),
                        ghost_nodes_outer(&ghost_nodes_outer_),
@@ -38,7 +37,8 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        Level(comm_, &(dm_all_.ghosted1_1dof)),
                        Tag(comm_, &(dm_all_.ghosted1_1dof)),
                        ID(NULL), L(NULL), TemperatureNS(),
-                       NS2Laser(NULL), Laser2NS(NULL), dms(NULL), spo(NULL)
+                       NS2Laser(NULL), Laser2NS(NULL), dms(NULL), spo(NULL),
+                       total_absorbed_energy(0.0)
 {
 
   L_initialized = false;
@@ -106,13 +106,14 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
 //--------------------------------------------------------------------------
 // Used with the option of re-balancing load
 LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm_all_, IoData &iod_, 
-                         vector<VarFcnBase*> &varFcn_, SpaceVariable3D &coordinates_, 
-                         FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
+                         vector<VarFcnBase*> &varFcn_, GlobalMeshInfo &global_mesh_,
+                         SpaceVariable3D &coordinates_, FluxFcnBase &fluxFcn_, ExactRiemannSolverBase &riemann_,
                          vector<double> &x, vector<double> &y, vector<double> &z,
                          vector<double> &dx, vector<double> &dy, vector<double> &dz)
-                     : nscomm(comm_), iod(iod_), varFcn(varFcn_), 
+                     : nscomm(comm_), iod(iod_), varFcn(varFcn_), global_mesh_NS(global_mesh_),
                        Temperature(), L0(), Lbk(), Phi(), Level(), Tag(),
-                       TemperatureNS(comm_, &(dm_all_.ghosted1_1dof))
+                       TemperatureNS(comm_, &(dm_all_.ghosted1_1dof)),
+                       total_absorbed_energy(0.0)
 {
 
   L_initialized = false;
@@ -2454,12 +2455,13 @@ LaserAbsorptionSolver::ApplyStoredGhostNodesRadiance(double*** l)
 
 void
 LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceVariable3D &L_, SpaceVariable3D &ID_,
-                                                     SpaceVariable3D *V_)
+                                                     SpaceVariable3D *V_,
+                                                     double dt) //dt is multiplied to power, for outputing energy ONLY
 {
 
   if(iod.laser.parallel != LaserData::BALANCED) {
 
-    AddHeatToNavierStokesResidualSingleMesh(R_, L_, ID_, V_);
+    AddHeatToNavierStokesResidualSingleMesh(R_, L_, ID_, V_, dt);
 
   } else {
 
@@ -2490,9 +2492,13 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceV
             myT = Tns[k][j][i];
 
           eta = GetAbsorptionCoefficient(myT, myid); //absorption coeff.
-          r[k][j][i][4] += eta*l[k][j][i];
+
+          double val = eta*l[k][j][i];
+          r[k][j][i][4] += val;
+          total_absorbed_energy += dt*val*global_mesh_NS.GetCellVolume(i,j,k,true); //accounts for symmetries
         } 
    
+
     TemperatureNS.RestoreDataPointerToLocalVector();
     if(V_) V_->RestoreDataPointerToLocalVector();
     ID_.RestoreDataPointerToLocalVector();
@@ -2507,8 +2513,9 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceV
 //--------------------------------------------------------------------------
 
 void
-LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &R_, SpaceVariable3D &L_, SpaceVariable3D &ID_,
-                                                               SpaceVariable3D *V_)
+LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &R_, SpaceVariable3D &L_,
+                                                               SpaceVariable3D &ID_, SpaceVariable3D *V_,
+                                                               double dt)
 {
   Vec5D***  r  = (Vec5D***) R_.GetDataPointer();
   double*** l  = L_.GetDataPointer();
@@ -2532,7 +2539,9 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &
     for(int n = 0; n < queueCounter[lvl]; n++) { //sortedNodes on lvl
       int i(it->i), j(it->j), k(it->k);
       double eta = GetAbsorptionCoefficient(T[k][j][i], id[k][j][i]); //absorption coeff.
-      r[k][j][i][4] += eta*l[k][j][i];
+      double val = eta*l[k][j][i];
+      r[k][j][i][4] += val;
+      total_absorbed_energy += dt*val*global_mesh_NS.GetCellVolume(i,j,k,true); //accounts for symmetries
       it++;
     }
     // No need of data exchange on r
@@ -2548,10 +2557,6 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &
 }
 
 //--------------------------------------------------------------------------
-
-
-
-
 
 
 

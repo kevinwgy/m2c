@@ -228,7 +228,7 @@ TimeIntegratorFE::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   std::unordered_map<Int3, Vec5D, Int3Hash> Floss, Gloss, Hloss; //storing mismatched interfacial flux x area
   spo.ComputeResidual(V, ID, Rn, Floss, Gloss, Hloss, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi,
                       EBDS.get(), Xi); //compute Rn
-  if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID);
+  if(laser) laser->AddHeatToNavierStokesResidual(Rn, *L, ID, NULL, dt);
 
   spo.PrimitiveToConservative(V, ID, Un); // get Un
   if(local_time_stepping)
@@ -388,7 +388,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   spo.ComputeResidual(V, ID, R, Floss, Gloss, Hloss, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi,
                       EBDS.get(), Xi/*, run_heat*/); //->R(V(n))
 
-  if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
+  if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID, NULL, 0.5*dt);
 
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
@@ -447,7 +447,7 @@ TimeIntegratorRK2::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time,time_step);
-    laser->AddHeatToNavierStokesResidual(R, *L, ID);
+    laser->AddHeatToNavierStokesResidual(R, *L, ID, NULL, 0.5*dt);
   }
   U1.AXPlusBY(0.5, 0.5, Un); //U(n+1) = 0.5*U(n) + 0.5*U1;
   if(local_time_stepping)
@@ -602,7 +602,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
   spo.ComputeResidual(V, ID, R, Floss, Gloss, Hloss, time-dt, &riemann_solutions, &ls_mat_id, &Phi, &KappaPhi,
                       EBDS.get(), Xi); //->R(V(n))
 
-  if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID);
+  if(laser) laser->AddHeatToNavierStokesResidual(R, *L, ID, NULL, dt/6.0);
 
   spo.PrimitiveToConservative(V, ID, Un); // get U(n)
   U1.AXPlusBY(0.0, 1.0, Un); //U1 = U(n)
@@ -661,7 +661,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   if(laser) {
     laser->ComputeLaserRadiance(V1,ID,*L,time,time_step);
-    laser->AddHeatToNavierStokesResidual(R, *L, ID);
+    laser->AddHeatToNavierStokesResidual(R, *L, ID, NULL, dt/6.0);
   }
 
   AccumulateInterfacialMismatch(Floss, Gloss, Hloss, dt/6.0);
@@ -720,7 +720,7 @@ TimeIntegratorRK3::AdvanceOneTimeStep(SpaceVariable3D &V, SpaceVariable3D &ID,
 
   if(laser) {
     laser->ComputeLaserRadiance(V2,ID,*L,time-0.5*dt,time_step);
-    laser->AddHeatToNavierStokesResidual(R, *L, ID);
+    laser->AddHeatToNavierStokesResidual(R, *L, ID, NULL, 2.0/3.0*dt);
   }
   U1.AXPlusBY(2.0/3.0, 1.0/3.0, Un); //U2 = 1/3*U(n) + 2/3*U2;
   if(local_time_stepping)
