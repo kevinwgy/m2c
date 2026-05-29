@@ -38,7 +38,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                        Tag(comm_, &(dm_all_.ghosted1_1dof)),
                        ID(NULL), L(NULL), TemperatureNS(),
                        NS2Laser(NULL), Laser2NS(NULL), dms(NULL), spo(NULL),
-                       total_absorbed_energy(0.0)
+                       absorbed_energy_in_subdomain(0.0)
 {
 
   L_initialized = false;
@@ -113,7 +113,7 @@ LaserAbsorptionSolver::LaserAbsorptionSolver(MPI_Comm &comm_, DataManagers3D &dm
                      : nscomm(comm_), iod(iod_), varFcn(varFcn_), global_mesh_NS(global_mesh_),
                        Temperature(), L0(), Lbk(), Phi(), Level(), Tag(),
                        TemperatureNS(comm_, &(dm_all_.ghosted1_1dof)),
-                       total_absorbed_energy(0.0)
+                       absorbed_energy_in_subdomain(0.0)
 {
 
   L_initialized = false;
@@ -2495,11 +2495,9 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidual(SpaceVariable3D &R_, SpaceV
 
           double val = eta*l[k][j][i];
           r[k][j][i][4] += val;
-          total_absorbed_energy += dt*val*global_mesh_NS.GetCellVolume(i,j,k,true); //accounts for symmetries
+          absorbed_energy_in_subdomain += dt*val*global_mesh_NS.GetCellVolume(i,j,k,true); //accounts for symmetries
         } 
    
-    MPI_Allreduce(MPI_IN_PLACE, &total_absorbed_energy, 1, MPI_DOUBLE, MPI_SUM, comm);
-
     TemperatureNS.RestoreDataPointerToLocalVector();
     if(V_) V_->RestoreDataPointerToLocalVector();
     ID_.RestoreDataPointerToLocalVector();
@@ -2542,13 +2540,11 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &
       double eta = GetAbsorptionCoefficient(T[k][j][i], id[k][j][i]); //absorption coeff.
       double val = eta*l[k][j][i];
       r[k][j][i][4] += val;
-      total_absorbed_energy += dt*val*global_mesh_NS.GetCellVolume(i,j,k,true); //accounts for symmetries
+      absorbed_energy_in_subdomain += dt*val*global_mesh_NS.GetCellVolume(i,j,k,true); //accounts for symmetries
       it++;
     }
     // No need of data exchange on r
   }
-
-  MPI_Allreduce(MPI_IN_PLACE, &total_absorbed_energy, 1, MPI_DOUBLE, MPI_SUM, comm);
 
   Temperature.RestoreDataPointerToLocalVector();
   if(V_) V_->RestoreDataPointerToLocalVector();
@@ -2557,6 +2553,16 @@ LaserAbsorptionSolver::AddHeatToNavierStokesResidualSingleMesh(SpaceVariable3D &
   R_.RestoreDataPointerToLocalVector(); //although data has been udpated, no need to communicate.
                                        //one subdomain does not need the residual info of another
                                        //subdomain
+}
+
+//--------------------------------------------------------------------------
+
+double
+LaserAbsorptionSolver::GetTotalAbsorbedEnergy()
+{
+  double total = absorbed_energy_in_subdomain;
+  MPI_Allreduce(MPI_IN_PLACE, &total, 1, MPI_DOUBLE, MPI_SUM, comm);
+  return total; 
 }
 
 //--------------------------------------------------------------------------

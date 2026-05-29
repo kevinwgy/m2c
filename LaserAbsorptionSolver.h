@@ -155,7 +155,7 @@ class LaserAbsorptionSolver {
   double sor_relax;
 
   //! Total absorbed laser energy (accumulated from t = 0, across all material subdomains)
-  double total_absorbed_energy;
+  double absorbed_energy_in_subdomain;
 
 public:
 
@@ -184,7 +184,8 @@ public:
                                      SpaceVariable3D *V = NULL,//if NULL, use stored temperature
                                      double dt = 0.0); //multiplied to 'power', for outputing absorbed energy ONLY
 
-  double GetTotalAbsorbedEnergy() {return total_absorbed_energy;}
+  double GetAbsorbedEnergyInSubdomain() {return absorbed_energy_in_subdomain;}
+  double GetTotalAbsorbedEnergy();
 
   inline double GetAbsorptionCoefficient(double T, int id) { //T must be in Kelvin
     return id<(int)absorption.size() ?
