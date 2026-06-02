@@ -1714,9 +1714,9 @@ void SpaceOperator::ComputeAdvectionFluxes(SpaceVariable3D &V, SpaceVariable3D &
           // track interfacial mismatch
           if(localflux1 != localflux2) {
             Vec5D loss = (localflux1 - localflux2)*area; //Note: currently fluxes are on the left-hand side
-            fprintf(stdout,"(%d-1/2,%d,%d): dflux = %e %e %e, area = %e, loss = %e %e %e.\n",
-                    i, j, k, (localflux1 - localflux2)[0], (localflux1 - localflux2)[1], (localflux1 - localflux2)[4],
-                    area, loss[0], loss[1], loss[4]);
+            //fprintf(stdout,"(%d-1/2,%d,%d): dflux = %e %e %e, area = %e, loss = %e %e %e.\n",
+            //        i, j, k, (localflux1 - localflux2)[0], (localflux1 - localflux2)[1], (localflux1 - localflux2)[4],
+            //        area, loss[0], loss[1], loss[4]);
             auto it = Floss.find(Int3(i,j,k));
             if(it != Floss.end())
               it->second += loss;
