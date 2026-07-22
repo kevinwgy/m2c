@@ -554,8 +554,8 @@ struct MaterialModelData {
   int id;
   enum EOS {STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, 
             EXTENDED_MIE_GRUNEISEN = 3,
-            TILLOTSON = 4, JWL = 5, ANEOS_BIRCH_MURNAGHAN_DEBYE = 6,
-            HOMOGENEOUS_INCOMPRESSIBLE = 7} eos;
+            TILLOTSON = 4, JWL = 5, ANEOS_BIRCH_MURNAGHAN_DEBYE = 6, VAN_DER_WAALS = 7,
+            HOMOGENEOUS_INCOMPRESSIBLE = 8} eos;
   double rhomin;
   double pmin;
   double rhomax;
@@ -570,6 +570,7 @@ struct MaterialModelData {
   TillotsonModelData                tillotModel;
   JonesWilkinsLeeModelData          jwlModel;
   ANEOSBirchMurnaghanDebyeModelData abmdModel;
+  //VanDerWaalsModelData              vdwModel; //KW: Not ready yet
   HomoIncompressibleModelData       incompModel;
 
   ViscosityModelData viscosity;

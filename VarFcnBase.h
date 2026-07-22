@@ -39,8 +39,8 @@ public:
   
   enum Type{STIFFENED_GAS = 0, NOBLE_ABEL_STIFFENED_GAS = 1, MIE_GRUNEISEN = 2, 
             EXTENDED_MIE_GRUNEISEN = 3, TILLOTSON = 4,
-            JWL = 5, ANEOS_BIRCH_MURNAGHAN_DEBYE = 6,
-            HOMOGENEOUS_INCOMPRESSIBLE = 7, DUMMY = 8} type;
+            JWL = 5, ANEOS_BIRCH_MURNAGHAN_DEBYE = 6, VAN_DER_WAALS = 7,
+            HOMOGENEOUS_INCOMPRESSIBLE = 8, DUMMY = 9} type;
 
   double rhomin,pmin;
   double rhomax,pmax;
