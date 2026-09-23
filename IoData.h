@@ -612,6 +612,8 @@ struct MaterialTransitionData {
 
   double latent_heat;
 
+  enum StoredEnergyBasis {UNIT_MASS = 0, UNIT_VOLUME = 1} stored_energy_basis;
+
   enum KineticsModel {NONE = 0, CONSTANT = 1} kinetics;
   MatTranConstantKineticsData constant_model;
 

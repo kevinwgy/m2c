@@ -24,6 +24,7 @@ class PhaseTransitionBase {
 protected:
 
   MaterialTransitionData::KineticsModel kinetics_model;
+  MaterialTransitionData::StoredEnergyBasis stored_energy_basis;
 
   int fromID, toID;
 
@@ -41,7 +42,8 @@ public:
        Tmin(data.temperature_lowerbound), Tmax(data.temperature_upperbound),
        pmin(data.pressure_lowerbound), pmax(data.pressure_upperbound),
        latent_heat(data.latent_heat),
-       kinetics_model(data.kinetics)
+       kinetics_model(data.kinetics),
+       stored_energy_basis(data.stored_energy_basis)
   { }
 
   virtual ~PhaseTransitionBase() {}
@@ -49,6 +51,7 @@ public:
   inline int FromID() {return fromID;}
   inline int ToID() {return toID;}
   inline double GetLatentHeat() {return latent_heat;}
+  inline MaterialTransitionData::StoredEnergyBasis GetStoredEnergyBasis() {return stored_energy_basis;} 
 
   //-----------------------------------------------------------------------------
   // Get the amount of latent heat (lambda) that should be deposited over time dt
@@ -62,10 +65,10 @@ public:
   //-----------------------------------------------------------------------------
   virtual void DepositDeltaLambdaAfterTransition(double *v, double &lambda, double dt,
                                                  double *delta_lam = NULL) {
-    double rho  = v[0];
-    double e    = vf2.GetInternalEnergyPerUnitMass(rho, v[4]);
-    double dlam = GetDeltaLambda(rho, lambda, dt);
-    e      += dlam/rho;
+    double e    = vf2.GetInternalEnergyPerUnitMass(v[0], v[4]);
+    double dlam = GetDeltaLambda(v[0], lambda, dt);
+    double denom= (stored_energy_basis==MaterialTransitionData::UNIT_MASS) ? 1.0 : v[0];
+    e      += dlam/denom;
     lambda -= dlam;
     v[4] = vf2.GetPressure(v[0], e);
 
@@ -100,14 +103,14 @@ PhaseTransitionBase::Transition(double *v, double &lambda, double dt, double *de
   if(T<=Tmax) { //no phase transition, but if lambda (latent heat reservoir) is non-zero, should pour it 
                 //back to raise temperature
     if(lambda>0) {
-      double rho = v[0];
-      double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(rho, Tmax); 
+      double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax); 
       double de = e_vap - e;
 
-      double dlam = std::min(rho*de, lambda);
+      double multiplier = (stored_energy_basis==MaterialTransitionData::UNIT_MASS) ? 1.0 : v[0];
+      double dlam = std::min(multiplier*de, lambda);
 
       lambda -= dlam;
-      e      += dlam/rho;
+      e      += dlam/multiplier;
 
       v[4] = vf1.GetPressure(v[0], e);
     }
@@ -116,16 +119,17 @@ PhaseTransitionBase::Transition(double *v, double &lambda, double dt, double *de
 
   } else { // excessive heat should go to lambda. Then, check if latent heat is reached
 
-    double rho = v[0];
-    double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(rho, Tmax);
+    double e_vap = vf1.GetInternalEnergyPerUnitMassFromTemperature(v[0], Tmax);
     double de = e - e_vap;
 
-    lambda += rho*de;
+    double multiplier = (stored_energy_basis==MaterialTransitionData::UNIT_MASS) ? 1.0 : v[0];
+
+    lambda += multiplier*de;
     e      -= de; //= e_vap
 
-    if(lambda >= rho*latent_heat) {//DETECTED PHASE TRANSITION
-      double dlam = GetDeltaLambda(rho, lambda, dt);
-      e      += dlam/rho;
+    if(lambda >= multiplier*latent_heat) {//DETECTED PHASE TRANSITION
+      double dlam = GetDeltaLambda(v[0], lambda, dt);
+      e      += dlam/multiplier;
       lambda -= dlam;
       v[4] = vf2.GetPressure(v[0], e);
       if(delta_lam)

@@ -60,14 +60,10 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
         exit_mpi();
       }
 
-      if(it->second->kinetics == MaterialTransitionData::CONSTANT) {
+      if(it->second->kinetics == MaterialTransitionData::CONSTANT)
         trans[i].push_back(new PhaseTransitionConstRate(*it->second, *varFcn[i], *varFcn[j]));
-//        print("ooo creating constant trans[%d].\n", i);
-      }
-      else {
+      else
         trans[i].push_back(new PhaseTransitionBase(*it->second, *varFcn[i], *varFcn[j]));
-//        print("ooo creating none trans[%d].\n", i);
-      }
 
       if(trans_reverse[j] != -1) {
         print_error("*** Error: Cannot handle multiple materials transferring to the same material.\n");
@@ -89,8 +85,8 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
           }
         }
         if(!found) {
-          print_error("*** Error: Phase transitions involve material ID %d, but a level set solver is not specified.\n",
-                      i);
+          print_error("*** Error: Phase transitions involve material ID %d, but a level set solver "
+                      "is not specified.\n", i);
           exit_mpi();
         }
       }
@@ -103,8 +99,8 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
           }
         }
         if(!found) {
-          print_error("*** Error: Phase transitions involve material ID %d, but a level set solver is not specified.\n",
-                      j);
+          print_error("*** Error: Phase transitions involve material ID %d, but a level set solver "
+                      "is not specified.\n", j);
           exit_mpi();
         }
       }
@@ -122,6 +118,19 @@ MultiPhaseOperator::MultiPhaseOperator(MPI_Comm &comm_, DataManagers3D &dm_all_,
       print_error("*** Error: Cannot handle one phase transferring to multiple other phases at this moment.\n");
       exit_mpi();
     }
+
+  //check to make sure all phase transitions adopt the same physical dimension for 'lambda'
+  std::set<MaterialTransitionData::StoredEnergyBasis> lam_basis_all; //should be consistent among all
+  for(auto&& tran : trans)
+    for(auto&& tr : tran)
+      lam_basis_all.insert(tr->GetStoredEnergyBasis());
+  if(lam_basis_all.size()>1) {
+    print_error("*** Error: Detected inconsistent physical dimensions (unit mass or unit volume) "
+                "in phase transition settings.\n");
+    exit_mpi();
+  } else if(lam_basis_all.size()==1)
+    lam_basis = *lam_basis_all.begin();
+    
 
   //Debug only
   lam_transitioned = lam_transitioned_new = 0.0;
@@ -1039,15 +1048,8 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
         }
 
         //-------------------------------------------------------------------------------------
-        if(lam && lam[k][j][i]>0.0) {
-          double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-            v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-          }
-          lam[k][j][i] = 0.0;
-          lambda_updated = 1;
-        } 
+        if(lam)
+          lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
         //-------------------------------------------------------------------------------------
 
       }  
@@ -1058,7 +1060,7 @@ MultiPhaseOperator::UpdateStateVariablesByRiemannSolutions(SpaceVariable3D &IDn,
   IDn.RestoreDataPointerToLocalVector();
 
   if(lam) {
-    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_MAX, comm);
+    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_SUM, comm);
     if(lambda_updated>0)
       Lambda.RestoreDataPointerAndInsert();
     else
@@ -1305,24 +1307,8 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
           if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
             double e0 = idn[k][j][i]==INACTIVE_MATERIAL_ID ? 0.0 :
                         varFcn[idn[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-
-//            fprintf(stdout,"i=%d: (before) idn(%d) %e %e %e %e | lam = %e\n",
-//                    i, (int)idn[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e0, lam[k][j][i]);
-
             v[k][j][i] = vsum/sum_weight; 
-
-            double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-//            fprintf(stdout,"i=%d: (after) id(%d) %e %e %e %e\n",
-//                    i, (int)id[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e);
-
-            if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-              e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-              v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-//              fprintf(stdout,"i=%d: (replenished) %e %e\n", i, v[k][j][j][4], e);
-            }
-
-            lam[k][j][i] = 0.0;
-            lambda_updated = 1; //i.e., true
+            lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
           }
           else
             v[k][j][i] = vsum/sum_weight; 
@@ -1335,7 +1321,7 @@ MultiPhaseOperator::UpdateStateVariablesByExtrapolation(SpaceVariable3D &IDn,
   coordinates.RestoreDataPointerToLocalVector();
 
   if(lam) {
-    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_MAX, comm);
+    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_SUM, comm);
     if(lambda_updated>0)
       Lambda.RestoreDataPointerAndInsert();
     else
@@ -1407,24 +1393,8 @@ MultiPhaseOperator::UpdateStateVariablesByConservation(SpaceVariable3D &IDn,
                                                  cleared_x, cleared_y, cleared_z);
         if(updated) {
 
-          if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
-
-//            fprintf(stdout,"i=%d: (before) idn(%d) %e %e %e %e | lam = %e\n",
-//                    i, (int)idn[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e0, lam[k][j][i]);
-
-            double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-//            fprintf(stdout,"i=%d: (after) id(%d) %e %e %e %e\n",
-//                    i, (int)id[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e);
-
-            if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-              e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-              v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-//              fprintf(stdout,"i=%d: (replenished) %e %e\n", i, v[k][j][j][4], e);
-            }
-
-            lam[k][j][i] = 0.0;
-            lambda_updated = 1; //i.e., true
-          }
+          if(lam)
+            lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
 
           continue; //done :)
         }
@@ -1504,28 +1474,10 @@ MultiPhaseOperator::UpdateStateVariablesByConservation(SpaceVariable3D &IDn,
           unresolved.push_back(Int3(k,j,i)); //note the order: k,j,i          
         }
         else {
-          if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
+          v[k][j][i] = vsum/sum_weight; 
 
-//            fprintf(stdout,"i=%d: (before) idn(%d) %e %e %e %e | lam = %e\n",
-//                    i, (int)idn[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e0, lam[k][j][i]);
-
-            v[k][j][i] = vsum/sum_weight; 
-
-            double e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-//            fprintf(stdout,"i=%d: (after) id(%d) %e %e %e %e\n",
-//                    i, (int)id[k][j][i], v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], e);
-
-            if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-              e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-              v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-//              fprintf(stdout,"i=%d: (replenished) %e %e\n", i, v[k][j][j][4], e);
-            }
-
-            lam[k][j][i] = 0.0;
-            lambda_updated = 1; //i.e., true
-          }
-          else
-            v[k][j][i] = vsum/sum_weight; 
+          if(lam && lam[k][j][i]>0.0) //may need to add lambda to e
+            lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
         }
       }
 
@@ -1538,7 +1490,7 @@ MultiPhaseOperator::UpdateStateVariablesByConservation(SpaceVariable3D &IDn,
 
 
   if(lam) {
-    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_MAX, comm);
+    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_SUM, comm);
     if(lambda_updated>0)
       Lambda.RestoreDataPointerAndInsert();
     else
@@ -1736,7 +1688,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
     bool reset = false; //whether v[k][j][i] has been reset
 
-    double e0(0.0), e(0.0);  //may need to replenish e
+    double e0(0.0); //may need to replenish e
     if(lam && lam[k][j][i]>0.0 && idn[k][j][i]!=INACTIVE_MATERIAL_ID)
       e0 = varFcn[idn[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
 
@@ -1819,16 +1771,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
         v[k][j][i] /= sum_weight; //Done!
 
-        if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
-          e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-            v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-          }
-
-          lam[k][j][i] = 0.0;
-          lambda_updated = 1; //i.e., true
-        }
+        if(lam) 
+          lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
 
         if(verbose>1)
           fprintf(stdout,"*** Node (%d,%d,%d): Updated state variables by extrapolation w/ upwinding. "
@@ -1842,17 +1786,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
 
       v[k][j][i] = vtmp/sum_weight2; //Done!
 
-      if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
-        e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-        if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-          e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-          v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-        }
-
-        lam[k][j][i] = 0.0;
-        lambda_updated = 1; //i.e., true
-      }
-
+      if(lam)
+        lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
 
       if(verbose>1)
         fprintf(stdout,"*** Node (%d,%d,%d): Updated state variables by extrapolation w/o "
@@ -1920,16 +1855,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
       if(sum_weight>0) {
         v[k][j][i][0] = density/sum_weight;
 
-        if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
-          e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-            v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-          }
-
-          lam[k][j][i] = 0.0;
-          lambda_updated = 1; //i.e., true
-        }
+        if(lam)
+          lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
 
         if(verbose>1)
           fprintf(stdout,"*** (%d,%d,%d): Updated density by interpolation w/ stencil width = "
@@ -1956,17 +1883,8 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
                        (int)id[k][j][i], max_layer);
         v[k][j][i][0] = varFcn[id[k][j][i]]->failsafe_density;
 
-        if(lam && lam[k][j][i]>0.0) { //may need to add lambda to e
-          e = varFcn[id[k][j][i]]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-          if(e < e0 + lam[k][j][i]/v[k][j][i][0]) {
-            e = e0 + lam[k][j][i]/v[k][j][i][0]; //replenish
-            v[k][j][i][4] = varFcn[id[k][j][i]]->GetPressure(v[k][j][i][0], e);
-          }
-
-          lam[k][j][i] = 0.0;
-          lambda_updated = 1; //i.e., true
-        }
-
+        if(lam)
+          lambda_updated += ReplenishInternalEnergyWithLambda(v[k][j][i], id[k][j][i], e0, lam[k][j][i]);
       }
       else { //id[k][j][i] = 0 && not applying failsafe
         fprintf(stdout,"\033[0;35mWarning: Updating phase change at (%d,%d,%d)(%e,%e,%e). "
@@ -1992,7 +1910,7 @@ MultiPhaseOperator::FixUnresolvedNodes(vector<Int3> &unresolved, SpaceVariable3D
   coordinates.RestoreDataPointerToLocalVector();
 
   if(lam) {
-    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_MAX, comm);
+    MPI_Allreduce(MPI_IN_PLACE, &lambda_updated, 1, MPI_INT, MPI_SUM, comm);
     if(lambda_updated>0)
       Lambda.RestoreDataPointerAndInsert();
     else
@@ -2592,11 +2510,11 @@ MultiPhaseOperator::AddLambdaToInternalEnergyAfterInterfaceMotion(double dt,
           //---------------------------------------------------------------------
           // Now, do the actual work: Add delta lam to internal energy
           double delta_lam = 0.0;
-          double internal_e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-	  fprintf(stdout,"%d - [before]: %e %e %e | %e | lam = %e\n", i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], internal_e, lam[k][j][i]);
+          //double internal_e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+	  //fprintf(stdout,"%d - [before]: %e %e %e | %e | lam = %e\n", i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], internal_e, lam[k][j][i]);
           (*it)->DepositDeltaLambdaAfterTransition(v[k][j][i], lam[k][j][i], dt, &delta_lam);
-          internal_e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
-	  fprintf(stdout,"%d - [after]: %e %e %e | %e | lam = %e\n", i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], internal_e, lam[k][j][i]);
+          //internal_e = varFcn[myid]->GetInternalEnergyPerUnitMass(v[k][j][i][0], v[k][j][i][4]);
+	  //fprintf(stdout,"%d - [after]: %e %e %e | %e | lam = %e\n", i, v[k][j][i][0], v[k][j][i][1], v[k][j][i][4], internal_e, lam[k][j][i]);
           lam_dumped_new += global_mesh.GetCellVolume(i,j,k,true)*delta_lam;
           counter++;
           //---------------------------------------------------------------------
@@ -2875,6 +2793,25 @@ MultiPhaseOperator::IsOrphanAcrossEmbeddedSurfaces(int i, int j, int k, double**
 
   return true;
 
+}
+
+//-----------------------------------------------------
+
+bool
+MultiPhaseOperator::ReplenishInternalEnergyWithLambda(Vec5D &v, int id, double e0, double& lam)
+{
+  if(lam<=0.0)
+    return false;
+
+  double e = varFcn[id]->GetInternalEnergyPerUnitMass(v[0], v[4]);
+  double denom = (lam_basis==MaterialTransitionData::UNIT_MASS) ? 1.0 : v[0];
+  if(e < e0 + lam/denom) {
+    e = e0 + lam/denom; //replenish
+    v[4] = varFcn[id]->GetPressure(v[0], e);
+  }
+  
+  lam = 0.0; 
+  return true; //lam is always changed to 0
 }
 
 //-----------------------------------------------------

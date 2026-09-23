@@ -1206,6 +1206,8 @@ MaterialTransitionData::MaterialTransitionData()
 
   latent_heat = 0.0;
 
+  stored_energy_basis = UNIT_MASS;
+
   kinetics = NONE;
 }
 
@@ -1214,7 +1216,7 @@ MaterialTransitionData::MaterialTransitionData()
 Assigner *MaterialTransitionData::getAssigner()
 {
 
-  ClassAssigner *ca = new ClassAssigner("normal", 9, nullAssigner);
+  ClassAssigner *ca = new ClassAssigner("normal", 10, nullAssigner);
 
   new ClassInt<MaterialTransitionData>(ca, "FromMaterialID", this, 
           &MaterialTransitionData::from_id);
@@ -1236,6 +1238,10 @@ Assigner *MaterialTransitionData::getAssigner()
 
   new ClassDouble<MaterialTransitionData>(ca, "LatentHeat", this, 
           &MaterialTransitionData::latent_heat);
+
+  new ClassToken<MaterialTransitionData>(ca, "StoredEnergyBasis", this,
+          reinterpret_cast<int MaterialTransitionData::*>(&MaterialTransitionData::stored_energy_basis), 2,
+          "UnitMass", MaterialTransitionData::UNIT_MASS, "UnitVolume", MaterialTransitionData::UNIT_VOLUME);
 
   new ClassToken<MaterialTransitionData>(ca, "KineticsModel", this,
           reinterpret_cast<int MaterialTransitionData::*>(&MaterialTransitionData::kinetics), 2,

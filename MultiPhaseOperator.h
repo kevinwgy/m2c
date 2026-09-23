@@ -58,9 +58,10 @@ class MultiPhaseOperator
   vector<int> trans_reverse; //!< trans_reverse[i] contains the origin MatID (cannot have >1 origins for now!)
   double lam_transitioned, lam_dumped; //!< output only (can be improved to distinguish different transitions)
   double lam_transitioned_new, lam_dumped_new;
+  MaterialTransitionData::StoredEnergyBasis lam_basis; //!< 0: per unit mass, 1: per unit volume
 
   //! latent heat reservoir (for modeling phase transition)
-  SpaceVariable3D Lambda;
+  SpaceVariable3D Lambda; //unit mass or unit volume, depending on iod.eqs.transitions...stored_energy_basis
 
 
 public:
@@ -179,6 +180,9 @@ protected:
   //! internal function called by ResolveConflictsWithEmbeddedSurfaces
   bool IsOrphanAcrossEmbeddedSurfaces(int i, int j, int k, double*** idn, double*** id,
                                       vector<Intersector*> *intersector);
+
+  //! internal function --- treatment of stored latent heat (lambda); Used only w/ 'Replenish' option
+  bool ReplenishInternalEnergyWithLambda(Vec5D &v, int id, double e0, double& lam); //!< lam always set to 0
 };
 
 #endif
